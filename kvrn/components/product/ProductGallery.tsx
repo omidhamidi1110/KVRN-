@@ -6,159 +6,116 @@ import { cn } from '@/lib/utils'
 import type { ProductImage } from '@/types'
 
 interface ProductGalleryProps {
-  images:     ProductImage[]
+  images:      ProductImage[]
   productName: string
-  colorName:  string
+  colorName:   string
 }
 
-export function ProductGallery({
-  images,
-  productName,
-  colorName,
-}: ProductGalleryProps) {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const touchStartX  = useRef<number | null>(null)
-  const galleryRef   = useRef<HTMLDivElement>(null)
+export function ProductGallery({ images, productName, colorName }: ProductGalleryProps) {
+  const [active, setActive] = useState(0)
+  const touchStart = useRef<number | null>(null)
 
-  // Reset to first image when images array changes (color switch)
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [images])
+  useEffect(() => { setActive(0) }, [images])
 
-  // Touch/swipe handlers for mobile
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX
+    touchStart.current = e.touches[0].clientX
   }, [])
 
-  const onTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
-      if (touchStartX.current === null) return
-      const delta = e.changedTouches[0].clientX - touchStartX.current
-      const threshold = 50
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStart.current === null) return
+    const delta = e.changedTouches[0].clientX - touchStart.current
+    if (delta < -50 && active < images.length - 1) setActive(i => i + 1)
+    if (delta >  50 && active > 0)                 setActive(i => i - 1)
+    touchStart.current = null
+  }, [active, images.length])
 
-      if (delta < -threshold && activeIndex < images.length - 1) {
-        setActiveIndex((i) => i + 1)
-      } else if (delta > threshold && activeIndex > 0) {
-        setActiveIndex((i) => i - 1)
-      }
-      touchStartX.current = null
-    },
-    [activeIndex, images.length]
-  )
+  const onKey = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowRight' && active < images.length - 1) setActive(i => i + 1)
+    if (e.key === 'ArrowLeft'  && active > 0)                 setActive(i => i - 1)
+  }, [active, images.length])
 
-  // Keyboard navigation
-  const onKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'ArrowRight' && activeIndex < images.length - 1) {
-        setActiveIndex((i) => i + 1)
-      } else if (e.key === 'ArrowLeft' && activeIndex > 0) {
-        setActiveIndex((i) => i - 1)
-      }
-    },
-    [activeIndex, images.length]
-  )
-
-  const activeImage = images[activeIndex]
+  const current = images[active]
 
   return (
-    <div className="flex flex-col gap-3" ref={galleryRef}>
-      {/* ─── Main Image ─── */}
+    <div className="flex flex-col gap-3">
+
+      {/* Main image */}
       <div
         role="region"
-        aria-label={`${productName} product images`}
-        aria-roledescription="image gallery"
+        aria-label={`${productName} images`}
         tabIndex={0}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        onKeyDown={onKeyDown}
-        className="relative aspect-[3/4] bg-kvrn-bg-raised overflow-hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-kvrn-text"
+        onKeyDown={onKey}
+        className="relative aspect-[3/4] bg-[var(--color-bg-raised)] overflow-hidden select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-text)]"
       >
-        {activeImage ? (
+        {current?.src ? (
           <Image
-            key={`${activeImage.src}-${activeIndex}`}
-            src={activeImage.src}
-            alt={activeImage.alt}
+            key={current.src}
+            src={current.src}
+            alt={current.alt}
             fill
+            priority={active === 0}
             sizes="(max-width: 1024px) 100vw, 55vw"
-            className="object-cover"
-            priority={activeIndex === 0}
-            quality={90}
+            className="object-cover transition-opacity duration-300"
+            quality={92}
           />
         ) : (
-          /* Placeholder when real images not added yet */
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-kvrn-bg-raised">
-            <div
-              className="w-16 h-16 rounded-full opacity-20"
-              style={{ backgroundColor: '#C8B89A' }}
-            />
-            <p className="label-11 text-kvrn-subtle text-center px-4">
-              {productName}<br />{colorName}
-              <br /><br />
-              Add product images to<br />
-              /public/images/products/
+          /* Clean color-tinted placeholder — no instructional text */
+          <div
+            className="absolute inset-0 flex items-end p-6"
+            style={{ background: 'linear-gradient(145deg, #F2EFE9 0%, #E8E4DC 100%)' }}
+          >
+            <p className="kvrn-label text-[var(--color-subtle)]">
+              {productName} — {colorName}
             </p>
           </div>
         )}
 
         {/* Mobile dot indicators */}
-        <div
-          className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 md:hidden"
-          aria-hidden="true"
-        >
-          {images.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveIndex(i)}
-              className={cn(
-                'w-1 h-1 rounded-full transition-all duration-200',
-                i === activeIndex ? 'bg-kvrn-text w-3' : 'bg-kvrn-muted/50'
-              )}
-            />
-          ))}
-        </div>
+        {images.length > 1 && (
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 md:hidden" aria-hidden="true">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActive(i)}
+                className={cn(
+                  'rounded-full transition-all duration-200',
+                  i === active
+                    ? 'w-4 h-1 bg-[var(--color-text)]'
+                    : 'w-1 h-1 bg-[var(--color-text)]/30'
+                )}
+              />
+            ))}
+          </div>
+        )}
 
-        {/* Screen reader navigation */}
         <span className="sr-only" aria-live="polite">
-          Image {activeIndex + 1} of {images.length}: {activeImage?.alt}
+          Image {active + 1} of {images.length}{current ? `: ${current.alt}` : ''}
         </span>
       </div>
 
-      {/* ─── Thumbnail Strip — desktop only ─── */}
+      {/* Thumbnails — desktop only */}
       {images.length > 1 && (
-        <div
-          className="hidden md:flex gap-2 overflow-x-auto scrollbar-thin pb-1"
-          aria-label="Image thumbnails"
-          role="list"
-        >
+        <div className="hidden md:flex gap-2 overflow-x-auto scrollbar-thin pb-1" aria-label="Image thumbnails">
           {images.map((img, i) => (
             <button
-              key={img.src + i}
-              onClick={() => setActiveIndex(i)}
-              role="listitem"
-              aria-label={`View image ${i + 1}: ${img.alt}`}
-              aria-current={i === activeIndex}
+              key={i}
+              onClick={() => setActive(i)}
+              aria-label={`View image ${i + 1}${img.alt ? `: ${img.alt}` : ''}`}
+              aria-current={i === active}
               className={cn(
-                'relative flex-shrink-0 w-[72px] h-[96px] overflow-hidden',
-                'bg-kvrn-bg-raised transition-all duration-150',
-                i === activeIndex
-                  ? 'ring-1 ring-kvrn-text ring-offset-1'
-                  : 'opacity-60 hover:opacity-100'
+                'relative flex-shrink-0 w-[68px] h-[90px] overflow-hidden bg-[var(--color-bg-raised)]',
+                'transition-all duration-150',
+                i === active
+                  ? 'ring-1 ring-[var(--color-text)]'
+                  : 'opacity-50 hover:opacity-80'
               )}
             >
               {img.src ? (
-                <Image
-                  src={img.src}
-                  alt=""
-                  fill
-                  sizes="72px"
-                  className="object-cover"
-                />
+                <Image src={img.src} alt="" fill sizes="68px" className="object-cover" />
               ) : (
-                <div className="absolute inset-0 bg-kvrn-bg-raised flex items-center justify-center">
-                  <span className="text-[9px] label-11 text-kvrn-subtle text-center px-1">
-                    {i + 1}
-                  </span>
-                </div>
+                <div className="absolute inset-0 bg-[var(--color-bg-raised)]" />
               )}
             </button>
           ))}

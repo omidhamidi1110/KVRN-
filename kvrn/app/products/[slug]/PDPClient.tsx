@@ -9,9 +9,8 @@ import { ColorSelector } from '@/components/product/ColorSelector'
 import { SizeSelector } from '@/components/product/SizeSelector'
 import { Accordion } from '@/components/ui/Accordion'
 import { Button } from '@/components/ui/Button'
-import { ProductCard } from '@/components/product/ProductCard'
 import { formatPrice } from '@/data/products'
-import { cn, scrollToElement } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import type { ColorOption, SizeLabel, Product } from '@/types'
 
 interface PDPClientProps {
@@ -28,50 +27,38 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
   const [addState,      setAddState]      = useState<'idle' | 'loading' | 'added'>('idle')
   const [stickyVisible, setStickyVisible] = useState(false)
 
-  const addButtonRef = useRef<HTMLButtonElement>(null)
-  const sizeSectionRef = useRef<HTMLDivElement>(null)
+  const addBtnRef    = useRef<HTMLButtonElement>(null)
+  const sizePanelRef = useRef<HTMLDivElement>(null)
 
-  // Current images for selected color
-  const currentImages = selectedColor.images
+  // Reset selected image index when color changes
+  const [, setColorKey] = useState(0)
 
-  // Detect when add-to-bag button leaves viewport → show sticky
+  // Sticky CTA detection
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => setStickyVisible(!entry.isIntersecting),
+    const obs = new IntersectionObserver(
+      ([e]) => setStickyVisible(!e.isIntersecting),
       { threshold: 0, rootMargin: '-80px 0px 0px 0px' }
     )
-    if (addButtonRef.current) observer.observe(addButtonRef.current)
-    return () => observer.disconnect()
+    if (addBtnRef.current) obs.observe(addBtnRef.current)
+    return () => obs.disconnect()
   }, [])
 
   const handleColorChange = useCallback((color: ColorOption) => {
     setSelectedColor(color)
-    // If selected size is OOS in new color — reset (all colors share same size availability for now)
-    // In a real multi-variant system you'd check per-color stock
+    setColorKey(k => k + 1)
   }, [])
 
   const handleAddToCart = useCallback(async () => {
-    // Validate size selection
     if (!selectedSize) {
       setSizeError(true)
-      // Scroll to size selector and pulse it
-      const sizeEl = sizeSectionRef.current
-      if (sizeEl) {
-        sizeEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        sizeEl.classList.add('animate-attention-pulse')
-        setTimeout(() => sizeEl.classList.remove('animate-attention-pulse'), 800)
-      }
+      sizePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-
     setSizeError(false)
     setAddState('loading')
+    await new Promise(r => setTimeout(r, 350))
 
-    // Simulate async (replace with real stock check if needed)
-    await new Promise((r) => setTimeout(r, 400))
-
-    const frontImage = selectedColor.images.find((i) => i.type === 'front')
-
+    const frontImg = selectedColor.images.find(i => i.type === 'front')
     addItem({
       productId:   product.id,
       productName: product.name,
@@ -82,25 +69,23 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       size:        selectedSize,
       price:       product.price,
       quantity:    1,
-      image:       frontImage?.src ?? '',
+      image:       frontImg?.src ?? '',
     })
-
     setAddState('added')
-    setTimeout(() => setAddState('idle'), 2000)
+    setTimeout(() => setAddState('idle'), 2200)
     openCart()
   }, [selectedSize, selectedColor, product, addItem, openCart])
 
-  // Accordion content
   const accordionItems = [
     {
       id: 'construction',
-      trigger: 'The Construction',
+      trigger: 'Construction',
       content: (
-        <div className="space-y-4">
-          {product.features.map((feat) => (
-            <div key={feat.title}>
-              <p className="text-[13px] font-light text-kvrn-text mb-0.5">{feat.title}</p>
-              <p className="text-[13px] text-kvrn-muted leading-relaxed">{feat.description}</p>
+        <div className="space-y-5">
+          {product.features.map(f => (
+            <div key={f.title}>
+              <p className="text-[13px] font-light text-[var(--color-text)] mb-1">{f.title}</p>
+              <p className="text-[13px] font-light text-[var(--color-muted)] leading-relaxed">{f.description}</p>
             </div>
           ))}
         </div>
@@ -110,11 +95,11 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       id: 'specifications',
       trigger: 'Specifications',
       content: (
-        <dl className="space-y-2">
-          {product.specs.map((spec) => (
-            <div key={spec.label} className="flex gap-4">
-              <dt className="text-[13px] font-light text-kvrn-text min-w-[110px]">{spec.label}</dt>
-              <dd className="text-[13px] text-kvrn-muted">{spec.value}</dd>
+        <dl className="space-y-2.5">
+          {product.specs.map(s => (
+            <div key={s.label} className="flex gap-6">
+              <dt className="text-[13px] font-light text-[var(--color-text)] min-w-[110px] flex-shrink-0">{s.label}</dt>
+              <dd className="text-[13px] font-light text-[var(--color-muted)]">{s.value}</dd>
             </div>
           ))}
         </dl>
@@ -122,14 +107,13 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
     },
     {
       id: 'shipping',
-      trigger: 'Shipping & Delivery',
+      trigger: 'Shipping',
       content: (
-        <div className="space-y-2 text-[13px] text-kvrn-muted">
-          <p><span className="text-kvrn-text font-light">UK Standard</span> — 3–5 business days, £4.99</p>
-          <p><span className="text-kvrn-text font-light">UK Express</span> — 1–2 business days, £9.99</p>
-          <p><span className="text-kvrn-text font-light">Europe</span> — 5–10 business days, £14.99</p>
-          <p><span className="text-kvrn-text font-light">USA / Canada</span> — 7–14 business days, £19.99</p>
-          <p className="pt-2">Orders placed before 1pm GMT ship same day. Tracking included with every order.</p>
+        <div className="space-y-2 text-[13px] font-light text-[var(--color-muted)]">
+          <p><span className="text-[var(--color-text)]">USA Standard</span> — 5–7 business days, $8</p>
+          <p><span className="text-[var(--color-text)]">USA Express</span> — 2–3 business days, $18</p>
+          <p><span className="text-[var(--color-text)]">International</span> — 7–14 business days, from $22</p>
+          <p className="pt-2">Orders before 1pm EST ship same day. Tracked delivery included.</p>
         </div>
       ),
     },
@@ -137,148 +121,127 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       id: 'returns',
       trigger: 'Returns',
       content: (
-        <div className="space-y-3 text-[13px] text-kvrn-muted">
-          <p>30-day returns accepted on unworn, unwashed items with tags attached.</p>
-          <p>
-            To start a return visit{' '}
-            <Link href="/support/shipping-returns" className="text-kvrn-text underline underline-offset-2">
-              our returns page
-            </Link>
-            . We&apos;ll email a prepaid label within 24 hours.
-          </p>
+        <div className="space-y-3 text-[13px] font-light text-[var(--color-muted)]">
+          <p>30-day returns on unworn, unwashed items with original tags attached.</p>
+          <p>Email <a href="mailto:hello@kvrn.com" className="text-[var(--color-text)] underline underline-offset-2">hello@kvrn.com</a> with your order number to initiate. Prepaid label for US returns.</p>
           <p>Refunds processed within 5–10 business days of receipt.</p>
         </div>
       ),
     },
   ]
 
-  const addButtonLabel =
-    addState === 'added'
-      ? 'Added ✓'
-      : addState === 'loading'
-      ? 'Adding...'
-      : selectedSize
-      ? `Add to bag — ${formatPrice(product.price)}`
-      : 'Select a size'
+  const btnLabel =
+    addState === 'added'   ? 'Added ✓' :
+    addState === 'loading' ? '' :
+    `Add to bag — ${formatPrice(product.price)}`
 
   return (
     <>
-      {/* ─── Breadcrumb ─── */}
-      <nav aria-label="Breadcrumb" className="container-kvrn pt-[calc(56px+24px)] pb-4">
-        <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
-          <li><Link href="/" className="hover:text-kvrn-text transition-colors">Home</Link></li>
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="kvrn-container pt-[calc(60px+20px)] pb-4">
+        <ol className="flex items-center gap-2 text-[11px] font-light text-[var(--color-muted)] tracking-wide">
+          <li><Link href="/" className="hover:text-[var(--color-text)] transition-colors">Home</Link></li>
           <li aria-hidden="true">·</li>
-          <li><Link href="/shop" className="hover:text-kvrn-text transition-colors">Shop</Link></li>
+          <li><Link href="/shop" className="hover:text-[var(--color-text)] transition-colors">Collection</Link></li>
           <li aria-hidden="true">·</li>
-          <li className="text-kvrn-text" aria-current="page">{product.name}</li>
+          <li className="text-[var(--color-text)]" aria-current="page">{product.name}</li>
         </ol>
       </nav>
 
-      {/* ─── Main PDP Layout ─── */}
-      <div className="container-kvrn pb-24">
+      {/* Main PDP layout */}
+      <div className="kvrn-container pb-24 md:pb-32">
         <div className="grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-8 lg:gap-16 items-start">
 
-          {/* ─── LEFT: Gallery ─── */}
-          <div className="lg:sticky lg:top-[72px]">
+          {/* Gallery */}
+          <div className="lg:sticky lg:top-[76px]">
             <ProductGallery
-              images={currentImages}
+              images={selectedColor.images}
               productName={product.name}
               colorName={selectedColor.name}
             />
           </div>
 
-          {/* ─── RIGHT: Product info panel ─── */}
+          {/* Product panel */}
           <div className="space-y-6">
-            {/* Name + Price */}
+
+            {/* Name + price */}
             <div>
-              <p className="label-11 mb-2">KVRN</p>
-              <h1 className="font-display font-light text-[28px] md:text-[32px] leading-tight tracking-tight">
+              <p className="kvrn-label mb-2">KVRN</p>
+              <h1 className="text-[28px] md:text-[34px] font-light leading-tight tracking-tight">
                 {product.name}
               </h1>
-              <div className="flex items-baseline gap-3 mt-2">
-                <p className="text-[18px] font-light">{formatPrice(product.price)}</p>
-                <p className="text-[12px] text-kvrn-muted">incl. VAT</p>
+              <div className="flex items-baseline gap-3 mt-3">
+                <p className="text-[20px] font-light">{formatPrice(product.price)}</p>
+                <p className="text-[12px] font-light text-[var(--color-muted)]">USD, incl. tax</p>
               </div>
             </div>
 
-            <div className="rule" />
+            <div className="kvrn-rule" />
 
-            {/* Color selector */}
+            {/* Color */}
             <ColorSelector
               colors={product.colors}
               selectedColor={selectedColor.value}
               onChange={handleColorChange}
             />
 
-            <div className="rule" />
+            <div className="kvrn-rule" />
 
-            {/* Size selector */}
-            <div ref={sizeSectionRef}>
+            {/* Size */}
+            <div ref={sizePanelRef}>
               <SizeSelector
                 sizes={product.sizes}
                 selectedSize={selectedSize}
-                onChange={(size) => { setSelectedSize(size); setSizeError(false) }}
+                onChange={s => { setSelectedSize(s); setSizeError(false) }}
                 hasError={sizeError}
               />
               {product.fitNote && (
-                <p className="text-[12px] text-kvrn-muted mt-3 leading-relaxed">
+                <p className="text-[12px] font-light text-[var(--color-muted)] mt-3">
                   {product.fitNote}
                 </p>
               )}
             </div>
 
-            <div className="rule" />
+            <div className="kvrn-rule" />
 
-            {/* Add to bag */}
+            {/* Add to bag + express */}
             <div className="space-y-3">
               <Button
-                ref={addButtonRef}
+                ref={addBtnRef}
                 variant="primary"
                 size="lg"
                 fullWidth
                 onClick={handleAddToCart}
                 loading={addState === 'loading'}
-                className={cn(addState === 'added' && 'bg-kvrn-success border-kvrn-success hover:bg-kvrn-success')}
-                aria-label={addButtonLabel}
+                className={cn(addState === 'added' && 'bg-[var(--color-success)] border-[var(--color-success)]')}
               >
-                {addButtonLabel}
+                {btnLabel}
               </Button>
-
-              {/* Express checkout placeholder
-                  Replace with actual Stripe Payment Request Button in checkout page */}
-              <div
-                className="flex gap-3"
-                aria-label="Express checkout options"
-              >
-                <button
-                  className="flex-1 h-12 border border-kvrn-border text-[11px] tracking-widest text-kvrn-muted hover:border-kvrn-border-strong hover:text-kvrn-text transition-colors duration-150"
-                  aria-label="Pay with Apple Pay"
-                  disabled
-                  title="Available at checkout"
-                >
-                   Pay
-                </button>
-                <button
-                  className="flex-1 h-12 border border-kvrn-border text-[11px] tracking-widest text-kvrn-muted hover:border-kvrn-border-strong hover:text-kvrn-text transition-colors duration-150"
-                  aria-label="Pay with Google Pay"
-                  disabled
-                  title="Available at checkout"
-                >
-                  G Pay
-                </button>
+              <div className="grid grid-cols-2 gap-3" aria-label="Express checkout">
+                {[' Pay', 'G Pay'].map(label => (
+                  <button
+                    key={label}
+                    className="h-12 border border-[var(--color-border)] text-[12px] font-light text-[var(--color-muted)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)] transition-all duration-150"
+                    aria-label={`${label} — available at checkout`}
+                    disabled
+                    title="Available at checkout"
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Trust signals */}
-            <ul className="space-y-2" aria-label="Delivery and returns information">
+            <ul className="space-y-2.5" aria-label="Shipping and returns">
               {[
                 'Ships in 3–5 business days',
                 'Free returns within 30 days',
-                'Tracked delivery, every order',
-              ].map((line) => (
-                <li key={line} className="flex items-center gap-2 text-[13px] text-kvrn-muted">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                'Tracked delivery on every order',
+              ].map(line => (
+                <li key={line} className="flex items-center gap-2.5 text-[13px] font-light text-[var(--color-muted)]">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                    <path d="M2 6.5l3 3 6-6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                   {line}
                 </li>
@@ -290,101 +253,66 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
           </div>
         </div>
 
-        {/* ─── Construction callouts ─── */}
-        <section className="mt-20 md:mt-32" aria-labelledby="construction-heading">
-          <p id="construction-heading" className="label-11 mb-8 md:mb-12 text-center">
-            The Construction
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-            {product.features.map((feat) => (
-              <div
-                key={feat.title}
-                className="border border-kvrn-border p-5 md:p-6 space-y-3"
-              >
-                <p className="text-[11px] font-light tracking-widest uppercase text-kvrn-text">
-                  {feat.title}
-                </p>
-                <p className="text-[13px] text-kvrn-muted leading-relaxed">
-                  {feat.description}
-                </p>
+        {/* ─── Construction details ─── */}
+        <section className="mt-20 md:mt-32 pt-12 md:pt-16 border-t border-[var(--color-border)]" aria-labelledby="pdp-construction">
+          <p id="pdp-construction" className="kvrn-label mb-8 md:mb-12">Construction</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {product.features.map(f => (
+              <div key={f.title} className="border border-[var(--color-border)] p-5 md:p-6 space-y-3">
+                <p className="text-[11px] font-light tracking-[0.12em] uppercase">{f.title}</p>
+                <p className="text-[13px] font-light text-[var(--color-muted)] leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ─── Complete the Set ─── */}
+        {/* ─── Complete the set ─── */}
         {relatedProduct && (
-          <section className="mt-20 md:mt-32" aria-labelledby="set-heading">
-            <div className="border-t border-kvrn-border pt-12 md:pt-16">
-              <p id="set-heading" className="label-11 mb-8 md:mb-12">
-                Complete the Set
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 md:gap-16 items-center">
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Current product mini card */}
-                  <div className="relative aspect-[3/4] bg-kvrn-bg-raised overflow-hidden">
-                    <Image
-                      src={selectedColor.images[0]?.src ?? ''}
-                      alt={product.name}
-                      fill
-                      className="object-cover"
-                      sizes="200px"
-                    />
-                    {!selectedColor.images[0]?.src && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="label-11 text-kvrn-subtle text-center px-2">
-                          {product.name}
-                        </span>
-                      </div>
+          <section className="mt-20 md:mt-32 pt-12 md:pt-16 border-t border-[var(--color-border)]" aria-labelledby="complete-set">
+            <p id="complete-set" className="kvrn-label mb-8 md:mb-12">Complete the set</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 md:gap-16 items-center max-w-2xl">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Current + related thumbnails */}
+                {[selectedColor.images[0], (() => {
+                  const matchingColor = relatedProduct.colors.find(c => c.value === selectedColor.value)
+                  return (matchingColor ?? relatedProduct.colors[0]).images[0]
+                })()].map((img, i) => (
+                  <div key={i} className="relative aspect-[3/4] bg-[var(--color-bg-raised)] overflow-hidden">
+                    {img?.src ? (
+                      <Image src={img.src} alt={img.alt} fill sizes="200px" className="object-cover" />
+                    ) : (
+                      <div
+                        className="absolute inset-0"
+                        style={{ background: i === 0 ? selectedColor.hex + '30' : (relatedProduct.colors.find(c => c.value === selectedColor.value) ?? relatedProduct.colors[0]).hex + '30' }}
+                      />
                     )}
                   </div>
-                  {/* Related product mini card */}
-                  <Link
-                    href={`/products/${relatedProduct.slug}`}
-                    className="relative aspect-[3/4] bg-kvrn-bg-raised overflow-hidden block"
-                  >
-                    <Image
-                      src={relatedProduct.colors.find(c => c.value === selectedColor.value)?.images[0]?.src ?? relatedProduct.colors[0]?.images[0]?.src ?? ''}
-                      alt={relatedProduct.name}
-                      fill
-                      className="object-cover"
-                      sizes="200px"
-                    />
-                    {!relatedProduct.colors[0]?.images[0]?.src && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="label-11 text-kvrn-subtle text-center px-2">
-                          {relatedProduct.name}
-                        </span>
-                      </div>
-                    )}
-                  </Link>
-                </div>
-
-                <div className="space-y-4">
-                  <p className="text-[15px] font-light">The KVRN Set</p>
-                  <p className="text-[13px] text-kvrn-muted leading-relaxed">
-                    The hoodie and sweatpants were designed together. Same fabric weight,
-                    same construction standard. Same colorway available in both.
-                  </p>
-                  <p className="text-[15px] font-light">
-                    {formatPrice(product.price)} + {formatPrice(relatedProduct.price)}
-                  </p>
-                  <Link href={`/products/${relatedProduct.slug}`}>
-                    <Button variant="secondary" size="md">
-                      View {relatedProduct.name}
-                    </Button>
-                  </Link>
-                </div>
+                ))}
+              </div>
+              <div className="space-y-4">
+                <p className="text-[15px] font-light">The KVRN Set</p>
+                <p className="text-[13px] font-light text-[var(--color-muted)] leading-relaxed">
+                  The hoodie and sweatpants share the same fabric weight, the same
+                  construction standard, and the same colorways. Designed together.
+                </p>
+                <p className="text-[14px] font-light text-[var(--color-muted)]">
+                  {formatPrice(product.price)} + {formatPrice(relatedProduct.price)}
+                </p>
+                <Link href={`/products/${relatedProduct.slug}`}>
+                  <Button variant="secondary" size="md">
+                    View {relatedProduct.name}
+                  </Button>
+                </Link>
               </div>
             </div>
           </section>
         )}
       </div>
 
-      {/* ─── Sticky Add-to-Bag (mobile) ─── */}
+      {/* Sticky mobile CTA */}
       <div
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-[200] bg-kvrn-bg border-t border-kvrn-border',
+          'fixed bottom-0 left-0 right-0 z-[200] bg-[var(--color-bg)] border-t border-[var(--color-border)]',
           'px-4 py-3 md:hidden',
           'transition-transform duration-300',
           stickyVisible ? 'translate-y-0' : 'translate-y-full'
@@ -394,8 +322,8 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
         <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-light truncate">{product.name}</p>
-            {selectedSize && selectedColor && (
-              <p className="text-[11px] text-kvrn-muted">
+            {selectedSize && (
+              <p className="text-[11px] text-[var(--color-muted)] font-light">
                 {selectedColor.name} / {selectedSize}
               </p>
             )}
@@ -407,7 +335,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
             loading={addState === 'loading'}
             className="flex-shrink-0"
           >
-            {addState === 'added' ? 'Added ✓' : `${formatPrice(product.price)} — Add`}
+            {addState === 'added' ? 'Added ✓' : `${formatPrice(product.price)}`}
           </Button>
         </div>
       </div>

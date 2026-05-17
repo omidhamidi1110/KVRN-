@@ -1,64 +1,79 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { products } from '@/data/products'
 import { ProductCard } from '@/components/product/ProductCard'
 
 export const metadata: Metadata = {
-  title: 'Shop — KVRN Heavyweight Fleece',
+  title: 'Collection — KVRN Heavyweight Fleece',
   description:
-    'Shop KVRN heavyweight hoodies and sweatpants. 400 GSM+ oversized fleece with structured 3-panel hood and concealed interior zippers.',
+    'KVRN heavyweight hoodies and sweatpants. 400 GSM+ ring-spun cotton fleece. Structured 3-panel hood. Concealed interior zippers.',
 }
 
 export default function ShopPage() {
   return (
-    <div className="pt-[56px]">
-      {/* Header */}
-      <section className="container-kvrn py-12 md:py-16">
-        <p className="label-11 mb-3">Drop 001</p>
-        <h1 className="font-display font-light text-[40px] md:text-[56px] leading-none tracking-tighter">
-          Shop
-        </h1>
-        <p className="text-[15px] text-kvrn-muted mt-4 max-w-[480px] leading-relaxed">
-          400 GSM+ heavyweight fleece. Built for daily wear.
-        </p>
-      </section>
+    <div className="pt-[60px]">
 
-      {/* Collection description — SEO */}
-      <section className="container-kvrn pb-0">
-        <div className="border-t border-kvrn-border pt-6 mb-8">
-          <details className="group">
-            <summary className="list-none cursor-pointer flex items-center justify-between text-[13px] text-kvrn-muted hover:text-kvrn-text transition-colors">
-              <span>About this collection</span>
-              <span className="transition-transform group-open:rotate-180 duration-200">↓</span>
-            </summary>
-            <p className="mt-4 text-[14px] text-kvrn-muted leading-relaxed max-w-[640px]">
-              KVRN hoodies and sweatpants are built from 400 GSM+ heavyweight fleece —
-              dense enough to feel structural, considered enough to be worn without
-              thinking. The structured 3-panel hood holds its form without a drawstring.
-              Concealed YKK zippers run parallel to both kangaroo pocket openings,
-              invisible from outside. A single rubber patch marks the hood. Nothing else.
+      {/* Page header */}
+      <section className="section-y-sm border-b border-[var(--color-border)]">
+        <div className="kvrn-container">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="kvrn-label mb-4">Collection</p>
+              <h1 className="text-[clamp(40px,6vw,72px)] font-light leading-none tracking-[-0.025em]">
+                Heavyweight
+                <br />
+                Fleece
+              </h1>
+            </div>
+            <p className="hidden md:block text-[13px] font-light text-[var(--color-muted)]">
+              {products.length} {products.length === 1 ? 'product' : 'products'}
             </p>
-          </details>
+          </div>
+
+          {/* Collection description — SEO + brand context */}
+          <div className="mt-10 max-w-[640px]">
+            <p className="text-[14px] font-light text-[var(--color-muted)] leading-relaxed">
+              KVRN heavyweight fleece. 400 GSM+ ring-spun combed cotton, tested per batch.
+              Structured 3-panel hood — holds form without a drawstring. Concealed interior
+              zipper pockets, both sides. No visible branding beyond a single moulded rubber
+              patch. Built to last years.
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Product grid */}
-      <section className="container-kvrn pb-24 md:pb-32">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-10">
-          {products.map((product, i) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              priority={i === 0}
-            />
-          ))}
-        </div>
+      <section className="section-y" aria-label="Products">
+        <div className="kvrn-container">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-10">
+            {products.map((product, i) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                priority={i === 0}
+              />
+            ))}
+          </div>
 
-        {/* End of collection — no "load more" for 2 products */}
-        {products.length > 0 && (
-          <p className="text-center label-11 mt-16 text-kvrn-subtle">
+          <p className="mt-16 kvrn-label text-[var(--color-subtle)] text-center">
             {products.length} {products.length === 1 ? 'product' : 'products'}
           </p>
-        )}
+        </div>
+      </section>
+
+      {/* Bottom brand bar */}
+      <section className="border-t border-[var(--color-border)] section-y-sm bg-[var(--color-bg-raised)]">
+        <div className="kvrn-container flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <p className="text-[14px] font-light text-[var(--color-muted)] max-w-sm leading-relaxed">
+            Every garment ships in 3–5 business days. Free returns within 30 days.
+          </p>
+          <Link
+            href="/support/faq"
+            className="text-[11px] font-light tracking-[0.14em] uppercase text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+          >
+            Sizing & FAQ →
+          </Link>
+        </div>
       </section>
     </div>
   )

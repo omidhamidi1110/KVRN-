@@ -3,26 +3,30 @@ import { WaitlistForm } from '@/components/forms/WaitlistForm'
 
 export const metadata: Metadata = {
   title: 'Waitlist — KVRN',
-  description:
-    'Join the KVRN waitlist. Be first to know when Drop 002 goes live.',
+  description: 'Join the KVRN waitlist. First access to new collections, 24 hours before the public.',
 }
 
 export default function WaitlistPage() {
   return (
-    <div className="min-h-screen bg-kvrn-bg-dark pt-[56px] flex flex-col">
-      <div className="flex-1 container-kvrn flex items-center">
-        <div className="w-full max-w-lg py-24 md:py-32">
-          <p className="label-11 text-kvrn-text-on-dark/50 mb-4">KVRN</p>
+    <div
+      className="min-h-screen bg-[var(--color-bg-dark)] pt-[60px] flex flex-col"
+      aria-labelledby="waitlist-heading"
+    >
+      <div className="flex-1 flex items-center kvrn-container">
+        <div className="w-full max-w-md py-24 md:py-32">
 
-          <h1 className="font-display font-light text-[48px] md:text-[64px] leading-none tracking-tighter text-kvrn-text-on-dark mb-6">
-            Join
-            <br />
-            the list.
+          <p className="kvrn-label text-[var(--color-text-on-dark)]/30 mb-8">KVRN</p>
+
+          <h1
+            id="waitlist-heading"
+            className="text-[clamp(44px,7vw,80px)] font-light leading-[0.92] tracking-[-0.03em] text-[var(--color-text-on-dark)] mb-6"
+          >
+            First.
           </h1>
 
-          <p className="text-[15px] text-kvrn-text-on-dark/60 mb-10 max-w-[380px] leading-relaxed">
-            Drop 001 is available now. Drop 002 is in production.
-            Be first — waitlist members are notified 24 hours before the public.
+          <p className="text-[15px] font-light text-[var(--color-text-on-dark)]/50 leading-relaxed mb-12 max-w-[320px]">
+            Waitlist members receive access to new collections 24 hours
+            before public release. Nothing else. No noise.
           </p>
 
           <WaitlistForm
@@ -34,10 +38,9 @@ export default function WaitlistPage() {
         </div>
       </div>
 
-      {/* Footer strip */}
-      <div className="border-t border-white/10 py-6 container-kvrn">
-        <p className="text-[11px] text-kvrn-text-on-dark/30 tracking-wide">
-          Drop notifications only. No spam. Unsubscribe any time.
+      <div className="border-t border-[var(--color-text-on-dark)]/10 kvrn-container py-6">
+        <p className="text-[11px] font-light text-[var(--color-text-on-dark)]/20 tracking-wide">
+          Collection notifications only. Unsubscribe any time.
         </p>
       </div>
     </div>

@@ -1,137 +1,107 @@
 import Link from 'next/link'
 
-const shopLinks = [
-  { label: 'Hoodies',    href: '/products/kvrn-heavyweight-hoodie' },
-  { label: 'Sweatpants', href: '/products/kvrn-heavyweight-sweatpants' },
-  { label: 'Shop All',   href: '/shop' },
-  { label: 'Waitlist',   href: '/waitlist' },
-]
+const col1 = {
+  heading: 'Shop',
+  links: [
+    { label: 'All Products',         href: '/shop' },
+    { label: 'Heavyweight Hoodie',   href: '/products/kvrn-heavyweight-hoodie' },
+    { label: 'Heavyweight Sweatpants', href: '/products/kvrn-heavyweight-sweatpants' },
+    { label: 'Waitlist',             href: '/waitlist' },
+  ],
+}
 
-const supportLinks = [
-  { label: 'FAQ',               href: '/support/faq' },
-  { label: 'Shipping & Returns', href: '/support/shipping-returns' },
-  { label: 'Contact',           href: '/contact' },
-  { label: 'Size Guide',        href: '/support/faq#sizing' },
-]
+const col2 = {
+  heading: 'Brand',
+  links: [
+    { label: 'About',   href: '/about' },
+    { label: 'Journal', href: '/journal' },
+  ],
+}
 
-const brandLinks = [
-  { label: 'About',   href: '/about' },
-  { label: 'Story',   href: '/about' },
-]
+const col3 = {
+  heading: 'Support',
+  links: [
+    { label: 'FAQ',               href: '/support/faq' },
+    { label: 'Shipping & Returns',href: '/support/shipping-returns' },
+    { label: 'Contact',           href: '/contact' },
+  ],
+}
 
-const legalLinks = [
-  { label: 'Privacy',         href: '/privacy' },
-  { label: 'Terms',           href: '/terms' },
-  { label: 'Cookie Policy',   href: '/cookies' },
+const legal = [
+  { label: 'Privacy',  href: '/legal/privacy' },
+  { label: 'Terms',    href: '/legal/terms' },
+  { label: 'Cookies',  href: '/legal/cookies' },
+  { label: 'Returns',  href: '/legal/returns' },
 ]
 
 export function Footer() {
-  const year = new Date().getFullYear()
-
   return (
-    <footer className="border-t border-kvrn-border bg-kvrn-bg" aria-label="Site footer">
-      <div className="container-kvrn">
-        {/* Main footer grid */}
-        <div className="py-16 md:py-24 grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-16">
-          {/* Brand */}
+    <footer className="border-t border-[var(--color-border)] bg-[var(--color-bg)]" aria-label="Site footer">
+      <div className="kvrn-container">
+
+        {/* Main grid */}
+        <div className="py-16 md:py-24 grid grid-cols-2 md:grid-cols-[2fr_1fr_1fr_1fr] gap-10 md:gap-16">
+
+          {/* Brand statement */}
           <div className="col-span-2 md:col-span-1">
-            <Link
-              href="/"
-              className="block text-[15px] font-display font-light tracking-wider uppercase mb-4"
-            >
+            <Link href="/" className="block text-[14px] font-light tracking-[0.2em] uppercase mb-5">
               KVRN
             </Link>
-            <p className="text-[13px] text-kvrn-muted leading-relaxed max-w-[220px]">
-              Quiet luxury.<br />Premium utility.
+            <p className="text-[13px] text-[var(--color-muted)] leading-relaxed max-w-[200px]">
+              Engineered for permanence.
             </p>
-            {/* Social */}
-            <div className="flex gap-5 mt-6">
-              <a
-                href="https://instagram.com/kvrn"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] tracking-widest uppercase text-kvrn-muted hover:text-kvrn-text transition-colors duration-150"
-                aria-label="KVRN on Instagram"
-              >
-                IG
-              </a>
-              <a
-                href="https://tiktok.com/@kvrn"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] tracking-widest uppercase text-kvrn-muted hover:text-kvrn-text transition-colors duration-150"
-                aria-label="KVRN on TikTok"
-              >
-                TT
-              </a>
+            <div className="flex gap-5 mt-8">
+              {[
+                { label: 'IG', href: 'https://instagram.com/kvrn', full: 'Instagram' },
+                { label: 'TT', href: 'https://tiktok.com/@kvrn',   full: 'TikTok' },
+              ].map((s) => (
+                <a
+                  key={s.label}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`KVRN on ${s.full}`}
+                  className="text-[11px] font-light tracking-[0.12em] text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150"
+                >
+                  {s.label}
+                </a>
+              ))}
             </div>
           </div>
 
-          {/* Shop */}
-          <div>
-            <p className="label-11 mb-5">Shop</p>
-            <ul className="space-y-3">
-              {shopLinks.map((link) => (
-                <li key={link.href + link.label}>
-                  <Link
-                    href={link.href}
-                    className="text-[13px] text-kvrn-text hover:text-kvrn-muted transition-colors duration-150"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <p className="label-11 mb-5">Support</p>
-            <ul className="space-y-3">
-              {supportLinks.map((link) => (
-                <li key={link.href + link.label}>
-                  <Link
-                    href={link.href}
-                    className="text-[13px] text-kvrn-text hover:text-kvrn-muted transition-colors duration-150"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Brand */}
-          <div>
-            <p className="label-11 mb-5">Brand</p>
-            <ul className="space-y-3">
-              {brandLinks.map((link) => (
-                <li key={link.href + link.label}>
-                  <Link
-                    href={link.href}
-                    className="text-[13px] text-kvrn-text hover:text-kvrn-muted transition-colors duration-150"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Link columns */}
+          {[col1, col2, col3].map((col) => (
+            <div key={col.heading}>
+              <p className="kvrn-label mb-5">{col.heading}</p>
+              <ul className="space-y-3">
+                {col.links.map((l) => (
+                  <li key={l.href}>
+                    <Link
+                      href={l.href}
+                      className="text-[13px] font-light text-[var(--color-text)] hover:text-[var(--color-muted)] transition-colors duration-150"
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        {/* Bottom row */}
-        <div className="py-6 border-t border-kvrn-border flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <p className="text-[11px] text-kvrn-muted tracking-wide">
-            © {year} KVRN. All rights reserved.
+        {/* Bottom bar */}
+        <div className="py-6 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <p className="text-[11px] font-light text-[var(--color-muted)] tracking-wide">
+            © {new Date().getFullYear()} KVRN. All rights reserved.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {legalLinks.map((link) => (
+            {legal.map((l) => (
               <Link
-                key={link.href}
-                href={link.href}
-                className="text-[11px] text-kvrn-muted hover:text-kvrn-text transition-colors duration-150 tracking-wide"
+                key={l.href}
+                href={l.href}
+                className="text-[11px] font-light text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150 tracking-wide"
               >
-                {link.label}
+                {l.label}
               </Link>
             ))}
           </div>

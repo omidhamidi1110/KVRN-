@@ -2,26 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── FONT DEFINITIONS ───────────────────────────────────────────────────── */
-/* System font stack — works without network requests. Self-host fonts for production. */
+/* ─── FONT DEFINITIONS ───────────────────────────────────────────────────────
+   System font stack tuned for light weights — renders beautifully on Apple
+   devices (San Francisco), Windows (Segoe UI), and Android (Roboto).
+   Self-host a custom typeface by adding @font-face rules and updating
+   --font-display / --font-body below.
+──────────────────────────────────────────────────────────────────────────── */
 
 /* ─── CSS CUSTOM PROPERTIES ─────────────────────────────────────────────── */
 :root {
+  /* Font families */
   --font-display: -apple-system, 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
   --font-body:    -apple-system, 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
 
   /* Color tokens */
-  --color-bg:            #FAFAF8;
-  --color-bg-raised:     #F3F0EB;
-  --color-bg-dark:       #111111;
-  --color-text:          #1A1A1A;
-  --color-text-on-dark:  #F5F0E8;
-  --color-muted:         #6B6B6B;
-  --color-subtle:        #9B9B9B;
-  --color-border:        #E8E5E0;
-  --color-border-strong: #C8C4BF;
+  --color-bg:            #F9F8F6;
+  --color-bg-raised:     #F2EFE9;
+  --color-bg-dark:       #0E0E0E;
+  --color-text:          #181818;
+  --color-text-on-dark:  #F0EDE8;
+  --color-muted:         #6A6A6A;
+  --color-subtle:        #9A9A9A;
+  --color-border:        #E5E2DC;
+  --color-border-strong: #C4C0BA;
   --color-error:         #B91C1C;
-  --color-success:       #15803D;
+  --color-success:       #166534;
 
   /* Z-index scale */
   --z-base:     0;
@@ -32,12 +37,16 @@
   --z-modal:    400;
   --z-toast:    500;
 
-  /* Nav height */
-  --nav-height: 56px;
+  /* Nav */
+  --nav-height: 60px;
 }
 
-/* ─── BASE RESET ─────────────────────────────────────────────────────────── */
+/* ─── BASE ───────────────────────────────────────────────────────────────── */
 @layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   html {
     background-color: var(--color-bg);
     color: var(--color-text);
@@ -45,76 +54,55 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1;
   }
 
   body {
-    font-family: var(--font-body), 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--font-body);
     font-size: 15px;
-    line-height: 1.6;
+    font-weight: 300;
+    line-height: 1.65;
     background-color: var(--color-bg);
     color: var(--color-text);
     min-height: 100svh;
   }
 
-  /* Remove default margins */
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display), 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-weight: 300;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+    font-family: var(--font-display);
+    font-weight: 200;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
   }
 
-  /* Precise link styling */
-  a {
-    color: inherit;
-    text-decoration: none;
-  }
+  a       { color: inherit; text-decoration: none; }
+  button  { cursor: pointer; background: none; border: none; font-family: inherit; font-weight: inherit; }
+  img     { display: block; max-width: 100%; height: auto; }
 
-  /* Remove default button styles */
-  button {
-    cursor: pointer;
-    background: none;
-    border: none;
-    font-family: inherit;
-  }
-
-  /* Form elements */
   input, textarea, select {
     font-family: inherit;
     font-size: inherit;
+    font-weight: inherit;
     color: inherit;
     background: transparent;
     outline: none;
   }
 
-  /* Image defaults */
-  img {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
-
-  /* Focus styles — keyboard only */
+  /* Focus — keyboard only, never mouse */
   *:focus-visible {
-    outline: 2px solid var(--color-text);
+    outline: 1.5px solid var(--color-text);
     outline-offset: 3px;
-    border-radius: 1px;
   }
 
-  *:focus:not(:focus-visible) {
-    outline: none;
-  }
+  *:focus:not(:focus-visible) { outline: none; }
 
-  /* Selection color */
   ::selection {
     background: var(--color-text);
     color: var(--color-bg);
   }
 }
 
-/* ─── UTILITY LAYERS ─────────────────────────────────────────────────────── */
+/* ─── UTILITIES ──────────────────────────────────────────────────────────── */
 @layer utilities {
-  /* Skip link for accessibility */
   .skip-link {
     position: absolute;
     top: -100%;
@@ -124,143 +112,74 @@
     color: var(--color-bg);
     font-size: 13px;
     z-index: var(--z-toast);
-    transition: top 0.2s;
   }
+  .skip-link:focus { top: 0; }
 
-  .skip-link:focus {
-    top: 0;
-  }
-
-  /* Screen reader only */
   .sr-only {
     position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    clip: rect(0,0,0,0);
     white-space: nowrap;
     border-width: 0;
   }
 
-  /* Luxury section label style */
-  .label-11 {
+  /* Label style — 11px tracked uppercase */
+  .kvrn-label {
     font-size: 11px;
+    font-weight: 300;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-muted);
   }
 
-  /* Image placeholder — shown before real images are added */
-  .img-placeholder {
-    background-color: var(--color-bg-raised);
-    position: relative;
-    overflow: hidden;
+  /* Thin rule */
+  .kvrn-rule {
+    width: 100%;
+    height: 1px;
+    background: var(--color-border);
   }
 
-  .img-placeholder::after {
-    content: 'IMAGE';
+  /* Image crossfade on hover (product cards) */
+  .img-primary {
+    transition: opacity 450ms ease-out;
+  }
+  .img-secondary {
     position: absolute;
     inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    color: var(--color-subtle);
+    opacity: 0;
+    transition: opacity 450ms ease-out;
+  }
+  .card-hover:hover .img-primary   { opacity: 0; }
+  .card-hover:hover .img-secondary { opacity: 1; }
+
+  /* Nav scroll states */
+  .nav-over-hero {
+    background: transparent;
+    color: var(--color-text-on-dark);
+  }
+  .nav-scrolled {
+    background: rgba(249, 248, 246, 0.93);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
   }
 
-  /* Scrollbar styling */
+  /* Scrollbar */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
   }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 2px;
-  }
-
-  /* Product image hover crossfade */
-  .product-image-primary {
-    transition: opacity 400ms ease-out;
-  }
-
-  .product-image-secondary {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    transition: opacity 400ms ease-out;
-  }
-
-  .product-card-wrap:hover .product-image-primary {
-    opacity: 0;
-  }
-
-  .product-card-wrap:hover .product-image-secondary {
-    opacity: 1;
-  }
-
-  /* Nav backdrop on scroll */
-  .nav-scrolled {
-    background: rgba(250, 250, 248, 0.92) !important;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-border);
-    color: var(--color-text) !important;
-  }
-
-  /* Cart drawer overlay */
-  .cart-overlay {
-    background: rgba(0, 0, 0, 0);
-    transition: background 300ms ease-out;
-    pointer-events: none;
-  }
-
-  .cart-overlay.open {
-    background: rgba(0, 0, 0, 0.4);
-    pointer-events: all;
-  }
+  .scrollbar-thin::-webkit-scrollbar { width: 3px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-border); }
 }
 
-/* ─── COMPONENT LAYER ────────────────────────────────────────────────────── */
+/* ─── COMPONENTS ─────────────────────────────────────────────────────────── */
 @layer components {
-  /* Section containers */
-  .section-padding {
-    padding-top: 80px;
-    padding-bottom: 80px;
-  }
-
-  @media (min-width: 1024px) {
-    .section-padding {
-      padding-top: 160px;
-      padding-bottom: 160px;
-    }
-  }
-
-  .section-padding-sm {
-    padding-top: 48px;
-    padding-bottom: 48px;
-  }
-
-  @media (min-width: 1024px) {
-    .section-padding-sm {
-      padding-top: 96px;
-      padding-bottom: 96px;
-    }
-  }
-
-  /* Content max width container */
-  .container-kvrn {
+  /* Container */
+  .kvrn-container {
     width: 100%;
     max-width: 1440px;
     margin-left: auto;
@@ -268,34 +187,37 @@
     padding-left: 24px;
     padding-right: 24px;
   }
-
   @media (min-width: 768px) {
-    .container-kvrn {
-      padding-left: 48px;
-      padding-right: 48px;
-    }
+    .kvrn-container { padding-left: 48px; padding-right: 48px; }
   }
-
   @media (min-width: 1280px) {
-    .container-kvrn {
-      padding-left: 80px;
-      padding-right: 80px;
-    }
+    .kvrn-container { padding-left: 80px; padding-right: 80px; }
   }
 
-  /* Rule / horizontal separator */
-  .rule {
-    width: 100%;
-    height: 1px;
-    background: var(--color-border);
+  /* Section rhythm */
+  .section-y {
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
+  @media (min-width: 1024px) {
+    .section-y { padding-top: 160px; padding-bottom: 160px; }
   }
 
-  /* Form input base */
-  .input-base {
+  .section-y-sm {
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+  @media (min-width: 1024px) {
+    .section-y-sm { padding-top: 96px; padding-bottom: 96px; }
+  }
+
+  /* Input */
+  .kvrn-input {
     width: 100%;
     height: 48px;
     padding: 0 16px;
-    font-size: 15px;
+    font-size: 14px;
+    font-weight: 300;
     color: var(--color-text);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
@@ -303,40 +225,25 @@
     appearance: none;
     transition: border-color 150ms ease-out;
   }
-
-  .input-base::placeholder {
-    color: var(--color-subtle);
-  }
-
-  .input-base:focus {
-    border-color: var(--color-text);
-  }
-
-  /* Error input state */
-  .input-base.error {
-    border-color: var(--color-error);
-  }
+  .kvrn-input::placeholder { color: var(--color-subtle); }
+  .kvrn-input:focus         { border-color: var(--color-text); }
+  .kvrn-input.error         { border-color: var(--color-error); }
 
   /* Textarea */
-  .textarea-base {
+  .kvrn-textarea {
     width: 100%;
-    padding: 12px 16px;
-    font-size: 15px;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-weight: 300;
     color: var(--color-text);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
     border-radius: 0;
-    appearance: none;
     resize: vertical;
     min-height: 120px;
+    appearance: none;
     transition: border-color 150ms ease-out;
   }
-
-  .textarea-base::placeholder {
-    color: var(--color-subtle);
-  }
-
-  .textarea-base:focus {
-    border-color: var(--color-text);
-  }
+  .kvrn-textarea::placeholder { color: var(--color-subtle); }
+  .kvrn-textarea:focus         { border-color: var(--color-text); }
 }

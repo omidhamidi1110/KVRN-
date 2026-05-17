@@ -6,107 +6,94 @@ import type { Product } from '@/types'
 
 interface ProductCardProps {
   product:    Product
-  priority?:  boolean  // Preload image for LCP
+  priority?:  boolean
   className?: string
 }
 
 export function ProductCard({ product, priority = false, className }: ProductCardProps) {
   const defaultColor = product.colors[0]
-  const frontImage   = defaultColor?.images.find((i) => i.type === 'front')
-  const backImage    = defaultColor?.images.find((i) => i.type === 'back') ||
-                       defaultColor?.images[1]
+  const front = defaultColor?.images.find(i => i.type === 'front')
+  const back  = defaultColor?.images.find(i => i.type === 'back') ?? defaultColor?.images[1]
+
+  const allOutOfStock = product.sizes.every(s => !s.inStock)
 
   return (
     <Link
       href={`/products/${product.slug}`}
-      className={cn(
-        'group block product-card-wrap',
-        className
-      )}
+      className={cn('group block card-hover', className)}
       aria-label={`${product.name} — ${formatPrice(product.price)}`}
     >
-      {/* ─── Image container ─── */}
-      <div className="relative aspect-[3/4] bg-kvrn-bg-raised overflow-hidden mb-4">
+      {/* Image container */}
+      <div className="relative aspect-[3/4] bg-[var(--color-bg-raised)] overflow-hidden mb-4">
+
         {/* Primary image */}
-        {frontImage?.src ? (
+        {front?.src ? (
           <Image
-            src={frontImage.src}
-            alt={frontImage.alt}
+            src={front.src}
+            alt={front.alt}
             fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 640px"
-            className="object-cover product-image-primary"
             priority={priority}
-            quality={85}
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 640px"
+            className="object-cover img-primary"
+            quality={88}
           />
         ) : (
-          /* Colorway placeholder when images not yet added */
+          /* Clean colour fallback — no text, no instructions */
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(145deg, ${defaultColor?.hex}18 0%, ${defaultColor?.hex}30 100%)`,
+            }}
             aria-hidden="true"
-          >
-            <div
-              className="w-12 h-12 rounded-full opacity-30"
-              style={{ backgroundColor: defaultColor?.hex }}
-            />
-            <span className="label-11 text-kvrn-subtle text-center px-4">
-              {product.name}
-            </span>
-          </div>
-        )}
-
-        {/* Secondary image (back view — revealed on hover) */}
-        {backImage?.src && (
-          <Image
-            src={backImage.src}
-            alt={backImage.alt}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 640px"
-            className="object-cover product-image-secondary"
-            quality={85}
           />
         )}
 
-        {/* Sold out badge */}
-        {product.sizes.every((s) => !s.inStock) && (
+        {/* Secondary (back) — revealed on hover */}
+        {back?.src && (
+          <Image
+            src={back.src}
+            alt={back.alt}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 640px"
+            className="object-cover img-secondary"
+            quality={88}
+          />
+        )}
+
+        {/* Sold out */}
+        {allOutOfStock && (
           <div className="absolute bottom-4 left-4">
-            <span className="label-11 bg-kvrn-bg/90 px-3 py-1.5 text-kvrn-text">
+            <span className="kvrn-label bg-[var(--color-bg)]/90 px-3 py-1.5">
               Sold Out
             </span>
           </div>
         )}
       </div>
 
-      {/* ─── Product info ─── */}
-      <div className="flex items-baseline justify-between gap-2">
-        <div>
-          <p className="text-[15px] font-light text-kvrn-text">
-            {product.name}
-          </p>
-          <p className="text-[13px] text-kvrn-muted mt-0.5">
-            {product.shortDescription}
-          </p>
+      {/* Info */}
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-[15px] font-light">{product.name}</p>
+          <p className="text-[15px] font-light flex-shrink-0">{formatPrice(product.price)}</p>
         </div>
-        <p className="text-[15px] font-light text-kvrn-text flex-shrink-0">
-          {formatPrice(product.price)}
-        </p>
-      </div>
 
-      {/* Color dots */}
-      <div className="flex gap-1.5 mt-3" aria-label="Available colors" role="list">
-        {product.colors.map((color) => (
-          <span
-            key={color.value}
-            role="listitem"
-            aria-label={color.name}
-            className={cn(
-              'w-3 h-3 rounded-full border',
-              color.value === 'off-white'
-                ? 'border-kvrn-border'
-                : 'border-transparent'
-            )}
-            style={{ backgroundColor: color.hex }}
-          />
-        ))}
+        {/* Color dots */}
+        <div className="flex gap-1.5" aria-label="Available colorways" role="list">
+          {product.colors.map(color => (
+            <span
+              key={color.value}
+              role="listitem"
+              aria-label={color.name}
+              className={cn(
+                'w-2.5 h-2.5 rounded-full border',
+                color.value === 'off-white'
+                  ? 'border-[var(--color-border)]'
+                  : 'border-transparent'
+              )}
+              style={{ backgroundColor: color.hex }}
+            />
+          ))}
+        </div>
       </div>
     </Link>
   )
