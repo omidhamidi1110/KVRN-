@@ -3,7 +3,7 @@ import { WaitlistForm } from '@/components/forms/WaitlistForm'
 
 export const metadata: Metadata = {
   title: 'Waitlist — KVRN',
-  description: 'Join the KVRN waitlist. First access to new collections, 24 hours before the public.',
+  description: 'Join the KVRN waitlist. Early access to new collections and release announcements.',
 }
 
 export default function WaitlistPage() {
@@ -25,7 +25,7 @@ export default function WaitlistPage() {
           </h1>
 
           <p className="text-[15px] font-light text-[var(--color-text-on-dark)]/50 leading-relaxed mb-12 max-w-[320px]">
-            Waitlist members receive access to new collections 24 hours
+            Waitlist members receive collection announcements and early access
             before public release. Nothing else. No noise.
           </p>
 

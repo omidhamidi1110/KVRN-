@@ -1,40 +1,48 @@
 import Link from 'next/link'
 
+// ─── FOOTER LINK CONFIG ───────────────────────────────────────────────────────
+// All hrefs must point to pages that exist.
+// /journal: add back only when app/journal/page.tsx exists.
+// /legal/*: pages live at /privacy, /terms, /cookies — no /legal/ prefix.
+
 const col1 = {
   heading: 'Shop',
   links: [
-    { label: 'All Products',         href: '/shop' },
-    { label: 'Heavyweight Hoodie',   href: '/products/kvrn-heavyweight-hoodie' },
+    { label: 'All Products',           href: '/shop' },
+    { label: 'Heavyweight Hoodie',     href: '/products/kvrn-heavyweight-hoodie' },
     { label: 'Heavyweight Sweatpants', href: '/products/kvrn-heavyweight-sweatpants' },
-    { label: 'Waitlist',             href: '/waitlist' },
+    { label: 'Waitlist',               href: '/waitlist' },
   ],
 }
 
 const col2 = {
   heading: 'Brand',
   links: [
-    { label: 'About',   href: '/about' },
-    { label: 'Journal', href: '/journal' },
+    { label: 'About', href: '/about' },
   ],
 }
 
 const col3 = {
   heading: 'Support',
   links: [
-    { label: 'FAQ',               href: '/support/faq' },
-    { label: 'Shipping & Returns',href: '/support/shipping-returns' },
-    { label: 'Contact',           href: '/contact' },
+    { label: 'FAQ',                href: '/support/faq' },
+  { label: 'Track order',        href: '/support/track' },
+    { label: 'Shipping & Returns', href: '/support/shipping-returns' },
+    { label: 'Size Guide',         href: '/support/size-guide' },
+    { label: 'Contact',            href: '/contact' },
   ],
 }
 
+// Legal links — point to actual page routes (no /legal/ prefix)
 const legal = [
-  { label: 'Privacy',  href: '/legal/privacy' },
-  { label: 'Terms',    href: '/legal/terms' },
-  { label: 'Cookies',  href: '/legal/cookies' },
-  { label: 'Returns',  href: '/legal/returns' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms',   href: '/terms' },
+  { label: 'Cookies', href: '/cookies' },
 ]
 
 export function Footer() {
+  const year = new Date().getFullYear()
+
   return (
     <footer className="border-t border-[var(--color-border)] bg-[var(--color-bg)]" aria-label="Site footer">
       <div className="kvrn-container">
@@ -48,60 +56,88 @@ export function Footer() {
               KVRN
             </Link>
             <p className="text-[13px] text-[var(--color-muted)] leading-relaxed max-w-[200px]">
-              Engineered for permanence.
+              Designed slowly.
+              <br />
+              Built to remain.
             </p>
-            <div className="flex gap-5 mt-8">
-              {[
-                { label: 'IG', href: 'https://instagram.com/kvrn', full: 'Instagram' },
-                { label: 'TT', href: 'https://tiktok.com/@kvrn',   full: 'TikTok' },
-              ].map((s) => (
-                <a
-                  key={s.label}
-                  href={s.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`KVRN on ${s.full}`}
-                  className="text-[11px] font-light tracking-[0.12em] text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150"
-                >
-                  {s.label}
-                </a>
-              ))}
+            <div className="flex gap-5 mt-6">
+              <a
+                href="https://instagram.com/kvrn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150"
+                aria-label="KVRN on Instagram"
+              >
+                Instagram
+              </a>
             </div>
           </div>
 
-          {/* Link columns */}
-          {[col1, col2, col3].map((col) => (
-            <div key={col.heading}>
-              <p className="kvrn-label mb-5">{col.heading}</p>
-              <ul className="space-y-3">
-                {col.links.map((l) => (
-                  <li key={l.href}>
-                    <Link
-                      href={l.href}
-                      className="text-[13px] font-light text-[var(--color-text)] hover:text-[var(--color-muted)] transition-colors duration-150"
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Shop */}
+          <div>
+            <p className="kvrn-label mb-5">{col1.heading}</p>
+            <ul className="space-y-3">
+              {col1.links.map((link) => (
+                <li key={link.href + link.label}>
+                  <Link
+                    href={link.href}
+                    className="text-[13px] font-light text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Brand */}
+          <div>
+            <p className="kvrn-label mb-5">{col2.heading}</p>
+            <ul className="space-y-3">
+              {col2.links.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-[13px] font-light text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Support */}
+          <div>
+            <p className="kvrn-label mb-5">{col3.heading}</p>
+            <ul className="space-y-3">
+              {col3.links.map((link) => (
+                <li key={link.href + link.label}>
+                  <Link
+                    href={link.href}
+                    className="text-[13px] font-light text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="py-6 border-t border-[var(--color-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <p className="text-[11px] font-light text-[var(--color-muted)] tracking-wide">
-            © {new Date().getFullYear()} KVRN. All rights reserved.
+        {/* Bottom row */}
+        <div className="py-6 border-t border-[var(--color-border)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <p className="text-[11px] text-[var(--color-muted)] tracking-wide">
+            © {year} KVRN. All rights reserved.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            {legal.map((l) => (
+            {legal.map((link) => (
               <Link
-                key={l.href}
-                href={l.href}
-                className="text-[11px] font-light text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150 tracking-wide"
+                key={link.href}
+                href={link.href}
+                className="text-[11px] text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors duration-150 tracking-wide"
               >
-                {l.label}
+                {link.label}
               </Link>
             ))}
           </div>

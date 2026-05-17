@@ -18,7 +18,7 @@ const faqSections = [
           <div className="space-y-3">
             <p>GSM stands for grams per square metre — the standard measurement of fabric weight. A higher number means a denser, heavier fabric.</p>
             <p>Most hoodies on the market are 280–320 GSM. At 300 GSM, a hoodie feels light and somewhat provisional. At 400 GSM+, the fabric becomes structural — it holds its shape, drapes differently, and has a perceptible weight when you hold it.</p>
-            <p>KVRN tests every batch to confirm the GSM meets our minimum standard. We do not accept batches below 390 GSM.</p>
+            <p>KVRN is developed around heavyweight fleece construction. Full material specifications are listed on every product page.</p>
           </div>
         ),
       },
@@ -115,7 +115,7 @@ const faqSections = [
         id:      'order-time',
         trigger: 'When will my order ship?',
         content: (
-          <p>Orders placed before 1pm GMT ship the same day (Monday–Friday, excluding bank holidays). Orders placed after 1pm ship the following working day. You will receive a tracking number by email once dispatched.</p>
+          <p>Orders are typically processed within 1–2 business days. You will receive a tracking number by email once your order has shipped.</p>
         ),
       },
       {

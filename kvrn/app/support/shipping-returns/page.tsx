@@ -44,7 +44,7 @@ export default function ShippingReturnsPage() {
             ))}
           </div>
           <div className="mt-8 space-y-3 text-[14px] font-light text-[var(--color-muted)] leading-relaxed">
-            <p>Orders placed before 1pm EST ship the same day, Monday through Friday. Tracking is included with every order.</p>
+            <p>Orders are typically processed within 1–2 business days, Monday through Friday. Tracking is included with every order.</p>
             <p>International customers are responsible for any import duties or taxes levied by their local customs authority.</p>
           </div>
         </section>

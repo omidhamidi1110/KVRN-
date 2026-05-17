@@ -70,7 +70,7 @@ export default function AboutPage() {
             {[
               {
                 heading: 'The weight.',
-                body:     '400 GSM+ loopback terry. Tested per batch. Every batch. Minimum 390 GSM accepted. Below that — it does not ship.',
+                body:     'Developed around heavyweight loopback terry. Dense enough to have real structural presence. Full specifications on each product page.',
               },
               {
                 heading: 'The hood.',
@@ -120,7 +120,7 @@ export default function AboutPage() {
             <div className="space-y-0">
               {[
                 { label: 'Fibre',         value: '100% ring-spun combed cotton' },
-                { label: 'Weight',        value: '400 GSM+ (tested per batch)' },
+                { label: 'Weight',        value: '400 GSM+ heavyweight fleece' },
                 { label: 'Construction',  value: 'Loopback terry, triple-brushed interior' },
                 { label: 'Face',          value: 'Dense, cold-resist smooth' },
                 { label: 'Interior',      value: 'Triple-brushed for immediate warmth' },

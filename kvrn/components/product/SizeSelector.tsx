@@ -57,7 +57,7 @@ export function SizeSelector({
                 'relative cursor-pointer',
                 isOutOfStock && 'cursor-not-allowed'
               )}
-              title={isOutOfStock ? `${size.label} — Out of stock` : size.label}
+              title={isOutOfStock ? `${size.label} — Out of stock. Click to be notified when back.` : size.label}
             >
               {/* Hidden radio */}
               <input

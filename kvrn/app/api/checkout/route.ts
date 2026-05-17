@@ -1,83 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { calculateShipping } from '@/lib/stripe'
 
-// ─── Stripe Checkout Session creation ────────────────────────────────────────
-// This endpoint creates a Stripe Payment Intent for use with Stripe Elements.
-// Activate by:
-// 1. npm install stripe
-// 2. Set STRIPE_SECRET_KEY in .env.local
-// 3. Uncomment the Stripe code below
-
+// ─── POST /api/checkout ────────────────────────────────────────────────────────
+// Creates a Stripe PaymentIntent and returns the client_secret.
+// The client uses the client_secret with Stripe Elements to confirm payment.
+//
+// ACTIVATION:
+//   npm install stripe
+//   Set STRIPE_SECRET_KEY in .env.local
+//   Uncomment the Stripe block below
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { items, email, shippingAddress, shippingMethod } = body
+    const {
+      items,
+      email,
+      shippingAddress,
+      shippingMethod = 'standard',
+    } = body
 
+    // ── Validate ───────────────────────────────────────────────────────────
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No items provided.' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'No items in cart.' }, { status: 400 })
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ success: false, error: 'Invalid email.' }, { status: 400 })
     }
 
-    // ─── Calculate totals ───────────────────────────────────────────
-    const subtotalPence = items.reduce(
-      (sum: number, item: { price: number; quantity: number }) =>
-        sum + item.price * item.quantity,
-      0
-    )
+    // ── Calculate totals ───────────────────────────────────────────────────
+    const subtotalPence = (items as Array<{ price: number; quantity: number }>)
+      .reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-    const shippingPence =
-      shippingAddress?.country === 'GB'
-        ? shippingMethod === 'express' ? 999 : 499
-        : shippingAddress?.country === 'US' || shippingAddress?.country === 'CA'
-        ? 1999
-        : 1499
+    const shippingPence = calculateShipping(
+      shippingAddress?.country ?? 'GB',
+      shippingMethod
+    )
 
     const totalPence = subtotalPence + shippingPence
 
-    // ─── Create Stripe PaymentIntent ────────────────────────────────
-    // TODO: Uncomment when ready to go live
+    // ── Stripe PaymentIntent ───────────────────────────────────────────────
+    // Uncomment once stripe is installed:
     //
     // import Stripe from 'stripe'
-    // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    //   apiVersion: '2024-06-20',
-    // })
+    // const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
     //
     // const paymentIntent = await stripe.paymentIntents.create({
-    //   amount: totalPence,
+    //   amount:   totalPence,
     //   currency: 'gbp',
     //   automatic_payment_methods: { enabled: true },
+    //   receipt_email: email,
     //   metadata: {
-    //     items:           JSON.stringify(items),
-    //     shipping_method: shippingMethod,
-    //     customer_email:  email,
+    //     customer_email:   email,
+    //     shipping_method:  shippingMethod,
+    //     shipping_country: shippingAddress?.country ?? 'GB',
+    //     item_count:       String(items.length),
+    //     subtotal_pence:   String(subtotalPence),
+    //     shipping_pence:   String(shippingPence),
     //   },
+    //   shipping: shippingAddress ? {
+    //     name:    `${shippingAddress.firstName} ${shippingAddress.lastName}`,
+    //     address: {
+    //       line1:       shippingAddress.address1,
+    //       line2:       shippingAddress.address2 || undefined,
+    //       city:        shippingAddress.city,
+    //       postal_code: shippingAddress.postcode,
+    //       country:     shippingAddress.country,
+    //     },
+    //   } : undefined,
     // })
     //
     // return NextResponse.json({
-    //   success:      true,
-    //   clientSecret: paymentIntent.client_secret,
+    //   success:        true,
+    //   clientSecret:   paymentIntent.client_secret,
+    //   paymentIntentId:paymentIntent.id,
     //   totalPence,
+    //   subtotalPence,
+    //   shippingPence,
     // })
 
-    // ─── MVP: Return mock client secret ────────────────────────────
+    // ── Stub response (dev mode) ───────────────────────────────────────────
     return NextResponse.json({
-      success:      true,
-      clientSecret: 'pi_mock_secret_connect_stripe_to_activate',
+      success:        true,
+      clientSecret:   'pi_test_placeholder_connect_stripe_to_activate',
+      paymentIntentId:'pi_test_placeholder',
       totalPence,
       subtotalPence,
       shippingPence,
-      message:      'Stripe not yet connected. Set STRIPE_SECRET_KEY to activate.',
+      dev:            true,
+      message:        'Set STRIPE_SECRET_KEY to enable real payments.',
     })
   } catch (err) {
-    console.error('[checkout] Error creating payment intent:', err)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create checkout session.' },
-      { status: 500 }
-    )
+    console.error('[checkout] Error:', err)
+    return NextResponse.json({ success: false, error: 'Failed to create payment intent.' }, { status: 500 })
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+  return NextResponse.json({ error: 'Method not allowed.' }, { status: 405 })
 }

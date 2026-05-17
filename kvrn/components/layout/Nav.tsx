@@ -7,13 +7,13 @@ import { useCart } from '@/context/CartContext'
 import { cn } from '@/lib/utils'
 
 // ─── NAV CONFIG ──────────────────────────────────────────────────────────────
-// Scalable structure: add future top-level collections here.
-// The mobile drawer reads from drawerSections automatically.
+// Single source of truth for all nav links.
+// Add /journal here only when the page exists.
 
 const primaryLinks = [
-  { label: 'Collections', href: '/shop' },
-  { label: 'About',       href: '/about' },
-  { label: 'Journal',     href: '/journal' },
+  { label: 'Shop',    href: '/shop' },
+  { label: 'About',  href: '/about' },
+  { label: 'Waitlist', href: '/waitlist' },
 ]
 
 const drawerSections = [
@@ -29,16 +29,16 @@ const drawerSections = [
     heading: 'Brand',
     links: [
       { label: 'About KVRN', href: '/about' },
-      { label: 'Journal',    href: '/journal' },
       { label: 'Waitlist',   href: '/waitlist' },
     ],
   },
   {
     heading: 'Support',
     links: [
-      { label: 'FAQ',                href: '/support/faq' },
+      { label: 'FAQ',               href: '/support/faq' },
       { label: 'Shipping & Returns', href: '/support/shipping-returns' },
-      { label: 'Contact',            href: '/contact' },
+      { label: 'Size Guide',        href: '/support/size-guide' },
+      { label: 'Contact',           href: '/contact' },
     ],
   },
 ]
@@ -51,14 +51,13 @@ export function Nav() {
   const [open,     setOpen]     = useState(false)
   const closeRef   = useRef<HTMLButtonElement>(null)
 
-  // Hero detection — only applies to pages that declare a full-height hero
   const isHeroPage = pathname === '/'
 
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY
       setScrolled(y > 40)
-      setOnHero(y < window.innerHeight * 0.75)
+      setOnHero(y < (window.innerHeight * 0.85))
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
@@ -80,71 +79,68 @@ export function Nav() {
     if (open) closeRef.current?.focus()
   }, [open])
 
-  // Nav is transparent/white-text over hero, solid after scroll or on non-hero pages
-  const transparent = isHeroPage && onHero && !scrolled
+  // Nav colour logic: transparent + white text over hero, solid otherwise
+  const isTransparent = isHeroPage && onHero && !scrolled
+  const navBg  = scrolled
+    ? 'bg-[rgba(250,250,248,0.95)] backdrop-blur-[20px] border-b border-[var(--color-border)]'
+    : isTransparent
+    ? 'bg-transparent'
+    : 'bg-[var(--color-bg)]'
+  const textCol = isTransparent ? 'text-[var(--color-text-on-dark)]' : 'text-[var(--color-text)]'
 
   return (
     <>
       <header
         className={cn(
-          'fixed top-0 left-0 right-0 z-[200] h-[60px] flex items-center',
-          'transition-all duration-500 ease-out',
-          transparent
-            ? 'bg-transparent text-[var(--color-text-on-dark)]'
-            : 'bg-[rgba(249,248,246,0.93)] backdrop-blur-[24px] border-b border-[var(--color-border)] text-[var(--color-text)]'
+          'fixed top-0 left-0 right-0 z-[200] h-[56px] flex items-center transition-all duration-300',
+          navBg, textCol
         )}
         aria-label="Site header"
       >
         <div className="kvrn-container w-full flex items-center justify-between">
-
-          {/* Wordmark */}
+          {/* Logo */}
           <Link
             href="/"
-            className="text-[14px] font-light tracking-[0.2em] uppercase hover:opacity-60 transition-opacity duration-200"
-            aria-label="KVRN — Home"
+            className="text-[13px] font-light tracking-[0.2em] uppercase hover:opacity-60 transition-opacity duration-150"
+            aria-label="KVRN — go to homepage"
           >
             KVRN
           </Link>
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-10" aria-label="Primary">
-            {primaryLinks.map((l) => (
+          {/* Desktop links */}
+          <nav className="hidden md:flex items-center gap-10" aria-label="Primary navigation">
+            {primaryLinks.map((link) => (
               <Link
-                key={l.href}
-                href={l.href}
-                className={cn(
-                  'text-[11px] font-light tracking-[0.14em] uppercase',
-                  'hover:opacity-60 transition-opacity duration-150',
-                  pathname === l.href && 'opacity-50'
-                )}
+                key={link.href}
+                href={link.href}
+                className="text-[11px] font-light tracking-[0.14em] uppercase hover:opacity-60 transition-opacity duration-150"
               >
-                {l.label}
+                {link.label}
               </Link>
             ))}
           </nav>
 
-          {/* Right: bag + menu */}
-          <div className="flex items-center gap-7">
+          {/* Right: bag + hamburger */}
+          <div className="flex items-center gap-6">
             <button
               onClick={openCart}
               className="text-[11px] font-light tracking-[0.14em] uppercase hover:opacity-60 transition-opacity duration-150"
-              aria-label={`Bag — ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`}
+              aria-label={`Shopping bag${itemCount > 0 ? `, ${itemCount} item${itemCount === 1 ? '' : 's'}` : ''}`}
             >
-              Bag{itemCount > 0 && ` (${itemCount})`}
+              Bag{itemCount > 0 && <span className="ml-1">({itemCount})</span>}
             </button>
-
-            {/* Hamburger — mobile only */}
             <button
               onClick={() => setOpen(true)}
+              className="md:hidden flex flex-col gap-[5px] p-1 -mr-1"
               aria-label="Open menu"
               aria-expanded={open}
-              className="md:hidden flex flex-col gap-[5px] p-1 -mr-1"
+              aria-controls="mobile-nav"
             >
-              {[0,1].map(i => (
+              {[0, 1].map((i) => (
                 <span
                   key={i}
-                  className="block h-px w-5 transition-colors duration-200"
-                  style={{ background: transparent ? 'var(--color-text-on-dark)' : 'var(--color-text)' }}
+                  className="block h-px w-[22px] transition-colors duration-300"
+                  style={{ backgroundColor: isTransparent ? 'var(--color-text-on-dark)' : 'var(--color-text)' }}
                 />
               ))}
             </button>
@@ -152,91 +148,81 @@ export function Nav() {
         </div>
       </header>
 
-      {/* ─── Mobile drawer overlay ─── */}
+      {/* ─── Mobile overlay ─── */}
       <div
         className={cn(
-          'fixed inset-0 z-[300] bg-black/50 md:hidden transition-opacity duration-300',
+          'fixed inset-0 z-[300] bg-black/40 transition-opacity duration-300 md:hidden',
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
-      {/* ─── Mobile drawer panel ─── */}
+      {/* ─── Mobile drawer ─── */}
       <div
+        id="mobile-nav"
         role="dialog"
         aria-modal="true"
-        aria-label="Navigation"
+        aria-label="Navigation menu"
         className={cn(
-          'fixed inset-y-0 right-0 z-[400] w-full max-w-sm bg-[var(--color-bg)]',
-          'flex flex-col overflow-y-auto scrollbar-thin',
+          'fixed inset-y-0 left-0 z-[400] w-[min(340px,100vw)] bg-[var(--color-bg)]',
+          'flex flex-col px-6 pt-7 pb-10 overflow-y-auto',
           'transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] md:hidden',
-          open ? 'translate-x-0' : 'translate-x-full'
+          open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Drawer header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-5 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between mb-10 flex-shrink-0">
           <Link
             href="/"
             onClick={() => setOpen(false)}
-            className="text-[14px] font-light tracking-[0.2em] uppercase"
+            className="text-[13px] font-light tracking-[0.2em] uppercase"
           >
             KVRN
           </Link>
           <button
             ref={closeRef}
             onClick={() => setOpen(false)}
+            className="p-2 -mr-2 text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
             aria-label="Close menu"
-            className="p-2 -mr-2 opacity-50 hover:opacity-100 transition-opacity"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+              <path d="M3 3L15 15M15 3L3 15" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
 
-        {/* Sections */}
-        <nav className="flex-1 px-6 py-8 space-y-10" aria-label="Mobile navigation">
+        {/* Drawer sections */}
+        <nav className="flex-1 space-y-8" aria-label="Mobile navigation">
           {drawerSections.map((section) => (
             <div key={section.heading}>
-              <p className="kvrn-label mb-4">{section.heading}</p>
-              <ul className="space-y-1">
-                {section.links.map((l) => (
-                  <li key={l.href}>
-                    <Link
-                      href={l.href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        'block py-2.5 text-[22px] font-light leading-tight',
-                        'hover:opacity-50 transition-opacity duration-150',
-                        pathname === l.href && 'opacity-40'
-                      )}
-                    >
-                      {l.label}
-                    </Link>
-                  </li>
+              <p className="kvrn-label text-[var(--color-muted)] mb-3">{section.heading}</p>
+              <div className="space-y-1">
+                {section.links.map((link) => (
+                  <Link
+                    key={link.href + link.label}
+                    href={link.href}
+                    onClick={() => setOpen(false)}
+                    className="block py-2.5 text-[15px] font-light text-[var(--color-text)] hover:text-[var(--color-muted)] transition-colors duration-150"
+                  >
+                    {link.label}
+                  </Link>
                 ))}
-              </ul>
+              </div>
             </div>
           ))}
         </nav>
 
-        {/* Drawer footer */}
-        <div className="px-6 py-6 border-t border-[var(--color-border)] flex gap-6">
-          {[
-            { label: 'Instagram', href: 'https://instagram.com/kvrn' },
-            { label: 'TikTok',    href: 'https://tiktok.com/@kvrn' },
-          ].map((s) => (
-            <a
-              key={s.label}
-              href={s.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="kvrn-label text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
-            >
-              {s.label}
-            </a>
-          ))}
+        {/* Social */}
+        <div className="mt-8 pt-6 border-t border-[var(--color-border)] flex gap-5 flex-shrink-0">
+          <a
+            href="https://instagram.com/kvrn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] tracking-[0.14em] uppercase text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+          >
+            Instagram
+          </a>
         </div>
       </div>
     </>

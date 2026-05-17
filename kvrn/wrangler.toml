@@ -1,0 +1,66 @@
+# ─── Cloudflare Workers Configuration ─────────────────────────────────────────
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+#
+# SETUP:
+#   1. Replace YOUR_ACCOUNT_ID with your Cloudflare account ID
+#      (Find at: dash.cloudflare.com → right sidebar)
+#
+#   2. Run once to create the KV namespace:
+#      npx wrangler kv:namespace create NEXT_CACHE_WORKERS_KV
+#      Then paste the returned ID into kv_namespaces below.
+#
+#   3. Set secrets (never put real values in this file):
+#      npx wrangler secret put STRIPE_SECRET_KEY
+#      npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#      npx wrangler secret put DATABASE_URL
+#      npx wrangler secret put RESEND_API_KEY
+#      npx wrangler secret put TWILIO_ACCOUNT_SID
+#      npx wrangler secret put TWILIO_AUTH_TOKEN
+#      npx wrangler secret put TWILIO_PHONE_NUMBER
+#      npx wrangler secret put ADMIN_SECRET
+#
+#   4. Deploy:
+#      npx opennextjs-cloudflare build
+#      npx wrangler deploy
+
+name       = "kvrn"
+main       = ".open-next/worker.js"
+# Account ID — replace with yours from Cloudflare dashboard
+account_id = "YOUR_ACCOUNT_ID"
+
+# Workers compatibility date — keep up to date
+compatibility_date  = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# ── KV namespace for caching ────────────────────────────────────────────────
+# Create with: npx wrangler kv:namespace create NEXT_CACHE_WORKERS_KV
+[[kv_namespaces]]
+binding = "NEXT_CACHE_WORKERS_KV"
+id      = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# ── Static assets ────────────────────────────────────────────────────────────
+[assets]
+directory = ".open-next/assets"
+binding   = "ASSETS"
+
+# ── Environment variables (non-secret) ──────────────────────────────────────
+# SECRETS must be set via `wrangler secret put` — never put them here
+[vars]
+NEXT_PUBLIC_SITE_URL       = "https://kvrn.com"
+NODE_ENV                   = "production"
+
+# ── Production environment ───────────────────────────────────────────────────
+[env.production]
+name = "kvrn"
+
+[env.production.vars]
+NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
+NODE_ENV             = "production"
+
+# ── Preview / staging environment ────────────────────────────────────────────
+[env.preview]
+name = "kvrn-preview"
+
+[env.preview.vars]
+NEXT_PUBLIC_SITE_URL = "https://kvrn-preview.YOUR_ACCOUNT.workers.dev"
+NODE_ENV             = "production"

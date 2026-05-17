@@ -97,9 +97,9 @@ export default function PrivacyPage() {
             <ul className="space-y-2">
               {[
                 ['Stripe',             'Payment processing (PCI DSS Level 1 certified)'],
-                ['Shippo',             'Shipping label generation and tracking'],
-                ['Resend',             'Transactional email delivery'],
-                ['Twilio',             'SMS notifications (opt-in only)'],
+                ['Shipping partner',   'Shipping label generation and order tracking'],
+                ['Email service',      'Transactional email delivery'],
+                ['SMS service',        'SMS notifications (opt-in only)'],
                 ['Neon',               'Database hosting (encrypted at rest)'],
                 ['Cloudflare',         'Hosting, CDN, and security'],
                 ['Google Analytics 4', 'Anonymous website analytics (consent-gated)'],
