@@ -3,6 +3,9 @@ import Script from 'next/script'
 import { CartProvider }     from '@/context/CartContext'
 import { CurrencyProvider } from '@/context/CurrencyContext'
 import { HeaderProvider }   from '@/context/HeaderContext'
+import { WishlistProvider } from '@/context/WishlistContext'
+import { I18nProvider }     from '@/context/I18nContext'
+import { WishlistDrawer }   from '@/components/ui/WishlistDrawer'
 import { ToastProvider }    from '@/components/ui/Toast'
 import { CookieBanner }     from '@/components/ui/CookieBanner'
 import { AnnouncementBar }  from '@/components/ui/AnnouncementBar'
@@ -82,20 +85,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-kvrn-bg text-kvrn-text font-body antialiased">
         <a href="#main-content" className="skip-link">Skip to main content</a>
 
+        <I18nProvider>
         <HeaderProvider>
           <CurrencyProvider>
-            <CartProvider>
+            <WishlistProvider>
+              <CartProvider>
               <ToastProvider>
                 <AnnouncementBar />
                 <Nav />
                 <CartDrawer />
+                <WishlistDrawer />
                 <main id="main-content">{children}</main>
                 <Footer />
                 <CookieBanner />
               </ToastProvider>
             </CartProvider>
+            </WishlistProvider>
           </CurrencyProvider>
         </HeaderProvider>
+        </I18nProvider>
 
         {gaId && (
           <>

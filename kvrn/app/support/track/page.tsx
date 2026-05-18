@@ -111,7 +111,7 @@ export default function TrackOrderPage() {
               placeholder="#1042"
               value={orderId}
               onChange={e => { setOrderId(e.target.value); setInputErr('') }}
-              className="input-base"
+              className="kvrn-input"
             />
           </div>
 
@@ -126,7 +126,7 @@ export default function TrackOrderPage() {
               placeholder="Email used at checkout"
               value={email}
               onChange={e => { setEmail(e.target.value); setInputErr('') }}
-              className="input-base"
+              className="kvrn-input"
             />
           </div>
 

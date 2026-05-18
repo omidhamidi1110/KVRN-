@@ -131,7 +131,7 @@ export default function ContactPage() {
                   value={fields[f.key]}
                   onChange={e => update(f.key, e.target.value)}
                   aria-invalid={!!errors[f.key]}
-                  className={`input-base ${errors[f.key] ? 'error' : ''}`}
+                  className={`kvrn-input ${errors[f.key] ? 'error' : ''}`}
                 />
                 {errors[f.key] && (
                   <p role="alert" className="text-[12px] text-kvrn-error mt-1">{errors[f.key]}</p>
@@ -148,7 +148,7 @@ export default function ContactPage() {
               value={fields.email}
               onChange={e => update('email', e.target.value)}
               aria-invalid={!!errors.email}
-              className={`input-base ${errors.email ? 'error' : ''}`}
+              className={`kvrn-input ${errors.email ? 'error' : ''}`}
             />
             {errors.email && <p role="alert" className="text-[12px] text-kvrn-error mt-1">{errors.email}</p>}
           </div>
@@ -164,7 +164,7 @@ export default function ContactPage() {
               value={fields.orderNumber}
               onChange={e => update('orderNumber', e.target.value)}
               placeholder="#1042"
-              className="input-base"
+              className="kvrn-input"
             />
           </div>
 
@@ -176,7 +176,7 @@ export default function ContactPage() {
               value={fields.subject}
               onChange={e => update('subject', e.target.value)}
               aria-invalid={!!errors.subject}
-              className={`input-base appearance-none cursor-pointer ${errors.subject ? 'error' : ''}`}
+              className={`kvrn-input appearance-none cursor-pointer ${errors.subject ? 'error' : ''}`}
             >
               <option value="">Select a subject</option>
               {subjects.map(s => <option key={s} value={s}>{s}</option>)}
@@ -192,7 +192,7 @@ export default function ContactPage() {
               value={fields.message}
               onChange={e => update('message', e.target.value)}
               aria-invalid={!!errors.message}
-              className={`textarea-base ${errors.message ? 'border-kvrn-error' : ''}`}
+              className={`kvrn-textarea ${errors.message ? 'error' : ''}`}
             />
             {errors.message && <p role="alert" className="text-[12px] text-kvrn-error mt-1">{errors.message}</p>}
           </div>

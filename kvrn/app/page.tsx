@@ -37,7 +37,10 @@ export default function HomePage() {
             Quiet luxury.<br />Premium utility.
           </h1>
           <Link href="/shop">
-            <Button variant="ghost" size="md">Shop now</Button>
+            <Link href="/shop"
+            className="inline-flex items-center h-11 px-8 border border-white/70 text-[11px] font-light tracking-[0.12em] uppercase text-white hover:bg-white hover:text-[#0E0E0E] transition-all duration-300">
+            Shop Now
+          </Link>
           </Link>
         </div>
 
@@ -110,7 +113,10 @@ export default function HomePage() {
                 ))}
               </div>
               <Link href="/shop">
-                <Button variant="secondary" size="md">Shop all</Button>
+                <Link href="/shop"
+                className="inline-flex items-center h-10 px-7 border border-[#1A1A1A] text-[11px] font-light tracking-[0.12em] uppercase text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition-all duration-300">
+                Shop All
+              </Link>
               </Link>
             </div>
           </div>
@@ -125,7 +131,7 @@ export default function HomePage() {
               { title: 'Secure checkout',         sub: 'Encrypted payment' },
               { title: 'Store credit returns',    sub: 'Within return window' },
               { title: 'Ships within 1–3 days',   sub: 'After order confirmation' },
-              { title: 'Built for longevity',      sub: 'Premium materials' },
+              { title: 'Built for longevity',      sub: 'Designed for daily wear' },
             ].map(item => (
               <div key={item.title}>
                 <p className="text-[13px] font-light text-[#1A1A1A]">{item.title}</p>

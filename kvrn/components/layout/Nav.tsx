@@ -2,48 +2,59 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useCart } from '@/context/CartContext'
-import { CurrencySelector } from '@/components/ui/CurrencySelector'
+import { useCart }     from '@/context/CartContext'
+import { useWishlist } from '@/context/WishlistContext'
+import { CurrencySelector }  from '@/components/ui/CurrencySelector'
+import { LanguageSelector }  from '@/components/ui/LanguageSelector'
 import { cn } from '@/lib/utils'
 
-// Desktop nav — curated shopping paths
+// Desktop nav — Track Order added, Size Guide removed
 const DESKTOP_LINKS = [
-  { label: 'Shop',        href: '/shop' },
-  { label: 'Hoodies',     href: '/shop?type=hoodies' },
-  { label: 'Sweatpants',  href: '/shop?type=sweatpants' },
-  { label: 'Size Guide',  href: '/support/size-guide' },
-  { label: 'About',       href: '/about' },
+  { label: 'Shop All',    href: '/shop' },
+  { label: 'Hoodies',    href: '/shop?type=hoodies' },
+  { label: 'Sweatpants', href: '/shop?type=sweatpants' },
+  { label: 'Track Order',href: '/support/track' },
+  { label: 'About',      href: '/about' },
 ]
 
-// Mobile drawer — fuller set
 const MOBILE_LINKS = [
-  { label: 'Shop All',         href: '/shop' },
-  { label: 'Hoodies',          href: '/shop?type=hoodies' },
-  { label: 'Sweatpants',       href: '/shop?type=sweatpants' },
-  { label: 'Waitlist',         href: '/waitlist' },
-  { label: 'About',            href: '/about' },
-  { label: 'Size Guide',       href: '/support/size-guide' },
-  { label: 'Track Order',      href: '/support/track' },
-  { label: 'FAQ',              href: '/support/faq' },
+  { label: 'Shop All',          href: '/shop' },
+  { label: 'Hoodies',           href: '/shop?type=hoodies' },
+  { label: 'Sweatpants',        href: '/shop?type=sweatpants' },
+  { label: 'Waitlist',          href: '/waitlist' },
+  { label: 'About',             href: '/about' },
+  { label: 'Size Guide',        href: '/support/size-guide' },
+  { label: 'Track Order',       href: '/support/track' },
+  { label: 'FAQ',               href: '/support/faq' },
   { label: 'Shipping & Returns',href: '/support/shipping-returns' },
-  { label: 'Contact',          href: '/contact' },
+  { label: 'Contact',           href: '/contact' },
 ]
+
+// Pages that start with a light/white background — nav text must be dark even when transparent
+const LIGHT_TOP_PAGES = [
+  '/shop', '/about', '/contact', '/waitlist', '/support', '/privacy', '/terms', '/cookies',
+  '/checkout', '/order-confirmation', '/admin', '/products',
+]
+
+function pageHasLightTop(path: string): boolean {
+  return LIGHT_TOP_PAGES.some(p => path.startsWith(p))
+}
 
 export function Nav() {
-  const { itemCount, openCart } = useCart()
+  const { itemCount, openCart }   = useCart()
+  const { count: savedCount, openWishlist } = useWishlist()
   const [scrolled,   setScrolled]   = useState(false)
   const [onHero,     setOnHero]     = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [currentPath, setCurrentPath] = useState('')
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  // Bar is always 36px, nav sits below it
-  const NAV_TOP = 36
-
   useEffect(() => {
+    setCurrentPath(window.location.pathname)
     const onScroll = () => {
       const y = window.scrollY
       setScrolled(y > 24)
-      setOnHero(y < (window.innerHeight * 0.7))
+      setOnHero(y < window.innerHeight * 0.7)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
@@ -61,8 +72,13 @@ export function Nav() {
     return () => { document.body.style.overflow = '' }
   }, [drawerOpen])
 
-  const transparent = !scrolled && onHero
-  const textColor   = transparent ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
+  // Force dark text on light-top pages even when transparent
+  const lightTop    = pageHasLightTop(currentPath)
+  const transparent = !scrolled && onHero && !lightTop
+  const darkText    = !transparent
+
+  const textColor = darkText ? 'text-[#1A1A1A]' : 'text-[#F0EDE8]'
+  const lineColor = darkText ? 'bg-[#1A1A1A]'   : 'bg-[#F0EDE8]'
 
   return (
     <>
@@ -71,20 +87,22 @@ export function Nav() {
           'fixed left-0 right-0 z-[200] h-[56px] flex items-center transition-all duration-300',
           scrolled
             ? 'bg-[rgba(249,248,246,0.95)] backdrop-blur-[16px] border-b border-[#E8E5E0]'
-            : 'bg-transparent',
+            : lightTop ? 'bg-[rgba(249,248,246,0.95)] border-b border-[#E8E5E0]' : 'bg-transparent',
           textColor
         )}
-        style={{ top: `${NAV_TOP}px` }}
+        style={{ top: '36px' }}
         aria-label="Main navigation"
       >
         <div className="container-kvrn flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="text-[15px] font-light tracking-[0.15em] uppercase hover:opacity-60 transition-opacity" aria-label="KVRN home">
+          <Link href="/"
+            className="text-[15px] font-light tracking-[0.15em] uppercase hover:opacity-60 transition-opacity"
+            aria-label="KVRN home">
             KVRN
           </Link>
 
           {/* Desktop links */}
-          <nav className="hidden lg:flex items-center gap-7" aria-label="Shop navigation">
+          <nav className="hidden lg:flex items-center gap-7" aria-label="Primary navigation">
             {DESKTOP_LINKS.map(l => (
               <Link key={l.href} href={l.href}
                 className="text-[11px] font-light tracking-[0.1em] uppercase hover:opacity-50 transition-opacity duration-150">
@@ -94,10 +112,28 @@ export function Nav() {
           </nav>
 
           {/* Right cluster */}
-          <div className="flex items-center gap-5">
-            <div className="hidden lg:block">
+          <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-4">
+              <LanguageSelector align="right" />
               <CurrencySelector align="right" />
             </div>
+
+            {/* Wishlist / saved */}
+            <button
+              onClick={openWishlist}
+              aria-label={`Saved items${savedCount > 0 ? `, ${savedCount}` : ''}`}
+              className="flex items-center gap-1 hover:opacity-50 transition-opacity"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                  stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
+                  fill={savedCount > 0 ? 'currentColor' : 'none'}
+                />
+              </svg>
+              {savedCount > 0 && (
+                <span className="text-[11px] font-light tabular-nums">({savedCount})</span>
+              )}
+            </button>
 
             {/* Bag */}
             <button
@@ -115,15 +151,11 @@ export function Nav() {
               )}
             </button>
 
-            {/* Hamburger — mobile */}
-            <button
-              onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
-              aria-expanded={drawerOpen}
-              className="lg:hidden flex flex-col gap-[6px] p-1"
-            >
-              <span className={cn('block h-px w-[22px] transition-colors', transparent ? 'bg-[#F0EDE8]' : 'bg-[#1A1A1A]')} />
-              <span className={cn('block h-px w-[22px] transition-colors', transparent ? 'bg-[#F0EDE8]' : 'bg-[#1A1A1A]')} />
+            {/* Hamburger */}
+            <button onClick={() => setDrawerOpen(true)} aria-label="Open menu"
+              aria-expanded={drawerOpen} className="lg:hidden flex flex-col gap-[6px] p-1">
+              <span className={cn('block h-px w-[22px] transition-colors', lineColor)} />
+              <span className={cn('block h-px w-[22px] transition-colors', lineColor)} />
             </button>
           </div>
         </div>
@@ -131,18 +163,14 @@ export function Nav() {
 
       {/* Mobile overlay */}
       <div
-        className={cn(
-          'fixed inset-0 z-[300] bg-black/40 transition-opacity duration-300 lg:hidden',
-          drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        )}
-        onClick={() => setDrawerOpen(false)}
-        aria-hidden="true"
+        className={cn('fixed inset-0 z-[300] bg-black/40 transition-opacity duration-300 lg:hidden',
+          drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')}
+        onClick={() => setDrawerOpen(false)} aria-hidden="true"
       />
 
       {/* Mobile drawer */}
       <div
-        ref={drawerRef}
-        role="dialog" aria-modal="true" aria-label="Navigation menu"
+        ref={drawerRef} role="dialog" aria-modal="true" aria-label="Navigation"
         className={cn(
           'fixed inset-y-0 left-0 z-[400] w-[85vw] max-w-[340px] bg-[#F9F8F6] flex flex-col',
           'transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] lg:hidden',
@@ -151,36 +179,36 @@ export function Nav() {
       >
         <div className="flex items-center justify-between px-6 pt-8 pb-6 border-b border-[#E8E5E0]">
           <Link href="/" onClick={() => setDrawerOpen(false)}
-            className="text-[15px] font-light tracking-[0.15em] uppercase">
-            KVRN
-          </Link>
+            className="text-[15px] font-light tracking-[0.15em] uppercase">KVRN</Link>
           <button onClick={() => setDrawerOpen(false)} aria-label="Close menu"
-            className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+            className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
               <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-6 py-4">
+        <nav className="flex-1 overflow-y-auto px-6 py-4" aria-label="Mobile navigation">
           {MOBILE_LINKS.map(l => (
-            <Link key={l.href + l.label} href={l.href}
-              onClick={() => setDrawerOpen(false)}
-              className="block py-3.5 text-[15px] font-light border-b border-[#E8E5E0] last:border-0 hover:text-[#6B6B6B] transition-colors">
+            <Link key={l.href + l.label} href={l.href} onClick={() => setDrawerOpen(false)}
+              className="block py-3.5 text-[15px] font-light border-b border-[#E8E5E0] last:border-0 hover:text-[#9B9B9B] transition-colors">
               {l.label}
             </Link>
           ))}
         </nav>
 
-        <div className="px-6 py-6 border-t border-[#E8E5E0] flex items-center justify-between">
-          <CurrencySelector align="left" />
+        <div className="px-6 py-5 border-t border-[#E8E5E0] space-y-4">
+          <div className="flex items-center gap-4">
+            <LanguageSelector align="left" />
+            <CurrencySelector align="left" />
+          </div>
           <div className="flex gap-4">
             <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-              aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+              aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
               <InstagramIcon />
             </a>
             <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-              aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+              aria-label="KVRN on TikTok" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
               <TikTokIcon />
             </a>
           </div>

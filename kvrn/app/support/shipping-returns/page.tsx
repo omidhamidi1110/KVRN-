@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Shipping & Returns — KVRN',
+  title: 'Shipping & Returns KVRN',
   description: 'KVRN shipping and returns policy. Store credit returns. Orders ship within 1–3 business days.',
 }
 
@@ -73,7 +73,7 @@ export default function ShippingReturnsPage() {
               {[
                 'Unworn and unwashed',
                 'In original condition with tags attached',
-                'Returned within our return window (shown in your order confirmation)',
+                'Returned within 14 days of delivery',
               ].map(item => (
                 <li key={item} className="flex items-start gap-2.5">
                   <span className="mt-2 w-1 h-1 rounded-full bg-[#9B9B9B] flex-shrink-0" aria-hidden="true" />
@@ -94,7 +94,7 @@ export default function ShippingReturnsPage() {
         <section>
           <p className="text-[14px] font-light mb-1">Questions?</p>
           <p className="text-[13px] text-[#6B6B6B]">
-            Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> — we respond within 1–2 business days.
+            Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> we respond within 1–2 business days.
           </p>
         </section>
       </div>
