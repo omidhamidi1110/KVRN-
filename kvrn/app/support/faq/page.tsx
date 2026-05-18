@@ -4,132 +4,132 @@ import { Accordion } from '@/components/ui/Accordion'
 
 export const metadata: Metadata = {
   title: 'FAQ — KVRN',
-  description: 'Frequently asked questions about KVRN products, sizing, shipping, and returns.',
+  description: 'Frequently asked questions about KVRN products, sizing, shipping and returns.',
 }
 
-const faqSections = [
+const FAQ_SECTIONS = [
   {
-    heading: 'Product',
+    heading: 'Products',
     items: [
       {
-        id:      'what-is-400-gsm',
-        trigger: 'What does 400 GSM mean?',
+        id: 'gsm',
+        trigger: 'What does GSM mean?',
         content: (
-          <div className="space-y-3">
-            <p>GSM stands for grams per square metre — the standard measurement of fabric weight. A higher number means a denser, heavier fabric.</p>
-            <p>Most hoodies on the market are 280–320 GSM. At 300 GSM, a hoodie feels light and somewhat provisional. At 400 GSM+, the fabric becomes structural — it holds its shape, drapes differently, and has a perceptible weight when you hold it.</p>
-            <p>KVRN is developed around heavyweight fleece construction. Full material specifications are listed on every product page.</p>
+          <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>GSM stands for grams per square metre. It measures how dense and heavy a fabric is. The higher the number, the heavier the material.</p>
+            <p>Most hoodies on the market sit around 280 to 320 GSM. At that weight the fabric feels light. At 400 GSM and above the structure changes noticeably — the garment holds its shape, drapes differently, and has real weight when you hold it.</p>
+            <p>Full material specifications are listed on each product page.</p>
           </div>
         ),
       },
       {
-        id:      'why-no-drawstring',
-        trigger: 'Why is there no drawstring?',
+        id: 'no-drawstring',
+        trigger: 'Why is there no drawstring on the hoodie?',
         content: (
-          <p>The 3-panel hood is engineered to hold its form without a drawstring. A drawstring is typically added because the hood collapses without it — the hood requires external support to maintain shape. KVRN&apos;s hood structure eliminates that requirement. There is nothing to pull, nothing to lose, and nothing to interrupt the silhouette.</p>
+          <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            The Heavyweight hood is structured across three panels so it holds its shape on its own. A drawstring is usually needed because the hood collapses without it. The construction here eliminates that problem. There is nothing to pull, nothing to lose, and nothing to interrupt the silhouette.
+          </p>
         ),
       },
       {
-        id:      'hidden-zippers',
-        trigger: 'How do the hidden zippers work?',
+        id: 'zippers',
+        trigger: 'How do the hidden interior pockets work?',
         content: (
-          <p>Each kangaroo pocket opening has a concealed YKK coil zipper running parallel behind it — one on each side. From the outside, with the zipper closed, the pockets appear completely standard. Open the zipper and you have access to a secure interior compartment. They are invisible in all positions.</p>
+          <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            The kangaroo pocket has two concealed zippers running inside it, one on each side. From the outside they are invisible. Open the zip and you access a secure interior compartment. They work in all positions and stay closed without looking closed.
+          </p>
         ),
       },
       {
-        id:      'care',
-        trigger: 'How should I wash and care for the hoodie?',
+        id: 'phantom',
+        trigger: 'What is the Phantom collection?',
         content: (
-          <div className="space-y-3">
-            <p>Machine wash cold (30°C), inside out. Use a gentle cycle. Air dry — do not tumble dry. Do not iron the rubber patch.</p>
-            <p>The fleece will soften over the first 3–5 washes. This is expected behaviour — the fabric continues to improve with regular wear and care. The structure of the hood and the integrity of the zippers are not affected by washing.</p>
+          <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>The Phantom collection uses a 500 GSM French terry blend rather than the brushed fleece of the Heavyweight collection. Both are heavy. The difference is in the construction and the proportion.</p>
+            <p>Phantom is enzyme washed and pre-shrunk before shipping, so it arrives with immediate softness and a more relaxed hand feel. It is also cut with a cropped, oversized proportion rather than a longer oversized one.</p>
           </div>
         ),
       },
       {
-        id:      'fabric',
-        trigger: 'What is the fabric composition?',
+        id: 'care',
+        trigger: 'How do I care for the garments?',
         content: (
-          <p>100% ring-spun combed cotton. No polyester blend. Ring-spun cotton is stronger and softer than standard spun cotton due to the way the fibres are twisted. Combing removes short fibres and impurities, resulting in a cleaner, more durable yarn.</p>
+          <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>Machine wash cold, inside out, gentle cycle. Air dry. Do not tumble dry on high heat.</p>
+            <p>The fleece will continue to soften over the first few washes. This is normal and expected. The structure of the hood and the zippers are not affected by regular washing.</p>
+          </div>
         ),
       },
     ],
   },
   {
     heading: 'Sizing',
-    id: 'sizing',
     items: [
       {
-        id:      'sizing-guide',
+        id: 'fit',
         trigger: 'How does KVRN fit?',
         content: (
-          <div className="space-y-4">
-            <p>KVRN is designed to be oversized. This is not a standard fit with extra room — it is a considered oversized silhouette where the proportions are deliberate.</p>
-            <p>If you want the intended silhouette, buy your normal size. If you prefer a cleaner, more fitted oversized look, size down.</p>
-            <div className="overflow-x-auto mt-4">
-              <table className="w-full text-[13px]" aria-label="Size guide measurements">
-                <thead>
-                  <tr className="border-b border-kvrn-border">
-                    <th className="text-left py-2 font-light label-11">Size</th>
-                    <th className="text-left py-2 font-light label-11">Chest (cm)</th>
-                    <th className="text-left py-2 font-light label-11">Length (cm)</th>
-                    <th className="text-left py-2 font-light label-11">Sleeve (cm)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-kvrn-border">
-                  {[
-                    { size: 'XS',  chest: 60, length: 72, sleeve: 63 },
-                    { size: 'S',   chest: 64, length: 74, sleeve: 64 },
-                    { size: 'M',   chest: 68, length: 76, sleeve: 65 },
-                    { size: 'L',   chest: 72, length: 78, sleeve: 66 },
-                    { size: 'XL',  chest: 76, length: 80, sleeve: 67 },
-                    { size: 'XXL', chest: 80, length: 82, sleeve: 68 },
-                  ].map((row) => (
-                    <tr key={row.size}>
-                      <td className="py-2.5 font-light">{row.size}</td>
-                      <td className="py-2.5 text-kvrn-muted">{row.chest}</td>
-                      <td className="py-2.5 text-kvrn-muted">{row.length}</td>
-                      <td className="py-2.5 text-kvrn-muted">{row.sleeve}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-[12px] text-kvrn-muted mt-3">All measurements in centimetres, taken flat. ±1.5cm tolerance.</p>
-            </div>
+          <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>KVRN is designed to be oversized. The proportions are intentional, not incidental. If you want the intended silhouette, order your usual size. If you want a slightly cleaner look, size down by one.</p>
+            <Link href="/support/size-guide" className="text-[#1A1A1A] underline underline-offset-2">View the size guide</Link>
           </div>
         ),
       },
       {
-        id:      'between-sizes',
-        trigger: 'I am between sizes — what should I do?',
+        id: 'measurements',
+        trigger: 'Where can I find measurements?',
         content: (
-          <p>Size down for a cleaner oversized silhouette. The oversized cut means even a smaller size will have substantial volume. If you are unsure, email us at support@kvrn.shop with your height and usual size — we will give you a specific recommendation.</p>
+          <div className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>The size guide has full measurements for both the hoodie and sweatpants, in centimetres and inches.</p>
+            <div className="mt-3">
+              <Link href="/support/size-guide" className="text-[#1A1A1A] underline underline-offset-2">Open size guide</Link>
+            </div>
+          </div>
         ),
       },
     ],
   },
   {
-    heading: 'Orders & Shipping',
+    heading: 'Shipping',
     items: [
       {
-        id:      'order-time',
-        trigger: 'When will my order ship?',
+        id: 'processing',
+        trigger: 'How long does processing take?',
         content: (
-          <p>Orders are typically processed within 1–2 business days. You will receive a tracking number by email once your order has shipped.</p>
+          <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            Orders are processed within approximately 1 to 3 business days of payment. Products are in stock and ship promptly unless a product page states otherwise.
+          </p>
         ),
       },
       {
-        id:      'international-duties',
-        trigger: 'Will I pay import duties on international orders?',
+        id: 'delivery',
+        trigger: 'How long does delivery take?',
         content: (
-          <p>Orders shipped outside the UK may be subject to import duties and taxes levied by the destination country&apos;s customs authority. These charges are the responsibility of the recipient and are not included in the shipping cost. For EU orders, we ship DDU (Delivered Duty Unpaid) — you will be contacted by your local customs authority if duties apply.</p>
+          <div className="space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>Domestic orders typically arrive within 2 to 7 business days after dispatch. International orders typically take 5 to 14 business days or more, depending on the destination and customs.</p>
+            <p>Delivery estimates are not guarantees. All orders include tracking, sent when your order dispatches.</p>
+          </div>
         ),
       },
       {
-        id:      'order-tracking',
+        id: 'free-shipping',
+        trigger: 'Is there free shipping?',
+        content: (
+          <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            Complimentary shipping is available on U.S. orders over $150. Shipping costs for all other orders are calculated at checkout based on destination and method selected.
+          </p>
+        ),
+      },
+      {
+        id: 'tracking',
         trigger: 'How do I track my order?',
         content: (
-          <p>Once your order ships, you will receive an email with your tracking number and a direct link to track your parcel. If you have not received a shipping confirmation within 2 business days of ordering, check your spam folder or contact us at orders@kvrn.shop.</p>
+          <div className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>You will receive a tracking number by email once your order ships. You can also use the track order page.</p>
+            <div className="mt-3">
+              <Link href="/support/track" className="text-[#1A1A1A] underline underline-offset-2">Track your order</Link>
+            </div>
+          </div>
         ),
       },
     ],
@@ -138,17 +138,34 @@ const faqSections = [
     heading: 'Returns',
     items: [
       {
-        id:      'returns-window',
-        trigger: 'What is the return window?',
+        id: 'returns',
+        trigger: 'What is the returns policy?',
         content: (
-          <p>30 days from the date of delivery, on unworn, unwashed items with tags attached. To initiate a return, email returns@kvrn.shop with your order number.</p>
+          <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>We accept returns for store credit on unworn, unwashed items with tags still attached, within our return window. The return window is shown in your order confirmation.</p>
+            <p>Customer covers return shipping unless the item arrives damaged, faulty, or incorrect.</p>
+            <div className="mt-1">
+              <Link href="/support/shipping-returns#returns" className="text-[#1A1A1A] underline underline-offset-2">Full returns policy</Link>
+            </div>
+          </div>
         ),
       },
       {
-        id:      'faulty',
-        trigger: 'What if my item is faulty?',
+        id: 'initiate-return',
+        trigger: 'How do I start a return?',
         content: (
-          <p>Faulty items are covered under your statutory consumer rights regardless of the 30-day window. Contact us immediately with photos of the fault at support@kvrn.shop. We will arrange a replacement or full refund — whichever you prefer.</p>
+          <div className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            <p>Email <a href="mailto:returns@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">returns@kvrn.shop</a> with your order number and the items you would like to return. We will respond within 24 hours with next steps.</p>
+          </div>
+        ),
+      },
+      {
+        id: 'wrong-item',
+        trigger: 'What if my order arrived wrong or damaged?',
+        content: (
+          <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
+            Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> with your order number and photos. If the item is faulty, incorrect, or damaged on arrival, we will cover the return shipping and resolve it at no cost to you.
+          </p>
         ),
       },
     ],
@@ -158,50 +175,41 @@ const faqSections = [
 export default function FAQPage() {
   return (
     <div className="pt-[calc(36px+56px)]">
-      <div className="container-kvrn section-padding max-w-3xl">
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="mb-10">
-          <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
-            <li><Link href="/" className="hover:text-kvrn-text transition-colors">Home</Link></li>
-            <li aria-hidden="true">·</li>
-            <li className="text-kvrn-text" aria-current="page">FAQ</li>
-          </ol>
-        </nav>
-
-        <h1 className="font-display font-light text-[40px] md:text-[56px] leading-none tracking-tighter mb-16">
-          Questions
-        </h1>
-
-        <div className="space-y-16">
-          {faqSections.map((section) => (
-            <section key={section.heading} id={section.id} aria-labelledby={`section-${section.heading}`}>
-              <h2
-                id={`section-${section.heading}`}
-                className="label-11 mb-6"
-              >
-                {section.heading}
-              </h2>
-              <Accordion items={section.items} />
-            </section>
-          ))}
+      {/* Dark header band */}
+      <div className="bg-[#0E0E0E] pb-14 pt-14">
+        <div className="container-kvrn max-w-3xl">
+          <nav aria-label="Breadcrumb" className="mb-8">
+            <ol className="flex items-center gap-2 text-[11px] text-[#F0EDE8]/40">
+              <li><Link href="/" className="hover:text-[#F0EDE8] transition-colors">Home</Link></li>
+              <li aria-hidden="true">·</li>
+              <li className="text-[#F0EDE8]/70" aria-current="page">FAQ</li>
+            </ol>
+          </nav>
+          <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
+            FAQ
+          </h1>
         </div>
+      </div>
 
-        {/* Still have questions */}
-        <div className="mt-20 pt-10 border-t border-kvrn-border">
-          <p className="text-[15px] font-light mb-2">Still have a question?</p>
-          <p className="text-[14px] text-kvrn-muted mb-4">
-            Email us at{' '}
-            <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2 hover:opacity-70 transition-opacity">
-              support@kvrn.shop
-            </a>
-            . We respond within 24 hours.
+      <div className="container-kvrn max-w-3xl py-14">
+        {FAQ_SECTIONS.map(section => (
+          <section key={section.heading} className="mb-12 last:mb-0">
+            <h2 className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-5 pb-3 border-b border-[#E8E5E0]">
+              {section.heading}
+            </h2>
+            <Accordion items={section.items.map(item => ({
+              id: item.id,
+              trigger: item.trigger,
+              content: item.content,
+            }))} />
+          </section>
+        ))}
+
+        <div className="mt-12 pt-8 border-t border-[#E8E5E0]">
+          <p className="text-[14px] font-light mb-1">Still have a question?</p>
+          <p className="text-[13px] text-[#6B6B6B]">
+            Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> and we will get back to you within 1 to 2 business days.
           </p>
-          <Link
-            href="/contact"
-            className="text-[13px] text-kvrn-muted hover:text-kvrn-text transition-colors duration-150 underline underline-offset-2"
-          >
-            Send a message →
-          </Link>
         </div>
       </div>
     </div>

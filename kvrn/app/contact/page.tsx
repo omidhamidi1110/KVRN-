@@ -85,7 +85,14 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="pt-[calc(36px+56px)]">
+    <div>
+      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-14">
+        <div className="container-kvrn max-w-2xl">
+          <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
+            Contact
+          </h1>
+        </div>
+      </div>
       <div className="container-kvrn section-padding max-w-2xl">
 
         {/* Breadcrumb */}

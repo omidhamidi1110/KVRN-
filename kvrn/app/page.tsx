@@ -97,14 +97,13 @@ export default function HomePage() {
                 Built for the<br />weight of daily life.
               </h2>
               <p className="text-[15px] text-[#6B6B6B] leading-relaxed max-w-[420px]">
-                Two collections. Both built from premium fleece with the structure and weight to last.
-                The Heavyweight is 100% cotton, brushed inside. The Phantom is a French terry blend, enzyme washed for immediate softness.
+                Two collections. Both developed around weight, structure, and longevity. Each piece is made to be worn every day and hold up over time.
               </p>
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3 pt-2 pb-2">
                 {[
-                  ['Heavyweight', '400 GSM brushed fleece, 100% cotton'],
-                  ['Phantom',     '500 GSM French terry, enzyme washed'],
-                  ['Both',        'Oversized fit, designed for daily wear'],
+                  ['Heavyweight', 'Dense fleece. Structured hood. Hidden zippers.'],
+                  ['Phantom',     'Heavier blend. Enzyme washed. Cropped proportion.'],
+                  ['Both',        'Oversized fit. Built to last.'],
                 ].map(([label, desc]) => (
                   <div key={label} className="flex gap-5 pb-3 border-b border-[#E8E5E0] last:border-0 last:pb-0">
                     <span className="text-[13px] font-light min-w-[100px] text-[#1A1A1A]">{label}</span>
@@ -112,11 +111,9 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-              <Link href="/shop">
-                <Link href="/shop"
+              <Link href="/shop"
                 className="inline-flex items-center h-10 px-7 border border-[#1A1A1A] text-[11px] font-light tracking-[0.12em] uppercase text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition-all duration-300">
                 Shop All
-              </Link>
               </Link>
             </div>
           </div>

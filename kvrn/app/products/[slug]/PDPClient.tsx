@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useCart }     from '@/context/CartContext'
 import { useCurrency } from '@/context/CurrencyContext'
-import { useWishlist } from '@/context/WishlistContext'
 import { ProductGallery } from '@/components/product/ProductGallery'
 import { ColorSelector }  from '@/components/product/ColorSelector'
 import { SizeSelector }   from '@/components/product/SizeSelector'
@@ -15,16 +14,19 @@ import { StockBadge, computeStock } from '@/components/ui/StockBadge'
 import { cn }             from '@/lib/utils'
 import type { ColorOption, SizeLabel, Product } from '@/types'
 
-interface Props {
+interface PDPClientProps {
   product:        Product
   relatedProduct: Product | null
 }
 
-export function PDPClient({ product, relatedProduct }: Props) {
-  const { addItem, openCart }          = useCart()
-  const { formatPrice }                = useCurrency()
-  const { isWishlisted, toggleItem }   = useWishlist()
+// Specs to suppress from the display list — handled via prose above
+const SUPPRESSED_SPEC_LABELS = new Set([
+  'Waist', 'Pockets', 'Pre-shrunk', 'Branding',
+])
 
+export function PDPClient({ product, relatedProduct }: PDPClientProps) {
+  const { addItem, openCart }  = useCart()
+  const { formatPrice }        = useCurrency()
   const [selectedColor, setSelectedColor] = useState<ColorOption>(product.colors[0])
   const [selectedSize,  setSelectedSize]  = useState<SizeLabel | null>(null)
   const [sizeError,     setSizeError]     = useState(false)
@@ -36,7 +38,6 @@ export function PDPClient({ product, relatedProduct }: Props) {
 
   const stock   = computeStock(product.sizes)
   const soldOut = stock === 0
-  const wished  = isWishlisted(product.id, selectedColor.value)
 
   useEffect(() => {
     if (!atcBtnRef.current) return
@@ -56,7 +57,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
     }
     setSizeError(false)
     setAddState('loading')
-    await new Promise(r => setTimeout(r, 260))
+    await new Promise(r => setTimeout(r, 280))
     const front = selectedColor.images.find(i => i.type === 'front')
     addItem({
       productId:   product.id,
@@ -75,26 +76,14 @@ export function PDPClient({ product, relatedProduct }: Props) {
     setTimeout(() => setAddState('idle'), 2000)
   }, [selectedSize, selectedColor, product, addItem, openCart])
 
-  const handleWishlist = useCallback(() => {
-    const front = selectedColor.images.find(i => i.type === 'front')
-    toggleItem({
-      productId:   product.id,
-      productName: product.name,
-      slug:        product.slug,
-      colorValue:  selectedColor.value,
-      colorName:   selectedColor.name,
-      colorHex:    selectedColor.hex,
-      price:       product.price,
-      image:       front?.src ?? '',
-    })
-  }, [selectedColor, product, toggleItem])
+  const visibleSpecs = product.specs.filter(s => !SUPPRESSED_SPEC_LABELS.has(s.label))
 
   const accordionItems = [
     {
-      id: 'details', trigger: 'Details',
+      id: 'details', trigger: 'Details & Construction',
       content: (
         <dl className="space-y-3">
-          {product.specs.map(s => (
+          {visibleSpecs.map(s => (
             <div key={s.label} className="flex gap-4">
               <dt className="text-[13px] font-light text-[#1A1A1A] min-w-[110px] flex-shrink-0">{s.label}</dt>
               <dd className="text-[13px] text-[#6B6B6B]">{s.value}</dd>
@@ -107,8 +96,8 @@ export function PDPClient({ product, relatedProduct }: Props) {
       id: 'shipping', trigger: 'Shipping',
       content: (
         <div className="space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
-          <p>Orders are processed within 1 to 3 business days. Shipping costs and delivery times depend on destination and chosen method, calculated at checkout.</p>
-          <p>Domestic: approximately 2 to 7 business days. International: 5 to 14 or more business days. Estimates are not guaranteed.</p>
+          <p>Orders processed within 1 to 3 business days. Shipping costs and delivery times depend on destination and method selected at checkout.</p>
+          <p>Domestic: approximately 2 to 7 business days. International: 5 to 14 or more business days. Delivery estimates are not guaranteed.</p>
           <Link href="/support/shipping-returns" className="text-[#1A1A1A] underline underline-offset-2">Full shipping policy</Link>
         </div>
       ),
@@ -117,23 +106,24 @@ export function PDPClient({ product, relatedProduct }: Props) {
       id: 'returns', trigger: 'Returns',
       content: (
         <div className="space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
-          <p>Returns are accepted for store credit within 14 days of delivery on unworn, unwashed items with original tags attached. Customer is responsible for return shipping unless the item is faulty or incorrect.</p>
+          <p>Returns accepted for store credit on unworn, unwashed items with tags attached, within our return window. Customer covers return shipping unless item arrives faulty or incorrect.</p>
           <Link href="/support/shipping-returns#returns" className="text-[#1A1A1A] underline underline-offset-2">Full returns policy</Link>
         </div>
       ),
     },
   ]
 
-  const atcLabel = soldOut ? 'Sold Out'
-    : addState === 'added' ? 'Added'
-    : addState === 'loading' ? 'Adding...'
-    : selectedSize ? `Add to Bag`
-    : 'Select a Size'
+  const atcLabel =
+    soldOut           ? 'Sold Out'   :
+    addState === 'added'   ? 'Added ✓'   :
+    addState === 'loading' ? 'Adding…'   :
+    selectedSize           ? 'Add to Bag' :
+                             'Select a Size'
 
   return (
     <>
       {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="container-kvrn pt-[calc(36px+56px+20px)] pb-3">
+      <nav aria-label="Breadcrumb" className="container-kvrn pt-[calc(36px+56px+16px)] pb-3">
         <ol className="flex items-center gap-2 text-[11px] text-[#9B9B9B]">
           <li><Link href="/" className="hover:text-[#1A1A1A] transition-colors">Home</Link></li>
           <li aria-hidden="true">·</li>
@@ -143,16 +133,22 @@ export function PDPClient({ product, relatedProduct }: Props) {
         </ol>
       </nav>
 
+      {/* Main grid */}
       <div className="container-kvrn pb-24">
         <div className="grid grid-cols-1 lg:grid-cols-[58fr_42fr] gap-8 lg:gap-14 items-start">
 
-          {/* Gallery */}
+          {/* Gallery — sticky */}
           <div className="lg:sticky lg:top-[calc(36px+56px+12px)]">
-            <ProductGallery images={selectedColor.images} productName={product.name} colorName={selectedColor.name} />
+            <ProductGallery
+              images={selectedColor.images}
+              productName={product.name}
+              colorName={selectedColor.name}
+            />
           </div>
 
-          {/* Info */}
+          {/* Info panel */}
           <div className="space-y-5">
+            {/* Brand + name + badge + price */}
             <div>
               <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-1.5">KVRN</p>
               <div className="flex items-start gap-3 justify-between">
@@ -161,50 +157,48 @@ export function PDPClient({ product, relatedProduct }: Props) {
                 </h1>
                 <StockBadge stock={stock} position="pdp" />
               </div>
-              <div className="flex items-center gap-3 mt-2">
-                <p className="text-[22px] font-light tabular-nums">{formatPrice(product.price)}</p>
-                {/* Wishlist on PDP */}
-                <button
-                  onClick={handleWishlist}
-                  aria-label={wished ? 'Remove from saved' : 'Save this item'}
-                  className="flex items-center gap-1.5 text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                      stroke={wished ? '#B91C1C' : 'currentColor'}
-                      strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
-                      fill={wished ? '#B91C1C' : 'none'}
-                    />
-                  </svg>
-                  <span className="text-[11px] tracking-wide">{wished ? 'Saved' : 'Save'}</span>
-                </button>
-              </div>
+              <p className="text-[22px] font-light mt-2 tabular-nums">{formatPrice(product.price)}</p>
               {product.founderNote && (
                 <p className="text-[12px] text-[#6B6B6B] mt-1">{product.founderNote}</p>
               )}
             </div>
 
             <div className="h-px bg-[#E8E5E0]" />
-            <ColorSelector colors={product.colors} selectedColor={selectedColor.value} onChange={setSelectedColor} />
+
+            {/* Color */}
+            <ColorSelector
+              colors={product.colors}
+              selectedColor={selectedColor.value}
+              onChange={setSelectedColor}
+            />
+
             <div className="h-px bg-[#E8E5E0]" />
 
+            {/* Size — no duplicate label, size guide link here only */}
             <div ref={sizePanelRef}>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">Size</span>
+                <span className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">
+                  Size{selectedSize ? ` — ${selectedSize}` : ''}
+                </span>
                 <Link href="/support/size-guide"
                   className="text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] underline underline-offset-2 transition-colors">
                   Size guide
                 </Link>
               </div>
-              <SizeSelector sizes={product.sizes} selectedSize={selectedSize}
-                onChange={s => { setSelectedSize(s); setSizeError(false) }} hasError={sizeError} />
+              <SizeSelector
+                sizes={product.sizes}
+                selectedSize={selectedSize}
+                onChange={s => { setSelectedSize(s); setSizeError(false) }}
+                hasError={sizeError}
+                hideSizeGuideLink  // suppress the internal link — we have it above
+              />
               {sizeError && <p className="text-[12px] text-[#B91C1C] mt-2">Please select a size</p>}
               {product.fitNote && <p className="text-[12px] text-[#6B6B6B] mt-2">{product.fitNote}</p>}
             </div>
 
             <div className="h-px bg-[#E8E5E0]" />
 
+            {/* Add to Bag */}
             <Button
               ref={atcBtnRef}
               variant="primary" size="lg" fullWidth
@@ -216,7 +210,8 @@ export function PDPClient({ product, relatedProduct }: Props) {
               {atcLabel}
             </Button>
 
-            <ul className="space-y-2">
+            {/* Trust signals */}
+            <ul className="space-y-2" aria-label="Purchase assurances">
               {['Quality checked before shipment', 'Secure checkout', 'Easy support if something arrives wrong'].map(line => (
                 <li key={line} className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -227,20 +222,26 @@ export function PDPClient({ product, relatedProduct }: Props) {
               ))}
             </ul>
 
+            {/* Description */}
             <p className="text-[14px] text-[#6B6B6B] leading-relaxed">{product.description}</p>
+
+            {/* Accordion details */}
             <Accordion items={accordionItems} />
           </div>
         </div>
 
         {/* Construction */}
         {product.features.length > 0 && (
-          <section className="mt-20 md:mt-28" aria-labelledby="construction-h">
-            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] text-center mb-8" id="construction-h">
+          <section className="mt-20 md:mt-28" aria-labelledby="construction-heading">
+            <p id="construction-heading"
+              className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] text-center mb-8">
               The Construction
             </p>
             <div className={cn(
               'grid gap-4 mx-auto',
-              product.features.length === 3 ? 'grid-cols-1 sm:grid-cols-3 max-w-3xl' : 'grid-cols-1 sm:grid-cols-2 max-w-2xl'
+              product.features.length === 3
+                ? 'grid-cols-1 sm:grid-cols-3 max-w-3xl'
+                : 'grid-cols-1 sm:grid-cols-2 max-w-xl'
             )}>
               {product.features.map(f => (
                 <div key={f.title} className="border border-[#E8E5E0] p-5 space-y-2">
@@ -252,75 +253,99 @@ export function PDPClient({ product, relatedProduct }: Props) {
           </section>
         )}
 
-        {/* Complete the Set */}
+        {/* Complete the Set — redesigned */}
         {relatedProduct && (
-          <section className="mt-16 md:mt-24 pt-12 border-t border-[#E8E5E0]">
-            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-8">Complete the Set</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 items-start max-w-2xl">
-              <div className="grid grid-cols-2 gap-3">
-                {[product, relatedProduct].map(p => {
-                  const color = p.colors.find(c => c.value === selectedColor.value) ?? p.colors[0]
-                  const img   = color.images[0]
-                  return (
-                    <Link key={p.id} href={`/products/${p.slug}`}
-                      className="relative aspect-[3/4] bg-[#F3F0EB] overflow-hidden block">
-                      {img?.src
-                        ? <Image src={img.src} alt={img.alt} fill sizes="200px" className="object-cover" />
-                        : <div className="absolute inset-0 flex items-end p-3"><span className="text-[11px] text-[#9B9B9B]">{p.name}</span></div>
-                      }
-                    </Link>
-                  )
-                })}
-              </div>
-              <div className="space-y-3">
-                <p className="text-[15px] font-light">The KVRN Set</p>
-                <p className="text-[13px] text-[#6B6B6B] leading-relaxed">Same fabric, same standard. Designed to be worn together.</p>
-                <p className="text-[15px] font-light tabular-nums">{formatPrice(product.price + relatedProduct.price)}</p>
-                <Link href={`/products/${relatedProduct.slug}`}>
-                  <Button variant="secondary" size="md">Shop {relatedProduct.name}</Button>
-                </Link>
+          <section className="mt-16 md:mt-24" aria-labelledby="set-heading">
+            <div className="bg-[#F3F0EB] p-8 md:p-12">
+              <p id="set-heading"
+                className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-8">
+                Complete the Set
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+                {/* Product pair thumbnails */}
+                <div className="grid grid-cols-2 gap-3 max-w-sm">
+                  {[product, relatedProduct].map((p, i) => {
+                    const color = p.colors.find(c => c.value === selectedColor.value) ?? p.colors[0]
+                    const img   = color.images[0]
+                    return (
+                      <Link key={p.id} href={`/products/${p.slug}`}
+                        className="relative aspect-[3/4] bg-[#E8E5E0] overflow-hidden block group">
+                        {img?.src
+                          ? <Image src={img.src} alt={img.alt} fill sizes="200px"
+                              className="object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+                          : <div className="absolute inset-0 flex items-end p-3">
+                              <span className="text-[11px] text-[#9B9B9B]">{p.name}</span>
+                            </div>
+                        }
+                        <div className="absolute bottom-0 left-0 right-0 bg-[#0E0E0E]/70 py-1.5 px-3">
+                          <p className="text-[10px] font-light tracking-[0.08em] text-[#F0EDE8] truncate">{p.name}</p>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+
+                {/* Text + CTA */}
+                <div>
+                  <h3 className="font-display font-light text-[22px] md:text-[26px] leading-tight tracking-[-0.02em] mb-3">
+                    The Full Set
+                  </h3>
+                  <p className="text-[13px] text-[#6B6B6B] leading-relaxed mb-5">
+                    Same fabric. Same weight. Designed to be worn together. Both available in the same colorways.
+                  </p>
+                  <p className="text-[18px] font-light tabular-nums mb-6">
+                    {formatPrice(product.price + relatedProduct.price)}
+                    <span className="text-[12px] text-[#9B9B9B] ml-2 font-light">for both</span>
+                  </p>
+                  <Link href={`/products/${relatedProduct.slug}`}>
+                    <Button variant="primary" size="md">Add {relatedProduct.name}</Button>
+                  </Link>
+                </div>
               </div>
             </div>
           </section>
         )}
       </div>
 
-      {/* Sticky ATC — clean, full-width bar */}
+      {/* Sticky ATC — shows color + size */}
       <div
         className={cn(
           'fixed bottom-0 left-0 right-0 z-[200]',
+          'bg-[#F9F8F6]/97 backdrop-blur-sm border-t border-[#E8E5E0]',
           'transition-transform duration-300',
           stickyVisible ? 'translate-y-0' : 'translate-y-full'
         )}
         aria-hidden={!stickyVisible}
       >
-        <div className="bg-[#F9F8F6] border-t border-[#E8E5E0] px-4 md:px-8 py-3">
-          <div className="max-w-4xl mx-auto flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-light truncate">{product.name}</p>
-              <p className="text-[11px] text-[#9B9B9B]">
-                {selectedSize ? `${selectedColor.name} / ${selectedSize}` : selectedColor.name}
+        <div className="container-kvrn py-3 flex items-center gap-4 max-w-[560px] mx-auto">
+          {/* Color swatch + selection info */}
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <span
+              className="w-4 h-4 rounded-full flex-shrink-0 border border-[#E8E5E0]"
+              style={{ backgroundColor: selectedColor.hex }}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <p className="text-[12px] font-light truncate leading-tight">{product.name}</p>
+              <p className="text-[11px] text-[#9B9B9B] leading-tight">
+                {selectedColor.name}{selectedSize ? ` / ${selectedSize}` : ' — Select size'}
               </p>
             </div>
-            <p className="text-[15px] font-light tabular-nums flex-shrink-0">
+          </div>
+          {/* Price + ATC */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[13px] font-light tabular-nums hidden sm:block">
               {formatPrice(product.price)}
-            </p>
-            <button
-              onClick={handleAdd}
+            </span>
+            <Button
+              variant="primary" size="sm"
+              loading={addState === 'loading'}
               disabled={soldOut}
-              className={cn(
-                'flex-shrink-0 h-10 px-8',
-                'text-[11px] font-light tracking-[0.1em] uppercase',
-                'transition-all duration-200',
-                soldOut
-                  ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
-                  : addState === 'added'
-                  ? 'bg-[#15803D] text-white'
-                  : 'bg-[#1A1A1A] text-white hover:bg-[#333]'
-              )}
+              onClick={handleAdd}
+              className="min-w-[110px]"
             >
-              {soldOut ? 'Sold Out' : addState === 'added' ? 'Added' : 'Add to Bag'}
-            </button>
+              {soldOut ? 'Sold Out' : addState === 'added' ? 'Added ✓' : 'Add to Bag'}
+            </Button>
           </div>
         </div>
       </div>

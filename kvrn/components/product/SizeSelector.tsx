@@ -5,12 +5,13 @@ import type { SizeLabel, SizeOption } from '@/types'
 import Link from 'next/link'
 
 interface SizeSelectorProps {
-  sizes:         SizeOption[]
-  selectedSize:  SizeLabel | null
-  onChange:      (size: SizeLabel) => void
-  hasError?:     boolean
-  className?:    string
-  id?:           string
+  sizes:              SizeOption[]
+  selectedSize:       SizeLabel | null
+  onChange:           (size: SizeLabel) => void
+  hasError?:          boolean
+  className?:         string
+  id?:                string
+  hideSizeGuideLink?: boolean  // suppress internal size guide link when parent provides it
 }
 
 export function SizeSelector({
@@ -20,6 +21,7 @@ export function SizeSelector({
   hasError = false,
   className,
   id = 'size-selector',
+  hideSizeGuideLink = false,
 }: SizeSelectorProps) {
   return (
     <fieldset
@@ -28,12 +30,14 @@ export function SizeSelector({
     >
       <div className="flex items-center justify-between mb-3">
         <legend className="label-11">Size</legend>
-        <Link
-          href="#size-guide"
-          className="text-[11px] text-kvrn-muted hover:text-kvrn-text tracking-wide underline underline-offset-2 transition-colors duration-150"
-        >
-          Size guide
-        </Link>
+        {!hideSizeGuideLink && (
+          <Link
+            href="#size-guide"
+            className="text-[11px] text-kvrn-muted hover:text-kvrn-text tracking-wide underline underline-offset-2 transition-colors duration-150"
+          >
+            Size guide
+          </Link>
+        )}
       </div>
 
       {/* Size grid */}

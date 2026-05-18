@@ -27,10 +27,10 @@ export function Footer() {
       <div className="container-kvrn">
 
         {/* Desktop 4-col grid / Mobile 2-col */}
-        <div className="py-10 md:py-14 grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
+        <div className="py-10 md:py-14 grid grid-cols-3 md:grid-cols-4 gap-6 md:gap-6">
 
           {/* Brand */}
-          <div className="col-span-2 md:col-span-1 space-y-4">
+          <div className="col-span-3 md:col-span-1 space-y-4 pb-6 border-b border-[#E8E5E0] md:border-0 md:pb-0">
             <Link href="/" className="block text-[14px] font-light tracking-[0.12em] uppercase">
               KVRN
             </Link>

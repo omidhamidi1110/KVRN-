@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useCurrency }  from '@/context/CurrencyContext'
+import { useCart } from '@/context/CartContext'
 import { useWishlist }  from '@/context/WishlistContext'
 import { StockBadge, computeStock } from '@/components/ui/StockBadge'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,13 @@ export function ProductCard({ product, priority = false, className }: ProductCar
       price:       product.price,
       image:       front?.src ?? '',
     })
+  }
+
+  const handleQuickAdd = (e: React.MouseEvent) => {
+    e.preventDefault()
+    // Quick-add in default color, no size — directs to PDP to select size
+    // If product has only one size or one color, could auto-add. For now: link to PDP.
+    window.location.href = `/products/${product.slug}?color=${activeColor.value}&quick=1`
   }
 
   return (

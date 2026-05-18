@@ -83,19 +83,16 @@ export default function TrackOrderPage() {
   const status = result ? (STATUS_LABELS[result.status] ?? { label: result.status, description: '' }) : null
 
   return (
-    <div className="pt-[calc(36px+56px)]">
+    <div>
+      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-14">
+        <div className="container-kvrn max-w-2xl">
+          <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
+            Track Order
+          </h1>
+        </div>
+      </div>
       <div className="container-kvrn section-padding max-w-xl">
-        <nav aria-label="Breadcrumb" className="mb-10">
-          <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
-            <li><Link href="/" className="hover:text-kvrn-text transition-colors">Home</Link></li>
-            <li aria-hidden="true">·</li>
-            <li><Link href="/support/faq" className="hover:text-kvrn-text transition-colors">Support</Link></li>
-            <li aria-hidden="true">·</li>
-            <li className="text-kvrn-text" aria-current="page">Track order</li>
-          </ol>
-        </nav>
-
-        <h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-10">
+<h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-10">
           Track your order
         </h1>
 

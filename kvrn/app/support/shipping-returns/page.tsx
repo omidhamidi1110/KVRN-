@@ -8,19 +8,24 @@ export const metadata: Metadata = {
 
 export default function ShippingReturnsPage() {
   return (
-    <div className="pt-[calc(36px+56px)]">
-      <div className="container-kvrn section-padding max-w-3xl">
+    <div>
+      {/* Dark header band */}
+      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-12">
+        <div className="container-kvrn max-w-3xl">
         <nav aria-label="Breadcrumb" className="mb-10">
-          <ol className="flex items-center gap-2 text-[11px] text-[#9B9B9B]">
-            <li><Link href="/" className="hover:text-[#1A1A1A] transition-colors">Home</Link></li>
+          <ol className="flex items-center gap-2 text-[11px] text-[#F0EDE8]/40">
+            <li><Link href="/" className="hover:text-[#F0EDE8] transition-colors">Home</Link></li>
             <li aria-hidden="true">·</li>
-            <li className="text-[#1A1A1A]" aria-current="page">Shipping & Returns</li>
+            <li className="text-[#F0EDE8]/70" aria-current="page">Shipping & Returns</li>
           </ol>
         </nav>
 
         <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] mb-14">
           Shipping & Returns
         </h1>
+        </div>
+      </div>
+      <div className="container-kvrn section-padding max-w-3xl">
 
         {/* Shipping */}
         <section className="mb-14" aria-labelledby="shipping-h">
