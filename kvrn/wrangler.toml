@@ -34,9 +34,6 @@ compatibility_flags = ["nodejs_compat"]
 
 # ── KV namespace for caching ────────────────────────────────────────────────
 # Create with: npx wrangler kv:namespace create NEXT_CACHE_WORKERS_KV
-[[kv_namespaces]]
-binding = "NEXT_CACHE_WORKERS_KV"
-id      = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
 
 # ── Static assets ────────────────────────────────────────────────────────────
 [assets]
