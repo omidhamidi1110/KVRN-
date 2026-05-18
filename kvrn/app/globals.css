@@ -290,3 +290,18 @@
     }
   }
 }
+
+/* ─── SCROLL SNAP (homepage sections) ───────────────────────────────────── */
+/* Applied manually via className, not via Tailwind plugin */
+.snap-container {
+  scroll-snap-type: y mandatory;
+  overflow-y: scroll;
+  height: 100svh;
+  /* Allow non-snap pages to scroll normally */
+}
+
+/* Only lock full-height sections; partial sections scroll freely */
+.snap-start {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}

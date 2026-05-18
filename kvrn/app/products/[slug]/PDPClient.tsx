@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useCart }     from '@/context/CartContext'
+import { useI18n }     from '@/context/I18nContext'
 import { useCurrency } from '@/context/CurrencyContext'
 import { ProductGallery } from '@/components/product/ProductGallery'
 import { ColorSelector }  from '@/components/product/ColorSelector'
@@ -26,6 +27,7 @@ const SUPPRESSED_SPEC_LABELS = new Set([
 
 export function PDPClient({ product, relatedProduct }: PDPClientProps) {
   const { addItem, openCart }  = useCart()
+  const { t }                  = useI18n()
   const { formatPrice }        = useCurrency()
   const [selectedColor, setSelectedColor] = useState<ColorOption>(product.colors[0])
   const [selectedSize,  setSelectedSize]  = useState<SizeLabel | null>(null)
@@ -80,7 +82,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
 
   const accordionItems = [
     {
-      id: 'details', trigger: 'Details & Construction',
+      id: 'details', trigger: t.details,
       content: (
         <dl className="space-y-3">
           {visibleSpecs.map(s => (
@@ -93,7 +95,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       ),
     },
     {
-      id: 'shipping', trigger: 'Shipping',
+      id: 'shipping', trigger: t.shipping,
       content: (
         <div className="space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
           <p>Orders processed within 1 to 3 business days. Shipping costs and delivery times depend on destination and method selected at checkout.</p>
@@ -103,7 +105,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       ),
     },
     {
-      id: 'returns', trigger: 'Returns',
+      id: 'returns', trigger: t.returns,
       content: (
         <div className="space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
           <p>Returns accepted for store credit on unworn, unwashed items with tags attached, within our return window. Customer covers return shipping unless item arrives faulty or incorrect.</p>
@@ -114,11 +116,11 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
   ]
 
   const atcLabel =
-    soldOut           ? 'Sold Out'   :
-    addState === 'added'   ? 'Added ✓'   :
-    addState === 'loading' ? 'Adding…'   :
-    selectedSize           ? 'Add to Bag' :
-                             'Select a Size'
+    soldOut           ? t.soldOut   :
+    addState === 'added'   ? t.addedToBag   :
+    addState === 'loading' ? t.adding   :
+    selectedSize           ? t.addToBag :
+                             t.selectSize
 
   return (
     <>
@@ -212,7 +214,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
 
             {/* Trust signals */}
             <ul className="space-y-2" aria-label="Purchase assurances">
-              {['Quality checked before shipment', 'Secure checkout', 'Easy support if something arrives wrong'].map(line => (
+              {[t.qualityChecked, t.secureCheckout, t.easySupport].map(line => (
                 <li key={line} className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                     <path d="M2 6l2.5 2.5L10 3" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
@@ -311,7 +313,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       <div
         className={cn(
           'fixed bottom-0 left-0 right-0 z-[200]',
-          'bg-[#F9F8F6]/97 backdrop-blur-sm border-t border-[#E8E5E0]',
+          'bg-[#F9F8F6] border-t border-[#E8E5E0]',
           'transition-transform duration-300',
           stickyVisible ? 'translate-y-0' : 'translate-y-full'
         )}
@@ -344,7 +346,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
               onClick={handleAdd}
               className="min-w-[110px]"
             >
-              {soldOut ? 'Sold Out' : addState === 'added' ? 'Added ✓' : 'Add to Bag'}
+              {soldOut ? t.soldOut : addState === 'added' ? t.addedToBag : t.addToBag}
             </Button>
           </div>
         </div>

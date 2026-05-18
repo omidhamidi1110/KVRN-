@@ -4,6 +4,7 @@ import { useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
+import { useI18n } from '@/context/I18nContext'
 import { useCurrency } from '@/context/CurrencyContext'
 import { Button } from '@/components/ui/Button'
 import { ShippingProgress } from '@/components/cart/ShippingProgress'
@@ -14,6 +15,7 @@ export function CartDrawer() {
     items, isOpen, closeCart, removeItem, updateQuantity, itemCount, subtotalPence,
   } = useCart()
   const { formatPrice } = useCurrency()
+  const { t } = useI18n()
   const closeRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export function CartDrawer() {
 
       {/* Drawer */}
       <div
-        role="dialog" aria-modal="true" aria-label="Shopping bag"
+        role="dialog" aria-modal="true" aria-label={t.bag}
         className={cn(
           'fixed top-0 right-0 bottom-0 z-[400] w-full max-w-[400px]',
           'bg-kvrn-bg flex flex-col',
@@ -50,7 +52,7 @@ export function CartDrawer() {
           <button
             ref={closeRef}
             onClick={closeCart}
-            aria-label="Close bag"
+            aria-label={t.bag}
             className="p-2 -mr-2 text-kvrn-muted hover:text-kvrn-text transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">

@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useI18n } from '@/context/I18nContext'
 
 const SHOP = [
   { label: 'All Products', href: '/shop' },
@@ -20,6 +23,7 @@ const LEGAL = [
 ]
 
 export function Footer() {
+  const { t } = useI18n()
   const year = new Date().getFullYear()
 
   return (
@@ -53,7 +57,7 @@ export function Footer() {
 
           {/* Shop */}
           <div>
-            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-4">Shop</p>
+            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-4">{t.shop}</p>
             <ul className="space-y-2.5">
               {SHOP.map(l => (
                 <li key={l.href}>
@@ -67,7 +71,7 @@ export function Footer() {
 
           {/* Support */}
           <div>
-            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-4">Support</p>
+            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-4">{t.support}</p>
             <ul className="space-y-2.5">
               {SUPPORT.map(l => (
                 <li key={l.href + l.label}>
@@ -81,7 +85,7 @@ export function Footer() {
 
           {/* Legal */}
           <div>
-            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-4">Legal</p>
+            <p className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-4">{t.legal}</p>
             <ul className="space-y-2.5">
               {LEGAL.map(l => (
                 <li key={l.href}>
@@ -102,8 +106,8 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="py-4 border-t border-[#E8E5E0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. All rights reserved.</p>
-          <p className="text-[11px] text-[#C8C4BF]">Prices shown in selected currency. Approximate conversion.</p>
+          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. {t.allRightsReserved}</p>
+          <p className="text-[11px] text-[#C8C4BF]">{t.approxConversion}</p>
         </div>
       </div>
     </footer>

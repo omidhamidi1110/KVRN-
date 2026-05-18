@@ -8,8 +8,8 @@ interface Props { className?: string; align?: 'left' | 'right' }
 
 export function LanguageSelector({ className, align = 'right' }: Props) {
   const { locale, setLocale } = useI18n()
-  const [open, setOpen] = useState(false)
-  const ref             = useRef<HTMLDivElement>(null)
+  const [open, setOpen]       = useState(false)
+  const ref                   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -26,13 +26,13 @@ export function LanguageSelector({ className, align = 'right' }: Props) {
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        aria-label={`Language: ${current.label}. Click to change.`}
-        className="flex items-center gap-1 text-[11px] font-light tracking-[0.08em] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors"
+        aria-label={`Language: ${current.label}`}
+        className="flex items-center gap-1 text-[11px] font-light tracking-[0.1em] text-[#1A1A1A] hover:opacity-50 transition-opacity"
       >
         <span>{current.nativeLabel}</span>
-        <svg width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"
+        <svg width="7" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"
           className={cn('transition-transform duration-200', open && 'rotate-180')}>
-          <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+          <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
         </svg>
       </button>
 
@@ -40,25 +40,29 @@ export function LanguageSelector({ className, align = 'right' }: Props) {
         <div
           role="listbox" aria-label="Select language"
           className={cn(
-            'absolute top-full mt-2 z-[300]',
-            'bg-[#F9F8F6] border border-[#E8E5E0] py-1 min-w-[180px]',
-            'max-h-[280px] overflow-y-auto shadow-sm',
+            'absolute top-full mt-3 z-[350]',
+            'bg-[#F9F8F6] border border-[#E8E5E0]',
+            'py-1 min-w-[180px] max-h-[300px] overflow-y-auto shadow-lg',
             align === 'right' ? 'right-0' : 'left-0'
           )}
         >
           {LANGUAGES.map(l => (
             <button
               key={l.code}
-              role="option" aria-selected={l.code === locale}
+              role="option"
+              aria-selected={l.code === locale}
               onClick={() => { setLocale(l.code as Locale); setOpen(false) }}
               className={cn(
-                'w-full text-left px-4 py-2 flex items-center justify-between gap-3 text-[12px] font-light',
-                'hover:bg-[#F3F0EB] transition-colors duration-100',
-                l.code === locale ? 'text-[#1A1A1A]' : 'text-[#6B6B6B]'
+                'w-full text-left px-4 py-2.5 flex items-center justify-between gap-3',
+                'text-[12px] font-light transition-colors duration-100',
+                'hover:bg-[#F3F0EB]',
+                l.code === locale
+                  ? 'text-[#1A1A1A] bg-[#F3F0EB]'
+                  : 'text-[#6B6B6B]'
               )}
             >
               <span>{l.nativeLabel}</span>
-              <span className="text-[10px] text-[#9B9B9B]">{l.label}</span>
+              <span className="text-[10px] text-[#9B9B9B] tracking-wide">{l.label}</span>
             </button>
           ))}
         </div>
