@@ -1,52 +1,38 @@
-# ─── Cloudflare Workers Configuration ─────────────────────────────────────────
-# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
-#
-# SETUP:
-#   1. Replace YOUR_ACCOUNT_ID with your Cloudflare account ID
-#      (Find at: dash.cloudflare.com → right sidebar)
-#
-#   2. Run once to create the KV namespace:
-#      npx wrangler kv:namespace create NEXT_CACHE_WORKERS_KV
-#      Then paste the returned ID into kv_namespaces below.
-#
-#   3. Set secrets (never put real values in this file):
-#      npx wrangler secret put STRIPE_SECRET_KEY
-#      npx wrangler secret put STRIPE_WEBHOOK_SECRET
-#      npx wrangler secret put DATABASE_URL
-#      npx wrangler secret put RESEND_API_KEY
-#      npx wrangler secret put TWILIO_ACCOUNT_SID
-#      npx wrangler secret put TWILIO_AUTH_TOKEN
-#      npx wrangler secret put TWILIO_PHONE_NUMBER
-#      npx wrangler secret put ADMIN_SECRET
-#
-#   4. Deploy:
-#      npx opennextjs-cloudflare build
-#      npx wrangler deploy
+# ─── Cloudflare Workers — KVRN ────────────────────────────────────────────────
+# Deploy: npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy
+# Secrets (set once via CLI, never stored here):
+#   npx wrangler secret put STRIPE_SECRET_KEY
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#   npx wrangler secret put DATABASE_URL
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put TWILIO_ACCOUNT_SID
+#   npx wrangler secret put TWILIO_AUTH_TOKEN
+#   npx wrangler secret put TWILIO_PHONE_NUMBER
+#   npx wrangler secret put ADMIN_SECRET
+#   npx wrangler secret put EMAIL_FROM
+#   npx wrangler secret put SUPPORT_EMAIL
+#   npx wrangler secret put ORDERS_EMAIL
+#   npx wrangler secret put RETURNS_EMAIL
 
 name       = "kvrn"
 main       = ".open-next/worker.js"
-# Account ID — replace with yours from Cloudflare dashboard
 account_id = "5c2f1f1df8ff752572878665e985280b"
 
-# Workers compatibility date — keep up to date
 compatibility_date  = "2024-12-18"
 compatibility_flags = ["nodejs_compat"]
 
-# ── KV namespace for caching ────────────────────────────────────────────────
-# Create with: npx wrangler kv:namespace create NEXT_CACHE_WORKERS_KV
-
-# ── Static assets ────────────────────────────────────────────────────────────
+# ── Static assets ─────────────────────────────────────────────────────────────
 [assets]
 directory = ".open-next/assets"
 binding   = "ASSETS"
 
-# ── Environment variables (non-secret) ──────────────────────────────────────
-# SECRETS must be set via `wrangler secret put` — never put them here
+# ── Public environment variables ───────────────────────────────────────────────
+# Secrets must be set via `wrangler secret put` — never hardcode here
 [vars]
-NEXT_PUBLIC_SITE_URL       = "https://kvrn.com"
-NODE_ENV                   = "production"
+NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
+NODE_ENV             = "production"
 
-# ── Production environment ───────────────────────────────────────────────────
+# ── Production ────────────────────────────────────────────────────────────────
 [env.production]
 name = "kvrn"
 
@@ -54,10 +40,10 @@ name = "kvrn"
 NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
 NODE_ENV             = "production"
 
-# ── Preview / staging environment ────────────────────────────────────────────
+# ── Preview / staging ─────────────────────────────────────────────────────────
 [env.preview]
 name = "kvrn-preview"
 
 [env.preview.vars]
-NEXT_PUBLIC_SITE_URL = "https://kvrn-preview.YOUR_ACCOUNT.workers.dev"
+NEXT_PUBLIC_SITE_URL = "https://kvrn.omidhamidi1110.workers.dev"
 NODE_ENV             = "production"
