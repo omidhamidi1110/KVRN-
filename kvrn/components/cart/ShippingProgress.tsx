@@ -2,57 +2,34 @@
 
 import { useCurrency } from '@/context/CurrencyContext'
 import { shippingProgressPct, centsToFreeShipping, freeShippingThreshold } from '@/lib/currency'
-import { cn } from '@/lib/utils'
 
-interface ShippingProgressProps {
-  cartUsdCents: number
-  className?:  string
-}
+interface Props { cartUsdCents: number; className?: string }
 
-export function ShippingProgress({ cartUsdCents, className }: ShippingProgressProps) {
+export function ShippingProgress({ cartUsdCents, className }: Props) {
   const { currency, formatPrice } = useCurrency()
   const pct       = shippingProgressPct(cartUsdCents)
   const remaining = centsToFreeShipping(cartUsdCents)
-  const threshold = freeShippingThreshold(currency)
   const achieved  = remaining === 0
 
   return (
-    <div className={cn('space-y-2', className)}>
-      {/* Message */}
-      <p className="text-[12px] text-kvrn-muted leading-relaxed">
+    <div className={className}>
+      <p className="text-[12px] text-[#6B6B6B] mb-2 leading-snug">
         {achieved ? (
-          <span className="text-kvrn-text font-light">
-            Complimentary U.S. shipping unlocked
-          </span>
+          <span className="text-[#1A1A1A] font-light">Complimentary U.S. shipping unlocked</span>
         ) : (
-          <>
-            <span className="text-kvrn-text font-light">{formatPrice(remaining)}</span>
-            {' '}away from complimentary U.S. shipping
-          </>
+          <><span className="text-[#1A1A1A] font-light">{formatPrice(remaining)}</span> away from complimentary U.S. shipping</>
         )}
       </p>
-
-      {/* Progress bar */}
-      <div
-        className="h-px bg-kvrn-border overflow-hidden"
-        role="progressbar"
-        aria-valuenow={Math.round(pct)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`${Math.round(pct)}% toward free shipping`}
-      >
+      <div className="h-px bg-[#E8E5E0] overflow-hidden"
+        role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}
+        aria-label={`${Math.round(pct)}% toward free shipping`}>
         <div
-          className={cn(
-            'h-full transition-all duration-700 ease-out',
-            achieved ? 'bg-kvrn-success' : 'bg-kvrn-text'
-          )}
+          className={`h-full transition-all duration-700 ease-out ${achieved ? 'bg-[#15803D]' : 'bg-[#1A1A1A]'}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-
-      {/* Disclaimer */}
-      <p className="text-[10px] text-kvrn-subtle tracking-wide">
-        Complimentary shipping applies to U.S. orders only. Threshold: {threshold}.
+      <p className="text-[10px] text-[#9B9B9B] mt-1.5 tracking-wide">
+        Complimentary shipping applies to U.S. orders only.
       </p>
     </div>
   )

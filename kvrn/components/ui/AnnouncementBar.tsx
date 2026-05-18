@@ -1,38 +1,26 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useHeader } from '@/context/HeaderContext'
+import { useEffect, useState } from 'react'
 
+// Announcement bar — always visible/sticky, does NOT hide on scroll
 const MESSAGES = [
-  'Complimentary U.S. shipping on orders above $150',
-  'Join the mailing list for $10 off your first order',
-  'Most orders ship within 1–3 business days',
-  'New arrivals available — shop the Phantom collection',
-  'Secure checkout',
+  'Complimentary U.S. shipping on orders over $150',
+  'New arrivals available now',
+  'Join the list for $10 off your first order',
 ]
 
-const INTERVAL   = 6000  // 6s per message
-const FADE_MS    = 600   // fade duration
+const INTERVAL = 6000
+const FADE_MS  = 500
 
 export function AnnouncementBar() {
-  const { barVisible, hideBar } = useHeader()
   const [idx,     setIdx]     = useState(0)
   const [fading,  setFading]  = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Hide bar on scroll past 80px
   useEffect(() => {
     if (!mounted) return
-    const onScroll = () => { if (window.scrollY > 80) hideBar() }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [mounted, hideBar])
-
-  // Rotate messages
-  useEffect(() => {
-    if (!barVisible) return
     const timer = setInterval(() => {
       setFading(true)
       setTimeout(() => {
@@ -41,18 +29,20 @@ export function AnnouncementBar() {
       }, FADE_MS)
     }, INTERVAL)
     return () => clearInterval(timer)
-  }, [barVisible])
+  }, [mounted])
 
-  if (!mounted || !barVisible) return null
+  if (!mounted) return (
+    <div className="fixed top-0 left-0 right-0 z-[250] h-[36px] bg-[#181818]" aria-hidden="true" />
+  )
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-[250] h-[36px] flex items-center justify-center bg-kvrn-text text-kvrn-bg overflow-hidden"
+      className="fixed top-0 left-0 right-0 z-[250] h-[36px] flex items-center justify-center bg-[#181818] overflow-hidden"
       aria-live="polite"
-      aria-label="Announcement"
+      aria-label="Site announcement"
     >
       <p
-        className="text-[11px] font-light tracking-widest text-center px-4 transition-opacity duration-500 select-none"
+        className="text-[11px] font-light tracking-[0.12em] text-[#F0EDE8] text-center px-4 select-none transition-opacity duration-500"
         style={{ opacity: fading ? 0 : 1 }}
       >
         {MESSAGES[idx]}

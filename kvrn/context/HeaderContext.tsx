@@ -1,23 +1,17 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext } from 'react'
 
+// Bar is now always visible — context kept for future use / nav offset
 interface HeaderContextValue {
-  barVisible:  boolean
-  hideBar:     () => void
+  barVisible: true
 }
 
-const HeaderContext = createContext<HeaderContextValue>({
-  barVisible: true,
-  hideBar:    () => {},
-})
+const HeaderContext = createContext<HeaderContextValue>({ barVisible: true })
 
 export function HeaderProvider({ children }: { children: React.ReactNode }) {
-  const [barVisible, setBarVisible] = useState(true)
-  const hideBar = useCallback(() => setBarVisible(false), [])
-
   return (
-    <HeaderContext.Provider value={{ barVisible, hideBar }}>
+    <HeaderContext.Provider value={{ barVisible: true }}>
       {children}
     </HeaderContext.Provider>
   )

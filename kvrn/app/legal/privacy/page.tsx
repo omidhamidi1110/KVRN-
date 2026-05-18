@@ -25,7 +25,7 @@ const sections = [
   },
   {
     heading: 'Your rights',
-    body: `You have the right to access the personal data we hold about you, request correction of inaccurate data, request deletion of your data, and withdraw consent for marketing communications at any time. To exercise any of these rights, email hello@kvrn.com.`,
+    body: `You have the right to access the personal data we hold about you, request correction of inaccurate data, request deletion of your data, and withdraw consent for marketing communications at any time. To exercise any of these rights, email support@kvrn.shop.`,
   },
   {
     heading: 'Retention',
@@ -33,7 +33,7 @@ const sections = [
   },
   {
     heading: 'Contact',
-    body: `For any privacy-related questions, email hello@kvrn.com. We aim to respond within 5 business days.`,
+    body: `For any privacy-related questions, email support@kvrn.shop. We aim to respond within 5 business days.`,
   },
 ]
 
@@ -72,8 +72,8 @@ export default function PrivacyPage() {
         <div className="mt-12 pt-10 border-t border-[var(--color-border)]">
           <p className="text-[13px] font-light text-[var(--color-muted)]">
             Questions?{' '}
-            <a href="mailto:hello@kvrn.com" className="text-[var(--color-text)] underline underline-offset-2 hover:opacity-70 transition-opacity">
-              hello@kvrn.com
+            <a href="mailto:support@kvrn.shop" className="text-[var(--color-text)] underline underline-offset-2 hover:opacity-70 transition-opacity">
+              support@kvrn.shop
             </a>
           </p>
         </div>

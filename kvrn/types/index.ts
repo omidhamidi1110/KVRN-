@@ -60,6 +60,7 @@ export interface Product {
   features: ProductFeature[]
   specs: ProductSpec[]
   fitNote: string
+  founderNote?: string  // Shown near price on PDP and cards
   relatedProductSlug?: string
   seo: {
     title: string

@@ -33,7 +33,7 @@ export default async function ShopPage({ searchParams }: PageProps) {
     : 'Shop All'
 
   return (
-    <div className="pt-[56px]" style={{ paddingTop: 'calc(36px + 56px)' }}>
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn py-10 md:py-14">
         {/* Header */}
         <div className="mb-8 md:mb-12">

@@ -1,59 +1,52 @@
 import { cn } from '@/lib/utils'
 
 interface StockBadgeProps {
-  stock:      number   // total in-stock units across all variants, or for a specific variant
+  stock:      number
   className?: string
-  position?:  'card' | 'pdp'  // card = corner overlay, pdp = inline near title
+  position?:  'card' | 'pdp'
 }
 
 export function StockBadge({ stock, className, position = 'card' }: StockBadgeProps) {
-  if (stock >= 3) return null  // No badge needed
+  if (stock >= 3) return null
 
-  const label    = stock === 0 ? 'Sold out' : 'Few left'
-  const isSoldOut = stock === 0
+  const soldOut = stock === 0
+  const label   = soldOut ? 'Sold Out' : 'Few Left'
 
   if (position === 'card') {
     return (
       <span
         className={cn(
-          'absolute bottom-3 left-3 px-2.5 py-1 text-[10px] font-light tracking-widest',
-          isSoldOut
-            ? 'bg-kvrn-text text-kvrn-bg'
-            : 'bg-kvrn-bg/90 text-kvrn-text border border-kvrn-border',
+          'absolute bottom-2.5 left-2.5 px-2 py-0.5 text-[10px] font-light tracking-[0.1em] uppercase',
+          soldOut
+            ? 'bg-[#181818] text-[#F0EDE8]'
+            : 'bg-[#F9F8F6]/90 text-[#1A1A1A] border border-[#E8E5E0]',
           className
         )}
-        aria-label={isSoldOut ? 'Sold out' : 'Limited stock remaining'}
+        aria-label={soldOut ? 'Sold out' : 'Limited stock remaining'}
       >
         {label}
       </span>
     )
   }
 
-  // PDP inline badge
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-1 text-[10px] font-light tracking-widest',
-        isSoldOut
-          ? 'bg-kvrn-text text-kvrn-bg'
-          : 'border border-kvrn-border-strong text-kvrn-text',
+        'inline-flex px-2.5 py-1 text-[11px] font-light tracking-[0.08em] uppercase',
+        soldOut
+          ? 'bg-[#181818] text-[#F0EDE8]'
+          : 'border border-[#C8C4BF] text-[#1A1A1A]',
         className
       )}
-      aria-label={isSoldOut ? 'Sold out' : 'Limited stock remaining'}
+      aria-label={soldOut ? 'Sold out' : 'Limited stock remaining'}
     >
       {label}
     </span>
   )
 }
 
-/** Compute total in-stock unit count from a product's size options */
 export function computeStock(sizes: Array<{ inStock: boolean; stockCount?: number }>): number {
-  // If stockCount is available use it; otherwise inStock booleans give 0 or ∞
   const hasCount = sizes.some(s => typeof s.stockCount === 'number')
-  if (hasCount) {
-    return sizes.reduce((sum, s) => sum + (s.stockCount ?? 0), 0)
-  }
-  // Fall back: in-stock = large number, out of stock = 0
-  const inStockCount = sizes.filter(s => s.inStock).length
-  return inStockCount === 0 ? 0 : 99  // 99 means "available, no badge"
+  if (hasCount) return sizes.reduce((sum, s) => sum + (s.stockCount ?? 0), 0)
+  return sizes.filter(s => s.inStock).length === 0 ? 0 : 99
 }

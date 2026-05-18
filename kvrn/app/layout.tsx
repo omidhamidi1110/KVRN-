@@ -50,7 +50,7 @@ const orgSchema = {
   '@type':    'ClothingStore',
   name:       'KVRN',
   url:        'https://kvrn.com',
-  description:'Quiet luxury meets premium utility. Heavyweight oversized hoodies and sweatpants.',
+  description:'Premium heavyweight fleece. Oversized hoodies and sweatpants built for daily wear.',
   email:      'support@kvrn.shop',
   sameAs: ['https://instagram.com/thekvrn', 'https://tiktok.com/@thekvrn'],
   contactPoint: {
