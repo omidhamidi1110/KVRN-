@@ -1,9 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, RefObject } from 'react'
 import { cn } from '@/lib/utils'
 
-export function ScrollCue() {
+interface Props {
+  scrollContainer?: RefObject<HTMLElement | null>
+}
+
+export function ScrollCue({ scrollContainer }: Props) {
   const [scrollY,  setScrollY]  = useState(0)
   const [mounted,  setMounted]  = useState(false)
   const [vh,       setVh]       = useState(700)
@@ -11,15 +15,30 @@ export function ScrollCue() {
   useEffect(() => {
     setMounted(true)
     setVh(window.innerHeight)
-    const onScroll = () => setScrollY(window.scrollY)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+
+    const el = scrollContainer?.current ?? window
+
+    const onScroll = () => {
+      const y = scrollContainer?.current
+        ? scrollContainer.current.scrollTop
+        : window.scrollY
+      setScrollY(y)
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [scrollContainer])
 
   const showDown = scrollY < 60
   const showUp   = mounted && scrollY > vh * 0.8
 
   if (!mounted) return null
+
+  const scrollToTop = () => {
+    const el = scrollContainer?.current
+    if (el) el.scrollTo({ top: 0, behavior: 'smooth' })
+    else window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
     <>
@@ -37,9 +56,9 @@ export function ScrollCue() {
         </svg>
       </div>
 
-      {/* Up arrow circle — right side, appears after scrolling */}
+      {/* Up arrow circle — right side */}
       <button
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        onClick={scrollToTop}
         aria-label="Return to top"
         className={cn(
           'fixed bottom-7 right-6 z-[190]',

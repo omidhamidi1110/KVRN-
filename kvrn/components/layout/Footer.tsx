@@ -1,13 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useCookiePrefs } from '@/context/CookiePrefsContext'
 import { useI18n } from '@/context/I18nContext'
 
 const SHOP = [
   { label: 'All Products', href: '/shop' },
   { label: 'Hoodies',      href: '/shop?type=hoodies' },
   { label: 'Sweatpants',   href: '/shop?type=sweatpants' },
-  { label: 'Waitlist',     href: '/waitlist' },
 ]
 const SUPPORT = [
   { label: 'FAQ',               href: '/support/faq' },
@@ -96,7 +96,8 @@ export function Footer() {
               ))}
             </ul>
             <div className="mt-6 pt-4 border-t border-[#E8E5E0]">
-              <a href="mailto:support@kvrn.shop"
+              <CookiePrefsLink />
+            <a href="mailto:support@kvrn.shop"
                 className="text-[12px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors">
                 support@kvrn.shop
               </a>
@@ -129,5 +130,17 @@ function TikTokIcon() {
     <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true">
       <path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2h0A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/>
     </svg>
+  )
+}
+
+function CookiePrefsLink() {
+  const { openPreferences } = useCookiePrefs()
+  return (
+    <button
+      onClick={openPreferences}
+      className="block text-[12px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors mb-1"
+    >
+      Cookie preferences
+    </button>
   )
 }

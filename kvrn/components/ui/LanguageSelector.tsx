@@ -4,12 +4,17 @@ import { useState, useRef, useEffect } from 'react'
 import { useI18n, LANGUAGES, type Locale } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 
-interface Props { className?: string; align?: 'left' | 'right' }
+interface Props {
+  className?: string
+  align?:     'left' | 'right'
+  inDrawer?:  boolean  // renders inline list style, no dropdown
+}
 
-export function LanguageSelector({ className, align = 'right' }: Props) {
+export function LanguageSelector({ className, align = 'right', inDrawer = false }: Props) {
   const { locale, setLocale } = useI18n()
   const [open, setOpen]       = useState(false)
   const ref                   = useRef<HTMLDivElement>(null)
+  const current = LANGUAGES.find(l => l.code === locale) ?? LANGUAGES[0]
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -19,7 +24,30 @@ export function LanguageSelector({ className, align = 'right' }: Props) {
     return () => document.removeEventListener('mousedown', close)
   }, [])
 
-  const current = LANGUAGES.find(l => l.code === locale) ?? LANGUAGES[0]
+  // Inline drawer style — horizontal pill list
+  if (inDrawer) {
+    return (
+      <div className={cn('space-y-1', className)}>
+        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">Language</p>
+        <div className="flex flex-wrap gap-1.5">
+          {LANGUAGES.map(l => (
+            <button
+              key={l.code}
+              onClick={() => setLocale(l.code as Locale)}
+              className={cn(
+                'px-2.5 py-1 text-[11px] font-light border transition-all duration-150',
+                l.code === locale
+                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                  : 'border-[#E8E5E0] text-[#1A1A1A] hover:border-[#1A1A1A]'
+              )}
+            >
+              {l.nativeLabel}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div ref={ref} className={cn('relative', className)}>
@@ -41,8 +69,8 @@ export function LanguageSelector({ className, align = 'right' }: Props) {
           role="listbox" aria-label="Select language"
           className={cn(
             'absolute top-full mt-3 z-[350]',
-            'bg-[#F9F8F6] border border-[#E8E5E0]',
-            'py-1 min-w-[180px] max-h-[300px] overflow-y-auto shadow-lg',
+            'bg-[#F9F8F6] border border-[#1A1A1A]/10',
+            'py-1 min-w-[200px] max-h-[320px] overflow-y-auto shadow-xl',
             align === 'right' ? 'right-0' : 'left-0'
           )}
         >
@@ -53,16 +81,18 @@ export function LanguageSelector({ className, align = 'right' }: Props) {
               aria-selected={l.code === locale}
               onClick={() => { setLocale(l.code as Locale); setOpen(false) }}
               className={cn(
-                'w-full text-left px-4 py-2.5 flex items-center justify-between gap-3',
-                'text-[12px] font-light transition-colors duration-100',
+                'w-full text-left px-4 py-2.5 flex items-center justify-between gap-4',
+                'transition-colors duration-100',
                 'hover:bg-[#F3F0EB]',
                 l.code === locale
-                  ? 'text-[#1A1A1A] bg-[#F3F0EB]'
-                  : 'text-[#6B6B6B]'
+                  ? 'bg-[#F3F0EB]'
+                  : ''
               )}
             >
-              <span>{l.nativeLabel}</span>
-              <span className="text-[10px] text-[#9B9B9B] tracking-wide">{l.label}</span>
+              {/* Native label — always high contrast */}
+              <span className="text-[13px] font-light text-[#1A1A1A]">{l.nativeLabel}</span>
+              {/* English label — readable secondary */}
+              <span className="text-[11px] text-[#6B6B6B] tracking-wide flex-shrink-0">{l.label}</span>
             </button>
           ))}
         </div>

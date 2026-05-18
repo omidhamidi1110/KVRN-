@@ -23,19 +23,21 @@ export function ShopClient({ products, type }: Props) {
   ]
 
   return (
-    <div className="pt-[calc(36px+56px)]">
-      <div className="container-kvrn py-10 md:py-14">
-        {/* Header */}
-        <div className="mb-8 md:mb-10">
-          <h1 className="font-display font-light text-[38px] md:text-[52px] leading-none tracking-[-0.03em]">
+    <div>
+      {/* Dark header — keeps nav text readable */}
+      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-12">
+        <div className="container-kvrn">
+          <h1 className="font-display font-light text-[40px] md:text-[56px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
             {heading}
           </h1>
           {!type && (
-            <p className="text-[14px] text-[#6B6B6B] mt-3">
+            <p className="text-[14px] text-[#F0EDE8]/40 mt-3">
               {products.length} products
             </p>
           )}
         </div>
+      </div>
+      <div className="container-kvrn py-10 md:py-14">
 
         {/* Filter tabs */}
         <div className="flex gap-6 mb-10 border-b border-[#E8E5E0] pb-4">

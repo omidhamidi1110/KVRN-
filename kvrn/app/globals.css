@@ -305,3 +305,29 @@
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
+
+/* ─── HOMEPAGE SCROLL SNAP ──────────────────────────────────────────────────
+   Applied only to the homepage via data-snap-page attribute on <main>.
+   Product/shop pages remain normal scroll.
+────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  [data-snap-page="true"] {
+    scroll-snap-type: y mandatory;
+    overflow-y: scroll;
+    height: 100svh;
+    scroll-behavior: smooth;
+    /* Override body overflow */
+    overscroll-behavior-y: none;
+  }
+
+  [data-snap-page="true"] [data-snap-section="true"] {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    /* Allow non-100vh sections to scroll through */
+  }
+
+  [data-snap-page="true"] [data-snap-section="false"] {
+    /* Sections that are NOT snapped — scroll naturally within snap container */
+    scroll-snap-align: none;
+  }
+}

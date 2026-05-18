@@ -18,7 +18,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/shop?type=sweatpants`,          lastModified: new Date(), changeFrequency:'weekly',  priority: 0.8 },
     ...productPages,
     { url: `${BASE}/about`,                         lastModified: new Date(), changeFrequency:'monthly', priority: 0.7 },
-    { url: `${BASE}/waitlist`,                      lastModified: new Date(), changeFrequency:'monthly', priority: 0.6 },
     { url: `${BASE}/contact`,                       lastModified: new Date(), changeFrequency:'monthly', priority: 0.5 },
     { url: `${BASE}/support/faq`,                   lastModified: new Date(), changeFrequency:'monthly', priority: 0.6 },
     { url: `${BASE}/support/shipping-returns`,      lastModified: new Date(), changeFrequency:'monthly', priority: 0.6 },
