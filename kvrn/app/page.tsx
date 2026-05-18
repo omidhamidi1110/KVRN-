@@ -91,12 +91,6 @@ export default function HomePage() {
                 fill quality={90} className="object-cover"
                 sizes="(max-width: 1024px) 100vw, 50vw"
               />
-              {/* Placeholder when image not added */}
-              <div className="absolute inset-0 flex items-center justify-center bg-kvrn-bg-raised opacity-70">
-                <p className="label-11 text-kvrn-subtle text-center px-6">
-                  Add /public/images/campaign/fabric-macro.webp
-                </p>
-              </div>
             </div>
 
             <div className="order-1 lg:order-2 space-y-7">
@@ -188,11 +182,6 @@ export default function HomePage() {
             fill quality={85} className="object-cover"
             sizes="100vw"
           />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="label-11 text-kvrn-subtle">
-              Add /public/images/campaign/fabric-macro.webp
-            </p>
-          </div>
         </div>
       </section>
 
