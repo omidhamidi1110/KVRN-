@@ -25,7 +25,7 @@ export default function HomePage() {
       >
         <div className="absolute inset-0">
           <Image
-            src="/images/campaign/hero-drop001.webp"
+            src="/images/campaign/hero-main.webp"
             alt="KVRN campaign — heavyweight oversized hoodie"
             fill priority fetchPriority="high" quality={90}
             className="object-cover object-center"
@@ -183,14 +183,14 @@ export default function HomePage() {
       <section className="relative overflow-hidden" aria-label="Campaign editorial">
         <div className="relative aspect-video lg:aspect-[21/9] bg-kvrn-bg-raised">
           <Image
-            src="/images/campaign/editorial-drop001.webp"
+            src="/images/campaign/fabric-macro.webp"
             alt="KVRN campaign editorial — oversized heavyweight hoodie and sweatpants"
             fill quality={85} className="object-cover"
             sizes="100vw"
           />
           <div className="absolute inset-0 flex items-center justify-center">
             <p className="label-11 text-kvrn-subtle">
-              Add /public/images/campaign/editorial-drop001.webp
+              Add /public/images/campaign/fabric-macro.webp
             </p>
           </div>
         </div>
