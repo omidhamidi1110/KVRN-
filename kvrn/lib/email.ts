@@ -4,7 +4,7 @@
 // SETUP:
 //   npm install resend
 //   Add RESEND_API_KEY to .env.local
-//   Verify kvrn.com domain at resend.com/domains
+//   Verify kvrn.shop domain at resend.com/domains (or route kvrn.shop through Cloudflare Email Routing to forward to your inbox)
 //
 // All transactional emails are plain-HTML, minimal, on-brand.
 // No heavy templates, no image-heavy emails — fast and reliable.
@@ -114,7 +114,7 @@ export function orderConfirmationHTML(data: OrderEmailData): string {
 
     <hr style="${STYLES.rule}">
 
-    <p style="${STYLES.p}">Questions? Reply to this email or contact <a href="mailto:hello@kvrn.com" style="color: #1A1A1A;">hello@kvrn.com</a>.</p>
+    <p style="${STYLES.p}">Questions? Reply to this email or contact <a href="mailto:support@kvrn.shop" style="color: #1A1A1A;">support@kvrn.shop</a>.</p>
 
     <p style="${STYLES.footer}">
       © KVRN · <a href="https://kvrn.com" style="color: #9B9B9B;">kvrn.com</a> ·
@@ -152,7 +152,7 @@ export function shippingConfirmationHTML(data: ShippingEmailData): string {
     <hr style="${STYLES.rule}">
 
     <p style="${STYLES.p}">
-      If anything isn't right when it arrives, email <a href="mailto:hello@kvrn.com" style="color: #1A1A1A;">hello@kvrn.com</a>.
+      If anything isn't right when it arrives, email <a href="mailto:support@kvrn.shop" style="color: #1A1A1A;">support@kvrn.shop</a>.
       Free returns within 30 days.
     </p>
 
@@ -212,7 +212,7 @@ export function waitlistConfirmationHTML(data: {
 
     <hr style="${STYLES.rule}">
 
-    <p style="${STYLES.p}">Questions? <a href="mailto:hello@kvrn.com" style="color: #1A1A1A;">hello@kvrn.com</a></p>
+    <p style="${STYLES.p}">Questions? <a href="mailto:support@kvrn.shop" style="color: #1A1A1A;">support@kvrn.shop</a></p>
 
     <p style="${STYLES.footer}">
       © KVRN · <a href="https://kvrn.com/api/unsubscribe?email=${encodeURIComponent(data.email)}" style="color: #9B9B9B;">Unsubscribe</a>
@@ -276,7 +276,7 @@ export async function sendEmail(params: {
     // const { Resend } = await import('resend')
     // const resend = new Resend(process.env.RESEND_API_KEY)
     // const { error } = await resend.emails.send({
-    //   from:     'KVRN <hello@kvrn.com>',
+    //   from:     'KVRN <support@kvrn.shop>',
     //   to:       params.to,
     //   subject:  params.subject,
     //   html:     params.html,

@@ -1,100 +1,138 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useCurrency } from '@/context/CurrencyContext'
+import { StockBadge, computeStock } from '@/components/ui/StockBadge'
 import { cn } from '@/lib/utils'
-import { formatPrice } from '@/data/products'
-import type { Product } from '@/types'
+import type { Product, ColorOption } from '@/types'
 
 interface ProductCardProps {
-  product:    Product
-  priority?:  boolean
+  product:   Product
+  priority?: boolean
   className?: string
 }
 
 export function ProductCard({ product, priority = false, className }: ProductCardProps) {
-  const defaultColor = product.colors[0]
-  const front = defaultColor?.images.find(i => i.type === 'front')
-  const back  = defaultColor?.images.find(i => i.type === 'back') ?? defaultColor?.images[1]
+  const { formatPrice } = useCurrency()
+  const [activeColor, setActiveColor] = useState<ColorOption>(product.colors[0])
 
-  const allOutOfStock = product.sizes.every(s => !s.inStock)
+  const frontImage = activeColor.images.find(i => i.type === 'front')
+  const backImage  = activeColor.images.find(i => i.type === 'back') ?? activeColor.images[1]
+  const stock      = computeStock(product.sizes)
 
   return (
-    <Link
-      href={`/products/${product.slug}`}
-      className={cn('group block card-hover', className)}
-      aria-label={`${product.name} — ${formatPrice(product.price)}`}
-    >
-      {/* Image container */}
-      <div className="relative aspect-[3/4] bg-[var(--color-bg-raised)] overflow-hidden mb-4">
-
+    <div className={cn('group flex flex-col', className)}>
+      {/* ── Image ── */}
+      <Link
+        href={`/products/${product.slug}?color=${activeColor.value}`}
+        className="relative aspect-[3/4] bg-kvrn-bg-raised overflow-hidden block"
+        aria-label={`${product.name} in ${activeColor.name} — ${formatPrice(product.price)}`}
+        tabIndex={0}
+      >
         {/* Primary image */}
-        {front?.src ? (
+        {frontImage?.src ? (
           <Image
-            src={front.src}
-            alt={front.alt}
+            src={frontImage.src}
+            alt={frontImage.alt}
             fill
             priority={priority}
-            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 640px"
-            className="object-cover img-primary"
-            quality={88}
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            className="object-cover transition-opacity duration-500 group-hover:opacity-0"
+            quality={85}
           />
         ) : (
-          /* Clean colour fallback — no text, no instructions */
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(145deg, ${defaultColor?.hex}18 0%, ${defaultColor?.hex}30 100%)`,
-            }}
-            aria-hidden="true"
-          />
+          <PlaceholderSwatch color={activeColor} label={product.name} />
         )}
 
-        {/* Secondary (back) — revealed on hover */}
-        {back?.src && (
+        {/* Back/secondary image */}
+        {backImage?.src && (
           <Image
-            src={back.src}
-            alt={back.alt}
+            src={backImage.src}
+            alt={backImage.alt}
             fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 640px"
-            className="object-cover img-secondary"
-            quality={88}
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+            className="object-cover absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+            quality={85}
           />
         )}
 
-        {/* Sold out */}
-        {allOutOfStock && (
-          <div className="absolute bottom-4 left-4">
-            <span className="kvrn-label bg-[var(--color-bg)]/90 px-3 py-1.5">
-              Sold Out
-            </span>
+        {/* Stock badge */}
+        <StockBadge stock={stock} position="card" />
+
+        {/* Wishlist — UI only, future feature */}
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation() }}
+          aria-label={`Save ${product.name} to wishlist`}
+          className={cn(
+            'absolute top-3 right-3 w-8 h-8 flex items-center justify-center',
+            'bg-kvrn-bg/80 backdrop-blur-sm',
+            'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
+            'hover:bg-kvrn-bg'
+          )}
+        >
+          <svg width="14" height="13" viewBox="0 0 14 13" fill="none" aria-hidden="true">
+            <path d="M7 12S1 7.5 1 4a3 3 0 015.2-2A3 3 0 0113 4c0 3.5-6 8-6 8z"
+              stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </Link>
+
+      {/* ── Product info ── */}
+      <div className="mt-3 space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <Link href={`/products/${product.slug}?color=${activeColor.value}`}
+            className="text-[14px] font-light text-kvrn-text hover:opacity-70 transition-opacity">
+            {product.name}
+          </Link>
+          <span className="text-[14px] font-light text-kvrn-text flex-shrink-0">
+            {formatPrice(product.price)}
+          </span>
+        </div>
+
+        {/* Color swatches — always visible */}
+        {product.colors.length > 1 && (
+          <div
+            className="flex items-center gap-1.5"
+            role="radiogroup"
+            aria-label={`Color options for ${product.name}`}
+          >
+            {product.colors.map(color => (
+              <button
+                key={color.value}
+                title={color.name}
+                aria-label={color.name}
+                aria-pressed={color.value === activeColor.value}
+                onClick={() => setActiveColor(color)}
+                className={cn(
+                  'w-4 h-4 rounded-full transition-all duration-150',
+                  'border',
+                  color.value === 'off-white' || color.hex.startsWith('#F')
+                    ? 'border-kvrn-border'
+                    : 'border-transparent',
+                  color.value === activeColor.value
+                    ? 'ring-1 ring-kvrn-text ring-offset-1 ring-offset-kvrn-bg scale-110'
+                    : 'hover:scale-110'
+                )}
+                style={{ backgroundColor: color.hex }}
+              />
+            ))}
           </div>
         )}
-      </div>
 
-      {/* Info */}
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="text-[15px] font-light">{product.name}</p>
-          <p className="text-[15px] font-light flex-shrink-0">{formatPrice(product.price)}</p>
-        </div>
-
-        {/* Color dots */}
-        <div className="flex gap-1.5" aria-label="Available colorways" role="list">
-          {product.colors.map(color => (
-            <span
-              key={color.value}
-              role="listitem"
-              aria-label={color.name}
-              className={cn(
-                'w-2.5 h-2.5 rounded-full border',
-                color.value === 'off-white'
-                  ? 'border-[var(--color-border)]'
-                  : 'border-transparent'
-              )}
-              style={{ backgroundColor: color.hex }}
-            />
-          ))}
-        </div>
+        <p className="text-[11px] text-kvrn-muted">{product.shortDescription}</p>
       </div>
-    </Link>
+    </div>
+  )
+}
+
+function PlaceholderSwatch({ color, label }: { color: ColorOption; label: string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+      style={{ backgroundColor: color.hex + '20' }}>
+      <div className="w-10 h-10 rounded-full opacity-40" style={{ backgroundColor: color.hex }} />
+      <span className="label-11 text-kvrn-subtle text-center px-4">{label}</span>
+    </div>
   )
 }

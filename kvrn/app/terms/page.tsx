@@ -10,7 +10,7 @@ const LAST_UPDATED = '1 January 2025'
 
 export default function TermsPage() {
   return (
-    <div className="pt-[56px]">
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn section-padding max-w-2xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -89,8 +89,8 @@ export default function TermsPage() {
             <p>
               Faulty goods are covered under the Consumer Rights Act 2015 regardless of our
               returns window. Contact us at{' '}
-              <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-                hello@kvrn.com
+              <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                support@kvrn.shop
               </a>{' '}
               for all warranty and fault claims.
             </p>
@@ -144,8 +144,8 @@ export default function TermsPage() {
             <h2 className="text-[15px] font-light text-kvrn-text mb-3">Contact</h2>
             <p>
               For any queries relating to these terms, contact us at{' '}
-              <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-                hello@kvrn.com
+              <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                support@kvrn.shop
               </a>.
             </p>
           </section>

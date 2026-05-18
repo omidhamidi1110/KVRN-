@@ -1,237 +1,186 @@
 import type { Product } from '@/types'
 
-// ─── CURRENCY CONFIG ─────────────────────────────────────────────────────────
-// All prices stored in cents (USD). formatPrice converts for display.
-// Update CURRENCY_CONFIG when adding multi-currency support.
+// ─── PRICE NOTE ───────────────────────────────────────────────────────────────
+// All prices stored as USD cents: 24000 = $240.00
+// Currency conversion handled by CurrencyContext + lib/currency.ts
 
-export const CURRENCY_CONFIG = {
-  code:   'USD',
-  symbol: '$',
-  locale: 'en-US',
+type ColorDef = { name: string; value: string; hex: string }
+type ShotType = import('@/types').ImageType
+
+function imgs(product: string, color: string, shots: string[]) {
+  const SHOT_ALTS: Record<string, string> = {
+    front: 'front view', back: 'back view',
+    'hood-macro': 'hood detail', 'fabric-macro': 'fabric texture',
+    'zipper-closed': 'pocket exterior', 'zipper-open': 'hidden zipper revealed',
+    lifestyle: 'worn lifestyle', 'flat-lay': 'flat lay', detail: 'detail',
+  }
+  const PROD_NAMES: Record<string, string> = {
+    'hoodie': 'KVRN Heavyweight Hoodie', 'sweatpants': 'KVRN Heavyweight Sweatpants',
+    'phantom-hoodie': 'KVRN Phantom Hoodie', 'phantom-pants': 'KVRN Phantom Sweatpants',
+  }
+  return shots.map(shot => ({
+    src: `/images/products/${product}-${color}-${shot}.webp`,
+    alt: `${PROD_NAMES[product] ?? product} in ${color.replace('-', ' ')}, ${SHOT_ALTS[shot] ?? shot}`,
+    type: shot as ShotType,
+  }))
 }
 
-export function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`
-}
+const STANDARD_SIZES = [
+  { label: 'XS' as const, value: 'xs', inStock: true },
+  { label: 'S'  as const, value: 's',  inStock: true },
+  { label: 'M'  as const, value: 'm',  inStock: true },
+  { label: 'L'  as const, value: 'l',  inStock: true },
+  { label: 'XL' as const, value: 'xl', inStock: true },
+  { label: 'XXL'as const, value: 'xxl',inStock: true },
+]
 
-export function formatPriceDecimal(cents: number): string {
-  return new Intl.NumberFormat(CURRENCY_CONFIG.locale, {
-    style:    'currency',
-    currency: CURRENCY_CONFIG.code,
-    minimumFractionDigits: 0,
-  }).format(cents / 100)
-}
+// ─── COLOR PALETTES ───────────────────────────────────────────────────────────
 
-// ─── PRODUCT CATALOG ─────────────────────────────────────────────────────────
+const HW_COLORS: ColorDef[] = [
+  { name: 'Black',     value: 'black',     hex: '#111111' },
+  { name: 'Dark Grey', value: 'dark-grey', hex: '#3A3A3A' },
+  { name: 'Grey',      value: 'grey',      hex: '#7A7A7A' },
+  { name: 'Brown',     value: 'brown',     hex: '#6B4C2A' },
+  { name: 'Plum',      value: 'plum',      hex: '#52274A' },
+]
+
+const PH_COLORS: ColorDef[] = [
+  { name: 'Black', value: 'black', hex: '#0A0A0A' },
+]
+
+// ─── PRODUCTS ─────────────────────────────────────────────────────────────────
 
 export const products: Product[] = [
   {
-    id:   'kh-001',
-    name: 'Heavyweight Hoodie',
-    slug: 'kvrn-heavyweight-hoodie',
-    type: 'hoodie',
-    price: 29000, // $290
-
-    shortDescription: '400 GSM+ fleece. Structured 3-panel hood. No drawstring.',
-
-    description:
-      'The KVRN Heavyweight Hoodie is built from 400 GSM+ loopback terry fleece — dense enough to hold structural form, refined enough to wear without thought. The three-panel hood maintains its architecture without a drawstring. Interior zipper compartments run behind both kangaroo pocket openings, invisible in every position. A single moulded rubber patch on the hood exterior. Nothing else.',
-
-    colors: [
-      {
-        name: 'Stone',
-        value: 'stone',
-        hex: '#C4B49A',
-        images: [
-          { src: '/images/products/hoodie-stone-01.jpg', alt: 'KVRN Heavyweight Hoodie in Stone — front view, structured hood down', type: 'front' },
-          { src: '/images/products/hoodie-stone-02.jpg', alt: 'KVRN Heavyweight Hoodie in Stone — back view, three-panel hood visible', type: 'back' },
-          { src: '/images/products/hoodie-stone-03.jpg', alt: 'KVRN Heavyweight Hoodie — structured hood worn up, architectural form', type: 'hood-macro' },
-          { src: '/images/products/hoodie-stone-04.jpg', alt: '400 GSM heavyweight fleece — triple-brushed interior texture detail', type: 'fabric-macro' },
-          { src: '/images/products/hoodie-stone-05.jpg', alt: 'KVRN kangaroo pocket exterior — concealed zipper not visible', type: 'zipper-closed' },
-          { src: '/images/products/hoodie-stone-06.jpg', alt: 'KVRN interior zipper compartment — revealed behind pocket opening', type: 'zipper-open' },
-          { src: '/images/products/hoodie-stone-07.jpg', alt: 'KVRN Heavyweight Hoodie worn — Stone colorway, architectural environment', type: 'lifestyle' },
-        ],
-      },
-      {
-        name: 'Slate',
-        value: 'slate',
-        hex: '#5C6470',
-        images: [
-          { src: '/images/products/hoodie-slate-01.jpg', alt: 'KVRN Heavyweight Hoodie in Slate — front view', type: 'front' },
-          { src: '/images/products/hoodie-slate-02.jpg', alt: 'KVRN Heavyweight Hoodie in Slate — back view', type: 'back' },
-          { src: '/images/products/hoodie-slate-03.jpg', alt: 'KVRN Heavyweight Hoodie in Slate — lifestyle', type: 'lifestyle' },
-        ],
-      },
-      {
-        name: 'Off White',
-        value: 'off-white',
-        hex: '#EDE8E0',
-        images: [
-          { src: '/images/products/hoodie-offwhite-01.jpg', alt: 'KVRN Heavyweight Hoodie in Off White — front view', type: 'front' },
-          { src: '/images/products/hoodie-offwhite-02.jpg', alt: 'KVRN Heavyweight Hoodie in Off White — back view', type: 'back' },
-        ],
-      },
-      {
-        name: 'Washed Black',
-        value: 'washed-black',
-        hex: '#2A2A2A',
-        images: [
-          { src: '/images/products/hoodie-washedblack-01.jpg', alt: 'KVRN Heavyweight Hoodie in Washed Black — front view', type: 'front' },
-          { src: '/images/products/hoodie-washedblack-02.jpg', alt: 'KVRN Heavyweight Hoodie in Washed Black — back view', type: 'back' },
-        ],
-      },
-    ],
-
-    sizes: [
-      { label: 'XS',  value: 'xs',  inStock: true },
-      { label: 'S',   value: 's',   inStock: true },
-      { label: 'M',   value: 'm',   inStock: true },
-      { label: 'L',   value: 'l',   inStock: true },
-      { label: 'XL',  value: 'xl',  inStock: true },
-      { label: 'XXL', value: 'xxl', inStock: false },
-    ],
-
-    fitNote: 'Designed oversized. Size down for a closer silhouette.',
-
+    id: 'kh-001', name: 'Heavyweight Hoodie', slug: 'kvrn-heavyweight-hoodie',
+    type: 'hoodie', price: 24000,
+    shortDescription: 'Brushed fleece, 400 GSM. Double-layered hood.',
+    description: 'Built for the weight of daily life. 400 GSM brushed fleece — dense enough to feel structural, considered enough to be worn without thinking. The double-layered hood holds its form without drawstrings. Two concealed zipper compartments sit inside the kangaroo pocket, invisible from outside.',
+    colors: HW_COLORS.map(c => ({
+      ...c,
+      images: imgs('hoodie', c.value, ['front', 'back', 'hood-macro', 'fabric-macro', 'zipper-closed', 'zipper-open', 'lifestyle']),
+    })),
+    sizes: STANDARD_SIZES,
+    fitNote: 'Runs oversized. If between sizes, size down for a cleaner silhouette.',
     features: [
-      {
-        title: '400 GSM+ Fleece',
-        description: 'Triple-brushed loopback terry. Dense, cold-resist face. Tested per production batch — minimum 390 GSM accepted.',
-      },
-      {
-        title: '3-Panel Structured Hood',
-        description: 'Three cut panels seamed to form a self-supporting dome. Holds its shape without external support.',
-      },
-      {
-        title: 'Interior Zipper Pockets',
-        description: 'YKK coil zippers run parallel to both kangaroo pocket openings. Invisible externally in any position.',
-      },
-      {
-        title: 'No Drawstring',
-        description: 'The hood structure is engineered not to require one. No silhouette interruption. Nothing to lose.',
-      },
+      { title: '400 GSM Brushed Fleece', description: '100% cotton. Dense, cold-resist face with a brushed interior. Perceptible weight from the first lift.' },
+      { title: 'Double-Layered Hood', description: 'Structured construction holds its form without a drawstring. Nothing to adjust.' },
+      { title: 'Two Hidden Zipper Pockets', description: 'Concealed zip compartments inside the kangaroo pocket — one each side. Secure. Invisible from outside.' },
+      { title: 'No Drawstring', description: 'Engineered not to need one. The hood structure does the work.' },
     ],
-
     specs: [
-      { label: 'Material',     value: '100% ring-spun combed cotton' },
-      { label: 'Weight',       value: '400 GSM+' },
-      { label: 'Construction', value: 'Loopback terry, triple-brushed interior' },
-      { label: 'Hood',         value: '3-panel structured, no drawstring' },
-      { label: 'Pockets',      value: 'Kangaroo with concealed interior YKK zippers' },
-      { label: 'Branding',     value: 'Moulded rubber patch, hood exterior only' },
-      { label: 'Fit',          value: 'Oversized' },
-      { label: 'Care',         value: 'Machine wash cold, inside out. Air dry.' },
+      { label: 'Material', value: '100% Cotton' },
+      { label: 'Weight',   value: '400 GSM' },
+      { label: 'Construction', value: 'Brushed fleece' },
+      { label: 'Hood',     value: 'Double-layered, no drawstring' },
+      { label: 'Pockets',  value: 'Kangaroo with 2 concealed interior zippers' },
+      { label: 'Branding', value: 'Minimal rubber patch, hood only' },
+      { label: 'Fit',      value: 'Oversized' },
+      { label: 'Care',     value: 'Machine wash cold. Inside out. Air dry.' },
     ],
-
     relatedProductSlug: 'kvrn-heavyweight-sweatpants',
-
     seo: {
-      title: 'KVRN Heavyweight Hoodie — 400 GSM Oversized Fleece',
-      description:
-        'KVRN Heavyweight Hoodie. 400 GSM+ ring-spun cotton fleece. Structured 3-panel hood. Concealed interior YKK zippers. No drawstring. Four colorways.',
+      title: 'KVRN Heavyweight Hoodie | 400 GSM Brushed Fleece | 5 Colorways',
+      description: 'KVRN Heavyweight Hoodie. 400 GSM brushed fleece, 100% cotton. Double-layered structured hood. Two hidden zipper pockets. No drawstring.',
     },
   },
 
   {
-    id:   'ks-001',
-    name: 'Heavyweight Sweatpants',
-    slug: 'kvrn-heavyweight-sweatpants',
-    type: 'sweatpants',
-    price: 25000, // $250
-
-    shortDescription: '400 GSM+ fleece. Wide-leg. Concealed drawcord. Back zip pocket.',
-
-    description:
-      'Cut from the same 400 GSM+ loopback terry as the hoodie. A wide-leg silhouette proportioned to sit beside the hoodie as a unified system. Elastic waistband with internal drawcord — functional, invisible. Two side pockets. One back zip pocket, concealed at the seam. No visible branding.',
-
-    colors: [
-      {
-        name: 'Stone',
-        value: 'stone',
-        hex: '#C4B49A',
-        images: [
-          { src: '/images/products/sweatpants-stone-01.jpg', alt: 'KVRN Heavyweight Sweatpants in Stone — front view', type: 'front' },
-          { src: '/images/products/sweatpants-stone-02.jpg', alt: 'KVRN Heavyweight Sweatpants in Stone — back view', type: 'back' },
-          { src: '/images/products/sweatpants-stone-03.jpg', alt: '400 GSM heavyweight fleece — sweatpants fabric detail', type: 'fabric-macro' },
-          { src: '/images/products/sweatpants-stone-04.jpg', alt: 'KVRN Heavyweight Sweatpants — worn, Stone colorway', type: 'lifestyle' },
-        ],
-      },
-      {
-        name: 'Slate',
-        value: 'slate',
-        hex: '#5C6470',
-        images: [
-          { src: '/images/products/sweatpants-slate-01.jpg', alt: 'KVRN Heavyweight Sweatpants in Slate — front view', type: 'front' },
-          { src: '/images/products/sweatpants-slate-02.jpg', alt: 'KVRN Heavyweight Sweatpants in Slate — back view', type: 'back' },
-        ],
-      },
-      {
-        name: 'Off White',
-        value: 'off-white',
-        hex: '#EDE8E0',
-        images: [
-          { src: '/images/products/sweatpants-offwhite-01.jpg', alt: 'KVRN Heavyweight Sweatpants in Off White — front view', type: 'front' },
-          { src: '/images/products/sweatpants-offwhite-02.jpg', alt: 'KVRN Heavyweight Sweatpants in Off White — back view', type: 'back' },
-        ],
-      },
-      {
-        name: 'Washed Black',
-        value: 'washed-black',
-        hex: '#2A2A2A',
-        images: [
-          { src: '/images/products/sweatpants-washedblack-01.jpg', alt: 'KVRN Heavyweight Sweatpants in Washed Black — front view', type: 'front' },
-          { src: '/images/products/sweatpants-washedblack-02.jpg', alt: 'KVRN Heavyweight Sweatpants in Washed Black — back view', type: 'back' },
-        ],
-      },
-    ],
-
-    sizes: [
-      { label: 'XS',  value: 'xs',  inStock: true },
-      { label: 'S',   value: 's',   inStock: true },
-      { label: 'M',   value: 'm',   inStock: true },
-      { label: 'L',   value: 'l',   inStock: true },
-      { label: 'XL',  value: 'xl',  inStock: true },
-      { label: 'XXL', value: 'xxl', inStock: true },
-    ],
-
+    id: 'ks-001', name: 'Heavyweight Sweatpants', slug: 'kvrn-heavyweight-sweatpants',
+    type: 'sweatpants', price: 19500,
+    shortDescription: 'Brushed fleece, 400 GSM. Wide-leg silhouette.',
+    description: 'The same 400 GSM brushed fleece as the hoodie. A wide-leg silhouette with considered proportions — generous without being shapeless. Concealed elastic waistband with internal drawcord.',
+    colors: HW_COLORS.map(c => ({
+      ...c,
+      images: imgs('sweatpants', c.value, ['front', 'back', 'fabric-macro', 'lifestyle']),
+    })),
+    sizes: STANDARD_SIZES,
     fitNote: 'Wide-leg, sits at natural waist. True to size.',
-
     features: [
-      {
-        title: '400 GSM+ Fleece',
-        description: 'Same triple-brushed loopback terry as the hoodie. Consistent weight across the full system.',
-      },
-      {
-        title: 'Wide-Leg Silhouette',
-        description: 'Proportioned deliberately — wide enough to carry structural presence, tapered enough at the ankle to stay precise.',
-      },
-      {
-        title: 'Concealed Drawcord',
-        description: 'Elastic waistband with internal drawcord. Adjustable, invisible from the exterior.',
-      },
-      {
-        title: 'Back Zip Pocket',
-        description: 'Single back pocket with concealed YKK zip at the seam. Secure. Seamless with the garment exterior.',
-      },
+      { title: '400 GSM Brushed Fleece', description: 'The same 100% cotton brushed fleece as the hoodie. Consistent weight across the full set.' },
+      { title: 'Wide-Leg Silhouette', description: 'A considered proportion. Generous enough to feel relaxed, structured enough to hold its shape.' },
+      { title: 'Concealed Waistband', description: 'Elastic with internal drawcord. Adjustable from inside. Nothing visible from out.' },
     ],
-
     specs: [
-      { label: 'Material',     value: '100% ring-spun combed cotton' },
-      { label: 'Weight',       value: '400 GSM+' },
-      { label: 'Construction', value: 'Loopback terry, triple-brushed interior' },
-      { label: 'Waist',        value: 'Elastic with internal drawcord' },
-      { label: 'Pockets',      value: 'Two side pockets, one back zip pocket' },
-      { label: 'Leg',          value: 'Wide-leg, tapered at ankle' },
-      { label: 'Branding',     value: 'None visible' },
-      { label: 'Care',         value: 'Machine wash cold, inside out. Air dry.' },
+      { label: 'Material', value: '100% Cotton' },
+      { label: 'Weight',   value: '400 GSM' },
+      { label: 'Construction', value: 'Brushed fleece' },
+      { label: 'Waist',    value: 'Elastic with internal drawcord' },
+      { label: 'Pockets',  value: 'Two side pockets' },
+      { label: 'Leg',      value: 'Wide-leg' },
+      { label: 'Branding', value: 'None visible' },
+      { label: 'Care',     value: 'Machine wash cold. Inside out. Air dry.' },
     ],
-
     relatedProductSlug: 'kvrn-heavyweight-hoodie',
-
     seo: {
-      title: 'KVRN Heavyweight Sweatpants — 400 GSM Wide-Leg Fleece',
-      description:
-        'KVRN Heavyweight Sweatpants. 400 GSM+ ring-spun cotton fleece. Wide-leg silhouette. Concealed drawcord. Back zip pocket. No visible branding.',
+      title: 'KVRN Heavyweight Sweatpants | 400 GSM Wide-Leg | 5 Colorways',
+      description: 'KVRN Heavyweight Sweatpants. 400 GSM brushed fleece. Wide-leg silhouette. Concealed elastic waistband. Available in 5 colorways.',
+    },
+  },
+
+  {
+    id: 'kph-001', name: 'Phantom Hoodie', slug: 'kvrn-phantom-hoodie',
+    type: 'hoodie', price: 26500,
+    shortDescription: '500 GSM French terry blend. Oversized, cropped.',
+    description: 'Phantom is cut in a heavier French terry blend with an oversized, cropped proportion. Enzyme washed for a softer hand feel and finished for everyday wear. Pre-shrunk, wrinkle-resistant, and built to stay that way.',
+    colors: PH_COLORS.map(c => ({
+      ...c,
+      images: imgs('phantom-hoodie', c.value, ['front', 'back', 'hood-macro', 'fabric-macro', 'lifestyle']),
+    })),
+    sizes: STANDARD_SIZES,
+    fitNote: 'Cropped oversized fit. Size up for more coverage, size down for the intended proportion.',
+    features: [
+      { title: '500 GSM French Terry Blend', description: '70% cotton, 30% polyester. Heavier than the standard collection. Dense with a slightly textured face.' },
+      { title: 'Enzyme Washed', description: 'Each piece is enzyme washed before shipping for an immediate softness. No break-in period.' },
+      { title: 'Pre-Shrunk', description: 'Pre-shrunk to lock in the fit. Wrinkle-resistant finish maintains the silhouette through regular wear.' },
+      { title: 'Cropped Proportion', description: 'Sits at the hip rather than the thigh. The intended silhouette for the Phantom collection.' },
+    ],
+    specs: [
+      { label: 'Material', value: '70% Cotton, 30% Polyester' },
+      { label: 'Weight',   value: '500 GSM' },
+      { label: 'Construction', value: 'French terry blend' },
+      { label: 'Finish',   value: 'Enzyme washed, wrinkle-resistant' },
+      { label: 'Pre-shrunk', value: 'Yes' },
+      { label: 'Fit',      value: 'Oversized, cropped' },
+      { label: 'Care',     value: 'Machine wash cold. Tumble dry low.' },
+    ],
+    relatedProductSlug: 'kvrn-phantom-sweatpants',
+    seo: {
+      title: 'KVRN Phantom Hoodie | 500 GSM French Terry | Oversized Cropped',
+      description: 'KVRN Phantom Hoodie. 500 GSM French terry blend, 70% cotton 30% polyester. Enzyme washed, pre-shrunk. Cropped oversized fit. Black.',
+    },
+  },
+
+  {
+    id: 'kps-001', name: 'Phantom Sweatpants', slug: 'kvrn-phantom-sweatpants',
+    type: 'sweatpants', price: 21500,
+    shortDescription: '500 GSM French terry blend. Relaxed oversized fit.',
+    description: 'Phantom Sweatpants use the same 500 GSM French terry blend with a relaxed oversized fit. Pre-shrunk, enzyme washed, and finished for a clean daily silhouette.',
+    colors: PH_COLORS.map(c => ({
+      ...c,
+      images: imgs('phantom-pants', c.value, ['front', 'back', 'fabric-macro', 'lifestyle']),
+    })),
+    sizes: STANDARD_SIZES,
+    fitNote: 'Relaxed oversized fit. True to size.',
+    features: [
+      { title: '500 GSM French Terry Blend', description: '70% cotton, 30% polyester. The same blend as the Phantom Hoodie — consistent weight and hand feel across the set.' },
+      { title: 'Enzyme Washed', description: 'Washed before shipping for immediate softness.' },
+      { title: 'Pre-Shrunk', description: 'Holds its shape through regular wear and washing. Wrinkle-resistant finish.' },
+    ],
+    specs: [
+      { label: 'Material', value: '70% Cotton, 30% Polyester' },
+      { label: 'Weight',   value: '500 GSM' },
+      { label: 'Construction', value: 'French terry blend' },
+      { label: 'Finish',   value: 'Enzyme washed, wrinkle-resistant' },
+      { label: 'Pre-shrunk', value: 'Yes' },
+      { label: 'Waist',    value: 'Elastic with internal drawcord' },
+      { label: 'Fit',      value: 'Relaxed oversized' },
+      { label: 'Care',     value: 'Machine wash cold. Tumble dry low.' },
+    ],
+    relatedProductSlug: 'kvrn-phantom-hoodie',
+    seo: {
+      title: 'KVRN Phantom Sweatpants | 500 GSM French Terry | Relaxed Fit',
+      description: 'KVRN Phantom Sweatpants. 500 GSM French terry blend. Enzyme washed, pre-shrunk. Relaxed oversized fit. Black.',
     },
   },
 ]
@@ -239,11 +188,18 @@ export const products: Product[] = [
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 export function getProductBySlug(slug: string): Product | undefined {
-  return products.find((p) => p.slug === slug)
+  return products.find(p => p.slug === slug)
 }
 
 export function getAllProductSlugs(): string[] {
-  return products.map((p) => p.slug)
+  return products.map(p => p.slug)
 }
 
-export const SET_PRICE_CENTS = products.reduce((acc, p) => acc + p.price, 0)
+export function getProductsByType(type: 'hoodie' | 'sweatpants'): Product[] {
+  return products.filter(p => p.type === type)
+}
+
+/** Simple USD formatter — use useCurrency().formatPrice() in components when possible */
+export function formatPrice(usdCents: number): string {
+  return `$${Math.round(usdCents / 100)}`
+}

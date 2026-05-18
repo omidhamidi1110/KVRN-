@@ -11,7 +11,7 @@ const LAST_UPDATED = '1 January 2025'
 
 export default function PrivacyPage() {
   return (
-    <div className="pt-[56px]">
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn section-padding max-w-2xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -37,8 +37,8 @@ export default function PrivacyPage() {
             </p>
             <p className="mt-3">
               For questions about this policy, contact us at{' '}
-              <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-                hello@kvrn.com
+              <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                support@kvrn.shop
               </a>.
             </p>
           </section>
@@ -147,8 +147,8 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-4">
               To exercise any of these rights, email{' '}
-              <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-                hello@kvrn.com
+              <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                support@kvrn.shop
               </a>.
               We will respond within 30 days. If you are unhappy with our response, you may
               contact the ICO:{' '}

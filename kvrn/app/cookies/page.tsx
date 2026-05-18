@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function CookiesPage() {
   return (
-    <div className="pt-[56px]">
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn section-padding max-w-2xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -119,7 +119,7 @@ export default function CookiesPage() {
               For more information, see our{' '}
               <Link href="/privacy" className="text-kvrn-text underline underline-offset-2">Privacy Policy</Link>.
               Questions? Email{' '}
-              <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">hello@kvrn.com</a>.
+              <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">support@kvrn.shop</a>.
             </p>
           </section>
         </div>

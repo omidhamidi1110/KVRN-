@@ -28,6 +28,11 @@
   --color-error:         #B91C1C;
   --color-success:       #166534;
 
+  /* Header heights */
+  --bar-height:    36px;   /* Announcement bar */
+  --nav-height:    56px;   /* Navigation */
+  --header-total:  92px;   /* Bar + nav total */
+
   /* Z-index scale */
   --z-base:     0;
   --z-raised:   10;

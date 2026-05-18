@@ -26,7 +26,7 @@
 name       = "kvrn"
 main       = ".open-next/worker.js"
 # Account ID — replace with yours from Cloudflare dashboard
-account_id = "5c2f1f1df8ff752572878665e985280b"
+account_id = "YOUR_ACCOUNT_ID"
 
 # Workers compatibility date — keep up to date
 compatibility_date  = "2024-12-18"
@@ -34,6 +34,10 @@ compatibility_flags = ["nodejs_compat"]
 
 # ── KV namespace for caching ────────────────────────────────────────────────
 # Create with: npx wrangler kv:namespace create NEXT_CACHE_WORKERS_KV
+[[kv_namespaces]]
+binding = "NEXT_CACHE_WORKERS_KV"
+id      = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
 # ── Static assets ────────────────────────────────────────────────────────────
 [assets]
 directory = ".open-next/assets"

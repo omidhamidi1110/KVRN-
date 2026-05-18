@@ -28,8 +28,8 @@ export async function POST(req: NextRequest) {
     //
     // // Notify KVRN team
     // await resend.emails.send({
-    //   from: 'KVRN Website <noreply@kvrn.com>',
-    //   to: 'hello@kvrn.com',
+    //   from: 'KVRN <orders@kvrn.shop>',
+    //   to: process.env.SUPPORT_EMAIL ?? 'support@kvrn.shop',
     //   replyTo: email,
     //   subject: `Contact: ${subject} — ${firstName} ${lastName}`,
     //   html: `
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     //
     // // Auto-reply to customer
     // await resend.emails.send({
-    //   from: 'KVRN <hello@kvrn.com>',
+    //   from: 'KVRN <support@kvrn.shop>',
     //   to: email,
     //   subject: 'We received your message.',
     //   html: `

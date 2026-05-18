@@ -26,7 +26,7 @@ const sweatpantsRows = [
 
 export default function SizeGuidePage() {
   return (
-    <div className="pt-[56px]" id="size-guide">
+    <div className="pt-[calc(36px+56px)]" id="size-guide">
       <div className="container-kvrn section-padding max-w-3xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -64,7 +64,7 @@ export default function SizeGuidePage() {
             </li>
             <li className="flex items-start gap-3">
               <span className="flex-shrink-0 mt-2 w-1.5 h-1.5 rounded-full bg-kvrn-muted" aria-hidden="true" />
-              <span><strong className="font-light text-kvrn-text">Unsure?</strong> Email <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">hello@kvrn.com</a> with your height and usual size — we'll advise directly.</span>
+              <span><strong className="font-light text-kvrn-text">Unsure?</strong> Email <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">support@kvrn.shop</a> with your height and usual size — we'll advise directly.</span>
             </li>
           </ul>
         </div>
@@ -179,7 +179,7 @@ export default function SizeGuidePage() {
             Email us your height and usual hoodie size. We'll tell you exactly which size to order.
           </p>
           <a
-            href="mailto:hello@kvrn.com?subject=Sizing question"
+            href="mailto:support@kvrn.shop?subject=Sizing question"
             className="text-[13px] font-light tracking-widest uppercase border border-kvrn-text px-5 h-10 inline-flex items-center hover:bg-kvrn-text hover:text-kvrn-bg transition-colors duration-150"
           >
             Email us

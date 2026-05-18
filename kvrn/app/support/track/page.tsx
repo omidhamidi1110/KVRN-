@@ -83,7 +83,7 @@ export default function TrackOrderPage() {
   const status = result ? (STATUS_LABELS[result.status] ?? { label: result.status, description: '' }) : null
 
   return (
-    <div className="pt-[56px]">
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn section-padding max-w-xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -146,8 +146,8 @@ export default function TrackOrderPage() {
             <p className="text-[13px] text-kvrn-muted leading-relaxed">
               Check your order number and email match what you entered at checkout.
               If you&apos;re still having trouble, email{' '}
-              <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-                hello@kvrn.com
+              <a href="mailto:orders@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                orders@kvrn.shop
               </a>{' '}
               with your order details.
             </p>
@@ -206,8 +206,8 @@ export default function TrackOrderPage() {
             <div className="border-t border-kvrn-border pt-6">
               <p className="text-[13px] text-kvrn-muted">
                 Questions about your order?{' '}
-                <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-                  hello@kvrn.com
+                <a href="mailto:orders@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                  orders@kvrn.shop
                 </a>
               </p>
             </div>

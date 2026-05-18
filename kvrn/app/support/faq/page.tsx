@@ -103,7 +103,7 @@ const faqSections = [
         id:      'between-sizes',
         trigger: 'I am between sizes — what should I do?',
         content: (
-          <p>Size down for a cleaner oversized silhouette. The oversized cut means even a smaller size will have substantial volume. If you are unsure, email us at hello@kvrn.com with your height and usual size — we will give you a specific recommendation.</p>
+          <p>Size down for a cleaner oversized silhouette. The oversized cut means even a smaller size will have substantial volume. If you are unsure, email us at support@kvrn.shop with your height and usual size — we will give you a specific recommendation.</p>
         ),
       },
     ],
@@ -129,7 +129,7 @@ const faqSections = [
         id:      'order-tracking',
         trigger: 'How do I track my order?',
         content: (
-          <p>Once your order ships, you will receive an email with your tracking number and a direct link to track your parcel. If you have not received a shipping confirmation within 2 business days of ordering, check your spam folder or contact us at hello@kvrn.com.</p>
+          <p>Once your order ships, you will receive an email with your tracking number and a direct link to track your parcel. If you have not received a shipping confirmation within 2 business days of ordering, check your spam folder or contact us at orders@kvrn.shop.</p>
         ),
       },
     ],
@@ -141,14 +141,14 @@ const faqSections = [
         id:      'returns-window',
         trigger: 'What is the return window?',
         content: (
-          <p>30 days from the date of delivery, on unworn, unwashed items with tags attached. To initiate a return, email hello@kvrn.com with your order number.</p>
+          <p>30 days from the date of delivery, on unworn, unwashed items with tags attached. To initiate a return, email returns@kvrn.shop with your order number.</p>
         ),
       },
       {
         id:      'faulty',
         trigger: 'What if my item is faulty?',
         content: (
-          <p>Faulty items are covered under your statutory consumer rights regardless of the 30-day window. Contact us immediately with photos of the fault at hello@kvrn.com. We will arrange a replacement or full refund — whichever you prefer.</p>
+          <p>Faulty items are covered under your statutory consumer rights regardless of the 30-day window. Contact us immediately with photos of the fault at support@kvrn.shop. We will arrange a replacement or full refund — whichever you prefer.</p>
         ),
       },
     ],
@@ -157,7 +157,7 @@ const faqSections = [
 
 export default function FAQPage() {
   return (
-    <div className="pt-[56px]">
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn section-padding max-w-3xl">
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="mb-10">
@@ -191,8 +191,8 @@ export default function FAQPage() {
           <p className="text-[15px] font-light mb-2">Still have a question?</p>
           <p className="text-[14px] text-kvrn-muted mb-4">
             Email us at{' '}
-            <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2 hover:opacity-70 transition-opacity">
-              hello@kvrn.com
+            <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2 hover:opacity-70 transition-opacity">
+              support@kvrn.shop
             </a>
             . We respond within 24 hours.
           </p>

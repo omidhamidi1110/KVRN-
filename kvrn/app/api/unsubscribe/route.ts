@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     )
   } catch (err) {
     console.error('[unsubscribe] Error:', err)
-    return new NextResponse('An error occurred. Please email hello@kvrn.com to unsubscribe.', {
+    return new NextResponse('An error occurred. Please email support@kvrn.shop to unsubscribe.', {
       status: 500,
     })
   }

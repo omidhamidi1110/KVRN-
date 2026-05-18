@@ -43,7 +43,7 @@ const formatPrice = (p: number) => `£${(p / 100).toFixed(0)}`
 
 export default function AdminPage() {
   return (
-    <div className="min-h-screen bg-kvrn-bg pt-[56px]">
+    <div className="min-h-screen bg-kvrn-bg pt-[calc(36px+56px)]">
       <div className="container-kvrn py-8">
 
         {/* Header */}

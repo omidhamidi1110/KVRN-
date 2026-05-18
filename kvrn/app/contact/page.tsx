@@ -30,8 +30,8 @@ export default function ContactPage() {
   })
 
   const update = (key: keyof typeof fields, val: string) => {
-    setFields((prev) => ({ ...prev, [key]: val }))
-    setErrors((prev) => ({ ...prev, [key]: '' }))
+    setFields(prev => ({ ...prev, [key]: val }))
+    setErrors(prev => ({ ...prev, [key]: '' }))
   }
 
   const validate = () => {
@@ -39,7 +39,7 @@ export default function ContactPage() {
     if (!fields.firstName.trim()) errs.firstName = 'Required'
     if (!fields.lastName.trim())  errs.lastName  = 'Required'
     if (!fields.email.trim())     errs.email     = 'Required'
-    else if (!isValidEmail(fields.email)) errs.email = 'Please enter a valid email'
+    else if (!isValidEmail(fields.email)) errs.email = 'Enter a valid email address'
     if (!fields.subject)          errs.subject   = 'Please select a subject'
     if (!fields.message.trim())   errs.message   = 'Required'
     setErrors(errs)
@@ -50,14 +50,13 @@ export default function ContactPage() {
     e.preventDefault()
     if (!validate()) return
     setFormState('loading')
-
     try {
       const res = await fetch('/api/contact', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(fields),
       })
-      if (!res.ok) throw new Error('Send failed')
+      if (!res.ok) throw new Error()
       setFormState('success')
     } catch {
       setFormState('error')
@@ -66,15 +65,16 @@ export default function ContactPage() {
 
   if (formState === 'success') {
     return (
-      <div className="pt-[56px] min-h-screen flex items-center">
+      <div className="pt-[calc(36px+56px)] min-h-screen flex items-center">
         <div className="container-kvrn max-w-xl py-24">
           <p className="label-11 mb-4">Message sent</p>
-          <h1 className="font-display font-light text-[40px] leading-none tracking-tighter mb-6">
+          <h1 className="font-display font-light text-[40px] leading-none tracking-tighter mb-5">
             We&apos;ll be in touch.
           </h1>
-          <p className="text-[15px] text-kvrn-muted leading-relaxed mb-8">
-            We respond to all messages within 24 hours (Monday–Friday).
-            You&apos;ll hear from us at <strong className="font-light">{fields.email}</strong>.
+          <p className="text-[14px] text-kvrn-muted leading-relaxed mb-8">
+            We respond to all messages within 1–2 business days.
+            You&apos;ll hear from us at{' '}
+            <strong className="font-light">{fields.email}</strong>.
           </p>
           <Link href="/" className="text-[13px] text-kvrn-muted hover:text-kvrn-text transition-colors underline underline-offset-2">
             Return home →
@@ -85,8 +85,9 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="pt-[56px]">
+    <div className="pt-[calc(36px+56px)]">
       <div className="container-kvrn section-padding max-w-2xl">
+
         {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -96,61 +97,56 @@ export default function ContactPage() {
           </ol>
         </nav>
 
+        {/* Header */}
         <div className="mb-12">
-          <h1 className="font-display font-light text-[40px] md:text-[56px] leading-none tracking-tighter mb-4">
+          <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-tighter mb-5">
             Contact
           </h1>
-          <p className="text-[15px] text-kvrn-muted leading-relaxed">
-            We respond to all messages within 24 hours.
-            For urgent order issues, email{' '}
-            <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2 hover:opacity-70 transition-opacity">
-              hello@kvrn.com
-            </a>{' '}
-            directly.
-          </p>
+
+          {/* Direct email block */}
+          <div className="border-l-2 border-kvrn-border pl-5 space-y-3 text-[14px] text-kvrn-muted leading-relaxed">
+            <p>
+              Questions regarding orders, sizing, shipping, or returns can be sent to{' '}
+              <a href="mailto:support@kvrn.shop"
+                className="text-kvrn-text underline underline-offset-2 hover:opacity-70 transition-opacity">
+                support@kvrn.shop
+              </a>.
+            </p>
+            <p>Typical response time: 1–2 business days.</p>
+          </div>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           {/* Name row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="firstName" className="label-11 block mb-2">First name</label>
-              <input
-                id="firstName"
-                type="text"
-                autoComplete="given-name"
-                value={fields.firstName}
-                onChange={(e) => update('firstName', e.target.value)}
-                aria-invalid={!!errors.firstName}
-                aria-describedby={errors.firstName ? 'firstName-error' : undefined}
-                className={`input-base ${errors.firstName ? 'error' : ''}`}
-              />
-              {errors.firstName && <p id="firstName-error" role="alert" className="text-[12px] text-kvrn-error mt-1">{errors.firstName}</p>}
-            </div>
-            <div>
-              <label htmlFor="lastName" className="label-11 block mb-2">Last name</label>
-              <input
-                id="lastName"
-                type="text"
-                autoComplete="family-name"
-                value={fields.lastName}
-                onChange={(e) => update('lastName', e.target.value)}
-                aria-invalid={!!errors.lastName}
-                className={`input-base ${errors.lastName ? 'error' : ''}`}
-              />
-              {errors.lastName && <p role="alert" className="text-[12px] text-kvrn-error mt-1">{errors.lastName}</p>}
-            </div>
+            {[
+              { id: 'firstName', label: 'First name', autocomplete: 'given-name',  key: 'firstName' as const },
+              { id: 'lastName',  label: 'Last name',  autocomplete: 'family-name', key: 'lastName'  as const },
+            ].map(f => (
+              <div key={f.id}>
+                <label htmlFor={f.id} className="label-11 block mb-2">{f.label}</label>
+                <input
+                  id={f.id} type="text" autoComplete={f.autocomplete}
+                  value={fields[f.key]}
+                  onChange={e => update(f.key, e.target.value)}
+                  aria-invalid={!!errors[f.key]}
+                  className={`input-base ${errors[f.key] ? 'error' : ''}`}
+                />
+                {errors[f.key] && (
+                  <p role="alert" className="text-[12px] text-kvrn-error mt-1">{errors[f.key]}</p>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Email */}
           <div>
             <label htmlFor="email" className="label-11 block mb-2">Email</label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
+              id="email" type="email" autoComplete="email"
               value={fields.email}
-              onChange={(e) => update('email', e.target.value)}
+              onChange={e => update('email', e.target.value)}
               aria-invalid={!!errors.email}
               className={`input-base ${errors.email ? 'error' : ''}`}
             />
@@ -160,14 +156,14 @@ export default function ContactPage() {
           {/* Order number (optional) */}
           <div>
             <label htmlFor="orderNumber" className="label-11 block mb-2">
-              Order number <span className="text-kvrn-subtle normal-case tracking-normal">(optional)</span>
+              Order number{' '}
+              <span className="text-kvrn-subtle normal-case tracking-normal">(optional)</span>
             </label>
             <input
-              id="orderNumber"
-              type="text"
+              id="orderNumber" type="text"
               value={fields.orderNumber}
-              onChange={(e) => update('orderNumber', e.target.value)}
-              placeholder="e.g. #1042"
+              onChange={e => update('orderNumber', e.target.value)}
+              placeholder="#1042"
               className="input-base"
             />
           </div>
@@ -178,12 +174,12 @@ export default function ContactPage() {
             <select
               id="subject"
               value={fields.subject}
-              onChange={(e) => update('subject', e.target.value)}
+              onChange={e => update('subject', e.target.value)}
               aria-invalid={!!errors.subject}
               className={`input-base appearance-none cursor-pointer ${errors.subject ? 'error' : ''}`}
             >
               <option value="">Select a subject</option>
-              {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
+              {subjects.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             {errors.subject && <p role="alert" className="text-[12px] text-kvrn-error mt-1">{errors.subject}</p>}
           </div>
@@ -192,10 +188,9 @@ export default function ContactPage() {
           <div>
             <label htmlFor="message" className="label-11 block mb-2">Message</label>
             <textarea
-              id="message"
+              id="message" rows={5}
               value={fields.message}
-              onChange={(e) => update('message', e.target.value)}
-              rows={5}
+              onChange={e => update('message', e.target.value)}
               aria-invalid={!!errors.message}
               className={`textarea-base ${errors.message ? 'border-kvrn-error' : ''}`}
             />
@@ -204,17 +199,14 @@ export default function ContactPage() {
 
           {formState === 'error' && (
             <p role="alert" className="text-[13px] text-kvrn-error">
-              Something went wrong. Please email us at hello@kvrn.com instead.
+              Something went wrong. Email us directly at{' '}
+              <a href="mailto:support@kvrn.shop" className="underline underline-offset-2">
+                support@kvrn.shop
+              </a>.
             </p>
           )}
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={formState === 'loading'}
-            className="mt-2"
-          >
+          <Button type="submit" variant="primary" size="lg" loading={formState === 'loading'} className="mt-2">
             Send message
           </Button>
         </form>

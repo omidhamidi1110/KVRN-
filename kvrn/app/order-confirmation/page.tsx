@@ -108,8 +108,8 @@ function ConfirmationContent() {
           </svg>
           <span>
             Questions?{' '}
-            <a href="mailto:hello@kvrn.com" className="text-kvrn-text underline underline-offset-2">
-              hello@kvrn.com
+            <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+              support@kvrn.shop
             </a>
           </span>
         </div>
