@@ -57,7 +57,7 @@ export function WaitlistBlock() {
           <p className="text-[15px] font-light text-[#FFFFFF] leading-relaxed mb-2">
             {t.earlyAccess}
           </p>
-          <p className="text-[13px] font-light text-[#F0EDE8]/28 mb-10">
+          <p className="text-[13px] font-light text-[#FFFFFF] mb-10">
             {t.dropsOnly}
           </p>
 
@@ -81,7 +81,7 @@ export function WaitlistBlock() {
                   required
                   aria-required="true"
                   aria-invalid={!!errMsg}
-                  className="flex-1 h-12 px-5 text-[13px] font-light bg-white/6 border border-[#F0EDE8]/18 text-[#F0EDE8] placeholder:text-[#F0EDE8]/28 focus:outline-none focus:border-[#F0EDE8]/45 transition-colors border-r-0"
+                  className="flex-1 h-12 rounded-none px-5 text-[13px] font-light bg-white/6 border border-[#F0EDE8]/18 text-[#F0EDE8] placeholder:text-[#FFFFFF] focus:outline-none focus:border-[#F0EDE8]/45 transition-colors border-r-0"
                 />
                 <button
                   type="submit"
@@ -99,7 +99,7 @@ export function WaitlistBlock() {
                 <p role="alert" className="text-[12px] text-[#F87171] font-light">{errMsg}</p>
               )}
 
-              <p className="text-[11px] font-light text-[#F0EDE8]/22 tracking-wide">
+              <p className="text-[11px] font-light text-[#FFFFFF] tracking-wide">
                 {t.collectionOnly}
               </p>
             </form>

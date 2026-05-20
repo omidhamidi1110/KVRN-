@@ -76,12 +76,13 @@ export function HomepageClient() {
           aria-hidden="true"
         />
         <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-16 md:pb-20">
-          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-2">\n            Available now
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-3">
+            Available now
           </p>
-          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-2">
+          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-5">
             Project<br />KVRN
           </h1>
-          <Link href="/shop?collection=project-kvrn"
+          <Link href="/collections/project-kvrn"
             className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
             Discover Project KVRN
           </Link>
@@ -240,70 +241,60 @@ function SlideIndicator({ current, total, dark }: {
 function HomepageFooter() {
   const year = new Date().getFullYear()
   return (
-    <div className="absolute inset-0 flex flex-col justify-between bg-[#F9F8F6]">
-      {/* Giant KVRN wordmark — background decoration */}
-      <div
-        className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none select-none"
-        aria-hidden="true"
-      >
+    <div className="absolute inset-0 bg-[#F9F8F6] flex flex-col pt-[92px]">
+      <div className="flex-1 flex items-center justify-center px-6 pb-10 pointer-events-none select-none" aria-hidden="true">
         <span
-          className="font-display font-light text-[#1A1A1A]/[0.10] whitespace-nowrap"
-          style={{ fontSize: 'clamp(160px,24vw,340px)', letterSpacing: '-0.04em', lineHeight: 1 }}
+          className="font-display font-light text-[#1A1A1A]/[0.13] whitespace-nowrap"
+          style={{ fontSize: 'clamp(130px, 22vw, 320px)', letterSpacing: '-0.04em', lineHeight: 1 }}
         >
           KVRN
         </span>
       </div>
 
-      <div className="container-kvrn relative z-10 flex-1 flex flex-col justify-end pb-4">
-        {/* Top: brand statement + nav columns */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 text-center md:text-left">
-          {/* Brand block */}
-          <div className="space-y-5 order-1 md:order-1">
-            <div className="space-y-0.5">
+      <div className="container-kvrn relative z-10 pb-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-8 md:gap-x-14 text-center items-start">
+          <div className="order-1 md:order-1 space-y-4">
+            <div className="space-y-1">
               <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Quiet garments.</p>
               <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Built with intention.</p>
               <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Designed with restraint.</p>
               <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Made to endure.</p>
             </div>
-            <div className="flex md:gap-4 justify-center md:justify-start pt-2">
-              <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+            <div className="flex justify-center gap-5 pt-2">
+              <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer" aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.4"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/></svg>
               </a>
-              <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+              <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer" aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
                 <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor"><path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/></svg>
               </a>
             </div>
           </div>
 
-          <div>
-            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">Shop</p>
+          <div className="order-2 md:order-2">
+            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Shop</p>
             {[['Shop All','/shop'],['Hoodies','/shop?type=hoodies'],['Sweatpants','/shop?type=sweatpants']].map(([l,h]) => (
               <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
             ))}
           </div>
-          <div>
-            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">Support</p>
+
+          <div className="order-3 md:order-3">
+            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Support</p>
             {[['Shipping & Returns','/support/shipping-returns'],['Track Order','/support/track'],['Contact','/contact']].map(([l,h]) => (
               <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
             ))}
           </div>
-          <div>
-            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">Legal</p>
+
+          <div className="order-4 md:order-4">
+            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Legal</p>
             {[['Privacy','/privacy'],['Terms','/terms'],['Cookies','/cookies']].map(([l,h]) => (
               <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
             ))}
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="border-t border-[#E8E5E0] py-2 mt-6 flex items-center justify-between">
+        <div className="border-t border-[#E8E5E0] mt-5 pt-3 pb-0 flex items-center justify-between gap-4">
           <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. All rights reserved.</p>
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))}
-            className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors"
-          >
+          <button onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))} className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors">
             Cookie preferences
           </button>
         </div>
