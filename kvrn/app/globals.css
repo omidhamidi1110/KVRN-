@@ -131,6 +131,14 @@
   }
 
   /* Label style — 11px tracked uppercase */
+  .rule {
+    @apply h-px bg-[#E8E5E0] w-full;
+  }
+
+  .label-11 {
+    @apply text-[11px] font-light tracking-[0.1em] uppercase;
+  }
+
   .kvrn-label {
     font-size: 11px;
     font-weight: 300;

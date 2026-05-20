@@ -93,8 +93,7 @@ export default function TermsPage() {
               statutory minimum.
             </p>
             <p>
-              Faulty goods are covered under the Consumer Rights Act 2015 regardless of our
-              returns window. Contact us at{' '}
+              Faulty or incorrectly shipped goods are covered regardless of our returns window. Contact us at{' '}
               <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
                 support@kvrn.shop
               </a>{' '}

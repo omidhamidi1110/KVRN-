@@ -1,26 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useI18n } from '@/context/I18nContext'
 import { WaitlistBlock } from '@/components/homepage/WaitlistBlock'
-import { HomepageProducts } from '@/components/homepage/HomepageProducts'
-import type { Product } from '@/types'
 
-interface Props { products: Product[] }
 
-// Sections that are truly 100svh snapped
-// 0: current drop (dark), 1: video (dark), 2: future drop (light), 3: list (dark), 4: footer (light)
+// Dark slides = white nav text; light slides = black nav text
 const DARK_SLIDES = new Set([0, 1, 3])
-const NAV_SLIDE_COUNT = 3  // indicator only for first 3 slides
+const TOTAL_SLIDES = 5
 
-export function HomepageClient({ products }: Props) {
-  const { t }         = useI18n()
-  const containerRef  = useRef<HTMLDivElement>(null)
+export function HomepageClient() {
+  const { t }        = useI18n()
+  const containerRef = useRef<HTMLDivElement>(null)
   const [slide, setSlide] = useState(0)
 
-  // Lock body scroll; use snap container
+  // Lock body scroll; snap container handles scrolling
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     document.documentElement.style.overflow = 'hidden'
@@ -30,27 +26,21 @@ export function HomepageClient({ products }: Props) {
     }
   }, [])
 
-  // Track active slide index
+  // Track active slide + dispatch nav color event
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const onScroll = () => {
       const idx = Math.round(el.scrollTop / el.clientHeight)
-      setSlide(idx)
-      // Notify nav of current slide theme
-      const event = new CustomEvent('kvrn-slide-change', {
+      setSlide(Math.min(idx, TOTAL_SLIDES - 1))
+      window.dispatchEvent(new CustomEvent('kvrn-slide-change', {
         detail: { dark: DARK_SLIDES.has(idx) }
-      })
-      window.dispatchEvent(event)
+      }))
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
-
-  // Project KVRN products (phantom-* slugs = current drop)
-  const currentDropProducts = products.filter(p => p.slug.includes('phantom'))
-  const futureDropProducts  = products.filter(p => !p.slug.includes('phantom'))
 
   return (
     <div
@@ -65,209 +55,256 @@ export function HomepageClient({ products }: Props) {
         overscrollBehaviorY: 'none',
       }}
     >
-      {/* ── Slide indicator (first 3 slides) ─────────────────────────────── */}
-      <SlideIndicator current={slide} total={NAV_SLIDE_COUNT} darkSlide={DARK_SLIDES.has(slide)} />
+      {/* Slide indicator — first 3 slides only */}
+      {slide < 3 && (
+        <SlideIndicator current={slide} total={3} dark={DARK_SLIDES.has(slide)} />
+      )}
 
-      {/* ── SLIDE 0: Current drop — Project KVRN ──────────────────────────── */}
-      <Slide dark aria-label="Project KVRN — current drop">
+      {/* ── SLIDE 0: Project KVRN (current drop) ─────────────────────────── */}
+      <FullSlide dark>
         <Image
           src="/images/campaign/hero-main.webp"
-          alt="Project KVRN — current collection"
+          alt="Project KVRN — available now"
           fill priority fetchPriority="high"
           className="object-cover object-center"
           sizes="100vw"
         />
-        {/* Gradient */}
         <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)' }}
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.08) 60%, transparent 100%)' }}
           aria-hidden="true"
         />
         <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-16 md:pb-20">
-          <p className="text-[11px] font-light tracking-[0.2em] uppercase text-[#F0EDE8]/60 mb-4">
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-4">
             Available now
           </p>
-          <h1 className="font-display font-light text-[44px] sm:text-[58px] md:text-[72px] leading-[0.88] tracking-[-0.03em] text-[#F0EDE8] mb-8">
-            Project KVRN
+          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-8">
+            Project<br />KVRN
           </h1>
-          <Link
-            href="/shop?type=hoodies"
-            className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/60 text-[11px] font-light tracking-[0.16em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300"
-          >
+          <Link href="/shop?type=hoodies"
+            className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
             Shop Project KVRN
           </Link>
         </div>
-      </Slide>
+      </FullSlide>
 
-      {/* ── SLIDE 1: Campaign video ─────────────────────────────────────────── */}
-      <Slide dark aria-label="KVRN campaign">
-        {/* Video placeholder — replace src when video is ready */}
+      {/* ── SLIDE 1: Campaign video ───────────────────────────────────────── */}
+      <FullSlide dark>
         <video
           autoPlay muted loop playsInline
           className="absolute inset-0 w-full h-full object-cover"
-          aria-hidden="true"
+          poster="/images/campaign/fabric-macro.webp"
         >
-          {/* <source src="/images/campaign/hero-video.mp4" type="video/mp4" /> */}
+          <source src="/images/campaign/hero-video.webm" type="video/webm" />
+          <source src="/images/campaign/hero-video.mp4"  type="video/mp4"  />
         </video>
-        {/* Fallback image shown until video is uploaded */}
+        {/* Fallback image — shows until video loads; hidden once video plays */}
         <Image
           src="/images/campaign/fabric-macro.webp"
-          alt="KVRN campaign"
+          alt="KVRN — weight, structure, restraint"
           fill
           className="object-cover"
           sizes="100vw"
+          style={{ zIndex: -1 }}
         />
-        <div className="absolute inset-0 bg-[#0E0E0E]/50" aria-hidden="true" />
+        <div className="absolute inset-0 bg-[#0E0E0E]/40" aria-hidden="true" />
         <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-16 md:pb-20">
-          <p className="font-display font-light text-[18px] md:text-[24px] tracking-[0.06em] text-[#F0EDE8]/80 max-w-[600px] leading-snug">
+          <p className="font-display font-light text-[20px] md:text-[28px] tracking-[0.04em] text-[#F0EDE8]/75 max-w-[560px] leading-snug">
             Weight. Structure. Restraint.
           </p>
         </div>
-      </Slide>
+      </FullSlide>
 
-      {/* ── SLIDE 2: Future drop — Heavyweight Collection ────────────────────── */}
-      <Slide light aria-label="Heavyweight collection — coming soon">
-        <div className="absolute inset-0 bg-[#F3F0EB]" />
+      {/* ── SLIDE 2: Future drop — Heavyweight Collection ─────────────────── */}
+      <FullSlide light>
+        {/* Background fill — warm light, not blank white */}
+        <div className="absolute inset-0 bg-[#EDE9E3]" />
         <div className="absolute inset-0 container-kvrn flex flex-col justify-end pb-16 md:pb-20">
-          <p className="text-[11px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-4">
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#9B9B9B] mb-4">
             Coming soon
           </p>
-          <h2 className="font-display font-light text-[44px] sm:text-[58px] md:text-[72px] leading-[0.88] tracking-[-0.03em] text-[#1A1A1A] mb-8">
+          <h2 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#1A1A1A] mb-6">
             Heavyweight<br />Collection
           </h2>
           <p className="text-[15px] font-light text-[#6B6B6B] leading-relaxed max-w-[440px] mb-8">
-            400 GSM brushed fleece. Dense enough to feel structural. Considered enough to be worn daily.
-            Five colorways.
+            400 GSM brushed fleece. Dense enough to feel structural.
+            Considered enough to be worn without thinking. Five colorways.
           </p>
-          <Link
-            href="/waitlist"
-            className="inline-flex items-center h-11 px-8 border border-[#1A1A1A] text-[11px] font-light tracking-[0.16em] uppercase text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F0EDE8] transition-all duration-300 w-fit"
-          >
+          <ScrollToSlide targetSlide={3} containerRef={containerRef}
+            className="inline-flex items-center h-11 px-8 border border-[#1A1A1A] text-[11px] font-light tracking-[0.18em] uppercase text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F0EDE8] transition-all duration-300">
             Join the list
-          </Link>
+          </ScrollToSlide>
         </div>
-      </Slide>
+      </FullSlide>
 
-      {/* ── SLIDE 3: KVRN List / Subscribe ────────────────────────────────── */}
-      <Slide dark aria-label="Join the KVRN list">
+      {/* ── SLIDE 3: KVRN List ────────────────────────────────────────────── */}
+      <FullSlide dark>
         <WaitlistBlock />
-      </Slide>
+      </FullSlide>
 
-      {/* ── SLIDE 4: Footer ────────────────────────────────────────────────── */}
-      <div
-        style={{
-          scrollSnapAlign: 'start',
-          scrollSnapStop: 'always',
-          minHeight: '100svh',
-        }}
-        className="bg-[#F9F8F6] flex flex-col justify-end"
-      >
-        {/* Compact footer content */}
-        <HomepageFooterContent />
-      </div>
+      {/* ── SLIDE 4: Footer ───────────────────────────────────────────────── */}
+      <FullSlide light>
+        <HomepageFooter />
+      </FullSlide>
     </div>
   )
 }
 
-// ── Reusable full-screen slide ─────────────────────────────────────────────────
-function Slide({
-  children, dark, light, className, 'aria-label': ariaLabel,
+
+// ── Scroll-to-slide helper (used by slide CTAs) ───────────────────────────────
+function ScrollToSlide({
+  targetSlide, containerRef, children, className,
 }: {
-  children:     React.ReactNode
-  dark?:        boolean
-  light?:       boolean
-  className?:   string
+  targetSlide:   number
+  containerRef:  React.RefObject<HTMLDivElement | null>
+  children:      React.ReactNode
+  className?:    string
+}) {
+  const scrollTo = () => {
+    const el = containerRef.current
+    if (!el) return
+    el.scrollTo({ top: targetSlide * el.clientHeight, behavior: 'smooth' })
+  }
+  return (
+    <button onClick={scrollTo} className={className}>
+      {children}
+    </button>
+  )
+}
+
+// ── Full-screen snap slide ─────────────────────────────────────────────────────
+function FullSlide({
+  children, dark, light, 'aria-label': label,
+}: {
+  children:      React.ReactNode
+  dark?:         boolean
+  light?:        boolean
   'aria-label'?: string
 }) {
   return (
     <section
+      aria-label={label}
       style={{
         scrollSnapAlign: 'start',
         scrollSnapStop:  'always',
-        minHeight:       '100svh',
         height:          '100svh',
+        minHeight:       '100svh',
+        maxHeight:       '100svh',
+        position:        'relative',
+        overflow:        'hidden',
       }}
-      className={`relative overflow-hidden ${dark ? 'bg-[#0E0E0E]' : 'bg-[#F3F0EB]'} ${className ?? ''}`}
-      aria-label={ariaLabel}
+      className={dark ? 'bg-[#0E0E0E]' : 'bg-[#EDE9E3]'}
     >
       {children}
     </section>
   )
 }
 
-// ── Left-side vertical slide indicator ─────────────────────────────────────────
-function SlideIndicator({ current, total, darkSlide }: {
-  current:   number
-  total:     number
-  darkSlide: boolean
+// ── Slide indicator — all 5 slides, left side ──────────────────────────────────
+function SlideIndicator({ current, total, dark }: {
+  current: number
+  total:   number
+  dark:    boolean
 }) {
-  if (current >= total) return null  // hide after slide 2
-
   return (
     <div
-      className="fixed left-5 md:left-8 top-1/2 -translate-y-1/2 z-[195] flex flex-col gap-[6px]"
+      className="fixed left-4 md:left-7 top-1/2 -translate-y-1/2 z-[195] flex flex-col gap-[5px]"
       role="tablist"
-      aria-label="Slide navigation"
+      aria-label="Slide position"
     >
-      {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          role="tab"
-          aria-selected={i === current}
-          aria-label={`Slide ${i + 1}`}
-          className="transition-all duration-300"
-          style={{
-            width:           '3px',
-            height:          i === current ? '28px' : '12px',
-            backgroundColor: darkSlide
-              ? (i === current ? 'rgba(240,237,232,0.9)' : 'rgba(240,237,232,0.25)')
-              : (i === current ? 'rgba(26,26,26,0.8)'    : 'rgba(26,26,26,0.2)'),
-            transition: 'height 0.4s cubic-bezier(0.25,0.46,0.45,0.94), background-color 0.3s',
-          }}
-        />
-      ))}
+      {Array.from({ length: total }, (_, i) => {
+        const active = i === current
+        return (
+          <div
+            key={i}
+            role="tab"
+            aria-selected={active}
+            aria-label={`Slide ${i + 1} of ${total}`}
+            style={{
+              width:           '2px',
+              height:          active ? '26px' : '10px',
+              borderRadius:    '1px',
+              backgroundColor: dark
+                ? (active ? 'rgba(240,237,232,0.9)' : 'rgba(240,237,232,0.22)')
+                : (active ? 'rgba(26,26,26,0.85)'   : 'rgba(26,26,26,0.18)'),
+              transition: 'height 0.45s cubic-bezier(0.25,0.46,0.45,0.94), background-color 0.3s',
+            }}
+          />
+        )
+      })}
     </div>
   )
 }
 
-// ── Compact footer shown in slide 4 ─────────────────────────────────────────────
-function HomepageFooterContent() {
+// ── Compact footer for slide 4 ─────────────────────────────────────────────────
+function HomepageFooter() {
+  const year = new Date().getFullYear()
   return (
-    <div className="container-kvrn py-16">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-        <div>
-          <Link href="/" className="block text-[14px] font-light tracking-[0.14em] uppercase mb-4">KVRN</Link>
-          <p className="text-[12px] text-[#6B6B6B] leading-relaxed">Quiet garments.<br />Built with intention.</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-light tracking-[0.12em] uppercase text-[#9B9B9B] mb-3">Shop</p>
-          {[['Shop All', '/shop'], ['Hoodies', '/shop?type=hoodies'], ['Sweatpants', '/shop?type=sweatpants']].map(([l, h]) => (
-            <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2">{l}</Link>
-          ))}
-        </div>
-        <div>
-          <p className="text-[10px] font-light tracking-[0.12em] uppercase text-[#9B9B9B] mb-3">Support</p>
-          {[['Shipping & Returns', '/support/shipping-returns'], ['Track Order', '/support/track'], ['Contact', '/contact']].map(([l, h]) => (
-            <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2">{l}</Link>
-          ))}
-        </div>
-        <div>
-          <p className="text-[10px] font-light tracking-[0.12em] uppercase text-[#9B9B9B] mb-3">Legal</p>
-          {[['Privacy', '/privacy'], ['Terms', '/terms'], ['Cookies', '/cookies']].map(([l, h]) => (
-            <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2">{l}</Link>
-          ))}
-        </div>
+    <div className="absolute inset-0 flex flex-col justify-between bg-[#F9F8F6]">
+      {/* Giant KVRN wordmark — background decoration */}
+      <div
+        className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none select-none"
+        aria-hidden="true"
+      >
+        <span
+          className="font-display font-light text-[#1A1A1A]/[0.03] whitespace-nowrap"
+          style={{ fontSize: 'clamp(120px, 22vw, 260px)', letterSpacing: '-0.04em', lineHeight: 1 }}
+        >
+          KVRN
+        </span>
       </div>
-      <div className="pt-6 border-t border-[#E8E5E0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-        <p className="text-[11px] text-[#9B9B9B]">© {new Date().getFullYear()} KVRN. All rights reserved.</p>
-        <div className="flex gap-4">
-          <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer" aria-label="KVRN on Instagram"
-            className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.4"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/></svg>
-          </a>
-          <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer" aria-label="KVRN on TikTok"
-            className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
-            <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor"><path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/></svg>
-          </a>
+
+      <div className="container-kvrn relative z-10 pt-14 flex-1 flex flex-col justify-between">
+        {/* Top: brand statement + nav columns */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          {/* Brand block */}
+          <div className="col-span-2 md:col-span-1 space-y-5">
+            <div className="space-y-0.5">
+              <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Quiet garments.</p>
+              <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Built with intention.</p>
+              <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Designed with restraint.</p>
+              <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Made to endure.</p>
+            </div>
+            <div className="flex gap-4">
+              <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
+                aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.4"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/></svg>
+              </a>
+              <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
+                aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor"><path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">Shop</p>
+            {[['Shop All','/shop'],['Hoodies','/shop?type=hoodies'],['Sweatpants','/shop?type=sweatpants']].map(([l,h]) => (
+              <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
+            ))}
+          </div>
+          <div>
+            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">Support</p>
+            {[['Shipping & Returns','/support/shipping-returns'],['Track Order','/support/track'],['Contact','/contact']].map(([l,h]) => (
+              <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
+            ))}
+          </div>
+          <div>
+            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">Legal</p>
+            {[['Privacy','/privacy'],['Terms','/terms'],['Cookies','/cookies']].map(([l,h]) => (
+              <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="border-t border-[#E8E5E0] py-5 flex items-center justify-between">
+          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. All rights reserved.</p>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))}
+            className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors"
+          >
+            Cookie preferences
+          </button>
         </div>
       </div>
     </div>

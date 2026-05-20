@@ -41,12 +41,12 @@ const FAQ_SECTIONS = [
         ),
       },
       {
-        id: 'phantom',
+        id: 'project-kvrn',
         trigger: 'What is the Project KVRN collection?',
         content: (
           <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
             <p>The Project KVRN collection uses a 500 GSM French terry blend rather than the brushed fleece of the Heavyweight collection. Both are heavy. The difference is in the construction and the proportion.</p>
-            <p>Phantom is enzyme washed and pre-shrunk before shipping, so it arrives with immediate softness and a more relaxed hand feel. It is also cut with a cropped, oversized proportion rather than a longer oversized one.</p>
+            <p>Project KVRN pieces are enzyme washed and pre-shrunk before shipping, so they arrive with immediate softness and a more relaxed hand feel. They are also cut with a cropped, oversized proportion rather than a longer oversized one.</p>
           </div>
         ),
       },

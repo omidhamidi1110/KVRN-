@@ -1,7 +1,4 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
-import Link from 'next/link'
-import { products } from '@/data/products'
 import { HomepageClient } from '@/components/homepage/HomepageClient'
 
 export const metadata: Metadata = {
@@ -10,5 +7,5 @@ export const metadata: Metadata = {
 }
 
 export default function HomePage() {
-  return <HomepageClient products={products} />
+  return <HomepageClient />
 }

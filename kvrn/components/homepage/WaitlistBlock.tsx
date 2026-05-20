@@ -16,7 +16,7 @@ export function WaitlistBlock() {
     e.preventDefault()
     setErrMsg('')
     if (!email.trim() || !isValidEmail(email)) {
-      setErrMsg('Please enter a valid email address.')
+      setErrMsg('Enter a valid email address.')
       return
     }
     setState('loading')
@@ -35,54 +35,42 @@ export function WaitlistBlock() {
   }
 
   return (
-    <section
-      className="relative min-h-[100svh] flex flex-col justify-between bg-[#0E0E0E] overflow-hidden"
-      aria-labelledby="waitlist-heading"
-    >
-      {/* Subtle background texture */}
+    <div className="absolute inset-0 flex flex-col bg-[#0E0E0E]">
+      {/* Subtle radial glow */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{ backgroundImage: 'radial-gradient(circle at 30% 60%, #F0EDE8 0%, transparent 60%)' }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 45%, rgba(240,237,232,0.04) 0%, transparent 70%)' }}
         aria-hidden="true"
       />
 
-      <div className="container-kvrn w-full py-24 md:py-32 relative z-10">
-        <div className="max-w-2xl">
-
-          {/* Eyebrow */}
-          <p className="text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8]/30 mb-8">
+      {/* Main content — centered */}
+      <div className="flex-1 flex items-center justify-center px-6 md:px-8">
+        <div className="w-full max-w-[480px] text-center">
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/30 mb-8">
             KVRN
           </p>
 
-          {/* Headline */}
-          <h2
-            id="waitlist-heading"
-            className="font-display font-light text-[clamp(36px,6vw,72px)] leading-[0.9] tracking-[-0.03em] text-[#F0EDE8] mb-8"
-          >
-            {t.builtFor}<br />
-            {t.designedFor}
+          <h2 className="font-display font-light text-[clamp(36px,6vw,68px)] leading-[0.88] tracking-[-0.03em] text-[#F0EDE8] mb-6">
+            {t.builtFor}<br />{t.designedFor}
           </h2>
 
-          {/* Sub */}
-          <p className="text-[16px] font-light text-[#F0EDE8]/60 leading-relaxed mb-2">
+          <p className="text-[15px] font-light text-[#F0EDE8]/55 leading-relaxed mb-2">
             {t.earlyAccess}
           </p>
-          <p className="text-[14px] font-light text-[#F0EDE8]/35 mb-10">
+          <p className="text-[13px] font-light text-[#F0EDE8]/28 mb-10">
             {t.dropsOnly}
           </p>
 
-          {/* Form */}
           {state === 'success' ? (
-            <div>
-              <p className="text-[22px] font-light text-[#F0EDE8]">{t.onTheList}</p>
-              <p className="text-[13px] text-[#F0EDE8]/40 mt-2">{t.collectionOnly}</p>
+            <div className="space-y-2">
+              <p className="text-[20px] font-light text-[#F0EDE8]">{t.onTheList}</p>
+              <p className="text-[13px] text-[#F0EDE8]/35">{t.collectionOnly}</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
-              <div className="flex gap-0 max-w-[440px]">
-                <label htmlFor="hp-waitlist-email" className="sr-only">
-                  {t.emailPlaceholder}
-                </label>
+            <form onSubmit={handleSubmit} noValidate className="space-y-3">
+              {/* Input + button — stacked on mobile, inline on sm+ */}
+              <div className="flex flex-col sm:flex-row gap-0 w-full">
+                <label htmlFor="hp-waitlist-email" className="sr-only">{t.emailPlaceholder}</label>
                 <input
                   id="hp-waitlist-email"
                   type="email"
@@ -93,47 +81,50 @@ export function WaitlistBlock() {
                   required
                   aria-required="true"
                   aria-invalid={!!errMsg}
-                  className="flex-1 h-12 px-4 text-[13px] font-light bg-white/8 border border-[#F0EDE8]/20 text-[#F0EDE8] placeholder:text-[#F0EDE8]/30 focus:outline-none focus:border-[#F0EDE8]/50 transition-colors"
+                  className="flex-1 h-12 px-5 text-[13px] font-light bg-white/6 border border-[#F0EDE8]/18 text-[#F0EDE8] placeholder:text-[#F0EDE8]/28 focus:outline-none focus:border-[#F0EDE8]/45 transition-colors sm:border-r-0"
                 />
                 <button
                   type="submit"
                   disabled={state === 'loading'}
-                  aria-busy={state === 'loading'}
-                  className="h-12 px-7 text-[11px] font-light tracking-[0.14em] uppercase bg-[#F0EDE8] text-[#0E0E0E] hover:bg-white transition-colors flex-shrink-0 disabled:opacity-50"
+                  className="h-12 px-7 text-[11px] font-light tracking-[0.16em] uppercase bg-[#F0EDE8] text-[#0E0E0E] hover:bg-white transition-colors disabled:opacity-50 flex-shrink-0"
                 >
                   {state === 'loading' ? '…' : t.joinBtn}
                 </button>
               </div>
 
-              {errMsg && (
-                <p role="alert" className="text-[12px] text-red-400 font-light">{errMsg}</p>
+              {state === 'error' && (
+                <p role="alert" className="text-[12px] text-[#F87171] font-light">{errMsg}</p>
+              )}
+              {errMsg && state !== 'error' && (
+                <p role="alert" className="text-[12px] text-[#F87171] font-light">{errMsg}</p>
               )}
 
-              <p className="text-[11px] font-light text-[#F0EDE8]/25 tracking-wide">
+              <p className="text-[11px] font-light text-[#F0EDE8]/22 tracking-wide">
                 {t.collectionOnly}
               </p>
             </form>
           )}
         </div>
       </div>
+
       {/* Trust strip at bottom */}
-      <div className="relative z-10 border-t border-[#F0EDE8]/10">
-        <div className="container-kvrn py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="border-t border-[#F0EDE8]/8 flex-shrink-0">
+        <div className="container-kvrn py-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             {[
-              ['Secure checkout',       'Encrypted payment'],
-              ['Store credit returns',  'Within return window'],
-              ['Ships within 1–3 days', 'After confirmation'],
-              ['Built for longevity',   'Premium materials'],
+              ['Secure checkout',      'Encrypted payment'],
+              ['Store credit returns', 'Within return window'],
+              ['Ships 1–3 days',       'After confirmation'],
+              ['Built to last',        'Premium materials'],
             ].map(([title, sub]) => (
               <div key={title}>
-                <p className="text-[12px] font-light text-[#F0EDE8]/70">{title}</p>
-                <p className="text-[10px] text-[#F0EDE8]/30 mt-0.5">{sub}</p>
+                <p className="text-[11px] font-light text-[#F0EDE8]/60">{title}</p>
+                <p className="text-[10px] text-[#F0EDE8]/25 mt-0.5">{sub}</p>
               </div>
             ))}
           </div>
         </div>
       </div>
-    </section>
+    </div>
   )
 }

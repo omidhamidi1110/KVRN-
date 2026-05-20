@@ -78,10 +78,16 @@ export function CookiePrefsProvider({ children }: { children: React.ReactNode })
       setPrefs(stored)
       applyToGtag(stored)
     } else {
-      // Show banner after short delay
       const t = setTimeout(() => setShowBanner(true), 1800)
       return () => clearTimeout(t)
     }
+  }, [])
+
+  // Listen for custom event from homepage footer (which can't use context directly)
+  useEffect(() => {
+    const handler = () => setShowPrefs(true)
+    window.addEventListener('kvrn-open-cookie-prefs', handler)
+    return () => window.removeEventListener('kvrn-open-cookie-prefs', handler)
   }, [])
 
   const savePrefs = useCallback((p: CookiePrefs) => {
