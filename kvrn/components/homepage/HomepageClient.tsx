@@ -46,8 +46,10 @@ export function HomepageClient() {
     <div
       ref={containerRef}
       style={{
-        position: 'fixed',
-        inset: 0,
+        position: 'relative',
+        width: '100%',
+        height: '100svh',
+        minHeight: '100svh',
         overflowY: 'scroll',
         scrollSnapType: 'y mandatory',
         scrollBehavior: 'smooth',
