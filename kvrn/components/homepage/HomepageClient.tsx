@@ -244,12 +244,12 @@ function HomepageFooter() {
     <div className="absolute inset-0 flex flex-col justify-between bg-[#F9F8F6]">
       {/* Giant KVRN wordmark — background decoration */}
       <div
-        className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none select-none"
+        className="relative flex justify-center pt-10 md:pt-16 pb-10 overflow-hidden pointer-events-none select-none"
         aria-hidden="true"
       >
         <span
-          className="font-display font-light text-[#1A1A1A]/[0.03] whitespace-nowrap"
-          style={{ fontSize: 'clamp(120px, 22vw, 260px)', letterSpacing: '-0.04em', lineHeight: 1 }}
+          className="font-display font-light text-[#1A1A1A]/[0.12] whitespace-nowrap"
+          style={{ fontSize: 'clamp(120px, 18vw, 220px)', letterSpacing: '-0.04em', lineHeight: 1 }}
         >
           KVRN
         </span>
