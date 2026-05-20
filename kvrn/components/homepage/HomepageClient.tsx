@@ -79,12 +79,12 @@ export function HomepageClient() {
           <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-4">
             Available now
           </p>
-          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-8">
+          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-5">
             Project<br />KVRN
           </h1>
           <Link href="/shop?type=hoodies"
             className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
-            Shop Project KVRN
+            Discover Project KVRN
           </Link>
         </div>
       </FullSlide>
@@ -249,15 +249,15 @@ function HomepageFooter() {
       >
         <span
           className="font-display font-light text-[#1A1A1A]/[0.10] whitespace-nowrap"
-          style={{ fontSize: 'clamp(180px,28vw,420px)', letterSpacing: '-0.04em', lineHeight: 1 }}
+          style={{ fontSize: 'clamp(160px,24vw,340px)', letterSpacing: '-0.04em', lineHeight: 1 }}
         >
           KVRN
         </span>
       </div>
 
-      <div className="container-kvrn relative z-10 flex-1 flex flex-col justify-center pb-2">
+      <div className="container-kvrn relative z-10 flex-1 flex flex-col justify-end pb-4">
         {/* Top: brand statement + nav columns */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-16 text-center md:text-center">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 text-center md:text-left">
           {/* Brand block */}
           <div className="space-y-5 order-1 md:order-1">
             <div className="space-y-0.5">
@@ -266,7 +266,7 @@ function HomepageFooter() {
               <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Designed with restraint.</p>
               <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Made to endure.</p>
             </div>
-            <div className="flex gap-4">
+            <div className="flex md:gap-4 justify-center md:justify-start pt-2">
               <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
                 aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.4"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/></svg>
