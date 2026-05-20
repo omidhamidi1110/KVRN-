@@ -86,6 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-kvrn-bg text-kvrn-text font-body antialiased">
         <a href="#main-content" className="skip-link">Skip to main content</a>
 
+        <CookiePrefsProvider>
         <I18nProvider>
         <HeaderProvider>
           <CurrencyProvider>
@@ -105,6 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </CurrencyProvider>
         </HeaderProvider>
         </I18nProvider>
+        </CookiePrefsProvider>
 
         {gaId && (
           <>

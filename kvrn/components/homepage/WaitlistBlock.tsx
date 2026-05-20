@@ -36,7 +36,7 @@ export function WaitlistBlock() {
 
   return (
     <section
-      className="relative min-h-[100svh] flex items-center bg-[#0E0E0E] overflow-hidden"
+      className="relative min-h-[100svh] flex flex-col justify-between bg-[#0E0E0E] overflow-hidden"
       aria-labelledby="waitlist-heading"
     >
       {/* Subtle background texture */}
@@ -114,6 +114,24 @@ export function WaitlistBlock() {
               </p>
             </form>
           )}
+        </div>
+      </div>
+      {/* Trust strip at bottom */}
+      <div className="relative z-10 border-t border-[#F0EDE8]/10">
+        <div className="container-kvrn py-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              ['Secure checkout',       'Encrypted payment'],
+              ['Store credit returns',  'Within return window'],
+              ['Ships within 1–3 days', 'After confirmation'],
+              ['Built for longevity',   'Premium materials'],
+            ].map(([title, sub]) => (
+              <div key={title}>
+                <p className="text-[12px] font-light text-[#F0EDE8]/70">{title}</p>
+                <p className="text-[10px] text-[#F0EDE8]/30 mt-0.5">{sub}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

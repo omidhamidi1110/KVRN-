@@ -73,13 +73,14 @@ export function HomepageClient({ products }: Props) {
       </section>
 
       {/* ─── PRODUCTS ─────────────────────────────────────────────────────── */}
-      {/* This section is NOT snap-locked — shorter, flows naturally */}
       <section
-        data-snap-section="false"
-        style={{ scrollSnapAlign: 'start' }}
-        className="bg-[#F9F8F6]"
+        data-snap-section="true"
+        style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always', minHeight: '100svh' }}
+        className="bg-[#F9F8F6] flex flex-col"
       >
-        <HomepageProducts products={products} />
+        <div className="flex-1">
+          <HomepageProducts products={products} />
+        </div>
       </section>
 
       {/* ─── FABRIC STORY ─────────────────────────────────────────────────── */}
@@ -137,32 +138,11 @@ export function HomepageClient({ products }: Props) {
         </div>
       </section>
 
-      {/* ─── TRUST SIGNALS ────────────────────────────────────────────────── */}
-      <section
-        data-snap-section="false"
-        className="py-10 border-y border-[#E8E5E0] bg-[#F9F8F6]"
-      >
-        <div className="container-kvrn">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { title: t.secureCheckout,        sub: 'Encrypted payment' },
-              { title: t.storeCreditReturns,    sub: 'Within return window' },
-              { title: 'Ships within 1–3 days', sub: 'After order confirmation' },
-              { title: 'Built for longevity',   sub: 'Premium materials' },
-            ].map(item => (
-              <div key={item.title}>
-                <p className="text-[13px] font-light text-[#1A1A1A]">{item.title}</p>
-                <p className="text-[11px] text-[#6B6B6B] mt-0.5">{item.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── WAITLIST CTA ─────────────────────────────────────────────────── */}
+      {/* ─── WAITLIST CTA (dark, snapped) ────────────────────────────────── */}
       <section
         data-snap-section="true"
-        style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
+        style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always', minHeight: '100svh' }}
+        className="flex flex-col"
       >
         <WaitlistBlock />
       </section>

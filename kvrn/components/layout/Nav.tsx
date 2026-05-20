@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useCart }          from '@/context/CartContext'
 import { useWishlist }      from '@/context/WishlistContext'
+import { useCookiePrefs }   from '@/context/CookiePrefsContext'
+import { useCurrency }      from '@/context/CurrencyContext'
+import { useI18n, LANGUAGES, type Locale } from '@/context/I18nContext'
+import { CURRENCIES, type CurrencyCode } from '@/lib/currency'
 import { CurrencySelector } from '@/components/ui/CurrencySelector'
 import { LanguageSelector } from '@/components/ui/LanguageSelector'
-import { useCookiePrefs }   from '@/context/CookiePrefsContext'
-import { useI18n }          from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 
 export function Nav() {
@@ -21,7 +23,9 @@ export function Nav() {
   const [scrolled,   setScrolled]   = useState(false)
   const [onHero,     setOnHero]     = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const drawerRef                   = useRef<HTMLDivElement>(null)
+  // Section-aware nav color (homepage only)
+  const [navTheme,   setNavTheme]   = useState<'dark' | 'light'>('dark')
+  const drawerRef = useRef<HTMLDivElement>(null)
 
   const isHome = pathname === '/'
 
@@ -35,6 +39,27 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Homepage scroll-snap section observer — detect current section background
+  useEffect(() => {
+    if (!isHome) return
+    const snapContainer = document.querySelector('[data-snap-page="true"]') as HTMLElement
+    if (!snapContainer) return
+
+    const detectSection = () => {
+      const scrollTop = snapContainer.scrollTop
+      const vh = snapContainer.clientHeight
+      const idx = Math.round(scrollTop / vh)
+
+      // Section order: 0=hero(dark), 1=products(light), 2=fabric(light), 3=trust(light), 4=waitlist(dark)
+      const DARK_SECTIONS = new Set([0, 4])
+      setNavTheme(DARK_SECTIONS.has(idx) ? 'dark' : 'light')
+    }
+
+    snapContainer.addEventListener('scroll', detectSection, { passive: true })
+    detectSection()
+    return () => snapContainer.removeEventListener('scroll', detectSection)
+  }, [isHome])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false) }
     window.addEventListener('keydown', onKey)
@@ -46,14 +71,15 @@ export function Nav() {
     return () => { document.body.style.overflow = '' }
   }, [drawerOpen])
 
-  // Transparent ONLY on homepage hero
-  const transparent = isHome && !scrolled && onHero
-  const onLight     = !transparent
+  // Nav visual state
+  const solidNav = scrolled && !isHome  // inner pages always solid when scrolled
+  const transparent = !solidNav && (isHome ? navTheme === 'dark' : false)
+  const onLight = !transparent
 
-  const navBg   = onLight
+  const navBg   = (onLight || scrolled)
     ? 'bg-[rgba(249,248,246,0.97)] backdrop-blur-[18px] border-b border-[#E8E5E0]'
     : 'bg-transparent'
-  const textCls = onLight ? 'text-[#1A1A1A]' : 'text-[#F0EDE8]'
+  const textCls = (onLight || scrolled) ? 'text-[#1A1A1A]' : 'text-[#F0EDE8]'
 
   const desktopLinks = [
     { label: t.shopAll,    href: '/shop' },
@@ -65,15 +91,15 @@ export function Nav() {
   ]
 
   const mobileLinks = [
-    { label: t.shopAll,          href: '/shop' },
-    { label: t.hoodies,          href: '/shop?type=hoodies' },
-    { label: t.sweatpants,       href: '/shop?type=sweatpants' },
-    { label: t.about,            href: '/about' },
-    { label: t.sizeGuide,        href: '/support/size-guide' },
-    { label: t.trackOrder,       href: '/support/track' },
-    { label: t.faq,              href: '/support/faq' },
-    { label: t.shippingReturns,  href: '/support/shipping-returns' },
-    { label: t.contact,          href: '/contact' },
+    { label: t.shopAll,         href: '/shop' },
+    { label: t.hoodies,         href: '/shop?type=hoodies' },
+    { label: t.sweatpants,      href: '/shop?type=sweatpants' },
+    { label: t.about,           href: '/about' },
+    { label: t.sizeGuide,       href: '/support/size-guide' },
+    { label: t.trackOrder,      href: '/support/track' },
+    { label: t.faq,             href: '/support/faq' },
+    { label: t.shippingReturns, href: '/support/shipping-returns' },
+    { label: t.contact,         href: '/contact' },
   ]
 
   return (
@@ -88,11 +114,10 @@ export function Nav() {
         aria-label="Main navigation"
       >
         <div className="container-kvrn flex items-center justify-between">
-
-          {/* Logo */}
           <Link href="/"
             className="text-[14px] font-light tracking-[0.18em] uppercase hover:opacity-50 transition-opacity"
-            aria-label="KVRN">KVRN
+            aria-label="KVRN">
+            KVRN
           </Link>
 
           {/* Desktop links */}
@@ -105,13 +130,16 @@ export function Nav() {
             ))}
           </nav>
 
-          {/* Right cluster */}
           <div className="flex items-center gap-3 lg:gap-4">
-            {/* Language + Currency — desktop only */}
+            {/* Language + Currency — desktop only, inherit nav text color */}
             <div className="hidden lg:flex items-center gap-3">
-              <LanguageSelector align="right" />
-              <span className="text-[11px] opacity-20">|</span>
-              <CurrencySelector align="right" />
+              <div className={cn(textCls)}>
+                <LanguageSelector align="right" />
+              </div>
+              <span className="text-[11px] opacity-20 select-none">|</span>
+              <div className={cn(textCls)}>
+                <CurrencySelector align="right" />
+              </div>
             </div>
 
             {/* Bag */}
@@ -134,11 +162,10 @@ export function Nav() {
             {/* Hamburger — mobile only, 3 lines */}
             <button
               onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
-              aria-expanded={drawerOpen}
+              aria-label="Open menu" aria-expanded={drawerOpen}
               className="lg:hidden flex flex-col justify-center gap-[5px] w-5 h-6 ml-1"
             >
-              {[0, 1, 2].map(i => (
+              {[0,1,2].map(i => (
                 <span key={i}
                   className={cn(
                     'block h-px w-5 transition-colors',
@@ -184,10 +211,10 @@ export function Nav() {
           </button>
         </div>
 
-        {/* Language + Currency — near top of drawer */}
-        <div className="px-6 py-4 border-b border-[#E8E5E0] space-y-4">
-          <LanguageSelector inDrawer />
-          <CurrencySelector inDrawer />
+        {/* Collapsible Language + Currency at top of drawer */}
+        <div className="border-b border-[#E8E5E0]">
+          <DrawerLangSelector />
+          <DrawerCurrencySelector />
         </div>
 
         {/* Nav links */}
@@ -202,8 +229,8 @@ export function Nav() {
         </nav>
 
         {/* Drawer footer */}
-        <div className="px-6 py-5 border-t border-[#E8E5E0] space-y-3">
-          <div className="flex gap-4">
+        <div className="px-6 py-5 border-t border-[#E8E5E0]">
+          <div className="flex items-center gap-4 mb-3">
             <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
               aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
               <InstagramIcon />
@@ -225,6 +252,95 @@ export function Nav() {
   )
 }
 
+// ─── Collapsible drawer selectors ────────────────────────────────────────────
+
+function DrawerLangSelector() {
+  const { locale, setLocale } = useI18n()
+  const [open, setOpen] = useState(false)
+  const current = LANGUAGES.find(l => l.code === locale) ?? LANGUAGES[0]
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F3F0EB] transition-colors"
+        aria-expanded={open}
+      >
+        <div className="text-left">
+          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">Language</p>
+          <p className="text-[13px] font-light text-[#1A1A1A] mt-0.5">{current.nativeLabel}</p>
+        </div>
+        <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
+          className={cn('text-[#9B9B9B] transition-transform duration-200', open && 'rotate-180')}>
+          <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="px-6 pb-3 grid grid-cols-2 gap-1.5">
+          {LANGUAGES.map(l => (
+            <button
+              key={l.code}
+              onClick={() => { setLocale(l.code as Locale); setOpen(false) }}
+              className={cn(
+                'px-3 py-2 text-left text-[12px] font-light border transition-all duration-150',
+                l.code === locale
+                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                  : 'border-[#E8E5E0] text-[#1A1A1A] hover:border-[#1A1A1A]'
+              )}
+            >
+              <span className="block">{l.nativeLabel}</span>
+              <span className="block text-[10px] opacity-60">{l.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DrawerCurrencySelector() {
+  const { currencyCode, setCurrency } = useCurrency()
+  const [open, setOpen] = useState(false)
+  const current = CURRENCIES.find(c => c.code === currencyCode) ?? CURRENCIES[0]
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F3F0EB] transition-colors"
+        aria-expanded={open}
+      >
+        <div className="text-left">
+          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">Currency</p>
+          <p className="text-[13px] font-light text-[#1A1A1A] mt-0.5">{currencyCode} — {current.label.split(' — ')[1]}</p>
+        </div>
+        <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
+          className={cn('text-[#9B9B9B] transition-transform duration-200', open && 'rotate-180')}>
+          <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="px-6 pb-3 grid grid-cols-3 gap-1.5">
+          {CURRENCIES.map(c => (
+            <button
+              key={c.code}
+              onClick={() => { setCurrency(c.code as CurrencyCode); setOpen(false) }}
+              className={cn(
+                'px-2 py-2 text-[12px] font-light border transition-all duration-150',
+                c.code === currencyCode
+                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                  : 'border-[#E8E5E0] text-[#1A1A1A] hover:border-[#1A1A1A]'
+              )}
+            >
+              {c.code}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function InstagramIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -234,7 +350,6 @@ function InstagramIcon() {
     </svg>
   )
 }
-
 function TikTokIcon() {
   return (
     <svg width="16" height="18" viewBox="0 0 448 512" fill="currentColor">

@@ -55,7 +55,7 @@ export function LanguageSelector({ className, align = 'right', inDrawer = false 
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-label={`Language: ${current.label}`}
-        className="flex items-center gap-1 text-[11px] font-light tracking-[0.1em] text-[#1A1A1A] hover:opacity-50 transition-opacity"
+        className="flex items-center gap-1 text-[11px] font-light tracking-[0.1em] hover:opacity-50 transition-opacity"
       >
         <span>{current.nativeLabel}</span>
         <svg width="7" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true"
