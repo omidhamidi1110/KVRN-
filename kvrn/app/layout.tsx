@@ -11,7 +11,7 @@ import { ToastProvider }    from '@/components/ui/Toast'
 import { CookieBanner }     from '@/components/ui/CookieConsent'
 import { AnnouncementBar }  from '@/components/ui/AnnouncementBar'
 import { Nav }              from '@/components/layout/Nav'
-import { Footer }           from '@/components/layout/Footer'
+import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { CartDrawer }       from '@/components/cart/CartDrawer'
 import './globals.css'
 
@@ -97,8 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Nav />
                 <CartDrawer />
                 <WishlistDrawer />
-                <main id="main-content">{children}</main>
-                <Footer />
+                <main id="main-content">{children}</main>{/* Footer handled per page */}
                 <CookieBanner />
               </ToastProvider>
             </CartProvider>

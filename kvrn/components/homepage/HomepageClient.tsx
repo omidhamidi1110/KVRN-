@@ -244,18 +244,18 @@ function HomepageFooter() {
     <div className="absolute inset-0 flex flex-col justify-between bg-[#F9F8F6]">
       {/* Giant KVRN wordmark — background decoration */}
       <div
-        className="relative flex justify-center pt-10 md:pt-16 pb-10 overflow-hidden pointer-events-none select-none"
+        className="relative flex justify-center pt-8 md:pt-10 pb-6 overflow-hidden pointer-events-none select-none"
         aria-hidden="true"
       >
         <span
-          className="font-display font-light text-[#1A1A1A]/[0.12] whitespace-nowrap"
-          style={{ fontSize: 'clamp(120px, 18vw, 220px)', letterSpacing: '-0.04em', lineHeight: 1 }}
+          className="font-display font-light text-[#1A1A1A]/[0.22] whitespace-nowrap"
+          style={{ fontSize: 'clamp(150px, 22vw, 300px)', letterSpacing: '-0.04em', lineHeight: 1 }}
         >
           KVRN
         </span>
       </div>
 
-      <div className="container-kvrn relative z-10 pt-14 flex-1 flex flex-col justify-between">
+      <div className="container-kvrn relative z-10 flex-1 flex flex-col justify-end pb-8">
         {/* Top: brand statement + nav columns */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {/* Brand block */}
