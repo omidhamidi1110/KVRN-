@@ -45,7 +45,7 @@ export function CookieBanner() {
               <p className="text-[13px] font-light text-[#F0EDE8] leading-relaxed mb-1">
                 We use cookies to improve your experience.
               </p>
-              <p className="text-[12px] text-[#F0EDE8]/45 leading-relaxed">
+              <p className="text-[12px] text-[#F0EDE8]/75 leading-relaxed">
                 Essential cookies keep the site working. Optional cookies help us understand usage.{' '}
                 <Link href="/privacy" className="text-[#F0EDE8]/65 underline underline-offset-2 hover:text-[#F0EDE8] transition-colors">
                   Privacy Policy
@@ -175,7 +175,7 @@ function CookiePrefsPanel() {
 
         {/* Description */}
         <div className="px-6 py-4 border-b border-[#F0EDE8]/8 flex-shrink-0">
-          <p className="text-[12px] text-[#F0EDE8]/45 leading-relaxed">
+          <p className="text-[12px] text-[#F0EDE8]/75 leading-relaxed">
             Choose which cookies you allow. Your preference is saved for 12 months.{' '}
             <Link href="/privacy" className="text-[#F0EDE8]/65 underline underline-offset-2 hover:text-[#F0EDE8]">
               Privacy Policy
@@ -205,7 +205,7 @@ function CookiePrefsPanel() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#F0EDE8]/38 leading-relaxed">{cat.desc}</p>
+                  <p className="text-[11px] text-[#F0EDE8]/70 leading-relaxed">{cat.desc}</p>
                 </div>
 
                 {/* Toggle switch — OFF=left, ON=right */}
@@ -217,20 +217,20 @@ function CookiePrefsPanel() {
                   disabled={cat.locked}
                   onClick={() => !cat.locked && toggle(cat.key as keyof Omit<CookiePrefs, 'essential'>)}
                   className={cn(
-                    'flex-shrink-0 relative w-11 h-6 rounded-full',
+                    'flex-shrink-0 relative w-12 h-6 rounded-full',
                     'transition-colors duration-200',
                     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0EDE8]/40',
                     cat.locked
                       ? 'bg-[#F0EDE8]/35 cursor-not-allowed'
                       : isOn
                       ? 'bg-[#F0EDE8] cursor-pointer'
-                      : 'bg-[#F0EDE8]/14 cursor-pointer hover:bg-[#F0EDE8]/22'
+                      : 'bg-[#444] cursor-pointer hover:bg-[#F0EDE8]/22'
                   )}
                 >
                   {/*
                     Circle position:
-                    OFF → left  (translate-x-[3px])
-                    ON  → right (translate-x-[22px])
+                    OFF → left  (translate-x-[2px])
+                    ON  → right (translate-x-[20px])
                   */}
                   <span
                     aria-hidden="true"
@@ -239,10 +239,10 @@ function CookiePrefsPanel() {
                       'transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
                       isOn
                         ? cn(
-                            'translate-x-[22px]',
+                            'translate-x-[20px]',
                             cat.locked ? 'bg-white' : 'bg-[#0E0E0E]'
                           )
-                        : 'translate-x-[3px] bg-[#F0EDE8]/50'
+                        : 'translate-x-[2px] bg-[#F0EDE8]/50'
                     )}
                   />
                 </button>

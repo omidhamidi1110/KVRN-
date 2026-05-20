@@ -69,7 +69,7 @@ export function WaitlistBlock() {
           ) : (
             <form onSubmit={handleSubmit} noValidate className="space-y-3">
               {/* Input + button — stacked on mobile, inline on sm+ */}
-              <div className="flex flex-col sm:flex-row gap-0 w-full">
+              <div className="flex flex-row gap-0 w-full">
                 <label htmlFor="hp-waitlist-email" className="sr-only">{t.emailPlaceholder}</label>
                 <input
                   id="hp-waitlist-email"
@@ -81,12 +81,12 @@ export function WaitlistBlock() {
                   required
                   aria-required="true"
                   aria-invalid={!!errMsg}
-                  className="flex-1 h-12 px-5 text-[13px] font-light bg-white/6 border border-[#F0EDE8]/18 text-[#F0EDE8] placeholder:text-[#F0EDE8]/28 focus:outline-none focus:border-[#F0EDE8]/45 transition-colors sm:border-r-0"
+                  className="flex-1 h-12 px-5 text-[13px] font-light bg-white/6 border border-[#F0EDE8]/18 text-[#F0EDE8] placeholder:text-[#F0EDE8]/28 focus:outline-none focus:border-[#F0EDE8]/45 transition-colors border-r-0"
                 />
                 <button
                   type="submit"
                   disabled={state === 'loading'}
-                  className="h-12 px-7 text-[11px] font-light tracking-[0.16em] uppercase bg-[#F0EDE8] text-[#0E0E0E] hover:bg-white transition-colors disabled:opacity-50 flex-shrink-0"
+                  className="w-[170px] h-12 text-[11px] font-light tracking-[0.16em] uppercase bg-[#F0EDE8] text-[#0E0E0E] hover:bg-white transition-colors disabled:opacity-50 flex-shrink-0"
                 >
                   {state === 'loading' ? '…' : t.joinBtn}
                 </button>

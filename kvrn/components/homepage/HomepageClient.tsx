@@ -58,8 +58,8 @@ export function HomepageClient() {
       }}
     >
       {/* Slide indicator — first 3 slides only */}
-      {slide < 3 && (
-        <SlideIndicator current={slide} total={3} dark={DARK_SLIDES.has(slide)} />
+      {slide < 5 && (
+        <SlideIndicator current={slide} total={5} dark={DARK_SLIDES.has(slide)} />
       )}
 
       {/* ── SLIDE 0: Project KVRN (current drop) ─────────────────────────── */}
@@ -244,22 +244,22 @@ function HomepageFooter() {
     <div className="absolute inset-0 flex flex-col justify-between bg-[#F9F8F6]">
       {/* Giant KVRN wordmark — background decoration */}
       <div
-        className="relative flex justify-center pt-8 md:pt-10 pb-6 overflow-hidden pointer-events-none select-none"
+        className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none select-none"
         aria-hidden="true"
       >
         <span
-          className="font-display font-light text-[#1A1A1A]/[0.22] whitespace-nowrap"
-          style={{ fontSize: 'clamp(150px, 22vw, 300px)', letterSpacing: '-0.04em', lineHeight: 1 }}
+          className="font-display font-light text-[#1A1A1A]/[0.10] whitespace-nowrap"
+          style={{ fontSize: 'clamp(180px,28vw,420px)', letterSpacing: '-0.04em', lineHeight: 1 }}
         >
           KVRN
         </span>
       </div>
 
-      <div className="container-kvrn relative z-10 flex-1 flex flex-col justify-end pb-8">
+      <div className="container-kvrn relative z-10 flex-1 flex flex-col justify-center pb-2">
         {/* Top: brand statement + nav columns */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-16 text-center md:text-center">
           {/* Brand block */}
-          <div className="col-span-2 md:col-span-1 space-y-5">
+          <div className="space-y-5 order-1 md:order-1">
             <div className="space-y-0.5">
               <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Quiet garments.</p>
               <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Built with intention.</p>
@@ -299,7 +299,7 @@ function HomepageFooter() {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-[#E8E5E0] py-5 flex items-center justify-between">
+        <div className="border-t border-[#E8E5E0] py-2 mt-6 flex items-center justify-between">
           <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. All rights reserved.</p>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))}
