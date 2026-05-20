@@ -72,7 +72,7 @@ export function ShopClient({ products, type }: Props) {
           <p className="mt-4 text-[13px] text-[#6B6B6B] leading-relaxed max-w-[640px]">
             KVRN produces two collections of heavyweight oversized hoodies and sweatpants.
             The Heavyweight collection is 400 GSM brushed fleece, 100% cotton.
-            The Phantom collection is 500 GSM French terry, enzyme washed. Both are designed for daily wear.
+            The Project KVRN collection is 500 GSM French terry, enzyme washed. Both are designed for daily wear.
           </p>
         </details>
       </div>

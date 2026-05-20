@@ -42,10 +42,10 @@ const FAQ_SECTIONS = [
       },
       {
         id: 'phantom',
-        trigger: 'What is the Phantom collection?',
+        trigger: 'What is the Project KVRN collection?',
         content: (
           <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
-            <p>The Phantom collection uses a 500 GSM French terry blend rather than the brushed fleece of the Heavyweight collection. Both are heavy. The difference is in the construction and the proportion.</p>
+            <p>The Project KVRN collection uses a 500 GSM French terry blend rather than the brushed fleece of the Heavyweight collection. Both are heavy. The difference is in the construction and the proportion.</p>
             <p>Phantom is enzyme washed and pre-shrunk before shipping, so it arrives with immediate softness and a more relaxed hand feel. It is also cut with a cropped, oversized proportion rather than a longer oversized one.</p>
           </div>
         ),

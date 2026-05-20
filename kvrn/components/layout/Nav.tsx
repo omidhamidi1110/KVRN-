@@ -39,25 +39,17 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Homepage scroll-snap section observer — detect current section background
+  // Homepage: listen for slide-change events dispatched by HomepageClient
   useEffect(() => {
     if (!isHome) return
-    const snapContainer = document.querySelector('[data-snap-page="true"]') as HTMLElement
-    if (!snapContainer) return
+    setNavTheme('dark')  // homepage default = dark (hero first)
 
-    const detectSection = () => {
-      const scrollTop = snapContainer.scrollTop
-      const vh = snapContainer.clientHeight
-      const idx = Math.round(scrollTop / vh)
-
-      // Section order: 0=hero(dark), 1=products(light), 2=fabric(light), 3=trust(light), 4=waitlist(dark)
-      const DARK_SECTIONS = new Set([0, 4])
-      setNavTheme(DARK_SECTIONS.has(idx) ? 'dark' : 'light')
+    const onSlideChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ dark: boolean }>).detail
+      setNavTheme(detail.dark ? 'dark' : 'light')
     }
-
-    snapContainer.addEventListener('scroll', detectSection, { passive: true })
-    detectSection()
-    return () => snapContainer.removeEventListener('scroll', detectSection)
+    window.addEventListener('kvrn-slide-change', onSlideChange)
+    return () => window.removeEventListener('kvrn-slide-change', onSlideChange)
   }, [isHome])
 
   useEffect(() => {
@@ -76,10 +68,16 @@ export function Nav() {
   const transparent = !solidNav && (isHome ? navTheme === 'dark' : false)
   const onLight = !transparent
 
-  const navBg   = (onLight || scrolled)
-    ? 'bg-[rgba(249,248,246,0.97)] backdrop-blur-[18px] border-b border-[#E8E5E0]'
-    : 'bg-transparent'
-  const textCls = (onLight || scrolled) ? 'text-[#1A1A1A]' : 'text-[#F0EDE8]'
+  // Homepage: always transparent, color driven by slide
+  // Other pages: solid when scrolled
+  const navBg = isHome
+    ? 'bg-transparent'
+    : (scrolled
+      ? 'bg-[rgba(249,248,246,0.97)] backdrop-blur-[18px] border-b border-[#E8E5E0]'
+      : 'bg-transparent')
+  const textCls = isHome
+    ? (navTheme === 'dark' ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]')
+    : (scrolled ? 'text-[#1A1A1A]' : 'text-[#F0EDE8]')
 
   const desktopLinks = [
     { label: t.shopAll,    href: '/shop' },
@@ -179,12 +177,12 @@ export function Nav() {
       </header>
 
       {/* Mobile backdrop */}
+      {/* No backdrop needed — drawer is full screen */}
       <div
         className={cn(
-          'fixed inset-0 z-[300] bg-black/50 transition-opacity duration-300 lg:hidden',
-          drawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          'fixed inset-0 z-[300] transition-opacity duration-300 lg:hidden pointer-events-none',
+          drawerOpen ? 'opacity-100' : 'opacity-0'
         )}
-        onClick={() => setDrawerOpen(false)}
         aria-hidden="true"
       />
 
@@ -193,18 +191,18 @@ export function Nav() {
         ref={drawerRef}
         role="dialog" aria-modal="true" aria-label="Navigation menu"
         className={cn(
-          'fixed inset-y-0 left-0 z-[400] w-[85vw] max-w-[320px]',
-          'bg-[#F9F8F6] flex flex-col',
-          'transition-transform duration-500 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] lg:hidden',
-          drawerOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed inset-0 z-[400]',
+          'bg-[#0E0E0E] flex flex-col',
+          'transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden',
+          drawerOpen ? 'translate-y-0' : 'translate-y-full'
         )}
       >
         {/* Drawer header */}
-        <div className="flex items-center justify-between px-6 pt-7 pb-5 border-b border-[#E8E5E0]">
+        <div className="flex items-center justify-between px-6 pt-8 pb-6 border-b border-[#F0EDE8]/10">
           <Link href="/" onClick={() => setDrawerOpen(false)}
-            className="text-[14px] font-light tracking-[0.18em] uppercase">KVRN</Link>
+            className="text-[14px] font-light tracking-[0.18em] uppercase text-[#F0EDE8]">KVRN</Link>
           <button onClick={() => setDrawerOpen(false)} aria-label="Close menu"
-            className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors p-1">
+            className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors p-1">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
@@ -212,7 +210,7 @@ export function Nav() {
         </div>
 
         {/* Collapsible Language + Currency at top of drawer */}
-        <div className="border-b border-[#E8E5E0]">
+        <div className="border-b border-[#F0EDE8]/10">
           <DrawerLangSelector />
           <DrawerCurrencySelector />
         </div>
@@ -222,27 +220,27 @@ export function Nav() {
           {mobileLinks.map(l => (
             <Link key={l.href + l.label} href={l.href}
               onClick={() => setDrawerOpen(false)}
-              className="block py-3.5 text-[14px] font-light border-b border-[#E8E5E0] last:border-0 text-[#1A1A1A] hover:text-[#6B6B6B] transition-colors">
+              className="block py-3.5 text-[16px] font-light border-b border-[#F0EDE8]/10 last:border-0 text-[#F0EDE8] hover:text-[#F0EDE8]/50 transition-colors">
               {l.label}
             </Link>
           ))}
         </nav>
 
         {/* Drawer footer */}
-        <div className="px-6 py-5 border-t border-[#E8E5E0]">
+        <div className="px-6 py-5 border-t border-[#F0EDE8]/10">
           <div className="flex items-center gap-4 mb-3">
             <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-              aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+              aria-label="KVRN on Instagram" className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
               <InstagramIcon />
             </a>
             <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-              aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+              aria-label="KVRN on TikTok" className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
               <TikTokIcon />
             </a>
           </div>
           <button
             onClick={() => { openPreferences(); setDrawerOpen(false) }}
-            className="text-[11px] font-light text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors tracking-wide"
+            className="text-[11px] font-light text-[#F0EDE8]/35 hover:text-[#F0EDE8]/70 transition-colors tracking-wide"
           >
             Cookie preferences
           </button>
@@ -263,15 +261,15 @@ function DrawerLangSelector() {
     <div>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F3F0EB] transition-colors"
+        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F0EDE8]/5 transition-colors"
         aria-expanded={open}
       >
         <div className="text-left">
-          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">Language</p>
-          <p className="text-[13px] font-light text-[#1A1A1A] mt-0.5">{current.nativeLabel}</p>
+          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">Language</p>
+          <p className="text-[13px] font-light text-[#F0EDE8] mt-0.5">{current.nativeLabel}</p>
         </div>
         <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
-          className={cn('text-[#9B9B9B] transition-transform duration-200', open && 'rotate-180')}>
+          className={cn('text-[#F0EDE8]/40 transition-transform duration-200', open && 'rotate-180')}>
           <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
       </button>
@@ -285,7 +283,7 @@ function DrawerLangSelector() {
                 'px-3 py-2 text-left text-[12px] font-light border transition-all duration-150',
                 l.code === locale
                   ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                  : 'border-[#E8E5E0] text-[#1A1A1A] hover:border-[#1A1A1A]'
+                  : 'border-[#F0EDE8]/20 text-[#F0EDE8]/70 hover:border-[#F0EDE8]/60'
               )}
             >
               <span className="block">{l.nativeLabel}</span>
@@ -307,15 +305,15 @@ function DrawerCurrencySelector() {
     <div>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F3F0EB] transition-colors"
+        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F0EDE8]/5 transition-colors"
         aria-expanded={open}
       >
         <div className="text-left">
-          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">Currency</p>
-          <p className="text-[13px] font-light text-[#1A1A1A] mt-0.5">{currencyCode} — {current.label.split(' — ')[1]}</p>
+          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">Currency</p>
+          <p className="text-[13px] font-light text-[#F0EDE8] mt-0.5">{currencyCode} — {current.label.split(' — ')[1]}</p>
         </div>
         <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
-          className={cn('text-[#9B9B9B] transition-transform duration-200', open && 'rotate-180')}>
+          className={cn('text-[#F0EDE8]/40 transition-transform duration-200', open && 'rotate-180')}>
           <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
       </button>
@@ -329,7 +327,7 @@ function DrawerCurrencySelector() {
                 'px-2 py-2 text-[12px] font-light border transition-all duration-150',
                 c.code === currencyCode
                   ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                  : 'border-[#E8E5E0] text-[#1A1A1A] hover:border-[#1A1A1A]'
+                  : 'border-[#F0EDE8]/20 text-[#F0EDE8]/70 hover:border-[#F0EDE8]/60'
               )}
             >
               {c.code}

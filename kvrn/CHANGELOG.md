@@ -13,7 +13,7 @@
 - `components/cart/ShippingProgress.tsx` — Free shipping progress bar in cart
 
 ### Rewritten Files
-- `data/products.ts` — 4 products total: Heavyweight Hoodie, Heavyweight Sweatpants, Phantom Hoodie, Phantom Sweatpants. Prices in USD cents. Correct specs. 5 colorways for Heavyweight, Black only for Phantom
+- `data/products.ts` — 4 products total: Heavyweight Hoodie, Heavyweight Sweatpants, Project KVRN Heavyweight Hoodie, Project KVRN Heavyweight Sweatpants. Prices in USD cents. Correct specs. 5 colorways for Heavyweight, Black only for Phantom
 - `components/layout/Nav.tsx` — Desktop links added (Shop, Hoodies, Sweatpants, About, Waitlist). SVG bag icon. Currency selector. SVG social icons (@thekvrn). Mobile drawer updated
 - `components/layout/Footer.tsx` — Compressed to 5-column desktop grid. SVG Instagram + TikTok icons linking @thekvrn
 - `components/product/ProductCard.tsx` — Interactive color swatches (always visible), stock badge, wishlist icon, currency-aware pricing

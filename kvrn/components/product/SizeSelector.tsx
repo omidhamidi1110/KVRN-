@@ -29,7 +29,7 @@ export function SizeSelector({
       className={cn('border-0 p-0 m-0', className)}
     >
       <div className="flex items-center justify-between mb-3">
-        <legend className="label-11">Size</legend>
+        {!hideSizeGuideLink && <legend className="label-11">Size</legend>}
         {!hideSizeGuideLink && (
           <Link
             href="#size-guide"

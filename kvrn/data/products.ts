@@ -17,8 +17,8 @@ function imgs(product: string, color: string, shots: string[]) {
   const PROD_NAMES: Record<string, string> = {
     'hoodie': 'KVRN Heavyweight Hoodie',
     'sweatpants': 'KVRN Heavyweight Sweatpants',
-    'phantom-hoodie': 'KVRN Phantom Hoodie',
-    'phantom-pants': 'KVRN Phantom Sweatpants',
+    'phantom-hoodie': 'Project KVRN Heavyweight Hoodie',
+    'phantom-pants': 'Project KVRN Heavyweight Sweatpants',
   }
   return shots.map(shot => ({
     src: `/images/products/${product}-${color}-${shot}.webp`,
@@ -120,11 +120,11 @@ export const products: Product[] = [
 
   // ── Phantom Hoodie ──────────────────────────────────────────────────────────
   {
-    id: 'kph-001', name: 'Phantom Hoodie', slug: 'kvrn-phantom-hoodie',
+    id: 'kph-001', name: 'Project KVRN Heavyweight Hoodie', slug: 'kvrn-phantom-hoodie',
     type: 'hoodie', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '500 GSM French terry blend. Oversized, cropped.',
-    description: 'Phantom is cut in a heavier French terry blend with an oversized, cropped proportion. Enzyme washed for a softer hand feel and finished for everyday wear.',
+    description: 'A heavier French terry blend with an oversized, cropped proportion. Enzyme washed for a softer hand feel and finished for everyday wear.',
     colors: PH_COLORS.map(c => ({
       ...c,
       images: imgs('phantom-hoodie', c.value, ['front', 'back', 'hood-macro', 'fabric-macro', 'lifestyle']),
@@ -147,18 +147,18 @@ export const products: Product[] = [
     ],
     relatedProductSlug: 'kvrn-phantom-sweatpants',
     seo: {
-      title: 'KVRN Phantom Hoodie | 500 GSM French Terry | Founder Price $80',
-      description: 'KVRN Phantom Hoodie. 500 GSM French terry blend, enzyme washed, pre-shrunk. Cropped oversized fit. Black. Founder price $80.',
+      title: 'Project KVRN Heavyweight Hoodie | 500 GSM French Terry | Founder Price $80',
+      description: 'Project KVRN Heavyweight Hoodie. 500 GSM French terry blend, enzyme washed, pre-shrunk. Cropped oversized fit. Black. Founder price $80.',
     },
   },
 
   // ── Phantom Sweatpants ──────────────────────────────────────────────────────
   {
-    id: 'kps-001', name: 'Phantom Sweatpants', slug: 'kvrn-phantom-sweatpants',
+    id: 'kps-001', name: 'Project KVRN Heavyweight Sweatpants', slug: 'kvrn-phantom-sweatpants',
     type: 'sweatpants', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '500 GSM French terry blend. Relaxed oversized fit.',
-    description: 'Phantom Sweatpants use the same 500 GSM French terry blend with a relaxed oversized fit. Pre-shrunk, enzyme washed, and finished for a clean daily silhouette.',
+    description: 'The same 500 GSM French terry blend with a relaxed oversized fit. Pre-shrunk, enzyme washed, and finished for a clean daily silhouette.',
     colors: PH_COLORS.map(c => ({
       ...c,
       images: imgs('phantom-pants', c.value, ['front', 'back', 'fabric-macro', 'lifestyle']),
@@ -166,7 +166,7 @@ export const products: Product[] = [
     sizes: STANDARD_SIZES,
     fitNote: 'Relaxed oversized fit. True to size.',
     features: [
-      { title: '500 GSM French Terry Blend', description: '70% cotton, 30% polyester. Same blend as the Phantom Hoodie.' },
+      { title: '500 GSM French Terry Blend', description: '70% cotton, 30% polyester. Same blend as the Project KVRN Heavyweight Hoodie.' },
       { title: 'Enzyme Washed', description: 'Immediate softness from first wear.' },
       { title: 'Pre-Shrunk', description: 'Holds its shape through regular wear and washing.' },
     ],
@@ -182,8 +182,8 @@ export const products: Product[] = [
     ],
     relatedProductSlug: 'kvrn-phantom-hoodie',
     seo: {
-      title: 'KVRN Phantom Sweatpants | 500 GSM French Terry | Founder Price $80',
-      description: 'KVRN Phantom Sweatpants. 500 GSM French terry blend. Enzyme washed, pre-shrunk. Relaxed oversized fit. Black. Founder price $80.',
+      title: 'Project KVRN Heavyweight Sweatpants | 500 GSM French Terry | Founder Price $80',
+      description: 'Project KVRN Heavyweight Sweatpants. 500 GSM French terry blend. Enzyme washed, pre-shrunk. Relaxed oversized fit. Black. Founder price $80.',
     },
   },
 ]

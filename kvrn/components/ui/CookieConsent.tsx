@@ -232,30 +232,34 @@ function CookiePrefsPanel() {
               </div>
 
               {/* Toggle switch */}
+              {/* Toggle switch — circle LEFT=off, RIGHT=on */}
               <button
                 role="switch"
-                aria-checked={!!local[cat.key]}
-                aria-label={`${cat.label}`}
+                aria-checked={cat.locked ? true : !!local[cat.key]}
+                aria-label={cat.label}
                 disabled={cat.locked}
                 onClick={() => !cat.locked && toggle(cat.key as keyof Omit<CookiePrefs, 'essential'>)}
                 className={cn(
-                  'relative w-11 h-6 flex-shrink-0 mt-0.5 rounded-full',
-                  'transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F0EDE8]/50',
+                  'relative flex-shrink-0 w-11 h-6 rounded-full',
+                  'transition-colors duration-200',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0EDE8]/50',
                   cat.locked
-                    ? 'bg-[#F0EDE8]/25 cursor-not-allowed'
-                    : local[cat.key]
-                    ? 'bg-[#F0EDE8] cursor-pointer'
-                    : 'bg-[#F0EDE8]/15 cursor-pointer hover:bg-[#F0EDE8]/25'
+                    ? 'bg-[#F0EDE8]/40 cursor-not-allowed'
+                    : (local[cat.key]
+                      ? 'bg-[#F0EDE8] cursor-pointer'
+                      : 'bg-[#F0EDE8]/15 cursor-pointer hover:bg-[#F0EDE8]/25')
                 )}
               >
                 <span
+                  aria-hidden="true"
                   className={cn(
-                    'absolute top-[3px] w-[18px] h-[18px] rounded-full transition-all duration-200',
+                    'absolute top-[3px] w-[18px] h-[18px] rounded-full shadow-sm',
+                    'transition-transform duration-200 ease-in-out',
                     cat.locked
-                      ? 'bg-[#F0EDE8]/60 translate-x-[22px]'
-                      : local[cat.key]
-                      ? 'bg-[#0E0E0E] translate-x-[22px]'
-                      : 'bg-[#F0EDE8]/40 translate-x-[3px]'
+                      ? 'bg-white translate-x-[22px]'       // locked = always ON = right
+                      : (local[cat.key]
+                        ? 'bg-[#0E0E0E] translate-x-[22px]' // ON  = right
+                        : 'bg-[#F0EDE8]/60 translate-x-[3px]') // OFF = left
                   )}
                 />
               </button>

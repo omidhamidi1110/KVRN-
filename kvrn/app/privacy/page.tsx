@@ -11,7 +11,13 @@ const LAST_UPDATED = '1 January 2025'
 
 export default function PrivacyPage() {
   return (
-    <div className="pt-[calc(36px+56px)]">
+    <div>
+      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-12">
+        <div className="container-kvrn max-w-3xl">
+  
+        </div>
+      </div>
+      <div className="pt-0">
       <div className="container-kvrn section-padding max-w-2xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
@@ -184,5 +190,6 @@ export default function PrivacyPage() {
         </div>
       </div>
     </div>
+      </div>
   )
 }

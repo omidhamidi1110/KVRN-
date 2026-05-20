@@ -309,45 +309,52 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
         )}
       </div>
 
-      {/* Sticky ATC — shows color + size */}
+      {/* Sticky ATC — white, refined */}
       <div
         className={cn(
           'fixed bottom-0 left-0 right-0 z-[200]',
-          'bg-[#F9F8F6] border-t border-[#E8E5E0]',
-          'transition-transform duration-300',
-          stickyVisible ? 'translate-y-0' : 'translate-y-full'
+          'bg-white border-t border-[#E8E5E0]',
+          'transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]',
+          stickyVisible ? 'translate-y-0 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]' : 'translate-y-full'
         )}
         aria-hidden={!stickyVisible}
       >
-        <div className="container-kvrn py-3 flex items-center gap-4 max-w-[560px] mx-auto">
-          {/* Color swatch + selection info */}
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        <div className="container-kvrn max-w-[640px] mx-auto py-3.5 flex items-center gap-4">
+          {/* Color swatch + info */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <span
-              className="w-4 h-4 rounded-full flex-shrink-0 border border-[#E8E5E0]"
+              className="w-5 h-5 rounded-full flex-shrink-0 border border-[#E8E5E0]"
               style={{ backgroundColor: selectedColor.hex }}
               aria-hidden="true"
             />
             <div className="min-w-0">
-              <p className="text-[12px] font-light truncate leading-tight">{product.name}</p>
-              <p className="text-[11px] text-[#9B9B9B] leading-tight">
-                {selectedColor.name}{selectedSize ? ` / ${selectedSize}` : ' — Select size'}
+              <p className="text-[12px] font-light text-[#1A1A1A] truncate leading-tight tracking-wide">
+                {product.name}
+              </p>
+              <p className="text-[11px] text-[#9B9B9B] leading-tight mt-0.5">
+                {selectedColor.name}{selectedSize ? ` · ${selectedSize}` : ' — select a size'}
               </p>
             </div>
           </div>
-          {/* Price + ATC */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-[13px] font-light tabular-nums hidden sm:block">
+          {/* Price + button */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-[14px] font-light tabular-nums text-[#1A1A1A] hidden sm:block">
               {formatPrice(product.price)}
             </span>
-            <Button
-              variant="primary" size="sm"
-              loading={addState === 'loading'}
-              disabled={soldOut}
+            <button
+              disabled={soldOut || addState === 'loading'}
               onClick={handleAdd}
-              className="min-w-[110px]"
+              className={cn(
+                'h-10 px-6 text-[11px] font-light tracking-[0.1em] uppercase transition-all duration-200',
+                soldOut
+                  ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
+                  : addState === 'added'
+                  ? 'bg-[#15803D] text-white'
+                  : 'bg-[#1A1A1A] text-white hover:bg-[#333]'
+              )}
             >
-              {soldOut ? t.soldOut : addState === 'added' ? t.addedToBag : t.addToBag}
-            </Button>
+              {soldOut ? t.soldOut : addState === 'added' ? t.addedToBag : addState === 'loading' ? '…' : t.addToBag}
+            </button>
           </div>
         </div>
       </div>
