@@ -46,7 +46,7 @@ export function WaitlistBlock() {
       {/* Main content — centered */}
       <div className="flex-1 flex items-center justify-center px-6 md:px-8">
         <div className="w-full max-w-[480px] text-center">
-          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-8">
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#FFFFFF]/78 mb-8">
             KVRN
           </p>
 
@@ -54,7 +54,7 @@ export function WaitlistBlock() {
             {t.builtFor}<br />{t.designedFor}
           </h2>
 
-          <p className="text-[15px] font-light text-[#F0EDE8]/82 leading-relaxed mb-2">
+          <p className="text-[15px] font-light text-[#FFFFFF] leading-relaxed mb-2">
             {t.earlyAccess}
           </p>
           <p className="text-[13px] font-light text-[#F0EDE8]/28 mb-10">

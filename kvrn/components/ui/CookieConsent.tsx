@@ -45,7 +45,7 @@ export function CookieBanner() {
               <p className="text-[13px] font-light text-[#F0EDE8] leading-relaxed mb-1">
                 We use cookies to improve your experience.
               </p>
-              <p className="text-[12px] text-[#F0EDE8]/82 leading-relaxed">
+              <p className="text-[12px] text-[#FFFFFF]/82 leading-relaxed">
                 Essential cookies keep the site working. Optional cookies help us understand usage.{' '}
                 <Link href="/privacy" className="text-[#F0EDE8]/65 underline underline-offset-2 hover:text-[#F0EDE8] transition-colors">
                   Privacy Policy
@@ -175,7 +175,7 @@ function CookiePrefsPanel() {
 
         {/* Description */}
         <div className="px-6 py-4 border-b border-[#F0EDE8]/8 flex-shrink-0">
-          <p className="text-[12px] text-[#F0EDE8]/82 leading-relaxed">
+          <p className="text-[12px] text-[#FFFFFF]/82 leading-relaxed">
             Choose which cookies you allow. Your preference is saved for 12 months.{' '}
             <Link href="/privacy" className="text-[#F0EDE8]/65 underline underline-offset-2 hover:text-[#F0EDE8]">
               Privacy Policy
@@ -205,7 +205,7 @@ function CookiePrefsPanel() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#F0EDE8]/88 leading-relaxed">{cat.desc}</p>
+                  <p className="text-[11px] text-[#FFFFFF] leading-relaxed">{cat.desc}</p>
                 </div>
 
                 {/* Toggle switch — OFF=left, ON=right */}
@@ -229,7 +229,7 @@ function CookiePrefsPanel() {
                 >
                   {/*
                     Circle position:
-                    OFF → left  (translate-x-[0px])
+                    OFF → left  (translate-x-[2px])
                     ON  → right (translate-x-[24px])
                   */}
                   <span
@@ -242,7 +242,7 @@ function CookiePrefsPanel() {
                             'translate-x-[24px]',
                             cat.locked ? 'bg-white' : 'bg-[#0E0E0E]'
                           )
-                        : 'translate-x-[0px] bg-[#F0EDE8]/50'
+                        : 'translate-x-[2px] bg-[#F0EDE8]/50'
                     )}
                   />
                 </button>
@@ -262,7 +262,7 @@ function CookiePrefsPanel() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => acceptAll()}
-              className="h-10 px-4 text-[11px] font-light tracking-[0.1em] uppercase border border-[#F0EDE8]/22 text-[#F0EDE8]/60 hover:border-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors"
+              className="h-10 px-4 text-[11px] font-light tracking-[0.1em] uppercase border border-[#F0EDE8]/22 text-[#FFFFFF]/90 hover:border-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors"
             >
               Accept all
             </button>

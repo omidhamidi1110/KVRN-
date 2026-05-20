@@ -76,13 +76,12 @@ export function HomepageClient() {
           aria-hidden="true"
         />
         <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-16 md:pb-20">
-          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-4">
-            Available now
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-2">\n            Available now
           </p>
-          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-5">
+          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-2">
             Project<br />KVRN
           </h1>
-          <Link href="/shop?type=hoodies"
+          <Link href="/shop?collection=project-kvrn"
             className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
             Discover Project KVRN
           </Link>
