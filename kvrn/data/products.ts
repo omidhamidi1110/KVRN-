@@ -52,6 +52,7 @@ export const products: Product[] = [
   // ── Heavyweight Hoodie ──────────────────────────────────────────────────────
   {
     id: 'kh-001', name: 'Heavyweight Hoodie', slug: 'kvrn-heavyweight-hoodie',
+    hidden: true,
     type: 'hoodie', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '400 GSM brushed fleece. Double-layered hood.',
@@ -86,6 +87,7 @@ export const products: Product[] = [
   // ── Heavyweight Sweatpants ──────────────────────────────────────────────────
   {
     id: 'ks-001', name: 'Heavyweight Sweatpants', slug: 'kvrn-heavyweight-sweatpants',
+    hidden: true,
     type: 'sweatpants', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '400 GSM brushed fleece. Wide-leg silhouette.',
@@ -202,4 +204,9 @@ export function getProductsByType(type: 'hoodie' | 'sweatpants'): Product[] {
 
 export function formatPrice(usdCents: number): string {
   return `$${Math.round(usdCents / 100)}`
+}
+
+/** Products visible in storefront listings (hidden:true products excluded) */
+export function getVisibleProducts(): Product[] {
+  return products.filter(p => !p.hidden)
 }

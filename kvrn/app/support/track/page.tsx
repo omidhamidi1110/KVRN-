@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHero } from '@/components/layout/PageHero'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
@@ -84,13 +85,7 @@ export default function TrackOrderPage() {
 
   return (
     <div>
-      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-14">
-        <div className="container-kvrn max-w-2xl">
-          <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
-            Track Order
-          </h1>
-        </div>
-      </div>
+      <PageHero title="Track Order" breadcrumb="Track Order" />
       <div className="container-kvrn section-padding max-w-xl">
 <h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-10">
           Track your order

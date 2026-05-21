@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { PageHero } from '@/components/layout/PageHero'
 import { useI18n } from '@/context/I18nContext'
 import { ProductCard } from '@/components/product/ProductCard'
 import type { Product } from '@/types'
@@ -26,18 +27,7 @@ export function ShopClient({ products, type, headingOverride }: Props) {
   return (
     <div>
       {/* Dark header — keeps nav text readable */}
-      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-12">
-        <div className="container-kvrn">
-          <h1 className="font-display font-light text-[40px] md:text-[56px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
-            {heading}
-          </h1>
-          {!type && (
-            <p className="text-[14px] text-[#F0EDE8]/40 mt-3">
-              {products.length} products
-            </p>
-          )}
-        </div>
-      </div>
+      <PageHero title={heading ?? 'Shop'} />
       <div className="container-kvrn py-10 md:py-14">
 
         {/* Filter tabs */}

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { products, getProductsByType } from '@/data/products'
+import { getVisibleProducts, getProductsByType } from '@/data/products'
 import { ShopClient } from '@/components/shop/ShopClient'
 
 interface PageProps {
@@ -17,11 +17,12 @@ export default async function ShopPage({ searchParams }: PageProps) {
   const { type } = await searchParams
   const isHoodies    = type === 'hoodies'
   const isSweatpants = type === 'sweatpants'
+  const visible      = getVisibleProducts()
   const displayed    = isHoodies
-    ? getProductsByType('hoodie')
+    ? visible.filter(p => p.type === 'hoodie')
     : isSweatpants
-    ? getProductsByType('sweatpants')
-    : products
+    ? visible.filter(p => p.type === 'sweatpants')
+    : visible
 
   return <ShopClient products={displayed} type={type ?? null} />
 }

@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CookieControls } from './CookieControls'
@@ -10,11 +11,7 @@ export const metadata: Metadata = {
 export default function CookiesPage() {
   return (
     <div>
-      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+40px)] pb-12">
-        <div className="container-kvrn max-w-3xl">
-  
-        </div>
-      </div>
+      <PageHero title="Cookie Policy" breadcrumb="Cookies" />
       <div className="pt-0">
       <div className="container-kvrn section-padding max-w-2xl">
         <nav aria-label="Breadcrumb" className="mb-10">

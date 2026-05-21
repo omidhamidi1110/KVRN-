@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHero } from '@/components/layout/PageHero'
 import { useState } from 'react'
 import Link from 'next/link'
 import { isValidEmail } from '@/lib/utils'
@@ -67,20 +68,7 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-[#F9F8F6]">
       {/* Dark intro */}
-      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+48px)] pb-16">
-        <div className="container-kvrn max-w-2xl">
-          <h1 className="font-display font-light text-[40px] md:text-[56px] leading-[0.9] tracking-[-0.03em] text-[#F0EDE8]">
-            Contact
-          </h1>
-          <p className="text-[14px] text-[#F0EDE8]/45 mt-4 leading-relaxed">
-            Questions about orders, sizing, shipping, or returns can be sent to{' '}
-            <a href="mailto:support@kvrn.shop" className="text-[#F0EDE8]/70 underline underline-offset-2">
-              support@kvrn.shop
-            </a>
-            . Response time: 1–2 business days.
-          </p>
-        </div>
-      </div>
+      <PageHero title="Contact" breadcrumb="Contact" />
 
       {/* Form */}
       <div className="container-kvrn max-w-2xl py-14">

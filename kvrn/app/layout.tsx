@@ -46,7 +46,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  width: 'device-width', initialScale: 1, themeColor: '#0E0E0E',
+  width: 'device-width', initialScale: 1, themeColor: '#000000',
 }
 
 const orgSchema = {
@@ -99,7 +99,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Nav />
                 <CartDrawer />
                 <WishlistDrawer />
-                <main id="main-content">{children}</main>{/* Footer handled per page */}
+                <main id="main-content">{children}</main>
+                <ConditionalFooter />
                 <CookieBanner />
               </ToastProvider>
             </CartProvider>

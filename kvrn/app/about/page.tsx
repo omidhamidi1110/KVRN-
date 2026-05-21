@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -10,14 +11,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[#F9F8F6]">
       {/* Dark intro */}
-      <div className="bg-[#0E0E0E] pt-[calc(36px+56px+48px)] pb-16">
-        <div className="container-kvrn max-w-3xl">
-          <p className="text-[11px] font-light tracking-[0.2em] uppercase text-[#F0EDE8]/35 mb-5">KVRN</p>
-          <h1 className="font-display font-light text-[40px] md:text-[58px] leading-[0.9] tracking-[-0.03em] text-[#F0EDE8]">
-            About
-          </h1>
-        </div>
-      </div>
+      <PageHero title="About" breadcrumb="About" />
 
       {/* Content */}
       <div className="container-kvrn max-w-3xl py-16 md:py-20">

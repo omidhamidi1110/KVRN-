@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHero } from '@/components/layout/PageHero'
 import { useState } from 'react'
 import Link from 'next/link'
 
@@ -35,39 +36,7 @@ export default function SizeGuidePage() {
   return (
     <div className="pt-[calc(36px+56px)]">
       {/* Dark header */}
-      <div className="bg-[#0E0E0E] pt-14 pb-14">
-        <div className="container-kvrn max-w-3xl">
-          <nav aria-label="Breadcrumb" className="mb-8">
-            <ol className="flex items-center gap-2 text-[11px] text-[#F0EDE8]/40">
-              <li><Link href="/" className="hover:text-[#F0EDE8] transition-colors">Home</Link></li>
-              <li aria-hidden="true">·</li>
-              <li className="text-[#F0EDE8]/70" aria-current="page">Size Guide</li>
-            </ol>
-          </nav>
-          <div className="flex items-end justify-between gap-4">
-            <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
-              Size Guide
-            </h1>
-            {/* cm / in toggle */}
-            <div className="flex items-center gap-1 p-1 border border-[#F0EDE8]/20 rounded-sm flex-shrink-0 mb-1.5">
-              {['cm', 'in'].map(unit => (
-                <button
-                  key={unit}
-                  onClick={() => setInches(unit === 'in')}
-                  className={cn(
-                    'px-3 py-1.5 text-[11px] font-light tracking-[0.08em] uppercase transition-all duration-150',
-                    (unit === 'in') === inches
-                      ? 'bg-[#F0EDE8] text-[#0E0E0E]'
-                      : 'text-[#F0EDE8]/50 hover:text-[#F0EDE8]'
-                  )}
-                >
-                  {unit}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHero title="Size Guide" breadcrumb="Size Guide" />
 
       <div className="container-kvrn max-w-3xl py-12">
         <p className="text-[14px] text-[#6B6B6B] mb-12 leading-relaxed max-w-[540px]">

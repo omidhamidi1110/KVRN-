@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Accordion } from '@/components/ui/Accordion'
@@ -176,20 +177,7 @@ export default function FAQPage() {
   return (
     <div className="pt-[calc(36px+56px)]">
       {/* Dark header band */}
-      <div className="bg-[#0E0E0E] pb-14 pt-14">
-        <div className="container-kvrn max-w-3xl">
-          <nav aria-label="Breadcrumb" className="mb-8">
-            <ol className="flex items-center gap-2 text-[11px] text-[#F0EDE8]/40">
-              <li><Link href="/" className="hover:text-[#F0EDE8] transition-colors">Home</Link></li>
-              <li aria-hidden="true">·</li>
-              <li className="text-[#F0EDE8]/70" aria-current="page">FAQ</li>
-            </ol>
-          </nav>
-          <h1 className="font-display font-light text-[40px] md:text-[52px] leading-none tracking-[-0.03em] text-[#F0EDE8]">
-            FAQ
-          </h1>
-        </div>
-      </div>
+      <PageHero title="FAQ" breadcrumb="FAQ" />
 
       <div className="container-kvrn max-w-3xl py-14">
         {FAQ_SECTIONS.map(section => (

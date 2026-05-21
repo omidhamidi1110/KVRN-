@@ -60,7 +60,8 @@ export interface Product {
   features: ProductFeature[]
   specs: ProductSpec[]
   fitNote: string
-  founderNote?: string  // Shown near price on PDP and cards
+  founderNote?: string  // Shown near price
+  hidden?:     boolean    // When true: routes exist, not shown in listings  // Shown near price on PDP and cards
   relatedProductSlug?: string
   seo: {
     title: string

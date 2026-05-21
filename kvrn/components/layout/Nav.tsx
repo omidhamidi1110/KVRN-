@@ -31,7 +31,8 @@ export function Nav() {
 
   useEffect(() => {
     const onScroll = () => {
-      setScrolled(window.scrollY > 24)
+      const threshold = isHome ? 24 : 100  // inner pages: stay white over dark header
+      setScrolled(window.scrollY > threshold)
       setOnHero(window.scrollY < window.innerHeight * 0.75)
     }
     window.addEventListener('scroll', onScroll, { passive: true })
