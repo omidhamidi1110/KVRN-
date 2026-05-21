@@ -1,0 +1,49 @@
+# ─── Cloudflare Workers — KVRN ────────────────────────────────────────────────
+# Deploy: npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy
+# Secrets (set once via CLI, never stored here):
+#   npx wrangler secret put STRIPE_SECRET_KEY
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#   npx wrangler secret put DATABASE_URL
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put TWILIO_ACCOUNT_SID
+#   npx wrangler secret put TWILIO_AUTH_TOKEN
+#   npx wrangler secret put TWILIO_PHONE_NUMBER
+#   npx wrangler secret put ADMIN_SECRET
+#   npx wrangler secret put EMAIL_FROM
+#   npx wrangler secret put SUPPORT_EMAIL
+#   npx wrangler secret put ORDERS_EMAIL
+#   npx wrangler secret put RETURNS_EMAIL
+
+name       = "kvrn"
+main       = ".open-next/worker.js"
+account_id = "5c2f1f1df8ff752572878665e985280b"
+
+compatibility_date  = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# ── Static assets ─────────────────────────────────────────────────────────────
+[assets]
+directory = ".open-next/assets"
+binding   = "ASSETS"
+
+# ── Public environment variables ───────────────────────────────────────────────
+# Secrets must be set via `wrangler secret put` — never hardcode here
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
+NODE_ENV             = "production"
+
+# ── Production ────────────────────────────────────────────────────────────────
+[env.production]
+name = "kvrn"
+
+[env.production.vars]
+NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
+NODE_ENV             = "production"
+
+# ── Preview / staging ─────────────────────────────────────────────────────────
+[env.preview]
+name = "kvrn-preview"
+
+[env.preview.vars]
+NEXT_PUBLIC_SITE_URL = "https://kvrn.omidhamidi1110.workers.dev"
+NODE_ENV             = "production"
