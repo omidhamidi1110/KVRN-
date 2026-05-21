@@ -136,16 +136,18 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       </nav>
 
       {/* Main grid */}
-      <div className="container-kvrn pb-24">
-        <div className="grid grid-cols-1 lg:grid-cols-[58fr_42fr] gap-8 lg:gap-14 items-start">
+      <div className="container-kvrn pb-24 max-w-6xl">
+        <div className="grid grid-cols-1 lg:grid-cols-[58fr_42fr] gap-6 lg:gap-10 items-start">
 
           {/* Gallery — sticky */}
           <div className="lg:sticky lg:top-[calc(36px+56px+12px)]">
-            <ProductGallery
-              images={selectedColor.images}
-              productName={product.name}
-              colorName={selectedColor.name}
-            />
+            <div className="max-w-[520px] mx-auto lg:mx-0">
+              <ProductGallery
+                images={selectedColor.images}
+                productName={product.name}
+                colorName={selectedColor.name}
+              />
+            </div>
           </div>
 
           {/* Info panel */}

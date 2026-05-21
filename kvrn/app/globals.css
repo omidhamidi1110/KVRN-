@@ -52,7 +52,9 @@
     box-sizing: border-box;
   }
 
-  html {
+  /* Force black browser chrome on mobile */
+html {
+  background-color: #0E0E0E;
     background-color: var(--color-bg);
     color: var(--color-text);
     scroll-behavior: smooth;

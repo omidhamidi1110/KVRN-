@@ -32,12 +32,12 @@ export function AnnouncementBar() {
   }, [mounted])
 
   if (!mounted) return (
-    <div className="fixed top-0 left-0 right-0 z-[250] h-[36px] bg-[#181818]" aria-hidden="true" />
+    <div className="fixed top-0 left-0 right-0 z-[250] h-[36px] bg-[#0E0E0E]" aria-hidden="true" />
   )
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-[250] h-[36px] flex items-center justify-center bg-[#181818] overflow-hidden"
+      className="fixed top-0 left-0 right-0 z-[250] h-[36px] flex items-center justify-center bg-[#0E0E0E] overflow-hidden"
       aria-live="polite"
       aria-label="Site announcement"
     >

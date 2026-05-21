@@ -63,21 +63,16 @@ export function Nav() {
     return () => { document.body.style.overflow = '' }
   }, [drawerOpen])
 
-  // Nav visual state
-  const solidNav = scrolled && !isHome  // inner pages always solid when scrolled
-  const transparent = !solidNav && (isHome ? navTheme === 'dark' : false)
-  const onLight = !transparent
-
-  // Homepage: always transparent, color driven by slide
-  // Other pages: solid when scrolled
-  const navBg = isHome
-    ? 'bg-transparent'
-    : (scrolled
-      ? 'bg-[rgba(249,248,246,0.97)] backdrop-blur-[18px] border-b border-[#E8E5E0]'
-      : 'bg-transparent')
-  const textCls = isHome
-    ? (navTheme === 'dark' ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]')
-    : (scrolled ? 'text-[#1A1A1A]' : 'text-[#F0EDE8]')
+  // ── Nav visual state ──────────────────────────────────────────────────────
+  // Rule: always transparent. Text color = white on dark bg, black on light bg.
+  // Homepage: driven by current slide (kvrn-slide-change event)
+  // Inner pages: white when NOT scrolled (dark intro headers), black when scrolled
+  const navBg = 'bg-transparent'   // NEVER add a background
+  const isWhiteText = isHome
+    ? navTheme === 'dark'     // homepage: slide drives it
+    : !scrolled               // inner pages: white until scrolled
+  const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
+  const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
   const desktopLinks = [
     { label: t.shopAll,    href: '/shop' },
@@ -106,6 +101,8 @@ export function Nav() {
         className={cn(
           'fixed left-0 right-0 z-[200] h-[56px] flex items-center',
           'transition-all duration-300',
+          // Add subtle bg only on inner pages when scrolled, so text stays legible
+          !isHome && scrolled ? 'bg-[rgba(249,248,246,0.97)] backdrop-blur-[18px] border-b border-[#E8E5E0]' : '',
           navBg, textCls
         )}
         style={{ top: '36px' }}
@@ -167,7 +164,7 @@ export function Nav() {
                 <span key={i}
                   className={cn(
                     'block h-px w-5 transition-colors',
-                    transparent ? 'bg-[#F0EDE8]' : 'bg-[#1A1A1A]'
+                    linesCls
                   )}
                 />
               ))}

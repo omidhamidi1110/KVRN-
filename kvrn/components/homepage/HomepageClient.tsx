@@ -6,17 +6,19 @@ import Link from 'next/link'
 import { useI18n } from '@/context/I18nContext'
 import { WaitlistBlock } from '@/components/homepage/WaitlistBlock'
 
-const DARK_SLIDES = new Set([0, 1, 3])
+// Slides 0, 1, 2, 3 all need white nav text (all have dark or image backgrounds)
+// Slide 4 (footer) is light → black text
+const DARK_SLIDES = new Set([0, 1, 2, 3])
 const TOTAL_SLIDES = 5
 
 export function HomepageClient() {
-  const { t }        = useI18n()
-  const containerRef = useRef<HTMLDivElement>(null)
+  const { t }           = useI18n()
+  const containerRef    = useRef<HTMLDivElement>(null)
   const [slide, setSlide]     = useState(0)
-  const [showUp, setShowUp]   = useState(false)
   const [showDown, setShowDown] = useState(true)
+  const [showUp,   setShowUp]   = useState(false)
 
-  // Lock body scroll
+  // Lock body scroll — snap container owns scrolling
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     document.documentElement.style.overflow = 'hidden'
@@ -26,19 +28,20 @@ export function HomepageClient() {
     }
   }, [])
 
-  // Track slide + scroll cues
+  // Scroll tracking + nav color events
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const onScroll = () => {
-      const scrollTop = el.scrollTop
-      const vh        = el.clientHeight
-      const idx       = Math.round(scrollTop / vh)
-      setSlide(Math.min(idx, TOTAL_SLIDES - 1))
-      setShowDown(scrollTop < 60)
-      setShowUp(scrollTop > vh * 0.8)
+      const st  = el.scrollTop
+      const vh  = el.clientHeight
+      const idx = Math.round(st / vh)
+      const clamped = Math.min(idx, TOTAL_SLIDES - 1)
+      setSlide(clamped)
+      setShowDown(st < 60)
+      setShowUp(st > vh * 0.8)
       window.dispatchEvent(new CustomEvent('kvrn-slide-change', {
-        detail: { dark: DARK_SLIDES.has(idx) }
+        detail: { dark: DARK_SLIDES.has(clamped) }
       }))
     }
     el.addEventListener('scroll', onScroll, { passive: true })
@@ -46,38 +49,35 @@ export function HomepageClient() {
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
+  const isDark   = DARK_SLIDES.has(slide)
+  const arrowClr = isDark ? '#F0EDE8' : '#1A1A1A'
+  const arrowBdr = isDark ? 'rgba(240,237,232,0.35)' : 'rgba(26,26,26,0.2)'
+  const arrowBg  = isDark ? 'rgba(14,14,14,0.25)' : 'rgba(249,248,246,0.7)'
+
   const scrollToTop = () => containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
 
   return (
     <div
       ref={containerRef}
       style={{
-        position:              'fixed',
-        inset:                 0,
-        overflowY:             'scroll',
-        scrollSnapType:        'y mandatory',
-        scrollBehavior:        'smooth',
+        position:               'fixed',
+        inset:                  0,
+        overflowY:              'scroll',
+        scrollSnapType:         'y mandatory',
+        scrollBehavior:         'smooth',
         WebkitOverflowScrolling:'touch',
-        overscrollBehaviorY:   'none',
+        overscrollBehaviorY:    'none',
       }}
     >
-      {/* Slide indicator — all slides */}
-      <SlideIndicator current={slide} total={TOTAL_SLIDES} dark={DARK_SLIDES.has(slide)} />
+      {/* Slide indicator */}
+      <SlideIndicator current={slide} total={TOTAL_SLIDES} dark={isDark} />
 
-      {/* ── Down arrow scroll cue ── */}
-      <div
-        aria-hidden="true"
-        style={{
-          position:   'fixed',
-          bottom:     '36px',
-          left:       '50%',
-          transform:  'translateX(-50%)',
-          zIndex:     190,
-          opacity:    showDown ? 0.65 : 0,
-          transition: 'opacity 0.6s ease',
-          pointerEvents: 'none',
-        }}
-      >
+      {/* ── DOWN cue (centered, fades on scroll) ── */}
+      <div aria-hidden="true" style={{
+        position: 'fixed', bottom: '36px', left: '50%', transform: 'translateX(-50%)',
+        zIndex: 190, opacity: showDown ? 0.65 : 0, transition: 'opacity 0.6s ease',
+        pointerEvents: 'none',
+      }}>
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
           style={{ animation: 'bounce 2s infinite' }}>
           <path d="M10 4v10M5 9l5 5 5-5" stroke="white" strokeWidth="1.3"
@@ -85,26 +85,25 @@ export function HomepageClient() {
         </svg>
       </div>
 
-      {/* ── Up arrow scroll-to-top ── */}
+      {/* ── UP arrow (right side, appears after scroll) ── */}
       <button
         onClick={scrollToTop}
         aria-label="Return to top"
         style={{
-          position:   'fixed',
-          bottom:     '28px',
-          right:      '24px',
-          zIndex:     190,
-          opacity:    showUp ? 1 : 0,
-          transform:  showUp ? 'translateY(0)' : 'translateY(10px)',
-          transition: 'opacity 0.3s, transform 0.3s',
+          position:    'fixed',
+          bottom:      '28px',
+          right:       '24px',
+          zIndex:      190,
+          opacity:     showUp ? 1 : 0,
+          transform:   showUp ? 'translateY(0)' : 'translateY(10px)',
+          transition:  'opacity 0.3s, transform 0.3s',
           pointerEvents: showUp ? 'auto' : 'none',
-          width: '36px', height: '36px',
-          borderRadius: '50%',
-          border: '1px solid rgba(255,255,255,0.35)',
-          background: 'rgba(249,248,246,0.12)',
+          width: '36px', height: '36px', borderRadius: '50%',
+          border: `1px solid ${arrowBdr}`,
+          background: arrowBg,
           backdropFilter: 'blur(8px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: DARK_SLIDES.has(slide) ? '#F0EDE8' : '#1A1A1A',
+          color: arrowClr,
         }}
       >
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -112,7 +111,7 @@ export function HomepageClient() {
         </svg>
       </button>
 
-      {/* ── SLIDE 0: Project KVRN ─────────────────────────────────────── */}
+      {/* ── SLIDE 0: Project KVRN ─────────────────────────────── */}
       <FullSlide dark>
         <Image
           src="/images/campaign/fabric-macro.webp"
@@ -125,12 +124,10 @@ export function HomepageClient() {
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.08) 60%, transparent 100%)' }}
           aria-hidden="true"
         />
-        {/* Centered copy layout */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-24 md:pb-28 px-6 text-center">
           <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-6">
             Available now
           </p>
-          {/* Extra letter-spacing between "Project" and "KVRN" for breathing room */}
           <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] tracking-[-0.03em] text-[#F0EDE8] mb-8"
             style={{ lineHeight: 1.05 }}>
             Project
@@ -144,10 +141,10 @@ export function HomepageClient() {
         </div>
       </FullSlide>
 
-      {/* ── SLIDE 1: Campaign video ───────────────────────────────────── */}
+      {/* ── SLIDE 1: Campaign video ──────────────────────────────── */}
       <FullSlide dark>
-        {/* No fallback image here — poster on the video handles loading state */}
-        <VideoSlide />
+        {/* No fallback image, no poster using slide 1 image — pure video */}
+        <VideoSlide containerRef={containerRef} />
         <div className="absolute inset-0 bg-[#0E0E0E]/25" aria-hidden="true" />
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-20 px-6 text-center">
           <p className="font-display font-light text-[20px] md:text-[28px] tracking-[0.06em] text-[#F0EDE8]/80 max-w-[560px] leading-snug">
@@ -156,8 +153,9 @@ export function HomepageClient() {
         </div>
       </FullSlide>
 
-      {/* ── SLIDE 2: Heavyweight Collection (future drop) ─────────────── */}
-      <FullSlide light>
+      {/* ── SLIDE 2: Heavyweight Collection ─────────────────────── */}
+      {/* Full image, NO overlay — white text with subtle shadow for readability */}
+      <FullSlide dark>
         <Image
           src="/images/campaign/hero-main.webp"
           alt="Heavyweight Collection — coming soon"
@@ -165,37 +163,40 @@ export function HomepageClient() {
           className="object-cover object-center"
           sizes="100vw"
         />
-        {/* Reduced overlay — image clear, text still readable */}
+        {/* Subtle bottom gradient only — enough for text contrast, not a wash */}
         <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(to top, rgba(237,233,227,0.72) 0%, rgba(237,233,227,0.22) 55%, rgba(237,233,227,0.05) 100%)' }}
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)' }}
           aria-hidden="true"
         />
-        {/* Centered copy layout */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-20 px-6 text-center">
-          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#4A4A4A] mb-4">
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/65 mb-4"
+            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
             Coming soon
           </p>
-          <h2 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#1A1A1A] mb-5">
+          <h2
+            className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-5"
+            style={{ textShadow: '0 2px 12px rgba(0,0,0,0.35)' }}>
             Heavyweight<br />Collection
           </h2>
-          <p className="text-[15px] font-light text-[#3A3A3A] leading-relaxed max-w-[400px] mb-8">
+          <p className="text-[15px] font-light text-[#F0EDE8]/80 leading-relaxed max-w-[400px] mb-8"
+            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}>
             The perfect hoodie and sweatpants. 400 GSM brushed fleece, built for structure and daily wear. Five colorways.
           </p>
           <ScrollToSlide
             targetSlide={3}
             containerRef={containerRef}
-            className="inline-flex items-center h-11 px-8 border border-[#1A1A1A] text-[11px] font-light tracking-[0.18em] uppercase text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-[#F0EDE8] transition-all duration-300">
+            className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
             Join the list
           </ScrollToSlide>
         </div>
       </FullSlide>
 
-      {/* ── SLIDE 3: KVRN List ───────────────────────────────────────── */}
+      {/* ── SLIDE 3: KVRN List ───────────────────────────────────── */}
       <FullSlide dark>
         <WaitlistBlock />
       </FullSlide>
 
-      {/* ── SLIDE 4: Footer ──────────────────────────────────────────── */}
+      {/* ── SLIDE 4: Footer ────────────────────────────────────────── */}
       <FullSlide light>
         <HomepageFooter />
       </FullSlide>
@@ -203,7 +204,7 @@ export function HomepageClient() {
   )
 }
 
-// ── Scroll-to-slide ───────────────────────────────────────────────────────────
+// ── Scroll-to-slide helper ────────────────────────────────────────────────────
 function ScrollToSlide({
   targetSlide, containerRef, children, className,
 }: {
@@ -220,62 +221,83 @@ function ScrollToSlide({
   return <button onClick={go} className={className}>{children}</button>
 }
 
-// ── Video with desktop zoom fix + mute toggle ─────────────────────────────────
-function VideoSlide() {
+// ── Video slide with mute button ─────────────────────────────────────────────
+function VideoSlide({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
   const [muted, setMuted] = useState(true)
-  const ref = useRef<HTMLVideoElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   const toggleMute = () => {
-    if (!ref.current) return
-    ref.current.muted = !ref.current.muted
-    setMuted(ref.current.muted)
+    if (!videoRef.current) return
+    videoRef.current.muted = !videoRef.current.muted
+    setMuted(videoRef.current.muted)
   }
+
+  // Restart video on mount to ensure reliable playback after refresh
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    v.load()
+    const play = () => v.play().catch(() => {})
+    v.addEventListener('canplay', play, { once: true })
+    return () => v.removeEventListener('canplay', play)
+  }, [])
 
   return (
     <>
       <video
-        ref={ref}
+        ref={videoRef}
         autoPlay
         muted
         loop
         playsInline
-        poster="/images/campaign/fabric-macro.webp"
+        preload="auto"
+        // No poster — don't use slide 1 image. Dark bg of FullSlide shows during load.
         onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none' }}
         style={{
-          position:   'absolute',
-          inset:      0,
-          width:      '100%',
-          height:     '100%',
-          // Mobile: cover (fills naturally)
-          // Desktop: contain-like but still fills — use objectPosition to reduce zoom feel
+          position:       'absolute',
+          inset:          0,
+          width:          '100%',
+          height:         '100%',
           objectFit:      'cover',
-          objectPosition: 'center center',
+          // Desktop: shift position to reduce "zoomed in" feel
+          objectPosition: 'center 30%',
         }}
-        // Override objectPosition on large screens via className for desktop
-        className="sm:object-[50%_35%]"
       >
         <source src="/images/campaign/hero-video.webm" type="video/webm" />
         <source src="/images/campaign/hero-video.mp4"  type="video/mp4" />
       </video>
 
-      {/* Mute / unmute button — bottom right of video slide, minimal */}
+      {/* Mute button — positioned just above the up-arrow (right: 24px, bottom: 72px) */}
+      {/* Matches the up-arrow circle style exactly */}
       <button
         onClick={toggleMute}
         aria-label={muted ? 'Unmute video' : 'Mute video'}
-        className="absolute bottom-6 right-6 z-10 flex items-center justify-center w-9 h-9 border border-[#F0EDE8]/30 bg-black/20 backdrop-blur-sm hover:border-[#F0EDE8]/60 transition-colors"
+        style={{
+          position:       'fixed',
+          bottom:         '72px',          // sits above the up-arrow at 28px
+          right:          '24px',
+          zIndex:         192,
+          width:          '36px',
+          height:         '36px',
+          borderRadius:   '50%',
+          border:         '1px solid rgba(240,237,232,0.35)',
+          background:     'rgba(14,14,14,0.25)',
+          backdropFilter: 'blur(8px)',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          color:          '#F0EDE8',
+        }}
       >
         {muted ? (
-          // Muted icon
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="#F0EDE8" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M23 9l-6 6M17 9l6 6" stroke="#F0EDE8" strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
         ) : (
-          // Unmuted icon
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="#F0EDE8" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M19.07 4.93a10 10 0 010 14.14" stroke="#F0EDE8" strokeWidth="1.3" strokeLinecap="round"/>
-            <path d="M15.54 8.46a5 5 0 010 7.07" stroke="#F0EDE8" strokeWidth="1.3" strokeLinecap="round"/>
+            <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" stroke="#F0EDE8" strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
         )}
       </button>
@@ -284,9 +306,7 @@ function VideoSlide() {
 }
 
 // ── Full-screen snap slide ────────────────────────────────────────────────────
-function FullSlide({
-  children, dark, light, 'aria-label': label,
-}: {
+function FullSlide({ children, dark, 'aria-label': label }: {
   children:      React.ReactNode
   dark?:         boolean
   light?:        boolean
@@ -304,7 +324,7 @@ function FullSlide({
         position:        'relative',
         overflow:        'hidden',
       }}
-      className={dark ? 'bg-[#0E0E0E]' : 'bg-[#EDE9E3]'}
+      className={dark ? 'bg-[#0E0E0E]' : 'bg-[#F9F8F6]'}
     >
       {children}
     </section>
@@ -312,23 +332,14 @@ function FullSlide({
 }
 
 // ── Slide indicator ───────────────────────────────────────────────────────────
-function SlideIndicator({ current, total, dark }: {
-  current: number; total: number; dark: boolean
-}) {
+function SlideIndicator({ current, total, dark }: { current: number; total: number; dark: boolean }) {
   return (
-    <div
-      className="fixed left-4 md:left-7 top-1/2 -translate-y-1/2 z-[195] flex flex-col gap-[5px]"
-      role="tablist" aria-label="Slide position"
-    >
+    <div className="fixed left-4 md:left-7 top-1/2 -translate-y-1/2 z-[195] flex flex-col gap-[5px]"
+      role="tablist" aria-label="Slide position">
       {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          role="tab"
-          aria-selected={i === current}
+        <div key={i} role="tab" aria-selected={i === current}
           style={{
-            width:           '2px',
-            height:          i === current ? '26px' : '10px',
-            borderRadius:    '1px',
+            width: '2px', height: i === current ? '26px' : '10px', borderRadius: '1px',
             backgroundColor: dark
               ? (i === current ? 'rgba(240,237,232,0.9)' : 'rgba(240,237,232,0.22)')
               : (i === current ? 'rgba(26,26,26,0.85)'   : 'rgba(26,26,26,0.18)'),
@@ -346,10 +357,10 @@ function HomepageFooter() {
   return (
     <div className="absolute inset-0 bg-[#F9F8F6] flex flex-col pt-[92px]">
       <div className="flex-1 flex items-center justify-center px-6 pb-10 pointer-events-none select-none" aria-hidden="true">
-        <span
-          className="font-display font-light text-[#1A1A1A]/[0.13] whitespace-nowrap"
-          style={{ fontSize: 'clamp(130px, 22vw, 320px)', letterSpacing: '-0.04em', lineHeight: 1 }}
-        >KVRN</span>
+        <span className="font-display font-light text-[#1A1A1A]/[0.13] whitespace-nowrap"
+          style={{ fontSize: 'clamp(130px, 22vw, 320px)', letterSpacing: '-0.04em', lineHeight: 1 }}>
+          KVRN
+        </span>
       </div>
       <div className="container-kvrn relative z-10 pb-2">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-8 md:gap-x-14 text-center items-start">
