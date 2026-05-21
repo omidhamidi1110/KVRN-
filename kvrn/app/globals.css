@@ -52,30 +52,11 @@
     box-sizing: border-box;
   }
 
-  /* Force black browser chrome on mobile */
+  /* Safari overscroll chrome — dark on homepage (body bg handles inner pages) */
 html {
+  /* This sets the Safari top/bottom chrome color seen behind the site */
   background-color: #0E0E0E;
-  /* iOS Safari overscroll area color — both top and bottom */
-  overflow: hidden;
-}
-html, body {
-  background-color: #0E0E0E;
-  /* Prevent white overscroll bounce on iOS Safari */
-  overscroll-behavior: none;
-  /* Ensure no white flash during scroll */
-  -webkit-overflow-scrolling: auto;
-}
-/* Safari bottom safe-area — keep dark */
-body::before {
-  content: '';
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-bottom, 0px);
-  background: #0E0E0E;
-  z-index: 0;
-  pointer-events: none;
+  /* Do NOT set overflow:hidden here — breaks non-homepage scroll */
 }
 
   body {

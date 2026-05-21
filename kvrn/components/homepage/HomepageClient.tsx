@@ -184,7 +184,11 @@ export function HomepageClient() {
           <p
             className="text-[15px] font-light text-[#F0EDE8]/80 leading-relaxed max-w-[400px] mb-8"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
-            The perfect hoodie and sweatpants. 400 GSM brushed fleece, built for structure and daily wear. Five colorways.
+Built to become the perfect hoodie and sweatpants, the ones you wear more than anything else in your closet.
+
+            The fit people keep coming back for.
+            400 GSM brushed fleece.
+            100&nbsp;%&nbsp;cotton.
           </p>
           <ScrollToSlide
             targetSlide={3}
