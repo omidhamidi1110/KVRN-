@@ -72,6 +72,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
@@ -83,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           gtag('consent','default',{analytics_storage:'denied',ad_storage:'denied',functionality_storage:'granted',wait_for_update:500});
         `}} />
       </head>
-      <body className="bg-kvrn-bg text-kvrn-text font-body antialiased">
+      <body className="bg-[#0E0E0E] text-kvrn-text font-body antialiased">
         <a href="#main-content" className="skip-link">Skip to main content</a>
 
         <CookiePrefsProvider>

@@ -64,13 +64,13 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state ──────────────────────────────────────────────────────
-  // Rule: always transparent. Text color = white on dark bg, black on light bg.
-  // Homepage: driven by current slide (kvrn-slide-change event)
-  // Inner pages: white when NOT scrolled (dark intro headers), black when scrolled
-  const navBg = 'bg-transparent'   // NEVER add a background
+  // ALWAYS transparent — no bg, no border, ever.
+  // Text: white on dark, black on light.
+  // Homepage: slide events drive navTheme ('dark'/'light')
+  // Inner pages: dark intro = white nav; after scrolling past intro = black nav
   const isWhiteText = isHome
-    ? navTheme === 'dark'     // homepage: slide drives it
-    : !scrolled               // inner pages: white until scrolled
+    ? navTheme === 'dark'   // homepage: driven by active slide
+    : !scrolled             // inner pages: white until user scrolls past dark header
   const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
@@ -101,9 +101,7 @@ export function Nav() {
         className={cn(
           'fixed left-0 right-0 z-[200] h-[56px] flex items-center',
           'transition-all duration-300',
-          // Add subtle bg only on inner pages when scrolled, so text stays legible
-          !isHome && scrolled ? 'bg-[rgba(249,248,246,0.97)] backdrop-blur-[18px] border-b border-[#E8E5E0]' : '',
-          navBg, textCls
+          textCls  // fully transparent always — no bg, no border
         )}
         style={{ top: '36px' }}
         aria-label="Main navigation"

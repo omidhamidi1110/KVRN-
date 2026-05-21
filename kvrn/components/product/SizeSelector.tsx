@@ -130,15 +130,7 @@ export function SizeSelector({
         })}
       </div>
 
-      {/* Error state */}
-      {hasError && (
-        <p
-          role="alert"
-          className="mt-2 text-[12px] text-kvrn-error"
-        >
-          Please select a size.
-        </p>
-      )}
+      {/* Error state handled by parent */}
     </fieldset>
   )
 }
