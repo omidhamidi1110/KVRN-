@@ -14,42 +14,27 @@ export function Footer() {
   const year                = new Date().getFullYear()
 
   return (
-    <footer className="relative border-t border-[#E8E5E0] bg-[#F9F8F6] overflow-hidden" aria-label="Site footer">
+    // No overflow-hidden, no giant wordmark, no decorative background
+    <footer className="border-t border-[#E8E5E0] bg-[#F9F8F6]" aria-label="Site footer">
+      <div className="container-kvrn">
 
-      {/* Giant KVRN wordmark — decorative background */}
-      <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden"
-        aria-hidden="true"
-      >
-        <span
-          className="font-display font-light text-[#1A1A1A]/[0.028] whitespace-nowrap"
-          style={{ fontSize: 'clamp(100px, 20vw, 240px)', letterSpacing: '-0.04em', lineHeight: 1 }}
-        >
-          KVRN
-        </span>
-      </div>
+        {/* ── Main columns ─────────────────────────────────────────── */}
+        <div className="py-10 md:py-12 grid grid-cols-3 md:grid-cols-4 gap-6 md:gap-8">
 
-      <div className="container-kvrn relative z-10">
-        {/* Main columns — centered on page */}
-        <div className="py-10 md:py-14 grid grid-cols-3 md:grid-cols-4 gap-6 md:gap-8">
-
-          {/* Brand — full width on mobile, 1 col on desktop */}
-          <div className="col-span-3 md:col-span-1 space-y-4 pb-6 border-b border-[#E8E5E0] md:border-0 md:pb-0">
+          {/* Brand block — desktop only */}
+          <div className="hidden md:block space-y-3">
+            <p className="text-[12px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">KVRN</p>
             <div className="space-y-0.5">
-              <p className="text-[13px] font-light tracking-[0.14em] uppercase text-[#1A1A1A] mb-1">KVRN</p>
-              <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Quiet garments.</p>
-              <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Built with intention.</p>
+              <p className="text-[12px] font-light text-[#6B6B6B]">Quiet garments.</p>
+              <p className="text-[12px] font-light text-[#6B6B6B]">Built with intention.</p>
             </div>
-            {/* Social icons — desktop only under brand statement */}
-            <div className="hidden md:flex gap-4 pt-1">
+            <div className="flex gap-4 pt-1">
               <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on Instagram"
-                className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
                 <InstagramIcon />
               </a>
               <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on TikTok"
-                className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                aria-label="KVRN on TikTok" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
                 <TikTokIcon />
               </a>
             </div>
@@ -89,21 +74,21 @@ export function Footer() {
                 </li>
               ))}
             </ul>
-            {/* Social — mobile only */}
+            {/* Social icons — mobile only (desktop shows in brand block) */}
             <div className="flex md:hidden gap-4 mt-5">
               <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
                 <InstagramIcon />
               </a>
               <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                aria-label="KVRN on TikTok" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
                 <TikTokIcon />
               </a>
             </div>
           </div>
         </div>
 
-        {/* Bottom bar — © left, Cookie preferences right */}
+        {/* ── Bottom bar ────────────────────────────────────────────── */}
         <div className="py-4 border-t border-[#E8E5E0] flex flex-row items-center justify-between gap-4">
           <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. {t.allRightsReserved}</p>
           <button
@@ -120,7 +105,7 @@ export function Footer() {
 
 function InstagramIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.4"/>
       <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.4"/>
       <circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/>
@@ -129,7 +114,7 @@ function InstagramIcon() {
 }
 function TikTokIcon() {
   return (
-    <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true">
+    <svg width="14" height="16" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true">
       <path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/>
     </svg>
   )
