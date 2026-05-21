@@ -181,8 +181,8 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
             {/* Size — no duplicate label, size guide link here only */}
             <div ref={sizePanelRef}>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B]">
-                  Size{selectedSize ? ` — ${selectedSize}` : ''}
+                <span className={`text-[11px] font-light tracking-[0.1em] uppercase ${sizeError ? 'text-[#B91C1C]' : 'text-[#9B9B9B]'}`}>
+                  {sizeError ? 'Select a size' : (selectedSize ? `Size — ${selectedSize}` : 'Size')}
                 </span>
                 <Link href="/support/size-guide"
                   className="text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] underline underline-offset-2 transition-colors">
@@ -196,7 +196,6 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
                 hasError={sizeError}
                 hideSizeGuideLink  // suppress the internal link — we have it above
               />
-              {sizeError && <p className="text-[12px] text-[#B91C1C] mt-2">Please select a size</p>}
               {product.fitNote && <p className="text-[12px] text-[#6B6B6B] mt-2">{product.fitNote}</p>}
             </div>
 
