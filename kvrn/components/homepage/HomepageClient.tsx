@@ -65,7 +65,7 @@ export function HomepageClient() {
       {/* ── SLIDE 0: Project KVRN (current drop) ─────────────────────────── */}
       <FullSlide dark>
         <Image
-          src="/images/campaign/hero-main.webp"
+          src="/images/campaign/fabric-macro.webp"
           alt="Project KVRN — available now"
           fill priority fetchPriority="high"
           className="object-cover object-center"
@@ -91,23 +91,16 @@ export function HomepageClient() {
 
       {/* ── SLIDE 1: Campaign video ───────────────────────────────────────── */}
       <FullSlide dark>
-        <video
-          autoPlay muted loop playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-          poster="/images/campaign/fabric-macro.webp"
-        >
-          <source src="/images/campaign/hero-video.webm" type="video/webm" />
-          <source src="/images/campaign/hero-video.mp4"  type="video/mp4"  />
-        </video>
-        {/* Fallback image — shows until video loads; hidden once video plays */}
+        {/* Fallback image — always visible as base layer */}
         <Image
           src="/images/campaign/fabric-macro.webp"
           alt="KVRN — weight, structure, restraint"
           fill
           className="object-cover"
           sizes="100vw"
-          style={{ zIndex: -1 }}
         />
+        {/* Video layer — plays when /images/campaign/hero-video.mp4 or .webm exist */}
+        <VideoSlide />
         <div className="absolute inset-0 bg-[#0E0E0E]/40" aria-hidden="true" />
         <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-16 md:pb-20">
           <p className="font-display font-light text-[20px] md:text-[28px] tracking-[0.04em] text-[#F0EDE8]/75 max-w-[560px] leading-snug">
@@ -118,8 +111,15 @@ export function HomepageClient() {
 
       {/* ── SLIDE 2: Future drop — Heavyweight Collection ─────────────────── */}
       <FullSlide light>
-        {/* Background fill — warm light, not blank white */}
-        <div className="absolute inset-0 bg-[#EDE9E3]" />
+        {/* Background image for future/Heavyweight collection */}
+        <Image
+          src="/images/campaign/hero-main.webp"
+          alt="Heavyweight Collection — coming soon"
+          fill
+          className="object-cover object-center"
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-[#EDE9E3]/60" />
         <div className="absolute inset-0 container-kvrn flex flex-col justify-end pb-16 md:pb-20">
           <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#9B9B9B] mb-4">
             Coming soon
@@ -170,6 +170,27 @@ function ScrollToSlide({
     <button onClick={scrollTo} className={className}>
       {children}
     </button>
+  )
+}
+
+
+// ── Video slide — only renders video element if files exist ───────────────────
+function VideoSlide() {
+  return (
+    <video
+      autoPlay
+      muted
+      loop
+      playsInline
+      className="absolute inset-0 w-full h-full object-cover"
+      // poster ensures something shows while loading
+      poster="/images/campaign/fabric-macro.webp"
+      // onError: if video fails, hide the element and show the fallback image below
+      onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none' }}
+    >
+      <source src="/images/campaign/hero-video.webm" type="video/webm" />
+      <source src="/images/campaign/hero-video.mp4"  type="video/mp4" />
+    </video>
   )
 }
 

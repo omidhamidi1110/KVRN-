@@ -5,16 +5,17 @@ import { useI18n } from '@/context/I18nContext'
 import { ProductCard } from '@/components/product/ProductCard'
 import type { Product } from '@/types'
 
-interface Props { products: Product[]; type: string | null }
+interface Props { products: Product[]; type: string | null; headingOverride?: string }
 
-export function ShopClient({ products, type }: Props) {
+export function ShopClient({ products, type, headingOverride }: Props) {
   const { t } = useI18n()
 
-  const heading = type === 'hoodies'
+  const heading = headingOverride
+    ?? (type === 'hoodies'
     ? t.hoodies
     : type === 'sweatpants'
     ? t.sweatpants
-    : t.shopAll
+    : t.shopAll)
 
   const TABS = [
     { label: t.shopAll,    href: '/shop',              active: !type },
