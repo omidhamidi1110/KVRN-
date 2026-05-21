@@ -4,8 +4,8 @@
   "description": "Heavyweight oversized hoodies and sweatpants. Quiet luxury.",
   "start_url": "/",
   "display": "browser",
-  "background_color": "#FAFAF8",
-  "theme_color": "#FAFAF8",
+  "background_color": "#0E0E0E",
+  "theme_color": "#0E0E0E",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -24,5 +24,8 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["shopping", "lifestyle"]
+  "categories": [
+    "shopping",
+    "lifestyle"
+  ]
 }

@@ -18,9 +18,8 @@ export default function ProjectKVRNPage() {
   ].map(p => ({
     ...p,
     // Display names with "Heavyweight" prefix as requested
-    name: p.name.startsWith('Project KVRN')
-      ? p.name.replace('Project KVRN', 'Heavyweight Project KVRN')
-      : p.name,
+    // Rename: 'Project KVRN Heavyweight Hoodie' / 'Project KVRN Heavyweight Sweatpants'
+    name: p.name.includes('Hoodie') ? 'Project KVRN Heavyweight Hoodie' : 'Project KVRN Heavyweight Sweatpants',
   }))
 
   return (
