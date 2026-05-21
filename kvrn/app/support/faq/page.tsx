@@ -175,7 +175,7 @@ const FAQ_SECTIONS = [
 
 export default function FAQPage() {
   return (
-    <div className="pt-[calc(36px+56px)]">
+    <div>
       {/* Dark header band */}
       <PageHero title="FAQ" breadcrumb="FAQ" />
 

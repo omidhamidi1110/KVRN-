@@ -68,8 +68,8 @@ export function HomepageClient() {
         scrollBehavior:         'smooth',
         WebkitOverflowScrolling:'touch',
         overscrollBehaviorY:    'none',
-        // Prevent any content peeking through by clipping
         overflow:               'hidden scroll',
+        backgroundColor:        '#0E0E0E',  // Safari overscroll shows dark on homepage
       }}
     >
       {/* Slide indicator */}
@@ -77,7 +77,7 @@ export function HomepageClient() {
 
       {/* Down cue — centered, fades after scroll */}
       <div aria-hidden="true" style={{
-        position: 'fixed', bottom: '36px', left: '50%', transform: 'translateX(-50%)',
+        position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
         zIndex: 190, opacity: showDown ? 0.65 : 0, transition: 'opacity 0.6s ease',
         pointerEvents: 'none',
       }}>
@@ -125,7 +125,7 @@ export function HomepageClient() {
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.08) 60%, transparent 100%)' }}
           aria-hidden="true"
         />
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[92px] px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[96px] px-6 text-center">
           <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-6">
             Available now
           </p>
@@ -148,7 +148,7 @@ export function HomepageClient() {
       <Slide bg="#0E0E0E">
         <VideoSlide activeSlide={slide} slideIndex={1} />
         <div className="absolute inset-0 bg-[#0E0E0E]/25" aria-hidden="true" />
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[92px] px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[96px] px-6 text-center">
           <p className="font-display font-light text-[20px] md:text-[28px] tracking-[0.06em] text-[#F0EDE8]/80 max-w-[560px] leading-snug">
             One drop. One chance.
           </p>
@@ -170,7 +170,7 @@ export function HomepageClient() {
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)' }}
           aria-hidden="true"
         />
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[92px] px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[96px] px-6 text-center">
           <p
             className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/65 mb-4"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>

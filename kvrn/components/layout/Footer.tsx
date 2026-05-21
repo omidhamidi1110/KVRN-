@@ -36,10 +36,9 @@ export function Footer() {
           {/* Brand — full width on mobile, 1 col on desktop */}
           <div className="col-span-3 md:col-span-1 space-y-4 pb-6 border-b border-[#E8E5E0] md:border-0 md:pb-0">
             <div className="space-y-0.5">
+              <p className="text-[13px] font-light tracking-[0.14em] uppercase text-[#1A1A1A] mb-1">KVRN</p>
               <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Quiet garments.</p>
               <p className="text-[13px] font-light text-[#1A1A1A] leading-relaxed">Built with intention.</p>
-              <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Designed with restraint.</p>
-              <p className="text-[13px] font-light text-[#6B6B6B] leading-relaxed">Made to endure.</p>
             </div>
             {/* Social icons — desktop only under brand statement */}
             <div className="hidden md:flex gap-4 pt-1">

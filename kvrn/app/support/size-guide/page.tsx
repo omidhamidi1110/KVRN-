@@ -34,7 +34,7 @@ export default function SizeGuidePage() {
   const [inches, setInches] = useState(false)
 
   return (
-    <div className="pt-[calc(36px+56px)]">
+    <div>
       {/* Dark header */}
       <PageHero title="Size Guide" breadcrumb="Size Guide" />
 
