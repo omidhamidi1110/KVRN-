@@ -125,7 +125,7 @@ export function HomepageClient() {
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.08) 60%, transparent 100%)' }}
           aria-hidden="true"
         />
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-[72px] md:pb-[84px] px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[88px] px-6 text-center">
           <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-6">
             Available now
           </p>
@@ -148,7 +148,7 @@ export function HomepageClient() {
       <Slide bg="#0E0E0E">
         <VideoSlide activeSlide={slide} slideIndex={1} />
         <div className="absolute inset-0 bg-[#0E0E0E]/25" aria-hidden="true" />
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-[68px] md:pb-[84px] px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[88px] px-6 text-center">
           <p className="font-display font-light text-[20px] md:text-[28px] tracking-[0.06em] text-[#F0EDE8]/80 max-w-[560px] leading-snug">
             One drop. One chance.
           </p>
@@ -170,7 +170,7 @@ export function HomepageClient() {
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)' }}
           aria-hidden="true"
         />
-        <div className="absolute inset-0 flex flex-col items-center justify-end pb-[68px] md:pb-[84px] px-6 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[88px] px-6 text-center">
           <p
             className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/65 mb-4"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
