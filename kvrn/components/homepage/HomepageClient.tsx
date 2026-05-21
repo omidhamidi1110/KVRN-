@@ -75,11 +75,11 @@ export function HomepageClient() {
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.08) 60%, transparent 100%)' }}
           aria-hidden="true"
         />
-        <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-16 md:pb-20">
-          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-3">
+        <div className="absolute bottom-0 left-0 right-0 container-kvrn pb-24 md:pb-28">
+          <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-5">
             Available now
           </p>
-          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-5">
+          <h1 className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-7">
             Project<br />KVRN
           </h1>
           <Link href="/collections/project-kvrn"

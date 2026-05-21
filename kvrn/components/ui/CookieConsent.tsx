@@ -191,7 +191,7 @@ function CookiePrefsPanel() {
               <div
                 key={cat.key}
                 className={cn(
-                  'flex items-center gap-5 px-6 py-4',
+                  'flex items-start gap-5 px-6 py-4',
                   i < CATS.length - 1 && 'border-b border-[#F0EDE8]/7'
                 )}
               >
@@ -200,12 +200,12 @@ function CookiePrefsPanel() {
                   <div className="flex items-center gap-2.5 mb-1">
                     <p className="text-[13px] font-light text-[#F0EDE8]">{cat.label}</p>
                     {cat.locked && (
-                      <span className="text-[9px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/75 border border-[#F0EDE8]/40 px-1.5 py-0.5 rounded-[1px]">
+                      <span className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8] border border-[#F0EDE8]/50 px-1.5 py-0.5">
                         Always on
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#FFFFFF] leading-relaxed">{cat.desc}</p>
+                  <p className="text-[12px] text-[#F0EDE8]/80 leading-relaxed">{cat.desc}</p>
                 </div>
 
                 {/* Toggle switch — OFF=left, ON=right */}
@@ -217,7 +217,7 @@ function CookiePrefsPanel() {
                   disabled={cat.locked}
                   onClick={() => !cat.locked && toggle(cat.key as keyof Omit<CookiePrefs, 'essential'>)}
                   className={cn(
-                    'flex-shrink-0 relative w-[48px] h-[24px] rounded-full',
+                    'flex-shrink-0 relative w-[48px] h-[24px] rounded-full mt-0.5',
                     'transition-colors duration-200',
                     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0EDE8]/40',
                     cat.locked

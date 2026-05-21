@@ -12,7 +12,7 @@ export default function ProjectKVRNCollectionPage() {
 
       <section className="container-kvrn py-12 md:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Link href="/products/phantom-hoodie" className="group">
+          <Link href="/products/kvrn-phantom-hoodie" className="group">
             <div className="aspect-[4/5] bg-[#F2EFE9] border border-[#E8E5E0] mb-4" />
             <div className="flex justify-between text-[13px]">
               <span>Project KVRN Hoodie</span>
@@ -21,7 +21,7 @@ export default function ProjectKVRNCollectionPage() {
             <p className="text-[11px] tracking-[0.14em] uppercase text-[#9B9B9B] mt-2 group-hover:text-[#1A1A1A]">View product</p>
           </Link>
 
-          <Link href="/products/phantom-sweatpants" className="group">
+          <Link href="/products/kvrn-phantom-sweatpants" className="group">
             <div className="aspect-[4/5] bg-[#F2EFE9] border border-[#E8E5E0] mb-4" />
             <div className="flex justify-between text-[13px]">
               <span>Project KVRN Sweatpants</span>
