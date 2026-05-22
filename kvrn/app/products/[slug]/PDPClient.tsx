@@ -123,7 +123,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
                              t.selectSize
 
   return (
-    <>
+    <div className="overflow-x-hidden w-full">
       {/* Breadcrumb */}
       <nav aria-label="Breadcrumb" className="container-kvrn pt-[calc(36px+56px+16px)] pb-3">
         <ol className="flex items-center gap-2 text-[11px] text-[#9B9B9B]">
@@ -301,7 +301,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
                     <span className="text-[12px] text-[#9B9B9B] ml-2 font-light">for both</span>
                   </p>
                   <Link href={`/products/${relatedProduct.slug}`}>
-                    <Button variant="primary" size="md">Add {relatedProduct.name}</Button>
+                    <Button variant="primary" size="md">{relatedProduct.name.includes('Hoodie') ? '+ Add Matching Hoodie' : '+ Add Matching Sweatpants'}</Button>
                   </Link>
                 </div>
               </div>
@@ -313,7 +313,7 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
       {/* Sticky ATC — white, refined */}
       <div
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-[200]',
+          'fixed bottom-0 left-0 right-0 z-[200] overflow-hidden',
           'bg-white border-t border-[#E8E5E0]',
           'transition-all duration-400 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]',
           stickyVisible ? 'translate-y-0 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]' : 'translate-y-full'
@@ -359,6 +359,6 @@ export function PDPClient({ product, relatedProduct }: PDPClientProps) {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

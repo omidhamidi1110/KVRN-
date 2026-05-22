@@ -28,6 +28,7 @@ export function Nav() {
   const drawerRef = useRef<HTMLDivElement>(null)
 
   const isHome = pathname === '/'
+  const isPDP  = pathname.startsWith('/products/')
 
   useEffect(() => {
     const onScroll = () => {
@@ -102,7 +103,8 @@ export function Nav() {
         className={cn(
           'fixed left-0 right-0 z-[200] h-[56px] flex items-center',
           'transition-all duration-300',
-          textCls  // fully transparent always — no bg, no border
+          isPDP ? 'bg-[#0E0E0E]' : '',  // product pages: always black nav
+          textCls
         )}
         style={{ top: '36px' }}
         aria-label="Main navigation"

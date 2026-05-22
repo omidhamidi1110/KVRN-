@@ -75,12 +75,10 @@ export function HomepageClient() {
       {/* Slide indicator */}
       <SlideIndicator current={slide} total={TOTAL_SLIDES} dark={isDark} />
 
-      {/* Down cue — centered, fades after scroll */}
-      <div aria-hidden="true" style={{
-        position: 'fixed', bottom: '14px', left: '50%', transform: 'translateX(-50%)',
-        zIndex: 190, opacity: showDown ? 0.65 : 0, transition: 'opacity 0.6s ease',
-        pointerEvents: 'none',
-      }}>
+      {/* Down cue — centered, fades after scroll. Mobile: bottom-3.5, Desktop: bottom-8 */}
+      <div aria-hidden="true"
+        className="fixed left-1/2 -translate-x-1/2 z-[190] pointer-events-none bottom-3.5 md:bottom-8"
+        style={{ opacity: showDown ? 0.65 : 0, transition: 'opacity 0.6s ease' }}>
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
           style={{ animation: 'bounce 2s infinite' }}>
           <path d="M10 4v10M5 9l5 5 5-5" stroke="white" strokeWidth="1.3"

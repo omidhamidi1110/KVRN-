@@ -1,3 +1,4 @@
+import type { ProductImage } from '@/types'
 import type { Product } from '@/types'
 
 // Prices in USD cents. $80 = 8000 cents (Founder Price)
@@ -7,23 +8,17 @@ const FOUNDER_NOTE  = 'Founder pricing — permanently increases after initial r
 type ColorDef = { name: string; value: string; hex: string }
 type ShotType = import('@/types').ImageType
 
-function imgs(product: string, color: string, shots: string[]) {
-  const SHOT_ALTS: Record<string, string> = {
-    front: 'front view', back: 'back view',
-    'hood-macro': 'hood detail', 'fabric-macro': 'fabric texture',
-    'zipper-closed': 'pocket exterior', 'zipper-open': 'hidden zipper revealed',
-    lifestyle: 'worn lifestyle', 'flat-lay': 'flat lay', detail: 'detail',
-  }
-  const PROD_NAMES: Record<string, string> = {
-    'hoodie': 'KVRN Heavyweight Hoodie',
-    'sweatpants': 'KVRN Heavyweight Sweatpants',
-    'phantom-hoodie': 'Project KVRN Heavyweight Hoodie',
-    'phantom-pants': 'Project KVRN Heavyweight Sweatpants',
-  }
-  return shots.map(shot => ({
-    src: `/images/products/${product}-${color}-${shot}.webp`,
-    alt: `${PROD_NAMES[product] ?? product} in ${color.replace(/-/g, ' ')}, ${SHOT_ALTS[shot] ?? shot}`,
-    type: shot as ShotType,
+/**
+ * Build standardized image array for a product.
+ * Files expected at: /images/products/{folderSlug}/1.webp … 5.webp
+ * Pass how many images exist; missing images degrade gracefully.
+ */
+function imgs(folderSlug: string, altLabel: string, count: 1 | 2 | 3 | 4 | 5 = 5): ProductImage[] {
+  const types: ProductImage['type'][] = ['front', 'back', 'detail', 'detail', 'detail']
+  return Array.from({ length: count }, (_, i) => ({
+    src:  `/images/products/${folderSlug}/${i + 1}.webp`,
+    alt:  `${altLabel} — view ${i + 1}`,
+    type: types[i],
   }))
 }
 
@@ -59,7 +54,7 @@ export const products: Product[] = [
     description: '400 GSM brushed fleece, 100% cotton. The double-layered hood holds its shape without a drawstring. Two hidden zipper compartments sit inside the kangaroo pocket — secure and invisible from outside.',
     colors: HW_COLORS.map(c => ({
       ...c,
-      images: imgs('hoodie', c.value, ['front', 'back', 'hood-macro', 'fabric-macro', 'zipper-closed', 'zipper-open', 'lifestyle']),
+      images: imgs('kvrn-heavyweight-hoodie', `KVRN Heavyweight Hoodie — ${c.name}`, 5),
     })),
     sizes: STANDARD_SIZES,
     fitNote: 'Runs oversized. If between sizes, size down for a cleaner fit.',
@@ -94,7 +89,7 @@ export const products: Product[] = [
     description: 'The same 400 GSM brushed fleece as the hoodie. Wide-leg cut with a concealed elastic waistband and internal drawcord. Built for daily wear.',
     colors: HW_COLORS.map(c => ({
       ...c,
-      images: imgs('sweatpants', c.value, ['front', 'back', 'fabric-macro', 'lifestyle']),
+      images: imgs('kvrn-heavyweight-sweatpants', `KVRN Heavyweight Sweatpants — ${c.name}`, 5),
     })),
     sizes: STANDARD_SIZES,
     fitNote: 'Wide-leg. Sits at natural waist. True to size.',
@@ -129,7 +124,7 @@ export const products: Product[] = [
     description: 'A heavier French terry blend with an oversized, cropped proportion. Enzyme washed for a softer hand feel and finished for everyday wear.',
     colors: PH_COLORS.map(c => ({
       ...c,
-      images: imgs('phantom-hoodie', c.value, ['front', 'back', 'hood-macro', 'fabric-macro', 'lifestyle']),
+      images: imgs('project-kvrn-heavyweight-hoodie', `Project KVRN Heavyweight Hoodie — ${c.name}`, 5),
     })),
     sizes: STANDARD_SIZES,
     fitNote: 'Cropped oversized fit. Size up for more length.',
@@ -163,7 +158,7 @@ export const products: Product[] = [
     description: 'The same 500 GSM French terry blend with a relaxed oversized fit. Pre-shrunk, enzyme washed, and finished for a clean daily silhouette.',
     colors: PH_COLORS.map(c => ({
       ...c,
-      images: imgs('phantom-pants', c.value, ['front', 'back', 'fabric-macro', 'lifestyle']),
+      images: imgs('project-kvrn-heavyweight-sweatpants', `Project KVRN Heavyweight Sweatpants — ${c.name}`, 5),
     })),
     sizes: STANDARD_SIZES,
     fitNote: 'Relaxed oversized fit. True to size.',
