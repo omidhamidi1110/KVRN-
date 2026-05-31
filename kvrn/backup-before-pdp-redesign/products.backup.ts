@@ -51,7 +51,6 @@ export const products: Product[] = [
     type: 'hoodie', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '400 GSM brushed fleece. Double-layered hood.',
-    constructionDetails: ['400 GSM brushed fleece.', '100% cotton.', 'Double-layered structured hood.', 'Two hidden zipper pockets.', 'Pre-shrunk. Built for everyday wear.'],
     description: '400 GSM brushed fleece, 100% cotton. The double-layered hood holds its shape without a drawstring. Two hidden zipper compartments sit inside the kangaroo pocket — secure and invisible from outside.',
     colors: HW_COLORS.map(c => ({
       ...c,
@@ -87,7 +86,6 @@ export const products: Product[] = [
     type: 'sweatpants', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '400 GSM brushed fleece. Wide-leg silhouette.',
-    constructionDetails: ['400 GSM brushed fleece.', '100% cotton.', 'Wide-leg cut with concealed elastic waistband.', 'Internal drawcord. Pre-shrunk.', 'Built for everyday wear.'],
     description: 'The same 400 GSM brushed fleece as the hoodie. Wide-leg cut with a concealed elastic waistband and internal drawcord. Built for daily wear.',
     colors: HW_COLORS.map(c => ({
       ...c,
@@ -123,7 +121,6 @@ export const products: Product[] = [
     type: 'hoodie', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '500 GSM French terry blend. Oversized, cropped.',
-    constructionDetails: ['500 GSM French terry blend.', '70% cotton, 30% polyester.', 'Enzyme washed. Pre-shrunk.', 'Oversized cropped proportion.', 'Immediate softness from first wear.'],
     description: 'A heavier French terry blend with an oversized, cropped proportion. Enzyme washed for a softer hand feel and finished for everyday wear.',
     colors: PH_COLORS.map(c => ({
       ...c,
@@ -158,7 +155,6 @@ export const products: Product[] = [
     type: 'sweatpants', price: FOUNDER_PRICE,
     founderNote: FOUNDER_NOTE,
     shortDescription: '500 GSM French terry blend. Relaxed oversized fit.',
-    constructionDetails: ['500 GSM French terry blend.', '70% cotton, 30% polyester.', 'Enzyme washed. Pre-shrunk.', 'Relaxed oversized fit.', 'Concealed elastic waistband.'],
     description: 'The same 500 GSM French terry blend with a relaxed oversized fit. Pre-shrunk, enzyme washed, and finished for a clean daily silhouette.',
     colors: PH_COLORS.map(c => ({
       ...c,

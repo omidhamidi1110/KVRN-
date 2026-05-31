@@ -12,6 +12,8 @@ interface SizeSelectorProps {
   className?:         string
   id?:                string
   hideSizeGuideLink?: boolean  // suppress internal size guide link when parent provides it
+  compact?:           boolean  // reduced padding/sizing
+  darkMode?:          boolean  // white text on dark backgrounds
 }
 
 export function SizeSelector({
@@ -22,6 +24,8 @@ export function SizeSelector({
   className,
   id = 'size-selector',
   hideSizeGuideLink = false,
+  compact   = false,
+  darkMode  = false,
 }: SizeSelectorProps) {
   return (
     <fieldset

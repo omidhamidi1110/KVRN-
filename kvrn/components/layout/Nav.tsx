@@ -66,15 +66,11 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state ──────────────────────────────────────────────────────
-  // ALWAYS transparent — no bg, no border, ever.
-  // Text: white on dark, black on light.
-  // Homepage: slide events drive navTheme ('dark'/'light')
-  // Inner pages: dark intro = white nav; after scrolling past intro = black nav
-  const isWhiteText = isHome
-    ? navTheme === 'dark'   // homepage: driven by active slide
-    : !scrolled             // inner pages: white until user scrolls past dark header
-  const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
-  const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
+  // Homepage: fully transparent, slide events drive text color (dark slide = white, light = black)
+  // All other pages: solid cream/white bg + border + black text — always, no scroll changes
+  const isWhiteText = isHome ? navTheme === 'dark' : false
+  const textCls     = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
+  const linesCls    = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
   const desktopLinks = [
     { label: t.shopAll,    href: '/shop' },
@@ -102,8 +98,11 @@ export function Nav() {
       <header
         className={cn(
           'fixed left-0 right-0 z-[200] h-[56px] flex items-center',
-          'transition-all duration-300',
-          isPDP ? 'bg-[#0E0E0E]' : '',  // product pages: always black nav
+          // Homepage: transparent, no border — slide system controls colors
+          // All other pages: solid cream bg + subtle border + black text, always
+          isHome
+            ? 'transition-colors duration-300'
+            : 'bg-[#F9F8F6]/98 backdrop-blur-[12px] border-b border-[#E8E5E0]',
           textCls
         )}
         style={{ top: '36px' }}

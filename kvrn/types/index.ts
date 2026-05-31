@@ -53,7 +53,8 @@ export interface Product {
   slug: string
   type: ProductType
   price: number          // In pence: 23000 = £230.00
-  shortDescription: string
+  shortDescription:    string
+  constructionDetails?: string[]
   description: string
   colors: ColorOption[]
   sizes: SizeOption[]
