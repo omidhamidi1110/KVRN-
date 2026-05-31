@@ -100,9 +100,10 @@ export function Nav() {
           'fixed left-0 right-0 z-[200] h-[56px] flex items-center',
           // Homepage: transparent, no border — slide system controls colors
           // All other pages: solid cream bg + subtle border + black text, always
-          isHome
-            ? 'transition-colors duration-300'
-            : 'bg-[#F9F8F6]/98 backdrop-blur-[12px] border-b border-[#E8E5E0]',
+          // Transparent always — bg only for inner pages after scrolling
+          (!isHome && scrolled)
+            ? 'bg-[#F9F8F6]/97 backdrop-blur-[14px] border-b border-[#E8E5E0]'
+            : 'transition-colors duration-300',
           textCls
         )}
         style={{ top: '36px' }}
