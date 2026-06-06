@@ -47,21 +47,12 @@ export function PDPClient({ product, relatedProduct }: Props) {
     }
   }, [snapOn])
 
-  // Track snap stage + fire nav color events
+  // Track snap stage
   useEffect(() => {
     const el = snapRef.current
     if (!el || !snapOn) return
-    const fn = () => {
-      const idx = Math.round(el.scrollTop / el.clientHeight) as 0|1
-      setStage(idx)
-      // Stage 0 (hero): light bg → dark text nav. Stage 1 (gallery): dark bg → white text nav.
-      window.dispatchEvent(new CustomEvent('kvrn-slide-change', {
-        detail: { dark: idx === 1 }  // gallery is dark bg
-      }))
-    }
+    const fn = () => setStage(Math.round(el.scrollTop / el.clientHeight) as 0|1)
     el.addEventListener('scroll', fn, { passive: true })
-    // Fire immediately for initial state (hero has light bg → dark nav)
-    window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
     return () => el.removeEventListener('scroll', fn)
   }, [snapOn])
 
@@ -107,8 +98,6 @@ export function PDPClient({ product, relatedProduct }: Props) {
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
     setSnapOn(false)
-    // Stage 3 is light bg — switch nav to dark text
-    window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
     setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }, [])
 
@@ -649,53 +638,49 @@ function MobileGallery({ images, productName, onShop }: any) {
             sizes="100vw"
             className="object-contain object-center pointer-events-none"
             priority={i === 0}
-            loading="eager"
+            loading={i < 3 ? 'eager' : 'lazy'}
             onError={() => {}}
             style={{
               opacity: i === active ? 1 : 0,
               transform: i === active ? `translateX(${offset}px)` : 'none',
               transition: i === active && Math.abs(offset) < 3
-                ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)'
-                : 'none',
-              willChange: i <= active + 1 ? 'transform, opacity' : 'auto',
+                ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.2s ease'
+                : i !== active ? 'opacity 0.15s ease' : 'none',
+              willChange: 'transform',
             }}
           />
         ) : null
       ))}
 
-      {/* Counter — floats top-center, no box, readable against any image */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center pointer-events-none"
-        aria-live="polite">
-        <span className="text-[12px] font-light tabular-nums text-white/75"
-          style={{ letterSpacing: '0.14em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
-          {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-        </span>
-      </div>
+      {/* ── Bottom UI bar: counter + progress + shop cue ── */}
+      {/* Positioned at bottom with gradient backing so always readable */}
+      <div className="absolute inset-x-0 bottom-0 pt-10 pb-7 px-6 flex flex-col items-center gap-3"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)' }}>
 
-      {/* Progress + shop — float at very bottom, no container box */}
-      <div className="absolute inset-x-0 bottom-0 pb-8 flex flex-col items-center gap-3 pointer-events-none"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 80%)' }}>
-        {/* Thin progress bar */}
-        <div className="w-[88px] h-[1px] bg-white/25 relative overflow-hidden">
+        {/* Prominent counter — bottom center */}
+        <p className="text-[14px] font-light tabular-nums text-white"
+          style={{ letterSpacing: '0.12em' }}
+          aria-live="polite">
+          {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        </p>
+
+        {/* Progress bar — thin line that fills left to right */}
+        <div className="w-full max-w-[120px] h-[1px] bg-white/20 relative overflow-hidden">
           <div style={{
-            position: 'absolute', top: 0, left: 0, height: '100%',
-            backgroundColor: 'rgba(255,255,255,0.75)',
+            position: 'absolute', top: 0, left: 0,
+            height: '100%', backgroundColor: 'white',
             width: `${((active + 1) / total) * 100}%`,
             transition: 'width 0.35s cubic-bezier(0.25,0.46,0.45,0.94)',
           }} />
         </div>
-        {/* Shop cue — pointer-events-auto so it's tappable */}
+
+        {/* Shop cue */}
         <button onClick={onShop}
-          className="flex items-center gap-1.5"
-          style={{ pointerEvents: 'auto' }}
+          className="flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors"
           aria-label="View purchase details">
-          <span className="text-[10px] font-light tracking-[0.18em] uppercase text-white/65"
-            style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>
-            Shop
-          </span>
+          <span className="text-[10px] font-light tracking-[0.18em] uppercase">Shop</span>
           <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-            <path d="M4.5 1.5v5M2 4.5l2.5 2.5L7 4.5" stroke="rgba(255,255,255,0.65)"
-              strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M4.5 1.5v5M2 4.5l2.5 2.5L7 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </button>
       </div>

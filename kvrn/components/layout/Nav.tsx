@@ -41,10 +41,10 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Homepage: listen for slide-change events dispatched by HomepageClient
+  // Homepage + PDP: listen for kvrn-slide-change events
   useEffect(() => {
-    if (!isHome) return
-    setNavTheme('dark')  // homepage default = dark (hero first)
+    if (!isHome && !isPDP) return
+    setNavTheme('dark')  // default to dark for both (both have dark opening stages)
 
     const onSlideChange = (e: Event) => {
       const detail = (e as CustomEvent<{ dark: boolean }>).detail
@@ -52,7 +52,7 @@ export function Nav() {
     }
     window.addEventListener('kvrn-slide-change', onSlideChange)
     return () => window.removeEventListener('kvrn-slide-change', onSlideChange)
-  }, [isHome])
+  }, [isHome, isPDP])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false) }
@@ -66,9 +66,9 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state ──────────────────────────────────────────────────────
-  // Homepage: fully transparent, slide events drive text color (dark slide = white, light = black)
-  // All other pages: solid cream/white bg + border + black text — always, no scroll changes
-  const isWhiteText = isHome ? navTheme === 'dark' : false
+  // Homepage + PDP: transparent, kvrn-slide-change events drive text color
+  // All other inner pages: black text always
+  const isWhiteText = (isHome || isPDP) ? navTheme === 'dark' : false
   const textCls     = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls    = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
