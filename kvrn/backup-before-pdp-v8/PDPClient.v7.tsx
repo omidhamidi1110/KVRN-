@@ -55,17 +55,14 @@ export function PDPClient({ product, relatedProduct }: Props) {
     return () => el.removeEventListener('scroll', fn)
   }, [snapOn])
 
-  // Sticky ATC — only show after Stage 3 enters viewport AND snap is done
+  // Sticky ATC – only when detail section crosses top
   useEffect(() => {
     const el = detailRef.current
     if (!el) return
-    const io = new IntersectionObserver(([e]) => {
-      // Only activate sticky after user has exited snap mode
-      setSticky(!e.isIntersecting && !snapOn)
-    }, { threshold: 0 })
+    const io = new IntersectionObserver(([e]) => setSticky(!e.isIntersecting), { threshold: 0 })
     io.observe(el)
     return () => io.disconnect()
-  }, [snapOn])
+  }, [])
 
   const addOne = useCallback(async (overrideSize?: SizeLabel) => {
     const s = overrideSize ?? size
@@ -126,7 +123,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
         }}>
           <SnapIndicator stage={stage} />
           <Stage1Hero
-            product={product} heroImg={imgs[0]} images={imgs}
+            product={product} heroImg={imgs[0]}
             color={color} setColor={setColor}
             size={size} setSize={setSize}
             sizeErr={sizeErr} setSizeErr={setSizeErr}
@@ -193,22 +190,8 @@ function SnapIndicator({ stage }: { stage: 0|1 }) {
 // Mobile:  stacked. Full-width image. Product info below.
 // No text overlaid on garment image.
 // ════════════════════════════════════════════════════════════════════════════
-function Stage1Hero({ product, heroImg, images, color, setColor, size, setSize,
+function Stage1Hero({ product, heroImg, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
-  // Hero-level image swiper — only the image changes, info panel is static
-  const [imgIdx,    setImgIdx]   = useState(0)
-  const [imgOffset, setOffset]   = useState(0)
-  const txX = useRef<number|null>(null)
-  const txY = useRef<number|null>(null)
-  const hz  = useRef<boolean|null>(null)
-  const allImgs = images ?? [heroImg]
-  const total   = allImgs.length
-
-  const goImg = useCallback((d: 1|-1) => {
-    setImgIdx(i => Math.max(0, Math.min(total - 1, i + d)))
-    setOffset(0)
-  }, [total])
-
   return (
     <section
       aria-label={product.name}
@@ -216,59 +199,20 @@ function Stage1Hero({ product, heroImg, images, color, setColor, size, setSize,
       style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always',
                height: '100svh', minHeight: '100svh', overflow: 'hidden' }}
     >
-      {/* ── PRODUCT IMAGE — swipeable, info stays static ── */}
+      {/* ── PRODUCT IMAGE ── */}
       <div className="relative flex-shrink-0 overflow-hidden bg-[#EDEAE4]
                       w-full h-[58svh]
-                      lg:w-[62%] lg:h-full"
-        onTouchStart={e => {
-          txX.current = e.touches[0].clientX
-          txY.current = e.touches[0].clientY
-          hz.current  = null
-        }}
-        onTouchMove={e => {
-          if (!txX.current || !txY.current) return
-          const dx = e.touches[0].clientX - txX.current
-          const dy = e.touches[0].clientY - txY.current
-          if (hz.current === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5))
-            hz.current = Math.abs(dx) > Math.abs(dy)
-          if (hz.current) { e.preventDefault(); setOffset(dx * 0.4) }
-        }}
-        onTouchEnd={() => {
-          if (hz.current) { if (imgOffset < -50) goImg(1); else if (imgOffset > 50) goImg(-1) }
-          txX.current = txY.current = null; hz.current = null; setOffset(0)
-        }}
-        style={{ touchAction: 'pan-y' }}
-      >
-        {allImgs[imgIdx]?.src ? (
-          <Image src={allImgs[imgIdx].src}
-            alt={allImgs[imgIdx].alt || product.name}
+                      lg:w-[62%] lg:h-full">
+        {heroImg?.src ? (
+          <Image src={heroImg.src} alt={heroImg.alt || product.name}
             fill priority fetchPriority="high"
             sizes="(max-width: 1023px) 100vw, 62vw"
-            className="object-cover object-[center_15%] pointer-events-none"
+            className="object-cover object-[center_15%]" 
             quality={92}
             onError={() => {}}
-            style={{
-              transform: `translateX(${imgOffset}px)`,
-              transition: Math.abs(imgOffset) < 3
-                ? 'transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
-            }}
           />
         ) : (
           <div className="absolute inset-0 bg-[#DDD9D2]" />
-        )}
-        {/* Image counter — mobile only */}
-        {total > 1 && (
-          <div className="absolute top-4 right-4 lg:hidden text-[11px] font-light tabular-nums text-[#1A1A1A]/50 bg-white/70 backdrop-blur-sm px-2 py-1"
-            style={{ letterSpacing: '0.1em' }}>
-            {String(imgIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-          </div>
-        )}
-        {/* Desktop image counter */}
-        {total > 1 && (
-          <div className="absolute bottom-4 right-4 hidden lg:block text-[11px] font-light tabular-nums text-[#1A1A1A]/45"
-            style={{ letterSpacing: '0.1em' }}>
-            {String(imgIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-          </div>
         )}
       </div>
 
@@ -469,14 +413,14 @@ function DesktopAccordion({ images, productName }: any) {
             className="relative flex-shrink-0 h-full bg-[#EDEAE4] cursor-grab active:cursor-grabbing"
             style={{
               // Each image: 85% viewport width so next image peeks
-              width:           '100%',
+              width:           '85%',
               scrollSnapAlign: 'start',
               scrollSnapStop:  'always',
               borderRight:     i < total - 1 ? '2px solid #F9F8F6' : 'none',
             }}>
             {img.src
               ? <Image src={img.src} alt={img.alt || productName} fill
-                  sizes="100vw"
+                  sizes="85vw"
                   className={cn('pointer-events-none transition-all duration-500',
                     // Active image: full cover. Others: slightly zoomed out for editorial feel
                     i === active ? 'object-cover object-[center_15%]' : 'object-cover object-[center_15%] scale-[0.97]'
