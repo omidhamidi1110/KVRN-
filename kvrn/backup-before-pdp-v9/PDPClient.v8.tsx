@@ -9,7 +9,7 @@ import { useI18n }     from '@/context/I18nContext'
 import { cn }          from '@/lib/utils'
 import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
 
-const NAV = 92 // announcement bar (36) + nav (56)
+const NAV = 92 // bar (36) + nav (56)
 
 interface Props { product: Product; relatedProduct: Product | null }
 
@@ -20,12 +20,14 @@ export function PDPClient({ product, relatedProduct }: Props) {
   const { t }                 = useI18n()
 
   const [color,   setColor]   = useState<ColorOption>(product.colors[0])
-  const [size,    setSize]    = useState<SizeLabel | null>(null)
-  const [sizeErr, setSizeErr] = useState(false)
-  const [cta,     setCta]     = useState<'idle'|'busy'|'done'>('idle')
-  const [snapOn,  setSnapOn]  = useState(true)
-  const [stage,   setStage]   = useState<0|1>(0)
-  const [sticky,  setSticky]  = useState(false)
+  const [size,    setSize]     = useState<SizeLabel | null>(null)
+  const [sizeErr, setSizeErr]  = useState(false)
+  const [cta,     setCta]      = useState<'idle'|'busy'|'done'>('idle')
+
+  // Snap manages stages 1+2; when exited, page scrolls normally into stage 3
+  const [snapOn,  setSnapOn]   = useState(true)
+  const [stage,   setStage]    = useState<0|1>(0)
+  const [sticky,  setSticky]   = useState(false)
 
   const snapRef   = useRef<HTMLDivElement>(null)
   const detailRef = useRef<HTMLDivElement>(null)
@@ -41,13 +43,10 @@ export function PDPClient({ product, relatedProduct }: Props) {
   useEffect(() => {
     document.body.style.overflow = snapOn ? 'hidden' : ''
     document.documentElement.style.overflow = snapOn ? 'hidden' : ''
-    return () => {
-      document.body.style.overflow = ''
-      document.documentElement.style.overflow = ''
-    }
+    return () => { document.body.style.overflow = ''; document.documentElement.style.overflow = '' }
   }, [snapOn])
 
-  // Track snap stage
+  // Track active snap stage
   useEffect(() => {
     const el = snapRef.current
     if (!el || !snapOn) return
@@ -56,23 +55,24 @@ export function PDPClient({ product, relatedProduct }: Props) {
     return () => el.removeEventListener('scroll', fn)
   }, [snapOn])
 
-  // Sticky ATC: only after snap is done AND stage 3 trigger passes viewport
+  // Sticky ATC — only show after Stage 3 enters viewport AND snap is done
   useEffect(() => {
     const el = detailRef.current
     if (!el) return
     const io = new IntersectionObserver(([e]) => {
+      // Only activate sticky after user has exited snap mode
       setSticky(!e.isIntersecting && !snapOn)
     }, { threshold: 0 })
     io.observe(el)
     return () => io.disconnect()
   }, [snapOn])
 
-  const addOne = useCallback(async (s?: SizeLabel) => {
-    const chosen = s ?? size
-    if (!chosen) { setSizeErr(true); return }
+  const addOne = useCallback(async (overrideSize?: SizeLabel) => {
+    const s = overrideSize ?? size
+    if (!s) { setSizeErr(true); return }
     setSizeErr(false); setCta('busy')
     addItem({ productId: product.id, productName: product.name, slug: product.slug,
-      color: color.value, colorName: color.name, colorHex: color.hex, size: chosen,
+      color: color.value, colorName: color.name, colorHex: color.hex, size: s,
       price: product.price, quantity: 1,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     setCta('done')
@@ -94,11 +94,16 @@ export function PDPClient({ product, relatedProduct }: Props) {
     openCart()
   }, [size, color, product, relatedProduct, addItem, openCart])
 
+  // Exit snap: unlock body, then scroll into detail section
   const exitSnap = useCallback(() => {
+    // First unlock
     document.body.style.overflow = ''
     document.documentElement.style.overflow = ''
     setSnapOn(false)
-    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    // Let React flush, then scroll
+    setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
   }, [])
 
   const imgs = color.images
@@ -106,7 +111,11 @@ export function PDPClient({ product, relatedProduct }: Props) {
   return (
     <div className="overflow-x-hidden w-full bg-[#F9F8F6]">
 
-      {/* ── Snap container: Stage 1 + Stage 2 ─────────────────────────── */}
+      {/*
+        ══════════════════════════════════════════════════
+        STAGES 1 + 2 — fixed snap container
+        ══════════════════════════════════════════════════
+      */}
       {snapOn && (
         <div ref={snapRef} style={{
           position: 'fixed', inset: 0, zIndex: 10,
@@ -116,32 +125,32 @@ export function PDPClient({ product, relatedProduct }: Props) {
           backgroundColor: '#F9F8F6',
         }}>
           <SnapIndicator stage={stage} />
-
-          {/* STAGE 1 — HERO */}
-          <HeroStage
-            product={product}
-            heroImage={imgs[0]}
-            mobileImages={imgs}
+          <Stage1Hero
+            product={product} heroImg={imgs[0]} images={imgs}
             color={color} setColor={setColor}
             size={size} setSize={setSize}
             sizeErr={sizeErr} setSizeErr={setSizeErr}
             cta={cta} ctaLabel={ctaLabel} soldOut={soldOut}
             onAdd={() => addOne()}
           />
-
-          {/* STAGE 2 — GALLERY */}
-          <GalleryStage
-            images={imgs}
-            productName={product.name}
-            onShop={exitSnap}
+          <Stage2Gallery
+            images={imgs} productName={product.name}
+            onExitToDetails={exitSnap}
           />
         </div>
       )}
+
+      {/* Spacer keeps page height while snap owns the scroll */}
       {snapOn && <div style={{ height: '200svh' }} aria-hidden="true" />}
 
-      {/* ── Stage 3: Details (normal scroll) ────────────────────────────── */}
+      {/*
+        ══════════════════════════════════════════════════
+        STAGE 3 — normal scroll, always in DOM
+        detailRef fires IntersectionObserver for sticky ATC
+        ══════════════════════════════════════════════════
+      */}
       <div ref={detailRef} />
-      <DetailsStage
+      <Stage3Details
         product={product} relatedProduct={relatedProduct}
         color={color} setColor={setColor}
         size={size} setSize={setSize}
@@ -151,7 +160,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
         formatPrice={formatPrice} t={t}
       />
 
-      {/* ── Sticky ATC: Stage 3 only ─────────────────────────────────────── */}
+      {/* Sticky — only appears after stage 3 */}
       <StickyATC
         product={product} color={color} size={size}
         cta={cta} ctaLabel={ctaLabel} soldOut={soldOut}
@@ -161,7 +170,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
   )
 }
 
-// ─── Snap stage indicator (homepage style) ────────────────────────────────────
+// ─── Stage progress indicator (homepage style) ────────────────────────────────
 function SnapIndicator({ stage }: { stage: 0|1 }) {
   return (
     <div className="fixed left-4 md:left-7 top-1/2 -translate-y-1/2 z-[195] flex flex-col gap-[5px]"
@@ -179,35 +188,26 @@ function SnapIndicator({ stage }: { stage: 0|1 }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  STAGE 1 — HERO
-//
-//  DESKTOP: Single first image on left (full bleed, no swipe).
-//           Product info panel on right. Side-by-side, both fill 100svh.
-//
-//  MOBILE:  Swipeable images on top (58svh). Static info panel below.
-//           Info panel never moves. Only image changes on swipe.
-//           Counter 01/05 shows on image.
+// STAGE 1 — HERO
+// Desktop: side-by-side columns. Image left (62%). Panel right (38%).
+// Mobile:  stacked. Full-width image. Product info below.
+// No text overlaid on garment image.
 // ════════════════════════════════════════════════════════════════════════════
-function HeroStage({ product, heroImage, mobileImages, color, setColor, size, setSize,
+function Stage1Hero({ product, heroImg, images, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
-
-  // Mobile-only swiper state (desktop shows single heroImage)
-  const [mIdx,    setMIdx]   = useState(0)
-  const [mOffset, setMOffset] = useState(0)
+  // Hero-level image swiper — only the image changes, info panel is static
+  const [imgIdx,    setImgIdx]   = useState(0)
+  const [imgOffset, setOffset]   = useState(0)
   const txX = useRef<number|null>(null)
   const txY = useRef<number|null>(null)
   const hz  = useRef<boolean|null>(null)
-  const total = mobileImages?.length ?? 1
+  const allImgs = images ?? [heroImg]
+  const total   = allImgs.length
 
-  const goMobile = useCallback((d: 1|-1) => {
-    setMIdx(i => Math.max(0, Math.min(total - 1, i + d)))
-    setMOffset(0)
+  const goImg = useCallback((d: 1|-1) => {
+    setImgIdx(i => Math.max(0, Math.min(total - 1, i + d)))
+    setOffset(0)
   }, [total])
-
-  const curMobileImg = mobileImages?.[mIdx] ?? heroImage
-
-  // Preload adjacent mobile images
-  const preloadSrc = mobileImages?.[mIdx + 1]?.src
 
   return (
     <section
@@ -216,35 +216,10 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
       style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always',
                height: '100svh', minHeight: '100svh', overflow: 'hidden' }}
     >
-      {/* ══ IMAGE AREA ══════════════════════════════════════════════════ */}
-
-      {/* DESKTOP: single static hero image — no swipe, no counter */}
-      <div className="hidden lg:block relative flex-shrink-0 bg-[#EDEAE4] w-[62%] h-full overflow-hidden">
-        {heroImage?.src ? (
-          <Image
-            src={heroImage.src}
-            alt={heroImage.alt || product.name}
-            fill priority fetchPriority="high"
-            sizes="62vw"
-            className="object-cover object-[center_15%]"
-            quality={92}
-            onError={() => {}}
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[#DDD9D2]" />
-        )}
-        {/* Preload next gallery image invisibly for smooth Stage 2 transition */}
-        {mobileImages?.[1]?.src && (
-          <Image src={mobileImages[1].src} alt="" fill
-            sizes="62vw" className="opacity-0 pointer-events-none absolute" loading="eager"
-            onError={() => {}} />
-        )}
-      </div>
-
-      {/* MOBILE: swipeable image strip — ONLY the image changes, info is separate */}
-      <div
-        className="lg:hidden relative flex-shrink-0 w-full bg-[#EDEAE4] overflow-hidden"
-        style={{ height: '58svh', touchAction: 'pan-y' }}
+      {/* ── PRODUCT IMAGE — swipeable, info stays static ── */}
+      <div className="relative flex-shrink-0 overflow-hidden bg-[#EDEAE4]
+                      w-full h-[58svh]
+                      lg:w-[62%] lg:h-full"
         onTouchStart={e => {
           txX.current = e.touches[0].clientX
           txY.current = e.touches[0].clientY
@@ -256,109 +231,85 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
           const dy = e.touches[0].clientY - txY.current
           if (hz.current === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5))
             hz.current = Math.abs(dx) > Math.abs(dy)
-          if (hz.current) { e.preventDefault(); setMOffset(dx * 0.38) }
+          if (hz.current) { e.preventDefault(); setOffset(dx * 0.4) }
         }}
         onTouchEnd={() => {
-          if (hz.current) {
-            if (mOffset < -48) goMobile(1)
-            else if (mOffset > 48) goMobile(-1)
-          }
-          txX.current = txY.current = null; hz.current = null; setMOffset(0)
+          if (hz.current) { if (imgOffset < -50) goImg(1); else if (imgOffset > 50) goImg(-1) }
+          txX.current = txY.current = null; hz.current = null; setOffset(0)
         }}
+        style={{ touchAction: 'pan-y' }}
       >
-        {/* Current mobile image */}
-        {curMobileImg?.src ? (
-          <Image
-            key={`m-${mIdx}-${curMobileImg.src}`}
-            src={curMobileImg.src}
-            alt={curMobileImg.alt || product.name}
-            fill priority={mIdx === 0} fetchPriority={mIdx === 0 ? 'high' : 'auto'}
-            sizes="100vw"
+        {allImgs[imgIdx]?.src ? (
+          <Image src={allImgs[imgIdx].src}
+            alt={allImgs[imgIdx].alt || product.name}
+            fill priority fetchPriority="high"
+            sizes="(max-width: 1023px) 100vw, 62vw"
             className="object-cover object-[center_15%] pointer-events-none"
             quality={92}
             onError={() => {}}
             style={{
-              transform: `translateX(${mOffset}px)`,
-              transition: Math.abs(mOffset) < 3
-                ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+              transform: `translateX(${imgOffset}px)`,
+              transition: Math.abs(imgOffset) < 3
+                ? 'transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
             }}
           />
         ) : (
           <div className="absolute inset-0 bg-[#DDD9D2]" />
         )}
-
-        {/* Preload next image eagerly to avoid flash */}
-        {preloadSrc && (
-          <Image key={`pre-${mIdx + 1}`} src={preloadSrc} alt="" fill
-            sizes="100vw" className="opacity-0 absolute pointer-events-none"
-            loading="eager" onError={() => {}} />
-        )}
-
-        {/* Mobile counter: 01 / 05 */}
+        {/* Image counter — mobile only */}
         {total > 1 && (
-          <div
-            className="absolute top-3.5 right-4 text-[11px] font-light tabular-nums"
-            style={{ letterSpacing: '0.1em', color: 'rgba(26,26,26,0.55)',
-                     backgroundColor: 'rgba(249,248,246,0.75)',
-                     backdropFilter: 'blur(6px)', padding: '2px 8px' }}
-            aria-live="polite"
-          >
-            {String(mIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+          <div className="absolute top-4 right-4 lg:hidden text-[11px] font-light tabular-nums text-[#1A1A1A]/50 bg-white/70 backdrop-blur-sm px-2 py-1"
+            style={{ letterSpacing: '0.1em' }}>
+            {String(imgIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
           </div>
         )}
-
-        {/* Mobile dash indicators */}
+        {/* Desktop image counter */}
         {total > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1" aria-hidden="true">
-            {mobileImages.map((_: any, i: number) => (
-              <div key={i} style={{
-                height: '2px', borderRadius: '1px', backgroundColor: '#1A1A1A',
-                width: i === mIdx ? '18px' : '4px',
-                opacity: i === mIdx ? 0.5 : 0.18,
-                transition: 'width 0.3s ease, opacity 0.3s ease',
-              }} />
-            ))}
+          <div className="absolute bottom-4 right-4 hidden lg:block text-[11px] font-light tabular-nums text-[#1A1A1A]/45"
+            style={{ letterSpacing: '0.1em' }}>
+            {String(imgIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
           </div>
         )}
       </div>
 
-      {/* ══ INFO PANEL — always static, never moves with image swipe ════ */}
+      {/* ── PRODUCT PANEL ── */}
       <div className="flex-1 flex flex-col overflow-y-auto bg-[#F9F8F6]">
-        {/* Desktop nav clearance */}
+        {/* Top padding: on desktop we need to clear the fixed nav */}
         <div className="hidden lg:block flex-shrink-0" style={{ height: NAV + 24 }} />
 
-        {/* Mobile: small nav clearance at top of info panel */}
-        <div className="lg:hidden flex-shrink-0" style={{ height: 12 }} />
+        <div className="flex-1 flex flex-col justify-between px-6 py-5 lg:px-14 lg:py-0 lg:pb-12">
 
-        <div className="flex-1 flex flex-col justify-between px-6 py-4 lg:px-14 lg:py-0 lg:pb-12">
-
-          {/* TOP: identity + details */}
-          <div className="space-y-4 lg:space-y-5">
+          {/* ── TOP BLOCK ── */}
+          <div className="space-y-5">
+            {/* Eyebrow */}
             <p className="text-[10px] font-light tracking-[0.22em] uppercase text-[#9B9B9B]">
               {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
             </p>
 
+            {/* Title + price */}
             <div>
-              <h1 className="font-display font-light leading-[0.9] tracking-[-0.025em] text-[#1A1A1A] mb-2.5
-                             text-[21px] lg:text-[clamp(22px,2.2vw,36px)]">
+              <h1 className="font-display font-light leading-[0.9] tracking-[-0.025em] text-[#1A1A1A] mb-3
+                             text-[22px] lg:text-[clamp(24px,2.2vw,36px)]">
                 {product.name}
               </h1>
               <div className="flex items-baseline gap-2">
-                <span className="text-[19px] lg:text-[22px] font-light tabular-nums text-[#1A1A1A]">$80</span>
+                <span className="text-[20px] lg:text-[22px] font-light tabular-nums text-[#1A1A1A]">$80</span>
                 {product.founderNote && (
                   <span className="text-[11px] text-[#9B9B9B] font-light">{product.founderNote}</span>
                 )}
               </div>
             </div>
 
-            <div className="border-t border-[#E8E5E0] pt-3.5 space-y-0.5">
+            {/* Key specs */}
+            <div className="border-t border-[#E8E5E0] pt-4 space-y-0.5">
               {(product.constructionDetails ?? []).slice(0, 3).map((l: string, i: number) => (
-                <p key={i} className="text-[12px] font-light text-[#6B6B6B] leading-relaxed">{l}</p>
+                <p key={i} className="text-[12px] lg:text-[13px] font-light text-[#6B6B6B] leading-relaxed">{l}</p>
               ))}
             </div>
 
+            {/* Color swatches */}
             {product.colors.length > 1 && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 {product.colors.map((c: ColorOption) => (
                   <button key={c.value} title={c.name} aria-label={c.name}
                     aria-pressed={c.value === color.value}
@@ -366,13 +317,14 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
                     className={cn('w-5 h-5 rounded-full transition-all',
                       c.value === color.value
                         ? 'ring-2 ring-[#1A1A1A] ring-offset-2 ring-offset-[#F9F8F6]'
-                        : 'hover:ring-1 hover:ring-[#BBB] hover:ring-offset-1')}
+                        : 'hover:ring-1 hover:ring-[#BBB] hover:ring-offset-1 hover:ring-offset-[#F9F8F6]')}
                     style={{ backgroundColor: c.hex }} />
                 ))}
-                <span className="text-[11px] text-[#9B9B9B]">{color.name}</span>
+                <span className="text-[11px] text-[#9B9B9B] font-light">{color.name}</span>
               </div>
             )}
 
+            {/* Size */}
             <div>
               <p className={cn('text-[10px] font-light tracking-[0.1em] uppercase mb-2',
                 sizeErr ? 'text-[#B91C1C]' : 'text-[#9B9B9B]')}>
@@ -393,8 +345,8 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
             </div>
           </div>
 
-          {/* BOTTOM: CTA + scroll cue */}
-          <div className="space-y-3 mt-4">
+          {/* ── BOTTOM BLOCK — CTA + cue ── */}
+          <div className="space-y-4 mt-5">
             <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
               className={cn('w-full h-11 text-[11px] font-light tracking-[0.14em] uppercase transition-all',
                 soldOut         ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
@@ -403,8 +355,8 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
               {ctaLabel}
             </button>
             <div className="flex items-center gap-1.5 opacity-25" aria-hidden="true">
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                <path d="M5.5 2v5M3 5.5l2.5 2.5L8 5.5" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 2.5v5M3.5 6l2.5 2.5L8.5 6" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
               <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">Explore</span>
             </div>
@@ -416,13 +368,13 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  STAGE 2 — GALLERY
-//  Desktop: horizontal scroll (trackpad/wheel), full-bleed images, 01/05 counter
-//  Mobile:  full-screen swipe, dash indicators
+// STAGE 2 — GALLERY
+// Desktop: accordion columns — click a strip to expand.
+//          Active image is wide. Others show as narrow strips with numbers.
+//          No arrows.
+// Mobile:  full-screen swipe. 01/05 counter. No arrows. Dash indicators.
 // ════════════════════════════════════════════════════════════════════════════
-function GalleryStage({ images, productName, onShop }: {
-  images: any[]; productName: string; onShop: () => void
-}) {
+function Stage2Gallery({ images, productName, onExitToDetails }: any) {
   return (
     <section
       aria-label={`${productName} — gallery`}
@@ -431,17 +383,19 @@ function GalleryStage({ images, productName, onShop }: {
                height: '100svh', minHeight: '100svh', overflow: 'hidden' }}
     >
       <div className="hidden lg:flex flex-1 min-h-0">
-        <DesktopGallery images={images} productName={productName} />
+        <DesktopAccordion images={images} productName={productName} />
       </div>
       <div className="lg:hidden flex-1 min-h-0">
-        <MobileGallery images={images} productName={productName} />
+        <MobileSwipe images={images} productName={productName} />
       </div>
+
+      {/* Thin bottom bar */}
       <div className="flex-shrink-0 border-t border-[#E8E5E0] bg-[#F9F8F6]">
         <div className="container-kvrn py-3.5 flex items-center justify-between">
           <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B]">
             {productName}
           </span>
-          <button onClick={onShop}
+          <button onClick={onExitToDetails}
             className="flex items-center gap-1.5 text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
             Shop
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -454,22 +408,29 @@ function GalleryStage({ images, productName, onShop }: {
   )
 }
 
-// ─── Desktop gallery: horizontal scroll, wheel/trackpad driven ────────────────
-function DesktopGallery({ images, productName }: any) {
+// ── Accordion gallery (desktop) ───────────────────────────────────────────────
+// Desktop gallery: horizontal scroll driven by wheel/trackpad.
+// Each image ~85vw wide so "next" peeks at edge. Snaps to each image.
+// Progress indicator 01/05 updates as user scrolls.
+function DesktopAccordion({ images, productName }: any) {
   const [active, setActive] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
-  const total    = images.length
+  const total = images.length
 
+  // Update active index from scroll position
   const onScroll = useCallback(() => {
     const el = trackRef.current
     if (!el) return
     const itemW = el.scrollWidth / total
-    setActive(Math.min(Math.round(el.scrollLeft / itemW), total - 1))
+    const idx   = Math.round(el.scrollLeft / itemW)
+    setActive(Math.min(idx, total - 1))
   }, [total])
 
+  // Convert vertical wheel to horizontal scroll
   const onWheel = useCallback((e: React.WheelEvent) => {
     const el = trackRef.current
     if (!el) return
+    // If user is scrolling primarily vertically and we're at edges, let it pass
     const atStart = el.scrollLeft <= 0
     const atEnd   = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2
     if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return
@@ -477,65 +438,88 @@ function DesktopGallery({ images, productName }: any) {
     el.scrollLeft += e.deltaY + e.deltaX
   }, [])
 
+  // Scroll to image on indicator click
   const goTo = useCallback((i: number) => {
     const el = trackRef.current
     if (!el) return
-    el.scrollTo({ left: (el.scrollWidth / total) * i, behavior: 'smooth' })
+    const itemW = el.scrollWidth / total
+    el.scrollTo({ left: i * itemW, behavior: 'smooth' })
   }, [total])
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#F9F8F6]">
-      <div ref={trackRef} onScroll={onScroll} onWheel={onWheel}
+
+      {/* Horizontal scroll track */}
+      <div
+        ref={trackRef}
+        onScroll={onScroll}
+        onWheel={onWheel}
         className="flex h-full overflow-x-scroll"
         style={{
-          scrollSnapType: 'x mandatory', scrollBehavior: 'smooth',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none', msOverflowStyle: 'none',
-        }}>
+          scrollSnapType:         'x mandatory',
+          scrollBehavior:         'smooth',
+          WebkitOverflowScrolling:'touch',
+          // Hide scrollbar — navigation via wheel/trackpad only
+          scrollbarWidth:         'none',
+          msOverflowStyle:        'none',
+        }}
+      >
         {images.map((img: any, i: number) => (
-          <div key={i} className="relative flex-shrink-0 h-full bg-[#EDEAE4]"
-            style={{ width: '100%', scrollSnapAlign: 'start', scrollSnapStop: 'always',
-                     borderRight: i < total - 1 ? '2px solid #F9F8F6' : 'none' }}>
+          <div key={i}
+            className="relative flex-shrink-0 h-full bg-[#EDEAE4] cursor-grab active:cursor-grabbing"
+            style={{
+              // Each image: 85% viewport width so next image peeks
+              width:           '100%',
+              scrollSnapAlign: 'start',
+              scrollSnapStop:  'always',
+              borderRight:     i < total - 1 ? '2px solid #F9F8F6' : 'none',
+            }}>
             {img.src
               ? <Image src={img.src} alt={img.alt || productName} fill
                   sizes="100vw"
-                  className="object-cover object-[center_15%] pointer-events-none"
-                  loading={i < 2 ? 'eager' : 'lazy'}
-                  onError={() => {}} />
+                  className={cn('pointer-events-none transition-all duration-500',
+                    // Active image: full cover. Others: slightly zoomed out for editorial feel
+                    i === active ? 'object-cover object-[center_15%]' : 'object-cover object-[center_15%] scale-[0.97]'
+                  )}
+                  loading={i === 0 ? 'eager' : 'lazy'}
+                  onError={() => {}}
+                />
               : <div className="absolute inset-0 bg-[#DDD9D2]" />}
           </div>
         ))}
       </div>
 
-      {/* Right-side vertical numbering */}
+      {/* Right-side vertical number indicator */}
       <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-3"
-        role="tablist" aria-label="Gallery image">
-        {images.map((_: any, i: number) => (
+        role="tablist" aria-label="Gallery position">
+        {Array.from({ length: total }, (_, i) => (
           <button key={i} role="tab" aria-selected={i === active}
             onClick={() => goTo(i)}
-            className="text-[10px] font-light tabular-nums focus-visible:outline-none transition-all duration-300"
+            className="text-[10px] font-light tabular-nums transition-all duration-300 focus-visible:outline-none"
             style={{
               letterSpacing: '0.1em',
-              color: i === active ? 'rgba(26,26,26,0.75)' : 'rgba(26,26,26,0.2)',
-              transform: i === active ? 'translateX(-1px)' : 'none',
+              color: i === active ? 'rgba(26,26,26,0.8)' : 'rgba(26,26,26,0.22)',
+              transform: i === active ? 'translateX(-2px)' : 'none',
+              transition: 'color 0.3s, transform 0.3s',
             }}>
             {String(i + 1).padStart(2, '0')}
           </button>
         ))}
       </div>
 
-      {/* Counter */}
-      <div className="absolute top-5 right-16 text-[11px] font-light tabular-nums text-[#1A1A1A]/35"
+      {/* Counter top-right */}
+      <div className="absolute top-5 right-14 text-[11px] font-light tabular-nums text-[#1A1A1A]/40"
         style={{ letterSpacing: '0.1em' }} aria-live="polite">
         {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       </div>
 
-      {/* Scroll hint — only on first image */}
+      {/* Subtle scroll cue — fades after first scroll */}
       {active === 0 && (
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-25 pointer-events-none">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-30 pointer-events-none"
+          aria-hidden="true">
           <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">Scroll</span>
-          <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
-            <path d="M1 4.5h12M8 1l4 3.5-4 3.5" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
+          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+            <path d="M2 5h12M9 1l4 4-4 4" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </div>
       )}
@@ -543,15 +527,14 @@ function DesktopGallery({ images, productName }: any) {
   )
 }
 
-// ─── Mobile gallery: full-screen swipe ────────────────────────────────────────
-function MobileGallery({ images, productName }: any) {
+// ── Mobile swipe (no arrows) ──────────────────────────────────────────────────
+function MobileSwipe({ images, productName }: any) {
   const [active, setActive] = useState(0)
   const [offset, setOffset] = useState(0)
   const txX = useRef<number|null>(null)
   const txY = useRef<number|null>(null)
   const hz  = useRef<boolean|null>(null)
   const total = images.length
-  const preloadSrc = images[active + 1]?.src
 
   const go = useCallback((d: 1|-1) =>
     setActive(i => { setOffset(0); return Math.max(0, Math.min(total - 1, i + d)) }),
@@ -575,48 +558,35 @@ function MobileGallery({ images, productName }: any) {
       }}
       onTouchEnd={() => {
         if (hz.current) {
-          if (offset < -50) go(1); else if (offset > 50) go(-1)
+          if (offset < -50) go(1)
+          else if (offset > 50) go(-1)
         }
         txX.current = txY.current = null; hz.current = null; setOffset(0)
       }}>
       {images[active]?.src ? (
         <Image key={images[active].src + active}
           src={images[active].src} alt={images[active].alt || productName} fill
-          sizes="100vw"
-          className="object-contain object-center pointer-events-none"
-          loading={active < 2 ? 'eager' : 'lazy'}
-          onError={() => {}}
+          sizes="100vw" className="object-contain object-center pointer-events-none"
+          loading="lazy" onError={() => {}}
           style={{
             transform: `translateX(${offset}px)`,
             transition: Math.abs(offset) < 3 ? 'transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
           }}
         />
       ) : <div className="absolute inset-0 bg-[#DDD9D2]" />}
-
-      {/* Preload next */}
-      {preloadSrc && (
-        <Image key={`pre-${active + 1}`} src={preloadSrc} alt="" fill
-          sizes="100vw" className="opacity-0 absolute pointer-events-none"
-          loading="eager" onError={() => {}} />
-      )}
-
       {/* Counter */}
-      <div className="absolute top-3.5 right-4 text-[11px] font-light tabular-nums"
-        style={{ letterSpacing: '0.1em', color: 'rgba(26,26,26,0.5)',
-                 backgroundColor: 'rgba(249,248,246,0.72)', backdropFilter: 'blur(6px)',
-                 padding: '2px 8px' }}
-        aria-live="polite">
+      <div className="absolute top-4 right-4 text-[11px] font-light tabular-nums text-[#1A1A1A]/45"
+        style={{ letterSpacing: '0.1em' }}>
         {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       </div>
-
       {/* Dash indicators */}
       {total > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1" aria-hidden="true">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1" aria-hidden="true">
           {images.map((_: any, i: number) => (
             <div key={i} style={{
               height: '2px', borderRadius: '1px', backgroundColor: '#1A1A1A',
-              width: i === active ? '18px' : '4px',
-              opacity: i === active ? 0.5 : 0.17,
+              width: i === active ? '20px' : '4px',
+              opacity: i === active ? 0.55 : 0.18,
               transition: 'width 0.3s ease, opacity 0.3s ease',
             }} />
           ))}
@@ -627,19 +597,20 @@ function MobileGallery({ images, productName }: any) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  STAGE 3 — DETAILS (normal scroll)
+// STAGE 3 — PURCHASE + DETAILS (normal vertical scroll)
 // ════════════════════════════════════════════════════════════════════════════
-function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
+function Stage3Details({ product, relatedProduct, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t }: any) {
   return (
     <div className="bg-[#F9F8F6] min-h-screen">
       <div className="max-w-[520px] mx-auto px-6 lg:px-0 py-16 md:py-20">
 
+        {/* Header */}
         <div className="mb-9">
           <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-2">
             {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
           </p>
-          <h2 className="font-display font-light text-[24px] md:text-[28px] leading-tight tracking-[-0.02em] mb-2.5">
+          <h2 className="font-display font-light text-[24px] md:text-[28px] leading-tight tracking-[-0.02em] text-[#1A1A1A] mb-2.5">
             {product.name}
           </h2>
           <div className="flex items-baseline gap-2">
@@ -650,6 +621,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           </div>
         </div>
 
+        {/* Color */}
         {product.colors.length > 1 && (
           <div className="mb-6">
             <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2.5">
@@ -669,6 +641,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           </div>
         )}
 
+        {/* Size */}
         <div className="mb-7">
           <div className="flex items-center justify-between mb-2.5">
             <p className={cn('text-[10px] font-light tracking-[0.1em] uppercase',
@@ -697,6 +670,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           )}
         </div>
 
+        {/* Add to Bag */}
         <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
           className={cn('w-full h-12 mb-8 text-[11px] font-light tracking-[0.14em] uppercase transition-all',
             soldOut         ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
@@ -705,10 +679,12 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           {ctaLabel}
         </button>
 
+        {/* Description */}
         <p className="text-[14px] text-[#6B6B6B] leading-relaxed">{product.description}</p>
 
+        {/* Construction */}
         <div className="border-t border-[#E8E5E0] mt-8 pt-8">
-          <p className="text-[10px] font-light tracking-[0.16em] uppercase mb-4">Construction</p>
+          <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#1A1A1A] mb-4">Construction</p>
           <div className="space-y-0.5">
             {(product.constructionDetails ?? []).map((l: string, i: number) => (
               <p key={i} className="text-[14px] font-light text-[#6B6B6B]">{l}</p>
@@ -716,6 +692,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           </div>
         </div>
 
+        {/* Shipping & Returns */}
         <div className="border-t border-[#E8E5E0] mt-8">
           <details className="group">
             <summary className="flex items-center justify-between py-5 cursor-pointer list-none text-[10px] font-light tracking-[0.16em] uppercase select-none">
@@ -737,6 +714,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           </details>
         </div>
 
+        {/* Complete the Set */}
         {relatedProduct && (
           <CompleteSet product={product} related={relatedProduct} onAddBoth={onAddBoth} />
         )}
@@ -784,7 +762,7 @@ function CompleteSet({ product, related, onAddBoth }: any) {
   )
 }
 
-// ─── Sticky ATC ───────────────────────────────────────────────────────────────
+// ─── Sticky ATC (visible only during Stage 3) ─────────────────────────────────
 function StickyATC({ product, color, size, cta, ctaLabel, soldOut, onAdd, t, visible }: any) {
   return (
     <div className={cn('fixed bottom-0 left-0 right-0 z-[200] overflow-hidden',
