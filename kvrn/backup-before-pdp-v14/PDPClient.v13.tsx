@@ -206,11 +206,9 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
   return (
     <section
       aria-label={product.name}
-      className="flex flex-col lg:flex-row"
+      className="flex flex-col lg:flex-row bg-[#F9F8F6]"
       style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always',
-               height: '100svh', minHeight: '100svh', overflow: 'hidden',
-               // Mobile: dark bg so no light bleed; desktop: cream handled by panel
-               backgroundColor: '#0E0E0E' }}
+               height: '100svh', minHeight: '100svh', overflow: 'hidden' }}
     >
       {/* ══ IMAGE AREA ══════════════════════════════════════════════════ */}
 
@@ -473,10 +471,9 @@ function GalleryStage({ images, productName, onShop }: {
   return (
     <section
       aria-label={`${productName} — gallery`}
-      className="flex flex-col"
+      className="flex flex-col bg-[#F9F8F6]"
       style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always',
-               height: '100svh', minHeight: '100svh', overflow: 'hidden',
-               backgroundColor: '#0E0E0E' }}
+               height: '100svh', minHeight: '100svh', overflow: 'hidden' }}
     >
       <div className="hidden lg:flex flex-1 min-h-0">
         <DesktopGallery images={images} productName={productName} />
@@ -592,19 +589,16 @@ function DesktopGallery({ images, productName }: any) {
   )
 }
 
-// ─── Mobile gallery — CSS track approach for zero-flash swiping ──────────────
-// All slides are rendered in a flex row.
-// Moving the track with transform: translate3d() is instant — no image src changes,
-// no remounting, no decode delay. All images are eagerly loaded on mount.
+// ─── Mobile gallery: full-screen swipe ────────────────────────────────────────
 function MobileGallery({ images, productName, onShop }: any) {
   const [active, setActive] = useState(0)
-  const [drag,   setDrag]   = useState(0)    // live finger offset
+  const [offset, setOffset] = useState(0)
   const txX = useRef<number|null>(null)
   const txY = useRef<number|null>(null)
   const hz  = useRef<boolean|null>(null)
   const total = images.length
 
-  // Eagerly load all images via the browser Image API on mount
+  // Preload ALL gallery images on mount — eliminates load flash on swipe
   useEffect(() => {
     images.forEach((img: any) => {
       if (!img?.src) return
@@ -613,17 +607,20 @@ function MobileGallery({ images, productName, onShop }: any) {
     })
   }, [images])
 
-  // Track X position = -(active * 100vw) + drag offset
-  const trackX = -(active * 100) // in vw units — each slide is 100vw wide
+  const go = useCallback((d: 1|-1) =>
+    setActive(i => { setOffset(0); return Math.max(0, Math.min(total - 1, i + d)) }),
+    [total])
+
+  const cur = images[active]
 
   return (
+    // Dark background so gallery feels editorial, not washed-out
     <div className="relative w-full h-full overflow-hidden bg-[#0E0E0E]"
       style={{ touchAction: 'pan-y' }}
       onTouchStart={e => {
         txX.current = e.touches[0].clientX
         txY.current = e.touches[0].clientY
         hz.current  = null
-        setDrag(0)
       }}
       onTouchMove={e => {
         if (!txX.current || !txY.current) return
@@ -631,85 +628,74 @@ function MobileGallery({ images, productName, onShop }: any) {
         const dy = e.touches[0].clientY - txY.current
         if (hz.current === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5))
           hz.current = Math.abs(dx) > Math.abs(dy)
-        if (hz.current) { e.preventDefault(); setDrag(dx) }
+        if (hz.current) { e.preventDefault(); setOffset(dx * 0.4) }
       }}
       onTouchEnd={() => {
-        if (hz.current && drag !== 0) {
-          if (drag < -50 && active < total - 1)      setActive(a => a + 1)
-          else if (drag > 50 && active > 0)           setActive(a => a - 1)
+        if (hz.current) {
+          if (offset < -50) go(1); else if (offset > 50) go(-1)
         }
-        txX.current = txY.current = null
-        hz.current = null
-        setDrag(0)
+        txX.current = txY.current = null; hz.current = null; setOffset(0)
       }}>
 
-      {/* TRACK — flex row of slides, all mounted, moved by translate3d */}
-      <div
-        style={{
-          display:        'flex',
-          width:          `${total * 100}%`,
-          height:         '100%',
-          // translate3d for GPU compositing — no layout thrashing
-          transform:      `translate3d(calc(${trackX}% + ${drag}px), 0, 0)`,
-          transition:     drag === 0 ? 'transform 0.36s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
-          willChange:     'transform',
-        }}>
-        {images.map((img: any, i: number) => (
-          <div key={i} style={{ width: `${100 / total}%`, height: '100%',
-                                flexShrink: 0, position: 'relative' }}>
-            {img?.src
-              ? <img
-                  src={img.src}
-                  alt={i === active ? (img.alt || productName) : ''}
-                  loading={i === 0 ? 'eager' : 'eager'}
-                  decoding="async"
-                  style={{
-                    position: 'absolute', inset: 0,
-                    width: '100%', height: '100%',
-                    objectFit: 'cover',
-                    objectPosition: 'center 15%',
-                    pointerEvents: 'none',
-                  }}
-                  onError={() => {}}
-                />
-              : <div style={{ position: 'absolute', inset: 0, background: '#1A1A1A' }} />}
-          </div>
-        ))}
-      </div>
+      {/* Stable image layer — all images rendered, only active one visible */}
+      {/* This avoids key-based remounting and the flash that comes with it */}
+      {images.map((img: any, i: number) => (
+        img?.src ? (
+          <Image
+            key={img.src}
+            src={img.src}
+            alt={i === active ? (img.alt || productName) : ''}
+            fill
+            sizes="100vw"
+            className="object-contain object-center pointer-events-none"
+            priority={i === 0}
+            loading="eager"
+            onError={() => {}}
+            style={{
+              opacity: i === active ? 1 : 0,
+              transform: i === active ? `translateX(${offset}px)` : 'none',
+              transition: i === active && Math.abs(offset) < 3
+                ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)'
+                : 'none',
+              willChange: i <= active + 1 ? 'transform, opacity' : 'auto',
+            }}
+          />
+        ) : null
+      ))}
 
-      {/* Counter — top-center, floats over image */}
+      {/* Counter — floats top-center, no box, readable against any image */}
       <div className="absolute top-4 left-0 right-0 flex justify-center pointer-events-none"
         aria-live="polite">
-        <span className="text-[12px] font-light tabular-nums text-white/80"
-          style={{ letterSpacing: '0.14em', textShadow: '0 1px 5px rgba(0,0,0,0.5)' }}>
+        <span className="text-[12px] font-light tabular-nums text-white/75"
+          style={{ letterSpacing: '0.14em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
           {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
         </span>
       </div>
 
-      {/* Progress bar + Shop — bottom overlay, no container box */}
-      <div className="absolute inset-x-0 bottom-0 pb-8 flex flex-col items-center gap-2.5 pointer-events-none"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.38) 0%, transparent 75%)' }}>
-        {/* Progress bar */}
-        <div style={{ width: 80, height: 1, background: 'rgba(255,255,255,0.22)', position: 'relative', overflow: 'hidden' }}>
+      {/* Progress + shop — float at very bottom, no container box */}
+      <div className="absolute inset-x-0 bottom-0 pb-8 flex flex-col items-center gap-3 pointer-events-none"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 80%)' }}>
+        {/* Thin progress bar */}
+        <div className="w-[88px] h-[1px] bg-white/25 relative overflow-hidden">
           <div style={{
-            position: 'absolute', inset: '0 auto 0 0',
-            background: 'rgba(255,255,255,0.8)',
+            position: 'absolute', top: 0, left: 0, height: '100%',
+            backgroundColor: 'rgba(255,255,255,0.75)',
             width: `${((active + 1) / total) * 100}%`,
-            transition: 'width 0.32s cubic-bezier(0.25,0.46,0.45,0.94)',
+            transition: 'width 0.35s cubic-bezier(0.25,0.46,0.45,0.94)',
           }} />
         </div>
-        {/* Shop cue */}
+        {/* Shop cue — pointer-events-auto so it's tappable */}
         <button onClick={onShop}
           className="flex items-center gap-1.5"
           style={{ pointerEvents: 'auto' }}
           aria-label="View purchase details">
-          <span className="text-[10px] font-light tracking-[0.18em] uppercase"
-            style={{ color: 'rgba(255,255,255,0.65)', textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>
+          <span className="text-[10px] font-light tracking-[0.18em] uppercase text-white/65"
+            style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>
             Shop
           </span>
           <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-            <path d="M4.5 1.5v5M2 4.5l2.5 2.5L7 4.5"
-              stroke="rgba(255,255,255,0.65)" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M4.5 1.5v5M2 4.5l2.5 2.5L7 4.5" stroke="rgba(255,255,255,0.65)"
+              strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </button>
       </div>
