@@ -207,7 +207,8 @@ function Stage1Hero({ product, heroImg, color, setColor, size, setSize,
           <Image src={heroImg.src} alt={heroImg.alt || product.name}
             fill priority fetchPriority="high"
             sizes="(max-width: 1023px) 100vw, 62vw"
-            className="object-cover object-[center_15%]" 
+            className="object-contain object-center"
+            style={{ padding: '24px' }}
             quality={92}
             onError={() => {}}
           />
@@ -353,120 +354,43 @@ function Stage2Gallery({ images, productName, onExitToDetails }: any) {
 }
 
 // ── Accordion gallery (desktop) ───────────────────────────────────────────────
-// Desktop gallery: horizontal scroll driven by wheel/trackpad.
-// Each image ~85vw wide so "next" peeks at edge. Snaps to each image.
-// Progress indicator 01/05 updates as user scrolls.
 function DesktopAccordion({ images, productName }: any) {
   const [active, setActive] = useState(0)
-  const trackRef = useRef<HTMLDivElement>(null)
   const total = images.length
-
-  // Update active index from scroll position
-  const onScroll = useCallback(() => {
-    const el = trackRef.current
-    if (!el) return
-    const itemW = el.scrollWidth / total
-    const idx   = Math.round(el.scrollLeft / itemW)
-    setActive(Math.min(idx, total - 1))
-  }, [total])
-
-  // Convert vertical wheel to horizontal scroll
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    const el = trackRef.current
-    if (!el) return
-    // If user is scrolling primarily vertically and we're at edges, let it pass
-    const atStart = el.scrollLeft <= 0
-    const atEnd   = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2
-    if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return
-    e.preventDefault()
-    el.scrollLeft += e.deltaY + e.deltaX
-  }, [])
-
-  // Scroll to image on indicator click
-  const goTo = useCallback((i: number) => {
-    const el = trackRef.current
-    if (!el) return
-    const itemW = el.scrollWidth / total
-    el.scrollTo({ left: i * itemW, behavior: 'smooth' })
-  }, [total])
-
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#F9F8F6]">
-
-      {/* Horizontal scroll track */}
-      <div
-        ref={trackRef}
-        onScroll={onScroll}
-        onWheel={onWheel}
-        className="flex h-full overflow-x-scroll"
-        style={{
-          scrollSnapType:         'x mandatory',
-          scrollBehavior:         'smooth',
-          WebkitOverflowScrolling:'touch',
-          // Hide scrollbar — navigation via wheel/trackpad only
-          scrollbarWidth:         'none',
-          msOverflowStyle:        'none',
-        }}
-      >
-        {images.map((img: any, i: number) => (
-          <div key={i}
-            className="relative flex-shrink-0 h-full bg-[#EDEAE4] cursor-grab active:cursor-grabbing"
+    <div className="relative flex w-full h-full overflow-hidden">
+      {images.map((img: any, i: number) => {
+        const on = i === active
+        return (
+          <button key={i}
+            onClick={() => setActive(i)}
+            aria-label={`Image ${i + 1} of ${total}${on ? ' (current)' : ''}`}
+            className={cn('relative overflow-hidden bg-[#EDEAE4] h-full flex-shrink-0 focus-visible:outline-none',
+              on ? 'cursor-default' : 'cursor-pointer')}
             style={{
-              // Each image: 85% viewport width so next image peeks
-              width:           '85%',
-              scrollSnapAlign: 'start',
-              scrollSnapStop:  'always',
-              borderRight:     i < total - 1 ? '2px solid #F9F8F6' : 'none',
+              flex: on ? '5 0 0%' : '1 0 0%',
+              borderRight: i < total - 1 ? '1px solid #E8E5E0' : 'none',
+              transition: 'flex 0.55s cubic-bezier(0.25,0.46,0.45,0.94)',
             }}>
             {img.src
               ? <Image src={img.src} alt={img.alt || productName} fill
-                  sizes="85vw"
-                  className={cn('pointer-events-none transition-all duration-500',
-                    // Active image: full cover. Others: slightly zoomed out for editorial feel
-                    i === active ? 'object-cover object-[center_15%]' : 'object-cover object-[center_15%] scale-[0.97]'
-                  )}
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                  onError={() => {}}
-                />
+                  sizes="40vw" className="object-cover object-center"
+                  loading={i === 0 ? 'eager' : 'lazy'} onError={() => {}} draggable={false} />
               : <div className="absolute inset-0 bg-[#DDD9D2]" />}
-          </div>
-        ))}
-      </div>
-
-      {/* Right-side vertical number indicator */}
-      <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-3"
-        role="tablist" aria-label="Gallery position">
-        {Array.from({ length: total }, (_, i) => (
-          <button key={i} role="tab" aria-selected={i === active}
-            onClick={() => goTo(i)}
-            className="text-[10px] font-light tabular-nums transition-all duration-300 focus-visible:outline-none"
-            style={{
-              letterSpacing: '0.1em',
-              color: i === active ? 'rgba(26,26,26,0.8)' : 'rgba(26,26,26,0.22)',
-              transform: i === active ? 'translateX(-2px)' : 'none',
-              transition: 'color 0.3s, transform 0.3s',
-            }}>
-            {String(i + 1).padStart(2, '0')}
+            {/* Number badge */}
+            <div className={cn(
+              'absolute bottom-4 left-4 text-[11px] font-light tabular-nums transition-all duration-300',
+              on ? 'text-[#1A1A1A] opacity-50' : 'text-[#1A1A1A] opacity-0'
+            )} style={{ letterSpacing: '0.08em' }}>
+              {String(i + 1).padStart(2, '0')}
+            </div>
           </button>
-        ))}
-      </div>
-
-      {/* Counter top-right */}
-      <div className="absolute top-5 right-14 text-[11px] font-light tabular-nums text-[#1A1A1A]/40"
-        style={{ letterSpacing: '0.1em' }} aria-live="polite">
+        )
+      })}
+      <div className="absolute top-5 right-5 text-[11px] font-light tabular-nums text-[#1A1A1A]/40"
+        style={{ letterSpacing: '0.1em' }}>
         {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       </div>
-
-      {/* Subtle scroll cue — fades after first scroll */}
-      {active === 0 && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-30 pointer-events-none"
-          aria-hidden="true">
-          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">Scroll</span>
-          <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
-            <path d="M2 5h12M9 1l4 4-4 4" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-        </div>
-      )}
     </div>
   )
 }
