@@ -598,13 +598,13 @@ function DesktopGallery({ images, productName }: any) {
 // no remounting, no decode delay. All images are eagerly loaded on mount.
 function MobileGallery({ images, productName, onShop }: any) {
   const [active, setActive] = useState(0)
-  const [drag,   setDrag]   = useState(0)   // px offset during active swipe
+  const [drag,   setDrag]   = useState(0)    // live finger offset
   const txX = useRef<number|null>(null)
   const txY = useRef<number|null>(null)
   const hz  = useRef<boolean|null>(null)
   const total = images.length
 
-  // Warm the browser cache for all images on mount
+  // Eagerly load all images via the browser Image API on mount
   useEffect(() => {
     images.forEach((img: any) => {
       if (!img?.src) return
@@ -613,11 +613,12 @@ function MobileGallery({ images, productName, onShop }: any) {
     })
   }, [images])
 
+  // Track X position = -(active * 100vw) + drag offset
+  const trackX = -(active * 100) // in vw units — each slide is 100vw wide
+
   return (
-    <div
-      style={{ position: 'relative', width: '100%', height: '100%',
-               overflow: 'hidden', background: '#0E0E0E',
-               touchAction: 'pan-y' }}   // allow vertical scroll, we handle horizontal
+    <div className="relative w-full h-full overflow-hidden bg-[#0E0E0E]"
+      style={{ touchAction: 'pan-y' }}
       onTouchStart={e => {
         txX.current = e.touches[0].clientX
         txY.current = e.touches[0].clientY
@@ -625,89 +626,59 @@ function MobileGallery({ images, productName, onShop }: any) {
         setDrag(0)
       }}
       onTouchMove={e => {
-        if (txX.current === null || txY.current === null) return
+        if (!txX.current || !txY.current) return
         const dx = e.touches[0].clientX - txX.current
         const dy = e.touches[0].clientY - txY.current
-        // Decide direction on first meaningful movement
-        if (hz.current === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6))
+        if (hz.current === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5))
           hz.current = Math.abs(dx) > Math.abs(dy)
-        if (hz.current) {
-          e.preventDefault()   // stop page scroll during horizontal swipe
-          // Clamp drag: don't drag past first or last slide
-          const clamped = active === 0
-            ? Math.min(dx, 0)
-            : active === total - 1
-            ? Math.max(dx, 0)
-            : dx
-          setDrag(clamped)
-        }
+        if (hz.current) { e.preventDefault(); setDrag(dx) }
       }}
       onTouchEnd={() => {
         if (hz.current) {
-          const threshold = 44   // px — intentional swipe threshold
-          if (drag < -threshold && active < total - 1) {
-            setActive(a => a + 1)   // advance exactly one slide
-          } else if (drag > threshold && active > 0) {
-            setActive(a => a - 1)   // go back exactly one slide
+          // Clamp: always move exactly ±1 (or 0 if below threshold)
+          // Threshold: 40px or ~10% of screen = intentional swipe
+          if (drag < -40 && active < total - 1) {
+            setActive(a => a + 1)          // one forward only
+          } else if (drag > 40 && active > 0) {
+            setActive(a => a - 1)          // one back only
           }
-          // Below threshold: spring back to current slide (drag → 0)
+          // else: below threshold → spring back to current (drag resets to 0)
         }
-        txX.current = null
-        txY.current = null
-        hz.current  = null
-        setDrag(0)
-      }}
-    >
-      {/*
-        TRACK — single flex row, all slides mounted simultaneously.
-        translateX moves in real px using CSS calc:
-          -(activeIndex × 100vw) + dragPx
-        Each slide is exactly 100vw wide (not a % of the track).
-        This is the only math that produces correct per-slide movement.
-      */}
-      <div style={{
-        display:    'flex',
-        flexWrap:   'nowrap',
-        height:     '100%',
-        width:      '100%',   // track doesn't need to be wide — slides overflow
-        transform:  `translateX(calc(${-active * 100}vw + ${drag}px))`,
-        transition: drag === 0
-          ? 'transform 0.42s cubic-bezier(0.25,0.46,0.45,0.94)'
-          : 'none',
-        willChange: 'transform',
+        txX.current = txY.current = null
+        hz.current = null
+        setDrag(0)                         // always reset drag — track springs back or forward
       }}>
+
+      {/* TRACK — flex row of slides, all mounted, moved by translate3d */}
+      <div
+        style={{
+          display:        'flex',
+          width:          `${total * 100}%`,
+          height:         '100%',
+          // translate3d for GPU compositing — no layout thrashing
+          transform:      `translate3d(calc(${trackX}% + ${drag}px), 0, 0)`,
+          transition:     drag === 0 ? 'transform 0.36s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+          willChange:     'transform',
+        }}>
         {images.map((img: any, i: number) => (
-          <div key={i} style={{
-            // Each slide = exactly one viewport wide, never shrinks
-            minWidth:   '100vw',
-            width:      '100vw',
-            flexShrink: 0,
-            height:     '100%',
-            position:   'relative',
-            background: '#0E0E0E',
-          }}>
-            {img?.src ? (
-              <img
-                src={img.src}
-                alt={i === active ? (img.alt || productName) : ''}
-                loading="eager"
-                decoding="async"
-                style={{
-                  position:      'absolute',
-                  inset:         0,
-                  width:         '100%',
-                  height:        '100%',
-                  objectFit:     'cover',
-                  objectPosition:'center 15%',
-                  pointerEvents: 'none',
-                  // Pre-paint next/prev for GPU — prevents decode stutter
-                  willChange:    Math.abs(i - active) <= 1 ? 'transform' : 'auto',
-                }}
-                onError={() => {}}
-              />
-            ) : (
-              <div style={{ position: 'absolute', inset: 0, background: '#1A1A1A' }} />
-            )}
+          <div key={i} style={{ width: `${100 / total}%`, height: '100%',
+                                flexShrink: 0, position: 'relative' }}>
+            {img?.src
+              ? <img
+                  src={img.src}
+                  alt={i === active ? (img.alt || productName) : ''}
+                  loading={i === 0 ? 'eager' : 'eager'}
+                  decoding="async"
+                  style={{
+                    position: 'absolute', inset: 0,
+                    width: '100%', height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center 15%',
+                    pointerEvents: 'none',
+                  }}
+                  onError={() => {}}
+                />
+              : <div style={{ position: 'absolute', inset: 0, background: '#1A1A1A' }} />}
           </div>
         ))}
       </div>
