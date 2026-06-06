@@ -435,15 +435,11 @@ function MobileHeroInfo({ product, color, setColor, size, setSize,
         {ctaLabel}
       </button>
       {/* Scroll cue */}
-      {/* Explore cue — bright and legible, not faded */}
-      <div className="flex items-center gap-2" aria-hidden="true">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M6 2.5v5M3.5 6l2.5 2.5L8.5 6" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+      <div className="flex items-center gap-1.5 opacity-30" aria-hidden="true">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <path d="M5.5 2v5M3 5.5l2.5 2.5L8 5.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
-        <span className="text-[11px] font-light tracking-[0.16em] uppercase text-white"
-          style={{ textShadow: shadow }}>
-          Explore
-        </span>
+        <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Explore</span>
       </div>
     </div>
   )
@@ -586,25 +582,14 @@ function MobileGallery({ images, productName, onShop }: any) {
   const txY = useRef<number|null>(null)
   const hz  = useRef<boolean|null>(null)
   const total = images.length
-
-  // Preload ALL gallery images on mount — eliminates load flash on swipe
-  useEffect(() => {
-    images.forEach((img: any) => {
-      if (!img?.src) return
-      const el = new window.Image()
-      el.src = img.src
-    })
-  }, [images])
+  const preloadSrc = images[active + 1]?.src
 
   const go = useCallback((d: 1|-1) =>
     setActive(i => { setOffset(0); return Math.max(0, Math.min(total - 1, i + d)) }),
     [total])
 
-  const cur = images[active]
-
   return (
-    // Dark background so gallery feels editorial, not washed-out
-    <div className="relative w-full h-full overflow-hidden bg-[#0E0E0E]"
+    <div className="relative w-full h-full overflow-hidden bg-[#EDEAE4]"
       style={{ touchAction: 'pan-y' }}
       onTouchStart={e => {
         txX.current = e.touches[0].clientX
@@ -625,62 +610,57 @@ function MobileGallery({ images, productName, onShop }: any) {
         }
         txX.current = txY.current = null; hz.current = null; setOffset(0)
       }}>
+      {images[active]?.src ? (
+        <Image key={images[active].src + active}
+          src={images[active].src} alt={images[active].alt || productName} fill
+          sizes="100vw"
+          className="object-contain object-center pointer-events-none"
+          loading={active < 2 ? 'eager' : 'lazy'}
+          onError={() => {}}
+          style={{
+            transform: `translateX(${offset}px)`,
+            transition: Math.abs(offset) < 3 ? 'transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+          }}
+        />
+      ) : <div className="absolute inset-0 bg-[#DDD9D2]" />}
 
-      {/* Stable image layer — all images rendered, only active one visible */}
-      {/* This avoids key-based remounting and the flash that comes with it */}
-      {images.map((img: any, i: number) => (
-        img?.src ? (
-          <Image
-            key={img.src}
-            src={img.src}
-            alt={i === active ? (img.alt || productName) : ''}
-            fill
-            sizes="100vw"
-            className="object-contain object-center pointer-events-none"
-            priority={i === 0}
-            loading={i < 3 ? 'eager' : 'lazy'}
-            onError={() => {}}
-            style={{
-              opacity: i === active ? 1 : 0,
-              transform: i === active ? `translateX(${offset}px)` : 'none',
-              transition: i === active && Math.abs(offset) < 3
-                ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.2s ease'
-                : i !== active ? 'opacity 0.15s ease' : 'none',
-              willChange: 'transform',
-            }}
-          />
-        ) : null
-      ))}
+      {/* Preload next */}
+      {preloadSrc && (
+        <Image key={`pre-${active + 1}`} src={preloadSrc} alt="" fill
+          sizes="100vw" className="opacity-0 absolute pointer-events-none"
+          loading="eager" onError={() => {}} />
+      )}
 
-      {/* ── Bottom UI bar: counter + progress + shop cue ── */}
-      {/* Positioned at bottom with gradient backing so always readable */}
-      <div className="absolute inset-x-0 bottom-0 pt-10 pb-7 px-6 flex flex-col items-center gap-3"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)' }}>
+      {/* Counter */}
+      <div className="absolute top-3.5 right-4 text-[11px] font-light tabular-nums"
+        style={{ letterSpacing: '0.1em', color: 'rgba(26,26,26,0.5)',
+                 backgroundColor: 'rgba(249,248,246,0.72)', backdropFilter: 'blur(6px)',
+                 padding: '2px 8px' }}
+        aria-live="polite">
+        {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+      </div>
 
-        {/* Prominent counter — bottom center */}
-        <p className="text-[14px] font-light tabular-nums text-white"
-          style={{ letterSpacing: '0.12em' }}
-          aria-live="polite">
-          {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-        </p>
-
-        {/* Progress bar — thin line that fills left to right */}
-        <div className="w-full max-w-[120px] h-[1px] bg-white/20 relative overflow-hidden">
-          <div style={{
-            position: 'absolute', top: 0, left: 0,
-            height: '100%', backgroundColor: 'white',
-            width: `${((active + 1) / total) * 100}%`,
-            transition: 'width 0.35s cubic-bezier(0.25,0.46,0.45,0.94)',
-          }} />
-        </div>
-
-        {/* Shop cue */}
-        <button onClick={onShop}
-          className="flex items-center gap-1.5 text-white/60 hover:text-white/90 transition-colors"
+      {/* Dash indicators + shop cue at bottom */}
+      <div className="absolute bottom-5 left-0 right-0 flex flex-col items-center gap-3">
+        {total > 1 && (
+          <div className="flex gap-1" aria-hidden="true">
+            {images.map((_: any, i: number) => (
+              <div key={i} style={{
+                height: '2px', borderRadius: '1px', backgroundColor: '#F0EDE8',
+                width: i === active ? '18px' : '4px',
+                opacity: i === active ? 0.65 : 0.25,
+                transition: 'width 0.3s ease, opacity 0.3s ease',
+              }} />
+            ))}
+          </div>
+        )}
+        {/* Shop cue — tap to go to details */}
+        <button onClick={onShop ?? undefined}
+          className="flex items-center gap-1.5 opacity-45"
           aria-label="View purchase details">
-          <span className="text-[10px] font-light tracking-[0.18em] uppercase">Shop</span>
-          <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-            <path d="M4.5 1.5v5M2 4.5l2.5 2.5L7 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Shop</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M5 1.5v6M2.5 5.5l2.5 2.5L7.5 5.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </button>
       </div>
