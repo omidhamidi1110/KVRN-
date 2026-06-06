@@ -241,10 +241,10 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
         )}
       </div>
 
-      {/* MOBILE: full-screen swipeable hero — image fills 100svh, info overlaid at bottom */}
+      {/* MOBILE: swipeable image strip — ONLY the image changes, info is separate */}
       <div
-        className="lg:hidden absolute inset-0 bg-[#EDEAE4] overflow-hidden"
-        style={{ touchAction: 'pan-y' }}
+        className="lg:hidden relative flex-shrink-0 w-full bg-[#EDEAE4] overflow-hidden"
+        style={{ height: '58svh', touchAction: 'pan-y' }}
         onTouchStart={e => {
           txX.current = e.touches[0].clientX
           txY.current = e.touches[0].clientY
@@ -298,8 +298,9 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
         {total > 1 && (
           <div
             className="absolute top-3.5 right-4 text-[11px] font-light tabular-nums"
-            style={{ letterSpacing: '0.1em', color: 'rgba(240,237,232,0.7)',
-                     padding: '2px 8px' }}
+            style={{ letterSpacing: '0.1em', color: 'rgba(26,26,26,0.55)',
+                     backgroundColor: 'rgba(249,248,246,0.75)',
+                     backdropFilter: 'blur(6px)', padding: '2px 8px' }}
             aria-live="polite"
           >
             {String(mIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
@@ -311,9 +312,9 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1" aria-hidden="true">
             {mobileImages.map((_: any, i: number) => (
               <div key={i} style={{
-                height: '2px', borderRadius: '1px', backgroundColor: '#F0EDE8',
+                height: '2px', borderRadius: '1px', backgroundColor: '#1A1A1A',
                 width: i === mIdx ? '18px' : '4px',
-                opacity: i === mIdx ? 0.65 : 0.28,
+                opacity: i === mIdx ? 0.5 : 0.18,
                 transition: 'width 0.3s ease, opacity 0.3s ease',
               }} />
             ))}
@@ -321,29 +322,13 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
         )}
       </div>
 
-      {/* ══ MOBILE: gradient overlay + info at bottom of full-screen hero ══ */}
-      {/* This is absolute-positioned, only visible on mobile */}
-      <div className="lg:hidden absolute inset-x-0 bottom-0 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 40%, transparent 100%)' }}
-        aria-hidden="true"
-        // Height covers bottom 65% of screen for gradient
-      />
-      <div className="lg:hidden absolute inset-x-0 bottom-0 z-20 px-6 pb-8 pt-16"
-        // pointer-events-auto so buttons work
-        style={{ pointerEvents: 'auto' }}>
-        <MobileHeroInfo
-          product={product}
-          color={color} setColor={setColor}
-          size={size} setSize={setSize}
-          sizeErr={sizeErr} setSizeErr={setSizeErr}
-          cta={cta} ctaLabel={ctaLabel} soldOut={soldOut}
-          onAdd={onAdd}
-        />
-      </div>
+      {/* ══ INFO PANEL — always static, never moves with image swipe ════ */}
+      <div className="flex-1 flex flex-col overflow-y-auto bg-[#F9F8F6]">
+        {/* Desktop nav clearance */}
+        <div className="hidden lg:block flex-shrink-0" style={{ height: NAV + 24 }} />
 
-      {/* ══ DESKTOP INFO PANEL — right column, hidden on mobile ══ */}
-      <div className="hidden lg:flex flex-1 flex-col overflow-y-auto bg-[#F9F8F6]">
-        <div className="flex-shrink-0" style={{ height: NAV + 24 }} />
+        {/* Mobile: small nav clearance at top of info panel */}
+        <div className="lg:hidden flex-shrink-0" style={{ height: 12 }} />
 
         <div className="flex-1 flex flex-col justify-between px-6 py-4 lg:px-14 lg:py-0 lg:pb-12">
 
@@ -430,84 +415,6 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
   )
 }
 
-// ─── Mobile hero info overlay ─────────────────────────────────────────────────
-function MobileHeroInfo({ product, color, setColor, size, setSize,
-  sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
-  return (
-    <div className="space-y-3">
-      {/* Eyebrow */}
-      <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#F0EDE8]/55">
-        {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
-      </p>
-      {/* Title + price */}
-      <div>
-        <h1 className="font-display font-light text-[24px] leading-[0.92] tracking-[-0.025em] text-white mb-1.5">
-          {product.name}
-        </h1>
-        <p className="text-[18px] font-light tabular-nums text-white/85">$80</p>
-      </div>
-      {/* Specs — 2 lines max on mobile */}
-      <div className="space-y-0.5">
-        {(product.constructionDetails ?? []).slice(0, 2).map((l: string, i: number) => (
-          <p key={i} className="text-[12px] font-light text-[#F0EDE8]/55 leading-snug">{l}</p>
-        ))}
-      </div>
-      {/* Color swatches */}
-      {product.colors.length > 1 && (
-        <div className="flex items-center gap-2">
-          {product.colors.map((c: any) => (
-            <button key={c.value} title={c.name} aria-label={c.name}
-              aria-pressed={c.value === color.value}
-              onClick={() => setColor(c)}
-              className={c.value === color.value
-                ? 'w-5 h-5 rounded-full ring-2 ring-white ring-offset-1 ring-offset-transparent'
-                : 'w-5 h-5 rounded-full opacity-60 hover:opacity-90 transition-opacity'}
-              style={{ backgroundColor: c.hex }} />
-          ))}
-          <span className="text-[11px] text-white/50">{color.name}</span>
-        </div>
-      )}
-      {/* Size */}
-      <div>
-        <p className={`text-[10px] font-light tracking-[0.1em] uppercase mb-1.5 ${sizeErr ? 'text-[#FF8080]' : 'text-[#F0EDE8]/45'}`}>
-          {sizeErr ? 'Select a size' : 'Size'}
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {product.sizes.map((s: any) => (
-            <button key={s.value} disabled={!s.inStock}
-              onClick={() => { setSize(s.label); setSizeErr(false) }}
-              className={
-                !s.inStock
-                  ? 'h-9 w-10 text-[11px] font-light border border-white/10 text-white/20 cursor-not-allowed'
-                  : size === s.label
-                  ? 'h-9 w-10 text-[11px] font-light bg-white text-[#0E0E0E]'
-                  : 'h-9 w-10 text-[11px] font-light border border-white/35 text-white hover:border-white transition-colors'
-              }>
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* CTA */}
-      <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
-        className={
-          soldOut ? 'w-full h-11 text-[11px] font-light tracking-[0.14em] uppercase bg-white/10 text-white/30 cursor-not-allowed'
-          : cta === 'done' ? 'w-full h-11 text-[11px] font-light tracking-[0.14em] uppercase bg-[#15803D] text-white'
-          : 'w-full h-11 text-[11px] font-light tracking-[0.14em] uppercase bg-white text-[#0E0E0E] hover:bg-[#F0EDE8] transition-colors'
-        }>
-        {ctaLabel}
-      </button>
-      {/* Scroll cue */}
-      <div className="flex items-center gap-1.5 opacity-30" aria-hidden="true">
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-          <path d="M5.5 2v5M3 5.5l2.5 2.5L8 5.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-        </svg>
-        <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Explore</span>
-      </div>
-    </div>
-  )
-}
-
 // ════════════════════════════════════════════════════════════════════════════
 //  STAGE 2 — GALLERY
 //  Desktop: horizontal scroll (trackpad/wheel), full-bleed images, 01/05 counter
@@ -527,10 +434,9 @@ function GalleryStage({ images, productName, onShop }: {
         <DesktopGallery images={images} productName={productName} />
       </div>
       <div className="lg:hidden flex-1 min-h-0">
-        <MobileGallery images={images} productName={productName} onShop={onShop} />
+        <MobileGallery images={images} productName={productName} />
       </div>
-      {/* Desktop bottom bar — hidden on mobile so gallery fills full viewport */}
-      <div className="hidden lg:block flex-shrink-0 border-t border-[#E8E5E0] bg-[#F9F8F6]">
+      <div className="flex-shrink-0 border-t border-[#E8E5E0] bg-[#F9F8F6]">
         <div className="container-kvrn py-3.5 flex items-center justify-between">
           <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B]">
             {productName}
@@ -638,7 +544,7 @@ function DesktopGallery({ images, productName }: any) {
 }
 
 // ─── Mobile gallery: full-screen swipe ────────────────────────────────────────
-function MobileGallery({ images, productName, onShop }: any) {
+function MobileGallery({ images, productName }: any) {
   const [active, setActive] = useState(0)
   const [offset, setOffset] = useState(0)
   const txX = useRef<number|null>(null)
@@ -703,30 +609,19 @@ function MobileGallery({ images, productName, onShop }: any) {
         {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       </div>
 
-      {/* Dash indicators + shop cue at bottom */}
-      <div className="absolute bottom-5 left-0 right-0 flex flex-col items-center gap-3">
-        {total > 1 && (
-          <div className="flex gap-1" aria-hidden="true">
-            {images.map((_: any, i: number) => (
-              <div key={i} style={{
-                height: '2px', borderRadius: '1px', backgroundColor: '#F0EDE8',
-                width: i === active ? '18px' : '4px',
-                opacity: i === active ? 0.65 : 0.25,
-                transition: 'width 0.3s ease, opacity 0.3s ease',
-              }} />
-            ))}
-          </div>
-        )}
-        {/* Shop cue — tap to go to details */}
-        <button onClick={onShop ?? undefined}
-          className="flex items-center gap-1.5 opacity-45"
-          aria-label="View purchase details">
-          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Shop</span>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M5 1.5v6M2.5 5.5l2.5 2.5L7.5 5.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
+      {/* Dash indicators */}
+      {total > 1 && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1" aria-hidden="true">
+          {images.map((_: any, i: number) => (
+            <div key={i} style={{
+              height: '2px', borderRadius: '1px', backgroundColor: '#1A1A1A',
+              width: i === active ? '18px' : '4px',
+              opacity: i === active ? 0.5 : 0.17,
+              transition: 'width 0.3s ease, opacity 0.3s ease',
+            }} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
