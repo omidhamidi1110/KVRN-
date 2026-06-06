@@ -190,8 +190,25 @@ function SnapIndicator({ stage }: { stage: 0|1 }) {
 // ════════════════════════════════════════════════════════════════════════════
 function HeroStage({ product, heroImage, mobileImages, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
-  // Stage 1: single hero image only — no swipe, no carousel
-  // All images shown in Stage 2 (GalleryStage)
+
+  // Mobile-only swiper state (desktop shows single heroImage)
+  const [mIdx,    setMIdx]   = useState(0)
+  const [mOffset, setMOffset] = useState(0)
+  const txX = useRef<number|null>(null)
+  const txY = useRef<number|null>(null)
+  const hz  = useRef<boolean|null>(null)
+  const total = mobileImages?.length ?? 1
+
+  const goMobile = useCallback((d: 1|-1) => {
+    setMIdx(i => Math.max(0, Math.min(total - 1, i + d)))
+    setMOffset(0)
+  }, [total])
+
+  const curMobileImg = mobileImages?.[mIdx] ?? heroImage
+
+  // Preload adjacent mobile images
+  const preloadSrc = mobileImages?.[mIdx + 1]?.src
+
   return (
     <section
       aria-label={product.name}
@@ -224,43 +241,95 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
         )}
       </div>
 
-      {/* MOBILE: static single first image — NO swipe. Stage 2 has the gallery. */}
-      <div className="lg:hidden absolute inset-0 bg-[#0E0E0E] overflow-hidden">
-        {heroImage?.src ? (
+      {/* MOBILE: full-screen swipeable hero — image fills 100svh, info overlaid at bottom */}
+      <div
+        className="lg:hidden absolute inset-0 bg-[#EDEAE4] overflow-hidden"
+        style={{ touchAction: 'pan-y' }}
+        onTouchStart={e => {
+          txX.current = e.touches[0].clientX
+          txY.current = e.touches[0].clientY
+          hz.current  = null
+        }}
+        onTouchMove={e => {
+          if (!txX.current || !txY.current) return
+          const dx = e.touches[0].clientX - txX.current
+          const dy = e.touches[0].clientY - txY.current
+          if (hz.current === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5))
+            hz.current = Math.abs(dx) > Math.abs(dy)
+          if (hz.current) { e.preventDefault(); setMOffset(dx * 0.38) }
+        }}
+        onTouchEnd={() => {
+          if (hz.current) {
+            if (mOffset < -48) goMobile(1)
+            else if (mOffset > 48) goMobile(-1)
+          }
+          txX.current = txY.current = null; hz.current = null; setMOffset(0)
+        }}
+      >
+        {/* Current mobile image */}
+        {curMobileImg?.src ? (
           <Image
-            src={heroImage.src}
-            alt={heroImage.alt || product.name}
-            fill priority fetchPriority="high"
+            key={`m-${mIdx}-${curMobileImg.src}`}
+            src={curMobileImg.src}
+            alt={curMobileImg.alt || product.name}
+            fill priority={mIdx === 0} fetchPriority={mIdx === 0 ? 'high' : 'auto'}
             sizes="100vw"
             className="object-cover object-[center_15%] pointer-events-none"
             quality={92}
             onError={() => {}}
+            style={{
+              transform: `translateX(${mOffset}px)`,
+              transition: Math.abs(mOffset) < 3
+                ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+            }}
           />
         ) : (
-          <div className="absolute inset-0 bg-[#1A1A1A]" />
+          <div className="absolute inset-0 bg-[#DDD9D2]" />
         )}
-        {/* Preload first gallery images for smooth Stage 2 transition */}
-        {mobileImages?.[0]?.src && (
-          <Image src={mobileImages[0].src} alt="" fill sizes="100vw"
-            className="opacity-0 absolute pointer-events-none" loading="eager" onError={() => {}} />
+
+        {/* Preload next image eagerly to avoid flash */}
+        {preloadSrc && (
+          <Image key={`pre-${mIdx + 1}`} src={preloadSrc} alt="" fill
+            sizes="100vw" className="opacity-0 absolute pointer-events-none"
+            loading="eager" onError={() => {}} />
         )}
-        {mobileImages?.[1]?.src && (
-          <Image src={mobileImages[1].src} alt="" fill sizes="100vw"
-            className="opacity-0 absolute pointer-events-none" loading="eager" onError={() => {}} />
+
+        {/* Mobile counter: 01 / 05 */}
+        {total > 1 && (
+          <div
+            className="absolute top-3.5 right-4 text-[11px] font-light tabular-nums"
+            style={{ letterSpacing: '0.1em', color: 'rgba(240,237,232,0.7)',
+                     padding: '2px 8px' }}
+            aria-live="polite"
+          >
+            {String(mIdx + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+          </div>
+        )}
+
+        {/* Mobile dash indicators */}
+        {total > 1 && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1" aria-hidden="true">
+            {mobileImages.map((_: any, i: number) => (
+              <div key={i} style={{
+                height: '2px', borderRadius: '1px', backgroundColor: '#F0EDE8',
+                width: i === mIdx ? '18px' : '4px',
+                opacity: i === mIdx ? 0.65 : 0.28,
+                transition: 'width 0.3s ease, opacity 0.3s ease',
+              }} />
+            ))}
+          </div>
         )}
       </div>
 
       {/* ══ MOBILE: gradient overlay + info at bottom of full-screen hero ══ */}
       {/* This is absolute-positioned, only visible on mobile */}
-      {/* Gradient: covers the whole lower section where text lives */}
       <div className="lg:hidden absolute inset-x-0 bottom-0 z-10 pointer-events-none"
-        style={{
-          height: '75%',
-          background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.72) 30%, rgba(0,0,0,0.35) 60%, transparent 100%)',
-        }}
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 40%, transparent 100%)' }}
         aria-hidden="true"
+        // Height covers bottom 65% of screen for gradient
       />
-      <div className="lg:hidden absolute inset-x-0 bottom-0 z-20 px-6 pb-7"
+      <div className="lg:hidden absolute inset-x-0 bottom-0 z-20 px-6 pb-8 pt-16"
+        // pointer-events-auto so buttons work
         style={{ pointerEvents: 'auto' }}>
         <MobileHeroInfo
           product={product}
@@ -364,28 +433,23 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
 // ─── Mobile hero info overlay ─────────────────────────────────────────────────
 function MobileHeroInfo({ product, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
-  const shadow = '0 1px 8px rgba(0,0,0,0.5)'
   return (
     <div className="space-y-3">
       {/* Eyebrow */}
-      <p className="text-[10px] font-light tracking-[0.2em] uppercase text-white/60"
-        style={{ textShadow: shadow }}>
+      <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#F0EDE8]/55">
         {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
       </p>
       {/* Title + price */}
       <div>
-        <h1 className="font-display font-light text-[24px] leading-[0.92] tracking-[-0.025em] text-white mb-1.5"
-          style={{ textShadow: shadow }}>
+        <h1 className="font-display font-light text-[24px] leading-[0.92] tracking-[-0.025em] text-white mb-1.5">
           {product.name}
         </h1>
-        <p className="text-[18px] font-light tabular-nums text-white"
-          style={{ textShadow: shadow }}>$80</p>
+        <p className="text-[18px] font-light tabular-nums text-white/85">$80</p>
       </div>
       {/* Specs — 2 lines max on mobile */}
       <div className="space-y-0.5">
         {(product.constructionDetails ?? []).slice(0, 2).map((l: string, i: number) => (
-          <p key={i} className="text-[12px] font-light text-white/70 leading-snug"
-            style={{ textShadow: shadow }}>{l}</p>
+          <p key={i} className="text-[12px] font-light text-[#F0EDE8]/55 leading-snug">{l}</p>
         ))}
       </div>
       {/* Color swatches */}
@@ -405,8 +469,7 @@ function MobileHeroInfo({ product, color, setColor, size, setSize,
       )}
       {/* Size */}
       <div>
-        <p className={`text-[10px] font-light tracking-[0.1em] uppercase mb-1.5 ${sizeErr ? 'text-[#FF8080]' : 'text-white/60'}`}
-          style={{ textShadow: shadow }}>
+        <p className={`text-[10px] font-light tracking-[0.1em] uppercase mb-1.5 ${sizeErr ? 'text-[#FF8080]' : 'text-[#F0EDE8]/45'}`}>
           {sizeErr ? 'Select a size' : 'Size'}
         </p>
         <div className="flex flex-wrap gap-1.5">
