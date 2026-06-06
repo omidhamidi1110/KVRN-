@@ -634,19 +634,13 @@ function MobileGallery({ images, productName, onShop }: any) {
         if (hz.current) { e.preventDefault(); setDrag(dx) }
       }}
       onTouchEnd={() => {
-        if (hz.current) {
-          // Clamp: always move exactly ±1 (or 0 if below threshold)
-          // Threshold: 40px or ~10% of screen = intentional swipe
-          if (drag < -40 && active < total - 1) {
-            setActive(a => a + 1)          // one forward only
-          } else if (drag > 40 && active > 0) {
-            setActive(a => a - 1)          // one back only
-          }
-          // else: below threshold → spring back to current (drag resets to 0)
+        if (hz.current && drag !== 0) {
+          if (drag < -50 && active < total - 1)      setActive(a => a + 1)
+          else if (drag > 50 && active > 0)           setActive(a => a - 1)
         }
         txX.current = txY.current = null
         hz.current = null
-        setDrag(0)                         // always reset drag — track springs back or forward
+        setDrag(0)
       }}>
 
       {/* TRACK — flex row of slides, all mounted, moved by translate3d */}
@@ -683,19 +677,20 @@ function MobileGallery({ images, productName, onShop }: any) {
         ))}
       </div>
 
-      {/* Bottom overlay: counter + progress + shop — all floated together */}
+      {/* Counter — top-center, floats over image */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center pointer-events-none"
+        aria-live="polite">
+        <span className="text-[12px] font-light tabular-nums text-white/80"
+          style={{ letterSpacing: '0.14em', textShadow: '0 1px 5px rgba(0,0,0,0.5)' }}>
+          {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        </span>
+      </div>
+
+      {/* Progress bar + Shop — bottom overlay, no container box */}
       <div className="absolute inset-x-0 bottom-0 pb-8 flex flex-col items-center gap-2.5 pointer-events-none"
-        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.42) 0%, transparent 70%)' }}>
-        {/* Counter — bottom center, above progress */}
-        <div aria-live="polite" className="pointer-events-none">
-          <span className="text-[11px] font-light tabular-nums text-white/75"
-            style={{ letterSpacing: '0.14em', textShadow: '0 1px 5px rgba(0,0,0,0.5)' }}>
-            {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-          </span>
-        </div>
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.38) 0%, transparent 75%)' }}>
         {/* Progress bar */}
-        <div style={{ width: 80, height: 1, background: 'rgba(255,255,255,0.22)',
-                      position: 'relative', overflow: 'hidden' }}>
+        <div style={{ width: 80, height: 1, background: 'rgba(255,255,255,0.22)', position: 'relative', overflow: 'hidden' }}>
           <div style={{
             position: 'absolute', inset: '0 auto 0 0',
             background: 'rgba(255,255,255,0.8)',

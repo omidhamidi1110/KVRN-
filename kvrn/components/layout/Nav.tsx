@@ -24,7 +24,7 @@ export function Nav() {
   const [onHero,     setOnHero]     = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
   // Section-aware nav color (homepage only)
-  const [navTheme,   setNavTheme]   = useState<'dark' | 'light'>('dark')
+  const [navTheme,   setNavTheme]   = useState<'dark' | 'light'>('light')  // PDP uses light default; homepage overrides
   const drawerRef = useRef<HTMLDivElement>(null)
 
   const isHome = pathname === '/'
@@ -44,7 +44,9 @@ export function Nav() {
   // Homepage + PDP: listen for kvrn-slide-change events
   useEffect(() => {
     if (!isHome && !isPDP) return
-    setNavTheme('dark')  // default to dark for both (both have dark opening stages)
+    // Homepage default: dark (first slide is dark hero)
+    // PDP default: light (Stage 1 hero has light/cream bg → black text nav)
+    setNavTheme(isHome ? 'dark' : 'light')
 
     const onSlideChange = (e: Event) => {
       const detail = (e as CustomEvent<{ dark: boolean }>).detail
