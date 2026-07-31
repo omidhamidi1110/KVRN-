@@ -899,86 +899,186 @@ function MobileGallery({ images, productName, onShop }: any) {
 // ════════════════════════════════════════════════════════════════════════════
 //  STAGE 3 — DETAILS (normal scroll)
 // ════════════════════════════════════════════════════════════════════════════
-// ─── Stage 3 portrait swipeable carousel ────────────────────────────────────
-function Stage3Carousel({ images, productName }: { images: any[]; productName: string }) {
+// ─── Stage 3 Gallery + Purchase (desktop 3-col / mobile stacked) ────────────
+
+/* ── Wheel-event locking for Stage3Gallery ─────────────────────────────── */
+// Shared outside component so it persists across renders without state
+let _s3WheelLocked = false
+let _s3WheelTimer: ReturnType<typeof setTimeout> | null = null
+
+function Stage3Gallery({
+  images, productName,
+}: { images: any[]; productName: string }) {
   const [active, setActive] = useState(0)
-  const [drag,   setDrag]   = useState(0)
   const total = images.length
 
+  // Reset on images change (color switch)
+  useEffect(() => { setActive(0) }, [images])
+
+  // Touch refs — no state updates during gesture
   const txStart = useRef<number | null>(null)
   const txCur   = useRef<number | null>(null)
 
-  // Reset to first image when images array changes (color switch)
-  useEffect(() => { setActive(0); setDrag(0) }, [images])
+  // Wheel handler — one event = one image
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    const dx = e.deltaX, dy = e.deltaY
+    if (Math.abs(dx) < Math.abs(dy) * 0.5) return // mostly vertical — ignore
+    e.preventDefault()
+    if (_s3WheelLocked) return
+    const dir = (dx + dy) > 0 ? 1 : -1
+    setActive(i => Math.max(0, Math.min(total - 1, i + dir)))
+    _s3WheelLocked = true
+    if (_s3WheelTimer) clearTimeout(_s3WheelTimer)
+    _s3WheelTimer = setTimeout(() => { _s3WheelLocked = false }, 420)
+  }, [total])
 
   const go = (dir: 1 | -1) =>
     setActive(i => Math.max(0, Math.min(total - 1, i + dir)))
 
-  return (
-    <div className="mb-8" style={{ userSelect: 'none' }}>
-      {/* Portrait image container */}
-      <div
-        className="w-full overflow-hidden bg-[#EDEAE4] relative"
-        style={{ aspectRatio: '3/4', touchAction: 'pan-y' }}
-        onTouchStart={e => {
-          txStart.current = e.touches[0].clientX
-          txCur.current   = e.touches[0].clientX
-        }}
-        onTouchMove={e => {
-          txCur.current = e.touches[0].clientX
-        }}
-        onTouchEnd={() => {
-          const start = txStart.current; const cur = txCur.current
-          txStart.current = null; txCur.current = null
-          if (start === null || cur === null) return
-          const dx = cur - start
-          if (Math.abs(dx) > 36) go(dx < 0 ? 1 : -1)
-        }}
-      >
-        {/* Slide track */}
-        <div style={{
-          display: 'flex', height: '100%',
-          transform: `translateX(calc(${-active * 100}% + ${drag}px))`,
-          transition: drag === 0 ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
-          willChange: 'transform',
-        }}>
-          {images.map((img: any, i: number) => (
-            <div key={i} style={{ minWidth: '100%', height: '100%', flexShrink: 0, position: 'relative' }}>
-              {img?.src ? (
-                <img src={img.src} alt={i === active ? (img.alt || productName) : ''}
-                  loading={i < 2 ? 'eager' : 'lazy'}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-                           objectFit: 'cover', objectPosition: 'center 30%', pointerEvents: 'none' }}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              ) : <div style={{ position: 'absolute', inset: 0, background: '#DDD9D2' }} />}
-            </div>
-          ))}
-        </div>
+  const cur = images[active]
 
-        {/* Left / right buttons — desktop only */}
-        {active > 0 && (
-          <button onClick={() => go(-1)} aria-label="Previous"
-            className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 items-center justify-center bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
-            style={{ borderRadius: 0 }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 1L3 5l4 4" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/></svg>
+  return (
+    <div className="flex gap-4 lg:gap-5" style={{ alignItems: 'flex-start' }}>
+
+      {/* ── Thumbnail rail — desktop only ── */}
+      <div
+        className="hidden lg:flex flex-col gap-2 flex-shrink-0"
+        style={{ width: 82, maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}
+      >
+        {images.map((img: any, i: number) => (
+          <button
+            key={i}
+            onClick={() => setActive(i)}
+            aria-label={`View image ${i + 1}`}
+            aria-pressed={i === active}
+            style={{
+              width: '100%',
+              aspectRatio: '3/4',
+              position: 'relative',
+              overflow: 'hidden',
+              flexShrink: 0,
+              background: '#EDEAE4',
+              border: 'none',
+              padding: 0,
+              outline: i === active ? '1.5px solid #111' : '1.5px solid transparent',
+              outlineOffset: 2,
+              cursor: 'pointer',
+              transition: 'outline-color 150ms ease',
+            }}
+          >
+            {img?.src ? (
+              <img
+                src={img.src}
+                alt=""
+                loading="lazy"
+                style={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                  objectFit: 'cover', objectPosition: 'center 30%',
+                  pointerEvents: 'none',
+                }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            ) : (
+              <div style={{ position: 'absolute', inset: 0, background: '#DDD9D2' }} />
+            )}
           </button>
-        )}
-        {active < total - 1 && (
-          <button onClick={() => go(1)} aria-label="Next"
-            className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 items-center justify-center bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
-            style={{ borderRadius: 0 }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/></svg>
-          </button>
+        ))}
+        {/* Down chevron if many thumbnails */}
+        {total > 5 && (
+          <div className="flex justify-center pt-1 opacity-30">
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
+              <path d="M1 1l5 5 5-5" stroke="#1A1A1A" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </div>
         )}
       </div>
 
-      {/* Counter below image */}
-      {total > 1 && (
-        <p className="text-center text-[11px] font-light tabular-nums text-[#9B9B9B] mt-2.5"
-          style={{ letterSpacing: '0.1em' }}>
+      {/* ── Main image + counter ── */}
+      <div className="flex-1 min-w-0">
+        <div
+          style={{ position: 'relative', width: '100%', aspectRatio: '3/4',
+                   overflow: 'hidden', background: '#EDEAE4',
+                   maxHeight: 'calc(100vh - 190px)' }}
+          onWheel={onWheel}
+          onTouchStart={e => {
+            txStart.current = e.touches[0].clientX
+            txCur.current   = e.touches[0].clientX
+          }}
+          onTouchMove={e => { txCur.current = e.touches[0].clientX }}
+          onTouchEnd={() => {
+            const s = txStart.current, c2 = txCur.current
+            txStart.current = null; txCur.current = null
+            if (s === null || c2 === null || Math.abs(c2 - s) < 36) return
+            go((c2 - s) < 0 ? 1 : -1)
+          }}
+        >
+          {/* Image — stable key to avoid remount flash */}
+          {images.map((img: any, i: number) => (
+            img?.src ? (
+              <img
+                key={img.src}
+                src={img.src}
+                alt={i === active ? (img.alt || productName) : ''}
+                loading={i < 2 ? 'eager' : 'lazy'}
+                style={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                  objectFit: 'cover', objectPosition: 'center 30%',
+                  pointerEvents: 'none',
+                  opacity: i === active ? 1 : 0,
+                  transition: 'opacity 220ms ease',
+                }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            ) : null
+          ))}
+
+          {/* Desktop prev/next chevrons */}
+          {active > 0 && (
+            <button
+              type="button" aria-label="Previous image"
+              onClick={() => go(-1)}
+              className="hidden lg:flex"
+              style={{
+                position: 'absolute', top: 0, bottom: 0, left: 0, width: '22%',
+                alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 20,
+                background: 'transparent', border: 0, cursor: 'pointer', zIndex: 2,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
+                style={{ opacity: 0.6, transition: 'opacity 180ms ease' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}>
+                <path d="M14 3L7 11l7 8" stroke="#111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+          {active < total - 1 && (
+            <button
+              type="button" aria-label="Next image"
+              onClick={() => go(1)}
+              className="hidden lg:flex"
+              style={{
+                position: 'absolute', top: 0, bottom: 0, right: 0, width: '22%',
+                alignItems: 'center', justifyContent: 'flex-end', paddingRight: 20,
+                background: 'transparent', border: 0, cursor: 'pointer', zIndex: 2,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
+                style={{ opacity: 0.6, transition: 'opacity 180ms ease' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}>
+                <path d="M8 3l7 8-7 8" stroke="#111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Counter */}
+        <p style={{ textAlign: 'center', marginTop: 10, fontSize: 11, fontWeight: 300,
+                    letterSpacing: '0.1em', color: '#9B9B9B' }}>
           {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
         </p>
-      )}
+      </div>
     </div>
   )
 }
@@ -986,161 +1086,281 @@ function Stage3Carousel({ images, productName }: { images: any[]; productName: s
 function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t }: any) {
   return (
-    <div className="bg-[#F9F8F6] min-h-screen">
+    <div className="bg-[#F9F8F6]">
 
-      <div className="max-w-[520px] mx-auto px-6 lg:px-0 pt-14 md:pt-20 pb-0">
+      {/* ════════ MAIN STAGE 3 SECTION ════════ */}
+      <div style={{
+        maxWidth: 1380, margin: '0 auto',
+        padding: '80px 32px 80px',
+      }}>
+        {/* Desktop: thumbnail | gallery | purchase. Mobile: stacked */}
+        <div className="flex flex-col lg:flex-row lg:gap-10 xl:gap-14" style={{ alignItems: 'start' }}>
 
-        <div className="mb-6">
-          <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-2">
-            {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
-          </p>
-          <h2 className="font-display font-light text-[24px] md:text-[28px] leading-tight tracking-[-0.02em] mb-2.5">
-            {product.name}
-          </h2>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[19px] font-light tabular-nums">$80</span>
-            {product.founderNote && (
-              <span className="text-[11px] text-[#9B9B9B]">{product.founderNote}</span>
-            )}
+          {/* ── Gallery column (thumbs + main image) ── */}
+          <div className="flex-1 min-w-0 mb-10 lg:mb-0">
+            <Stage3Gallery images={color.images} productName={product.name} />
           </div>
-        </div>
 
-        {/* Stage 3 portrait carousel */}
-        <Stage3Carousel images={color.images} productName={product.name} />
+          {/* ── Purchase panel ── */}
+          <div style={{ flexBasis: 420, flexShrink: 0, maxWidth: '100%' }}
+            className="lg:sticky lg:top-[100px]">
 
-        {product.colors.length > 1 && (
-          <div className="mb-6">
-            <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2.5">
-              Color — {color.name}
-            </p>
-            <div className="flex gap-2.5 flex-wrap">
-              {product.colors.map((c: ColorOption) => (
-                <button key={c.value} title={c.name} aria-label={c.name}
-                  aria-pressed={c.value === color.value} onClick={() => setColor(c)}
-                  className={cn('w-7 h-7 rounded-full transition-all',
-                    c.value === color.value
-                      ? 'ring-2 ring-[#1A1A1A] ring-offset-2 ring-offset-[#F9F8F6]'
-                      : 'hover:ring-1 hover:ring-[#C8C4BF] hover:ring-offset-1')}
-                  style={{ backgroundColor: c.hex }} />
-              ))}
+            {/* Product title + price */}
+            <div className="mb-6">
+              <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-2">
+                {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
+              </p>
+              <h2 className="font-display font-light text-[28px] md:text-[36px] leading-tight tracking-[-0.02em] mb-3">
+                {product.name}
+              </h2>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-[22px] font-light tabular-nums">$80</span>
+              </div>
+              {product.founderNote && (
+                <p className="text-[12px] text-[#9B9B9B]">{product.founderNote}</p>
+              )}
+            </div>
+
+            <div className="border-t border-[#E8E5E0] pt-6 mb-6" />
+
+            {/* Color */}
+            {product.colors.length > 1 && (
+              <div className="mb-6">
+                <p className="text-[11px] font-light tracking-[0.08em] uppercase text-[#9B9B9B] mb-3">
+                  Color — <span className="text-[#1A1A1A]">{color.name}</span>
+                </p>
+                <div className="flex gap-2.5 flex-wrap">
+                  {product.colors.map((c: ColorOption) => (
+                    <button key={c.value} title={c.name} aria-label={c.name}
+                      aria-pressed={c.value === color.value} onClick={() => setColor(c)}
+                      className={cn('w-7 h-7 rounded-full transition-all',
+                        c.value === color.value
+                          ? 'ring-2 ring-[#1A1A1A] ring-offset-2 ring-offset-[#F9F8F6]'
+                          : 'hover:ring-1 hover:ring-[#C8C4BF] hover:ring-offset-1')}
+                      style={{ backgroundColor: c.hex }} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Size */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <p className={cn('text-[11px] font-light tracking-[0.08em] uppercase',
+                  sizeErr ? 'text-[#B91C1C]' : 'text-[#9B9B9B]')}>
+                  {sizeErr ? 'Select a size' : 'Size'}
+                </p>
+                <Link href="/support/size-guide"
+                  className="text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors underline underline-offset-2">
+                  Size guide
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {product.sizes.map((s: SizeOption) => (
+                  <button key={s.value} disabled={!s.inStock}
+                    onClick={() => { setSize(s.label); setSizeErr(false) }}
+                    className={cn(
+                      'h-10 min-w-[44px] px-2 text-[12px] font-light border transition-all',
+                      !s.inStock ? 'border-[#E8E5E0] text-[#C8C4BF] cursor-not-allowed'
+                      : size === s.label ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                      : 'border-[#D5D1CB] text-[#1A1A1A] hover:border-[#1A1A1A]')}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              {product.fitNote && (
+                <p className="text-[11px] text-[#9B9B9B] mt-2 leading-relaxed">{product.fitNote}</p>
+              )}
+            </div>
+
+            {/* Add to Bag */}
+            <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
+              className={cn(
+                'w-full text-[11px] font-light tracking-[0.14em] uppercase transition-all mb-8',
+                soldOut         ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
+                : cta === 'done' ? 'bg-[#15803D] text-white'
+                :                  'bg-[#1A1A1A] text-white hover:bg-[#333]'
+              )}
+              style={{ minHeight: 56 }}>
+              {ctaLabel}
+            </button>
+
+            {/* Accordions */}
+            {[
+              { label: 'Description', content: product.description },
+              { label: 'Details', content: (product.constructionDetails ?? []).join('\n') },
+            ].map(({ label, content }) => content ? (
+              <div key={label} className="border-t border-[#E8E5E0]">
+                <details className="group">
+                  <summary className="flex items-center justify-between py-4 cursor-pointer list-none text-[11px] font-light tracking-[0.1em] uppercase select-none">
+                    {label}
+                    <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
+                      className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
+                      <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                  </summary>
+                  <div className="pb-5 text-[13px] text-[#6B6B6B] leading-relaxed whitespace-pre-line">
+                    {content}
+                  </div>
+                </details>
+              </div>
+            ) : null)}
+
+            <div className="border-t border-[#E8E5E0]">
+              <details className="group">
+                <summary className="flex items-center justify-between py-4 cursor-pointer list-none text-[11px] font-light tracking-[0.1em] uppercase select-none">
+                  Shipping & Returns
+                  <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
+                    className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
+                    <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                </summary>
+                <div className="pb-5 space-y-1.5 text-[13px] text-[#6B6B6B] leading-relaxed">
+                  <p>Orders processed within 1–3 business days.</p>
+                  <p>US: 2–7 days. International: 5–14+ days.</p>
+                  <p>Returns within 14 days, unworn and in original condition.</p>
+                  <Link href="/support/shipping-returns"
+                    className="block text-[12px] text-[#1A1A1A] underline underline-offset-2 mt-2 hover:opacity-60 transition-opacity">
+                    Full policy →
+                  </Link>
+                </div>
+              </details>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        <div className="mb-7">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className={cn('text-[10px] font-light tracking-[0.1em] uppercase',
-              sizeErr ? 'text-[#B91C1C]' : 'text-[#9B9B9B]')}>
-              {sizeErr ? 'Select a size' : 'Size'}
+      {/* ════════ COMPLETE THE SET ════════ */}
+      {relatedProduct && (
+        <CompleteSet product={product} related={relatedProduct} onAddBoth={onAddBoth} />
+      )}
+    </div>
+  )
+}
+
+// ─── Complete the Set — premium beige bundle section ─────────────────────────
+function CompleteSet({ product, related, onAddBoth }: any) {
+  const [hoodieSize,  setHoodieSize]  = useState<string | null>(null)
+  const [pantsSize,   setPantsSize]   = useState<string | null>(null)
+
+  const img1 = product.colors[0]?.images.find((i: any) => i.type === 'front') ?? product.colors[0]?.images[0]
+  const img2  = related.colors[0]?.images.find((i: any) => i.type === 'front') ?? related.colors[0]?.images[0]
+
+  const isHoodie = (p: any) => p.name.toLowerCase().includes('hoodie')
+
+  return (
+    <section style={{ background: '#F3F0EA', padding: '80px 32px' }}>
+      <div style={{ maxWidth: 1380, margin: '0 auto' }}>
+
+        {/* ── Desktop 4-col / Mobile stacked ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(200px,0.85fr)_minmax(240px,1fr)_minmax(240px,1fr)_minmax(220px,0.9fr)] gap-8 lg:gap-10">
+
+          {/* 1. Intro copy */}
+          <div className="flex flex-col justify-center lg:pr-4">
+            <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-4">
+              Complete the Set
             </p>
-            <Link href="/support/size-guide"
-              className="text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors underline underline-offset-2">
-              Size guide
+            <h3 className="font-display font-light text-[28px] md:text-[32px] leading-tight tracking-[-0.02em] text-[#1A1A1A] mb-4">
+              Designed to be worn together.
+            </h3>
+            <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
+              Same fabric. Same weight.<br />
+              Built for comfort. Made to move as one.
+            </p>
+          </div>
+
+          {/* 2. Hoodie card */}
+          <BundleProductCard
+            product={product}
+            img={img1}
+            selectedSize={isHoodie(product) ? hoodieSize : pantsSize}
+            onSizeSelect={isHoodie(product) ? setHoodieSize : setPantsSize}
+          />
+
+          {/* 3. Sweatpants card */}
+          <BundleProductCard
+            product={related}
+            img={img2}
+            selectedSize={isHoodie(related) ? hoodieSize : pantsSize}
+            onSizeSelect={isHoodie(related) ? setHoodieSize : setPantsSize}
+          />
+
+          {/* 4. Bundle CTA */}
+          <div className="flex flex-col justify-center">
+            {/* Box icon */}
+            <div className="mb-5">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" className="opacity-50">
+                <rect x="4" y="11" width="28" height="22" rx="1" stroke="#1A1A1A" strokeWidth="1.3"/>
+                <path d="M4 16h28" stroke="#1A1A1A" strokeWidth="1.3"/>
+                <path d="M13 11V7a5 5 0 0 1 10 0v4" stroke="#1A1A1A" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M14 16v4h8v-4" stroke="#1A1A1A" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <p className="text-[14px] font-light text-[#1A1A1A] leading-snug mb-1">
+              Complete the set.
+            </p>
+            <p className="text-[14px] font-light text-[#6B6B6B] mb-6">
+              Save when you add both.
+            </p>
+            <div className="border-t border-[#D8D4CC] pt-5 mb-5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[12px] font-light tracking-[0.08em] uppercase text-[#9B9B9B]">Total</span>
+                <span className="text-[20px] font-light tabular-nums text-[#1A1A1A]">$160</span>
+              </div>
+            </div>
+            <button onClick={onAddBoth}
+              className="w-full text-[11px] font-light tracking-[0.12em] uppercase text-white bg-[#1A1A1A] hover:bg-[#333] transition-colors"
+              style={{ minHeight: 52 }}>
+              Add the Complete Set — $160
+            </button>
+            <Link href={`/products/${related.slug}`}
+              className="block text-center mt-4 text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors underline underline-offset-2">
+              View {related.name.includes('Hoodie') ? 'Hoodie' : 'Sweatpants'} separately
             </Link>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {product.sizes.map((s: SizeOption) => (
-              <button key={s.value} disabled={!s.inStock}
-                onClick={() => { setSize(s.label); setSizeErr(false) }}
-                className={cn('h-10 w-11 text-[12px] font-light border transition-all',
-                  !s.inStock ? 'border-[#E8E5E0] text-[#C8C4BF] cursor-not-allowed'
-                  : size === s.label ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                  : 'border-[#D5D1CB] text-[#1A1A1A] hover:border-[#1A1A1A]')}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-          {product.fitNote && (
-            <p className="text-[11px] text-[#9B9B9B] mt-2 leading-relaxed">{product.fitNote}</p>
-          )}
         </div>
+      </div>
+    </section>
+  )
+}
 
-        <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
-          className={cn('w-full h-12 mb-8 text-[11px] font-light tracking-[0.14em] uppercase transition-all',
-            soldOut         ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
-            : cta === 'done' ? 'bg-[#15803D] text-white'
-            :                  'bg-[#1A1A1A] text-white hover:bg-[#333]')}>
-          {ctaLabel}
-        </button>
-
-        <p className="text-[14px] text-[#6B6B6B] leading-relaxed">{product.description}</p>
-
-        <div className="border-t border-[#E8E5E0] mt-8 pt-8">
-          <p className="text-[10px] font-light tracking-[0.16em] uppercase mb-4">Construction</p>
-          <div className="space-y-0.5">
-            {(product.constructionDetails ?? []).map((l: string, i: number) => (
-              <p key={i} className="text-[14px] font-light text-[#6B6B6B]">{l}</p>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-[#E8E5E0] mt-8">
-          <details className="group">
-            <summary className="flex items-center justify-between py-5 cursor-pointer list-none text-[10px] font-light tracking-[0.16em] uppercase select-none">
-              Shipping & Returns
-              <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
-                className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
-                <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-            </summary>
-            <div className="pb-6 space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
-              <p>Orders processed within 1–3 business days.</p>
-              <p>US: 2–7 days. International: 5–14+ days.</p>
-              <p>Returns within 14 days, unworn and in original condition.</p>
-              <Link href="/support/shipping-returns"
-                className="block text-[12px] text-[#1A1A1A] underline underline-offset-2 mt-2 hover:opacity-60 transition-opacity">
-                Full policy →
-              </Link>
-            </div>
-          </details>
-        </div>
-
-        {relatedProduct && (
-          <CompleteSet product={product} related={relatedProduct} onAddBoth={onAddBoth} />
+function BundleProductCard({ product, img, selectedSize, onSizeSelect }: {
+  product: any; img: any; selectedSize: string | null; onSizeSelect: (s: string) => void
+}) {
+  return (
+    <div style={{ background: '#fff', padding: '0 0 20px' }}>
+      {/* Portrait image */}
+      <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4',
+                    overflow: 'hidden', background: '#EDEAE4', marginBottom: 16 }}>
+        {img?.src ? (
+          <img src={img.src} alt={product.name} loading="lazy"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                     objectFit: 'cover', objectPosition: 'center 30%' }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, background: '#DDD9D2' }} />
         )}
       </div>
+      <div style={{ padding: '0 16px' }}>
+        <p className="text-[13px] font-light text-[#1A1A1A] leading-snug mb-1">{product.name}</p>
+        <p className="text-[13px] font-light text-[#9B9B9B] tabular-nums mb-4">$80</p>
+        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">Size</p>
+        <div className="flex flex-wrap gap-1.5">
+          {product.sizes.filter((s: any) => s.inStock).map((s: any) => (
+            <button key={s.value} onClick={() => onSizeSelect(s.label)}
+              className={cn('h-8 min-w-[36px] px-1.5 text-[11px] font-light border transition-all',
+                selectedSize === s.label
+                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                  : 'border-[#D5D1CB] text-[#1A1A1A] hover:border-[#1A1A1A]')}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
 
-// ─── Complete the Set ─────────────────────────────────────────────────────────
-function CompleteSet({ product, related, onAddBoth }: any) {
-  const i1 = product.colors[0]?.images.find((i: any) => i.type === 'front') ?? product.colors[0]?.images[0]
-  const i2 = related.colors[0]?.images.find((i: any) => i.type === 'front') ?? related.colors[0]?.images[0]
-  return (
-    <div className="border-t border-[#E8E5E0] mt-8 pt-8">
-      <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-6">
-        Complete the Set
-      </p>
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        {[{ p: product, img: i1 }, { p: related, img: i2 }].map(({ p, img }) => (
-          <div key={p.id}>
-            <div className="relative aspect-[3/4] bg-[#F0EDE8] overflow-hidden mb-2.5">
-              {img?.src
-                ? <Image src={img.src} alt={p.name} fill sizes="50vw"
-                    className="object-cover" loading="lazy" onError={() => {}} />
-                : <div className="absolute inset-0 bg-[#E8E5E0]" />}
-            </div>
-            <p className="text-[11px] font-light text-[#1A1A1A] leading-snug">{p.name}</p>
-            <p className="text-[11px] text-[#9B9B9B] tabular-nums">$80</p>
-          </div>
-        ))}
-      </div>
-      <p className="text-[12px] text-[#6B6B6B] leading-relaxed mb-5">
-        Same fabric. Same weight. Designed to be worn together.
-      </p>
-      <button onClick={onAddBoth}
-        className="w-full h-12 border border-[#1A1A1A] text-[11px] font-light tracking-[0.12em] uppercase text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white transition-all flex items-center justify-center gap-3">
-        Add Both to Bag
-        <span className="text-[#9B9B9B]">— $160</span>
-      </button>
-      <Link href={`/products/${related.slug}`}
-        className="block text-center mt-3 text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors underline underline-offset-2">
-        View {related.name.includes('Hoodie') ? 'Hoodie' : 'Sweatpants'} separately
-      </Link>
-    </div>
-  )
-}
 
 // ─── Sticky ATC ───────────────────────────────────────────────────────────────
 function StickyATC({ product, color, size, cta, ctaLabel, soldOut, onAdd, t, visible }: any) {
