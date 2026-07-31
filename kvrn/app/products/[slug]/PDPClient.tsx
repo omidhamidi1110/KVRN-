@@ -1201,7 +1201,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
     <div className="bg-[#F9F8F6]">
 
       {/* ══ MOBILE LAYOUT (< lg) ══ */}
-      <div className="lg:hidden" style={{ padding:'0 0 100px' }}>
+      <div className="lg:hidden" style={{ padding:'0 0 0' }}>
         {/* Portrait carousel — full width, edge to edge */}
         <MobileCarousel3 images={color.images} productName={product.name} />
 
@@ -1239,7 +1239,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
       {/* ══ DESKTOP LAYOUT (≥ lg) ══ */}
       <div className="hidden lg:block"
-        style={{ maxWidth:1380, margin:'0 auto', padding:'56px 48px 80px' }}>
+        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 36px) 48px 80px' }}>
         <div style={{ display:'grid',
                       gridTemplateColumns:'80px minmax(400px,620px) minmax(360px,440px)',
                       gap:40, alignItems:'start', justifyContent:'center' }}>
@@ -1358,11 +1358,14 @@ function CompleteSet({ product, related, onAddBoth }: any) {
               </div>
             </div>
             <button onClick={onAddBoth}
-              style={{ width:'100%', minHeight:52, fontSize:11, fontWeight:300,
-                       letterSpacing:'0.12em', textTransform:'uppercase',
+              style={{ width:'100%', minWidth:0, minHeight:60, fontSize:11, fontWeight:300,
+                       letterSpacing:'0.08em', textTransform:'uppercase',
                        background:'#1A1A1A', color:'#fff', border:'none',
                        cursor:'pointer', transition:'background 200ms',
-                       marginBottom:14 }}
+                       marginBottom:14, padding:'0 12px',
+                       display:'flex', alignItems:'center', justifyContent:'center',
+                       boxSizing:'border-box', overflow:'hidden',
+                       whiteSpace:'nowrap', textAlign:'center', lineHeight:1 }}
               onMouseEnter={e=>(e.currentTarget.style.background='#333')}
               onMouseLeave={e=>(e.currentTarget.style.background='#1A1A1A')}>
               Add the Complete Set — $160
