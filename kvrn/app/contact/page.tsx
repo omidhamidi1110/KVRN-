@@ -50,7 +50,7 @@ export default function ContactPage() {
   if (state === 'success') {
     return (
       <div className="min-h-screen bg-[#F9F8F6] flex items-center">
-        <div className="container-kvrn max-w-xl py-32">
+        <div data-nav-theme="light" className="container-kvrn max-w-xl py-32">
           <h1 className="font-display font-light text-[40px] leading-none tracking-[-0.03em] mb-5">
             Message sent.
           </h1>

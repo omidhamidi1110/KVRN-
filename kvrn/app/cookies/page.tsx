@@ -13,7 +13,7 @@ export default function CookiesPage() {
     <div>
       <PageHero title="Cookie Policy" breadcrumb="Cookies" />
       <div className="pt-0">
-      <div className="container-kvrn section-padding max-w-2xl">
+      <div data-nav-theme="light" className="container-kvrn section-padding max-w-2xl">
         <nav aria-label="Breadcrumb" className="mb-10">
           <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
             <li><Link href="/" className="hover:text-kvrn-text transition-colors">Home</Link></li>

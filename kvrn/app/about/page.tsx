@@ -14,7 +14,7 @@ export default function AboutPage() {
       <PageHero title="About" breadcrumb="About" />
 
       {/* Content */}
-      <div className="container-kvrn max-w-3xl py-16 md:py-20">
+      <div data-nav-theme="light" className="container-kvrn max-w-3xl py-16 md:py-20">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16">
           <div className="space-y-6">
             <p className="text-[11px] font-light tracking-[0.14em] uppercase text-[#9B9B9B]">The brand</p>

@@ -86,7 +86,7 @@ export default function TrackOrderPage() {
   return (
     <div>
       <PageHero title="Track Order" breadcrumb="Track Order" />
-      <div className="container-kvrn section-padding max-w-xl">
+      <div data-nav-theme="light" className="container-kvrn section-padding max-w-xl">
 <h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-10">
           Track your order
         </h1>

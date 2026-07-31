@@ -11,7 +11,7 @@ interface PageHeroProps {
  */
 export function PageHero({ title, breadcrumb }: PageHeroProps) {
   return (
-    <div className="bg-[#0E0E0E] pt-[calc(36px+56px+20px)] pb-8">
+    <div className="bg-[#0E0E0E] pt-[calc(36px+56px+20px)] pb-8" data-nav-theme="dark">
       <div className="container-kvrn max-w-3xl">
         {breadcrumb && (
           <nav aria-label="Breadcrumb" className="mb-4">

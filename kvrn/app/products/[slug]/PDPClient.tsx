@@ -582,7 +582,7 @@ function DesktopGallery({ images, productName }: any) {
       {/* Scroll hint — only on first image */}
       {active === 0 && (
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-25 pointer-events-none">
-          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">Scroll</span>
+          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Scroll</span>
           <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
             <path d="M1 4.5h12M8 1l4 3.5-4 3.5" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
