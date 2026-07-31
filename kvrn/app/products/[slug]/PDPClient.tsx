@@ -535,6 +535,21 @@ function DesktopGallery({ images, productName }: any) {
   const wheelAccum = useRef(0)
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Touch handlers for swipe navigation
+  const touchStartX = useRef<number | null>(null)
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }, [])
+
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(dx) < 40) return          // too small — ignore
+    if (!transitioning) go(dx < 0 ? 1 : -1)
+  }, [go, transitioning])
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     if (transitioning) return   // locked — ignore all events during animation
@@ -566,6 +581,8 @@ function DesktopGallery({ images, productName }: any) {
     <div
       className="relative w-full h-full overflow-hidden bg-[#0E0E0E] flex"
       onWheel={onWheel}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       role="region"
       aria-label={`${productName} gallery`}
     >
@@ -599,9 +616,8 @@ function DesktopGallery({ images, productName }: any) {
               flexShrink: 0,
               overflow:   'hidden',
               cursor:     isActive ? 'default' : 'pointer',
-              backgroundColor: '#0E0E0E',
-              // 1px separator between panels (uses bg color as gap)
-              borderRight: i < total - 1 ? '1px solid #1A1A1A' : 'none',
+              backgroundColor: '#EDEAE4',
+              borderRight: i < total - 1 ? '1px solid #F9F8F6' : 'none',
             }}
           >
             {img.src ? (
@@ -614,14 +630,10 @@ function DesktopGallery({ images, productName }: any) {
                 // object-contain: shows entire garment, no aggressive crop
                 className="pointer-events-none"
                 style={{
-                  objectFit:      'contain',
-                  objectPosition: 'center center',
-                  // Inactive strips: slightly zoomed/cropped to tease
-                  // Active image: full contain, full garment visible
-                  transform:      isActive ? 'scale(1)' : 'scale(1.15)',
-                  transformOrigin:'center top',
-                  transition:     `transform ${DURATION_MS}ms cubic-bezier(0.4,0,0.2,1), filter ${DURATION_MS}ms ease`,
-                  filter:         isActive ? 'none' : 'brightness(0.45)',
+                  objectFit:      'cover',
+                  objectPosition: 'center top',
+                  transition:     `filter ${DURATION_MS}ms ease`,
+                  filter:         isActive ? 'none' : 'brightness(0.7)',
                 }}
                 loading={i < 2 ? 'eager' : 'lazy'}
                 onError={() => {}}
