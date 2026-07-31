@@ -899,338 +899,394 @@ function MobileGallery({ images, productName, onShop }: any) {
 // ════════════════════════════════════════════════════════════════════════════
 //  STAGE 3 — DETAILS (normal scroll)
 // ════════════════════════════════════════════════════════════════════════════
-// ─── Stage 3 Gallery + Purchase (desktop 3-col / mobile stacked) ────────────
 
-/* ── Wheel-event locking for Stage3Gallery ─────────────────────────────── */
-// Shared outside component so it persists across renders without state
-let _s3WheelLocked = false
-let _s3WheelTimer: ReturnType<typeof setTimeout> | null = null
+// ═════════════════════════════════════════════════════════════════════════════
+//  STAGE 3 — Gallery and Purchase
+// ═════════════════════════════════════════════════════════════════════════════
 
-function Stage3Gallery({
-  images, productName,
-}: { images: any[]; productName: string }) {
-  const [active, setActive] = useState(0)
+/* One-at-a-time wheel gate */
+let _wLocked = false, _wTimer: ReturnType<typeof setTimeout> | null = null
+
+// ─── Shared carousel hook ────────────────────────────────────────────────────
+function useCarousel(images: any[]) {
+  const [idx, setIdx] = useState(0)
+  useEffect(() => { setIdx(0) }, [images])
+  const go = useCallback((dir: 1 | -1) =>
+    setIdx(i => Math.max(0, Math.min(images.length - 1, i + dir))), [images.length])
+  return { idx, setIdx, go }
+}
+
+// ─── Desktop gallery (thumbnail + main + chevrons) ────────────────────────────
+function DesktopGallery3({ images, productName }: { images: any[]; productName: string }) {
+  const { idx, setIdx, go } = useCarousel(images)
   const total = images.length
 
-  // Reset on images change (color switch)
-  useEffect(() => { setActive(0) }, [images])
-
-  // Touch refs — no state updates during gesture
-  const txStart = useRef<number | null>(null)
-  const txCur   = useRef<number | null>(null)
-
-  // Wheel handler — one event = one image
   const onWheel = useCallback((e: React.WheelEvent) => {
-    const dx = e.deltaX, dy = e.deltaY
-    if (Math.abs(dx) < Math.abs(dy) * 0.5) return // mostly vertical — ignore
+    const d = e.deltaX + e.deltaY
+    if (Math.abs(d) < 5) return
     e.preventDefault()
-    if (_s3WheelLocked) return
-    const dir = (dx + dy) > 0 ? 1 : -1
-    setActive(i => Math.max(0, Math.min(total - 1, i + dir)))
-    _s3WheelLocked = true
-    if (_s3WheelTimer) clearTimeout(_s3WheelTimer)
-    _s3WheelTimer = setTimeout(() => { _s3WheelLocked = false }, 420)
-  }, [total])
+    if (_wLocked) return
+    go(d > 0 ? 1 : -1)
+    _wLocked = true
+    if (_wTimer) clearTimeout(_wTimer)
+    _wTimer = setTimeout(() => { _wLocked = false }, 420)
+  }, [go])
 
-  const go = (dir: 1 | -1) =>
-    setActive(i => Math.max(0, Math.min(total - 1, i + dir)))
-
-  const cur = images[active]
+  const txS = useRef<number|null>(null), txC = useRef<number|null>(null)
 
   return (
-    <div className="flex gap-4 lg:gap-5" style={{ alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
 
-      {/* ── Thumbnail rail — desktop only ── */}
-      <div
-        className="hidden lg:flex flex-col gap-2 flex-shrink-0"
-        style={{ width: 82, maxHeight: 'calc(100vh - 160px)', overflowY: 'auto' }}
-      >
+      {/* Thumbnail rail */}
+      <div style={{ width: 80, flexShrink: 0, display: 'flex', flexDirection: 'column',
+                    gap: 8, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
         {images.map((img: any, i: number) => (
-          <button
-            key={i}
-            onClick={() => setActive(i)}
-            aria-label={`View image ${i + 1}`}
-            aria-pressed={i === active}
-            style={{
-              width: '100%',
-              aspectRatio: '3/4',
-              position: 'relative',
-              overflow: 'hidden',
-              flexShrink: 0,
-              background: '#EDEAE4',
-              border: 'none',
-              padding: 0,
-              outline: i === active ? '1.5px solid #111' : '1.5px solid transparent',
-              outlineOffset: 2,
-              cursor: 'pointer',
-              transition: 'outline-color 150ms ease',
-            }}
+          <button key={i} onClick={() => setIdx(i)}
+            aria-label={`Image ${i+1}`}
+            style={{ width: '100%', aspectRatio: '3/4', position: 'relative',
+                     overflow: 'hidden', background: '#EDEAE4', border: 'none', padding: 0,
+                     cursor: 'pointer', flexShrink: 0,
+                     outline: i === idx ? '1.5px solid #111' : '1.5px solid transparent',
+                     outlineOffset: 2, transition: 'outline-color 150ms' }}
           >
-            {img?.src ? (
-              <img
-                src={img.src}
-                alt=""
-                loading="lazy"
-                style={{
-                  position: 'absolute', inset: 0, width: '100%', height: '100%',
-                  objectFit: 'cover', objectPosition: 'center 30%',
-                  pointerEvents: 'none',
-                }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
-            ) : (
-              <div style={{ position: 'absolute', inset: 0, background: '#DDD9D2' }} />
-            )}
+            {img?.src && <img src={img.src} alt="" loading="lazy" style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none'
+            }} onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />}
           </button>
         ))}
-        {/* Down chevron if many thumbnails */}
-        {total > 5 && (
-          <div className="flex justify-center pt-1 opacity-30">
-            <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-              <path d="M1 1l5 5 5-5" stroke="#1A1A1A" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-          </div>
-        )}
       </div>
 
-      {/* ── Main image + counter ── */}
-      <div className="flex-1 min-w-0">
-        <div
-          style={{ position: 'relative', width: '100%', aspectRatio: '3/4',
-                   overflow: 'hidden', background: '#EDEAE4',
-                   maxHeight: 'calc(100vh - 190px)' }}
-          onWheel={onWheel}
-          onTouchStart={e => {
-            txStart.current = e.touches[0].clientX
-            txCur.current   = e.touches[0].clientX
-          }}
-          onTouchMove={e => { txCur.current = e.touches[0].clientX }}
+      {/* Main image */}
+      <div style={{ flex: '1 1 0', minWidth: 0, maxWidth: 620 }}>
+        <div onWheel={onWheel}
+          onTouchStart={e => { txS.current = e.touches[0].clientX; txC.current = e.touches[0].clientX }}
+          onTouchMove={e => { txC.current = e.touches[0].clientX }}
           onTouchEnd={() => {
-            const s = txStart.current, c2 = txCur.current
-            txStart.current = null; txCur.current = null
-            if (s === null || c2 === null || Math.abs(c2 - s) < 36) return
-            go((c2 - s) < 0 ? 1 : -1)
+            const s=txS.current, c2=txC.current; txS.current=null; txC.current=null
+            if(s!==null && c2!==null && Math.abs(c2-s)>36) go(c2<s?1:-1)
           }}
-        >
-          {/* Image — stable key to avoid remount flash */}
-          {images.map((img: any, i: number) => (
-            img?.src ? (
-              <img
-                key={img.src}
-                src={img.src}
-                alt={i === active ? (img.alt || productName) : ''}
-                loading={i < 2 ? 'eager' : 'lazy'}
-                style={{
-                  position: 'absolute', inset: 0, width: '100%', height: '100%',
-                  objectFit: 'cover', objectPosition: 'center 30%',
-                  pointerEvents: 'none',
-                  opacity: i === active ? 1 : 0,
-                  transition: 'opacity 220ms ease',
-                }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
-            ) : null
-          ))}
+          style={{ position: 'relative', width: '100%', aspectRatio: '3/4',
+                   overflow: 'hidden', background: '#EDEAE4' }}>
+          {images.map((img: any, i: number) => img?.src ? (
+            <img key={img.src} src={img.src}
+              alt={i===idx ? (img.alt||productName) : ''}
+              loading={i<2?'eager':'lazy'}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                       objectFit: 'cover', objectPosition: 'center top',
+                       pointerEvents: 'none',
+                       opacity: i===idx ? 1 : 0, transition: 'opacity 220ms ease' }}
+              onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />
+          ) : null)}
 
-          {/* Desktop prev/next chevrons */}
-          {active > 0 && (
-            <button
-              type="button" aria-label="Previous image"
-              onClick={() => go(-1)}
-              className="hidden lg:flex"
-              style={{
-                position: 'absolute', top: 0, bottom: 0, left: 0, width: '22%',
-                alignItems: 'center', justifyContent: 'flex-start', paddingLeft: 20,
-                background: 'transparent', border: 0, cursor: 'pointer', zIndex: 2,
-              }}
-            >
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
-                style={{ opacity: 0.6, transition: 'opacity 180ms ease' }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}>
-                <path d="M14 3L7 11l7 8" stroke="#111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          {/* Chevrons */}
+          {idx > 0 && (
+            <button type="button" aria-label="Previous" onClick={()=>go(-1)}
+              style={{ position:'absolute', top:0, bottom:0, left:0, width:'22%',
+                       background:'transparent', border:0, cursor:'pointer', zIndex:2,
+                       display:'flex', alignItems:'center', paddingLeft:20 }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
+                style={{opacity:.55, transition:'opacity 180ms'}}
+                onMouseEnter={e=>(e.currentTarget.style.opacity='1')}
+                onMouseLeave={e=>(e.currentTarget.style.opacity='.55')}>
+                <path d="M13 3L7 10l6 7" stroke="#111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           )}
-          {active < total - 1 && (
-            <button
-              type="button" aria-label="Next image"
-              onClick={() => go(1)}
-              className="hidden lg:flex"
-              style={{
-                position: 'absolute', top: 0, bottom: 0, right: 0, width: '22%',
-                alignItems: 'center', justifyContent: 'flex-end', paddingRight: 20,
-                background: 'transparent', border: 0, cursor: 'pointer', zIndex: 2,
-              }}
-            >
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
-                style={{ opacity: 0.6, transition: 'opacity 180ms ease' }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}>
-                <path d="M8 3l7 8-7 8" stroke="#111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          {idx < total-1 && (
+            <button type="button" aria-label="Next" onClick={()=>go(1)}
+              style={{ position:'absolute', top:0, bottom:0, right:0, width:'22%',
+                       background:'transparent', border:0, cursor:'pointer', zIndex:2,
+                       display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:20 }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
+                style={{opacity:.55, transition:'opacity 180ms'}}
+                onMouseEnter={e=>(e.currentTarget.style.opacity='1')}
+                onMouseLeave={e=>(e.currentTarget.style.opacity='.55')}>
+                <path d="M7 3l6 7-6 7" stroke="#111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           )}
         </div>
 
         {/* Counter */}
-        <p style={{ textAlign: 'center', marginTop: 10, fontSize: 11, fontWeight: 300,
-                    letterSpacing: '0.1em', color: '#9B9B9B' }}>
-          {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        <p style={{ textAlign:'center', marginTop:10, fontSize:11, fontWeight:300,
+                    letterSpacing:'0.1em', color:'#9B9B9B' }}>
+          {String(idx+1).padStart(2,'0')} / {String(total).padStart(2,'0')}
         </p>
       </div>
     </div>
   )
 }
 
+// ─── Mobile carousel (full-width, no thumbnails) ─────────────────────────────
+function MobileCarousel3({ images, productName }: { images: any[]; productName: string }) {
+  const { idx, go } = useCarousel(images)
+  const total = images.length
+  const txS = useRef<number|null>(null), txC = useRef<number|null>(null)
+  const locked = useRef(false)
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div
+        onTouchStart={e => {
+          txS.current = e.touches[0].clientX
+          txC.current = e.touches[0].clientX
+          locked.current = false
+        }}
+        onTouchMove={e => { txC.current = e.touches[0].clientX }}
+        onTouchEnd={() => {
+          if (locked.current) return
+          const s=txS.current, c2=txC.current; txS.current=null; txC.current=null
+          if(s!==null && c2!==null && Math.abs(c2-s)>36) {
+            locked.current = true
+            go(c2<s?1:-1)
+          }
+        }}
+        style={{ position:'relative', width:'100%', aspectRatio:'3/4',
+                 overflow:'hidden', background:'#EDEAE4', touchAction:'pan-y' }}
+      >
+        {images.map((img: any, i: number) => img?.src ? (
+          <img key={img.src} src={img.src}
+            alt={i===idx ? (img.alt||productName) : ''}
+            loading={i<2?'eager':'lazy'}
+            style={{ position:'absolute', inset:0, width:'100%', height:'100%',
+                     objectFit:'cover', objectPosition:'center top',
+                     pointerEvents:'none',
+                     opacity: i===idx ? 1 : 0, transition:'opacity 220ms ease' }}
+            onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />
+        ) : null)}
+      </div>
+      {total > 1 && (
+        <p style={{ textAlign:'center', marginTop:10, fontSize:11, fontWeight:300,
+                    letterSpacing:'0.1em', color:'#9B9B9B' }}>
+          {String(idx+1).padStart(2,'0')} / {String(total).padStart(2,'0')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─── Shared purchase controls (color, size, ATC, accordions) ─────────────────
+function PurchasePanel({ product, color, setColor, size, setSize,
+  sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
+  return (
+    <>
+      {/* Color */}
+      <div style={{ marginBottom: 24 }}>
+        <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em',
+                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
+          Color
+        </p>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          {product.colors.map((c: ColorOption) => (
+            <button key={c.value} title={c.name} aria-label={c.name}
+              aria-pressed={c.value === color.value}
+              onClick={() => setColor(c)}
+              className={cn('rounded-full transition-all',
+                c.value === color.value
+                  ? 'ring-2 ring-[#1A1A1A] ring-offset-2 ring-offset-[#F9F8F6]'
+                  : 'hover:ring-1 hover:ring-[#C8C4BF] hover:ring-offset-1')}
+              style={{ width:24, height:24, backgroundColor:c.hex,
+                       border:'none', cursor:'pointer', flexShrink:0 }} />
+          ))}
+          <span style={{ fontSize:13, fontWeight:300, color:'#1A1A1A' }}>{color.name}</span>
+        </div>
+      </div>
+
+      <div style={{ borderTop:'1px solid #E8E5E0', marginBottom:24 }} />
+
+      {/* Size */}
+      <div style={{ marginBottom:24 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em',
+                      textTransform:'uppercase', color: sizeErr ? '#B91C1C' : '#9B9B9B', margin:0 }}>
+            {sizeErr ? 'Select a size' : 'Size'}
+          </p>
+          <Link href="/support/size-guide"
+            style={{ fontSize:11, fontWeight:300, color:'#9B9B9B', textDecoration:'underline',
+                     textUnderlineOffset:2 }}
+            className="hover:text-[#1A1A1A] transition-colors">
+            Size guide
+          </Link>
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+          {product.sizes.map((s: SizeOption) => (
+            <button key={s.value} disabled={!s.inStock}
+              onClick={() => { setSize(s.label); setSizeErr(false) }}
+              style={{
+                height:40, minWidth:44, padding:'0 8px',
+                fontSize:12, fontWeight:300, cursor: s.inStock ? 'pointer' : 'not-allowed',
+                border: size === s.label ? '1.5px solid #1A1A1A'
+                        : s.inStock ? '1px solid #D5D1CB' : '1px solid #E8E5E0',
+                background: size === s.label ? '#1A1A1A' : 'transparent',
+                color: !s.inStock ? '#C8C4BF' : size === s.label ? '#fff' : '#1A1A1A',
+                transition:'all 150ms',
+              }}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {product.fitNote && (
+          <p style={{ fontSize:12, color:'#9B9B9B', marginTop:8, lineHeight:1.5 }}>{product.fitNote}</p>
+        )}
+      </div>
+
+      {/* Add to Bag */}
+      <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
+        style={{
+          width:'100%', minHeight:52, fontSize:11, fontWeight:300,
+          letterSpacing:'0.14em', textTransform:'uppercase', border:'none',
+          cursor: soldOut ? 'not-allowed' : 'pointer', marginBottom:32,
+          background: soldOut ? '#E8E5E0' : cta === 'done' ? '#15803D' : '#1A1A1A',
+          color: soldOut ? '#9B9B9B' : '#fff', transition:'background 200ms',
+        }}>
+        {ctaLabel}
+      </button>
+
+      {/* Accordions */}
+      {[
+        { label: 'Description', content: product.description },
+        { label: 'Details', content: (product.constructionDetails ?? []).join('\n') },
+      ].map(({ label, content }) => content ? (
+        <div key={label} style={{ borderTop:'1px solid #E8E5E0' }}>
+          <details className="group">
+            <summary className="flex items-center justify-between py-4 cursor-pointer list-none select-none"
+              style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+              {label}
+              <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
+                className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
+                <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            </summary>
+            <div style={{ paddingBottom:20, fontSize:13, color:'#6B6B6B', lineHeight:1.7, whiteSpace:'pre-line' }}>
+              {content}
+            </div>
+          </details>
+        </div>
+      ) : null)}
+
+      <div style={{ borderTop:'1px solid #E8E5E0' }}>
+        <details className="group">
+          <summary className="flex items-center justify-between py-4 cursor-pointer list-none select-none"
+            style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em', textTransform:'uppercase' }}>
+            Shipping & Returns
+            <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
+              className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
+              <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </summary>
+          <div style={{ paddingBottom:20, fontSize:13, color:'#6B6B6B', lineHeight:1.7 }}>
+            <p>Orders processed within 1–3 business days.</p>
+            <p>US: 2–7 days. International: 5–14+ days.</p>
+            <p>Returns within 14 days, unworn and in original condition.</p>
+            <Link href="/support/shipping-returns"
+              style={{ display:'block', marginTop:8, fontSize:12, color:'#1A1A1A',
+                       textDecoration:'underline', textUnderlineOffset:2 }}>
+              Full policy →
+            </Link>
+          </div>
+        </details>
+      </div>
+    </>
+  )
+}
+
+// ─── DetailsStage ─────────────────────────────────────────────────────────────
 function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t }: any) {
+
+  const eyebrow = product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'
+
   return (
     <div className="bg-[#F9F8F6]">
 
-      {/* ════════ MAIN STAGE 3 SECTION ════════ */}
-      <div style={{
-        maxWidth: 1380, margin: '0 auto',
-        padding: '80px 32px 80px',
-      }}>
-        {/* Desktop: thumbnail | gallery | purchase. Mobile: stacked */}
-        <div className="flex flex-col lg:flex-row lg:gap-10 xl:gap-14" style={{ alignItems: 'start' }}>
+      {/* ══ MOBILE LAYOUT (< lg) ══ */}
+      <div className="lg:hidden" style={{ padding:'40px 20px 120px' }}>
+        {/* Title block */}
+        <p style={{ fontSize:11, fontWeight:300, letterSpacing:'0.26em',
+                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:14 }}>
+          {eyebrow}
+        </p>
+        <h2 style={{ fontFamily:'var(--font-display)', fontWeight:300, lineHeight:1.08,
+                     letterSpacing:'-0.035em', color:'#1A1A1A', marginBottom:16,
+                     fontSize:'clamp(30px, 8.5vw, 38px)' }}>
+          {product.name}
+        </h2>
+        <p style={{ fontSize:28, fontWeight:300, fontVariantNumeric:'tabular-nums',
+                    color:'#1A1A1A', marginBottom: product.founderNote ? 8 : 20 }}>
+          $80
+        </p>
+        {product.founderNote && (
+          <p style={{ fontSize:13, color:'#9B9B9B', lineHeight:1.55, marginBottom:20 }}>
+            {product.founderNote}
+          </p>
+        )}
 
-          {/* ── Gallery column (thumbs + main image) ── */}
-          <div className="flex-1 min-w-0 mb-10 lg:mb-0">
-            <Stage3Gallery images={color.images} productName={product.name} />
+        <div style={{ borderTop:'1px solid #E8E5E0', marginBottom:24 }} />
+
+        {/* Portrait carousel */}
+        <MobileCarousel3 images={color.images} productName={product.name} />
+
+        {/* Purchase controls */}
+        <PurchasePanel
+          product={product} color={color} setColor={setColor}
+          size={size} setSize={setSize} sizeErr={sizeErr} setSizeErr={setSizeErr}
+          cta={cta} ctaLabel={ctaLabel} soldOut={soldOut} onAdd={onAdd}
+        />
+      </div>
+
+      {/* ══ DESKTOP LAYOUT (≥ lg) ══ */}
+      <div className="hidden lg:block"
+        style={{ maxWidth:1380, margin:'0 auto', padding:'64px 48px 80px' }}>
+        <div style={{ display:'grid',
+                      gridTemplateColumns:'80px minmax(400px,620px) minmax(360px,440px)',
+                      gap:40, alignItems:'start', justifyContent:'center' }}>
+
+          {/* Column 1: thumbnail rail (rendered inside DesktopGallery3) */}
+          {/* Column 2: main gallery */}
+          {/* DesktopGallery3 handles both thumbnails + main image in one flex row */}
+          {/* We use a 2-column span trick: grid places [thumb+gallery] then [panel] */}
+          {/* Actually simpler: nest thumbnail+gallery in col 1+2, purchase in col 3 */}
+          {/* Use a sub-grid approach: outer grid col1=80px, col2=gallery, col3=panel */}
+
+          {/* Thumbnail + gallery spanning cols 1-2 */}
+          <div style={{ gridColumn:'1 / 3' }}>
+            <DesktopGallery3 images={color.images} productName={product.name} />
           </div>
 
-          {/* ── Purchase panel ── */}
-          <div style={{ flexBasis: 420, flexShrink: 0, maxWidth: '100%' }}
-            className="lg:sticky lg:top-[100px]">
-
-            {/* Product title + price */}
-            <div className="mb-6">
-              <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-2">
-                {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
+          {/* Purchase panel col 3 */}
+          <div style={{ position:'sticky', top:120, alignSelf:'start' }}>
+            <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.22em',
+                        textTransform:'uppercase', color:'#9B9B9B', marginBottom:14 }}>
+              {eyebrow}
+            </p>
+            <h2 style={{ fontFamily:'var(--font-display)', fontWeight:300,
+                         fontSize:'clamp(28px,2.2vw,38px)', lineHeight:1.08,
+                         letterSpacing:'-0.03em', color:'#1A1A1A', marginBottom:14 }}>
+              {product.name}
+            </h2>
+            <p style={{ fontSize:22, fontWeight:300, fontVariantNumeric:'tabular-nums',
+                        marginBottom: product.founderNote ? 6 : 24 }}>
+              $80
+            </p>
+            {product.founderNote && (
+              <p style={{ fontSize:12, color:'#9B9B9B', marginBottom:24, lineHeight:1.55 }}>
+                {product.founderNote}
               </p>
-              <h2 className="font-display font-light text-[28px] md:text-[36px] leading-tight tracking-[-0.02em] mb-3">
-                {product.name}
-              </h2>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-[22px] font-light tabular-nums">$80</span>
-              </div>
-              {product.founderNote && (
-                <p className="text-[12px] text-[#9B9B9B]">{product.founderNote}</p>
-              )}
-            </div>
-
-            <div className="border-t border-[#E8E5E0] pt-6 mb-6" />
-
-            {/* Color */}
-            {product.colors.length > 1 && (
-              <div className="mb-6">
-                <p className="text-[11px] font-light tracking-[0.08em] uppercase text-[#9B9B9B] mb-3">
-                  Color — <span className="text-[#1A1A1A]">{color.name}</span>
-                </p>
-                <div className="flex gap-2.5 flex-wrap">
-                  {product.colors.map((c: ColorOption) => (
-                    <button key={c.value} title={c.name} aria-label={c.name}
-                      aria-pressed={c.value === color.value} onClick={() => setColor(c)}
-                      className={cn('w-7 h-7 rounded-full transition-all',
-                        c.value === color.value
-                          ? 'ring-2 ring-[#1A1A1A] ring-offset-2 ring-offset-[#F9F8F6]'
-                          : 'hover:ring-1 hover:ring-[#C8C4BF] hover:ring-offset-1')}
-                      style={{ backgroundColor: c.hex }} />
-                  ))}
-                </div>
-              </div>
             )}
 
-            {/* Size */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <p className={cn('text-[11px] font-light tracking-[0.08em] uppercase',
-                  sizeErr ? 'text-[#B91C1C]' : 'text-[#9B9B9B]')}>
-                  {sizeErr ? 'Select a size' : 'Size'}
-                </p>
-                <Link href="/support/size-guide"
-                  className="text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors underline underline-offset-2">
-                  Size guide
-                </Link>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {product.sizes.map((s: SizeOption) => (
-                  <button key={s.value} disabled={!s.inStock}
-                    onClick={() => { setSize(s.label); setSizeErr(false) }}
-                    className={cn(
-                      'h-10 min-w-[44px] px-2 text-[12px] font-light border transition-all',
-                      !s.inStock ? 'border-[#E8E5E0] text-[#C8C4BF] cursor-not-allowed'
-                      : size === s.label ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                      : 'border-[#D5D1CB] text-[#1A1A1A] hover:border-[#1A1A1A]')}>
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              {product.fitNote && (
-                <p className="text-[11px] text-[#9B9B9B] mt-2 leading-relaxed">{product.fitNote}</p>
-              )}
-            </div>
+            <div style={{ borderTop:'1px solid #E8E5E0', marginBottom:24 }} />
 
-            {/* Add to Bag */}
-            <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
-              className={cn(
-                'w-full text-[11px] font-light tracking-[0.14em] uppercase transition-all mb-8',
-                soldOut         ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'
-                : cta === 'done' ? 'bg-[#15803D] text-white'
-                :                  'bg-[#1A1A1A] text-white hover:bg-[#333]'
-              )}
-              style={{ minHeight: 56 }}>
-              {ctaLabel}
-            </button>
-
-            {/* Accordions */}
-            {[
-              { label: 'Description', content: product.description },
-              { label: 'Details', content: (product.constructionDetails ?? []).join('\n') },
-            ].map(({ label, content }) => content ? (
-              <div key={label} className="border-t border-[#E8E5E0]">
-                <details className="group">
-                  <summary className="flex items-center justify-between py-4 cursor-pointer list-none text-[11px] font-light tracking-[0.1em] uppercase select-none">
-                    {label}
-                    <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
-                      className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
-                      <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                    </svg>
-                  </summary>
-                  <div className="pb-5 text-[13px] text-[#6B6B6B] leading-relaxed whitespace-pre-line">
-                    {content}
-                  </div>
-                </details>
-              </div>
-            ) : null)}
-
-            <div className="border-t border-[#E8E5E0]">
-              <details className="group">
-                <summary className="flex items-center justify-between py-4 cursor-pointer list-none text-[11px] font-light tracking-[0.1em] uppercase select-none">
-                  Shipping & Returns
-                  <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
-                    className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
-                    <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  </svg>
-                </summary>
-                <div className="pb-5 space-y-1.5 text-[13px] text-[#6B6B6B] leading-relaxed">
-                  <p>Orders processed within 1–3 business days.</p>
-                  <p>US: 2–7 days. International: 5–14+ days.</p>
-                  <p>Returns within 14 days, unworn and in original condition.</p>
-                  <Link href="/support/shipping-returns"
-                    className="block text-[12px] text-[#1A1A1A] underline underline-offset-2 mt-2 hover:opacity-60 transition-opacity">
-                    Full policy →
-                  </Link>
-                </div>
-              </details>
-            </div>
+            <PurchasePanel
+              product={product} color={color} setColor={setColor}
+              size={size} setSize={setSize} sizeErr={sizeErr} setSizeErr={setSizeErr}
+              cta={cta} ctaLabel={ctaLabel} soldOut={soldOut} onAdd={onAdd}
+            />
           </div>
         </div>
       </div>
 
-      {/* ════════ COMPLETE THE SET ════════ */}
+      {/* ══ COMPLETE THE SET ══ */}
       {relatedProduct && (
         <CompleteSet product={product} related={relatedProduct} onAddBoth={onAddBoth} />
       )}
@@ -1238,84 +1294,92 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
   )
 }
 
-// ─── Complete the Set — premium beige bundle section ─────────────────────────
+// ─── Complete the Set ─────────────────────────────────────────────────────────
 function CompleteSet({ product, related, onAddBoth }: any) {
-  const [hoodieSize,  setHoodieSize]  = useState<string | null>(null)
-  const [pantsSize,   setPantsSize]   = useState<string | null>(null)
+  const [hSize, setHSize] = useState<string|null>(null)
+  const [pSize, setPSize] = useState<string|null>(null)
 
+  const isHoodie = (p: any) => p.name.toLowerCase().includes('hoodie')
   const img1 = product.colors[0]?.images.find((i: any) => i.type === 'front') ?? product.colors[0]?.images[0]
   const img2  = related.colors[0]?.images.find((i: any) => i.type === 'front') ?? related.colors[0]?.images[0]
 
-  const isHoodie = (p: any) => p.name.toLowerCase().includes('hoodie')
-
   return (
-    <section style={{ background: '#F3F0EA', padding: '80px 32px' }}>
-      <div style={{ maxWidth: 1380, margin: '0 auto' }}>
+    <section style={{ background:'#F3F0EA' }}>
+      <div style={{ maxWidth:1380, margin:'0 auto', padding:'88px 48px' }}>
 
-        {/* ── Desktop 4-col / Mobile stacked ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(200px,0.85fr)_minmax(240px,1fr)_minmax(240px,1fr)_minmax(220px,0.9fr)] gap-8 lg:gap-10">
+        {/* Mobile stacked / Desktop 4-col */}
+        <div className="flex flex-col lg:grid"
+          style={{ ['--cols' as any]:'minmax(200px,0.85fr) minmax(260px,1fr) minmax(260px,1fr) minmax(230px,0.9fr)' }}
+        >
+          {/* Force desktop grid via inline */}
+          <div className="hidden lg:contents">
+            {/* Desktop uses CSS grid applied on parent below */}
+          </div>
+        </div>
 
-          {/* 1. Intro copy */}
-          <div className="flex flex-col justify-center lg:pr-4">
-            <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-4">
+        {/* Simpler: use a responsive flex/grid wrapper */}
+        <div className="flex flex-col lg:grid gap-8 lg:gap-10"
+          style={{ gridTemplateColumns:'minmax(200px,0.85fr) minmax(260px,1fr) minmax(260px,1fr) minmax(230px,0.9fr)',
+                   alignItems:'center' } as any}>
+
+          {/* 1. Intro */}
+          <div style={{ paddingRight:8 }}>
+            <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.22em',
+                        textTransform:'uppercase', color:'#9B9B9B', marginBottom:16 }}>
               Complete the Set
             </p>
-            <h3 className="font-display font-light text-[28px] md:text-[32px] leading-tight tracking-[-0.02em] text-[#1A1A1A] mb-4">
+            <h3 style={{ fontFamily:'var(--font-display)', fontWeight:300, fontSize:'clamp(26px,2.4vw,32px)',
+                         lineHeight:1.1, letterSpacing:'-0.025em', color:'#1A1A1A', marginBottom:16 }}>
               Designed to be worn together.
             </h3>
-            <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
-              Same fabric. Same weight.<br />
+            <p style={{ fontSize:13, color:'#6B6B6B', lineHeight:1.65 }}>
+              Same fabric. Same weight.<br/>
               Built for comfort. Made to move as one.
             </p>
           </div>
 
           {/* 2. Hoodie card */}
-          <BundleProductCard
-            product={product}
-            img={img1}
-            selectedSize={isHoodie(product) ? hoodieSize : pantsSize}
-            onSizeSelect={isHoodie(product) ? setHoodieSize : setPantsSize}
-          />
+          <BundleCard product={product} img={img1}
+            selectedSize={isHoodie(product)?hSize:pSize}
+            onSize={isHoodie(product)?setHSize:setPSize} />
 
           {/* 3. Sweatpants card */}
-          <BundleProductCard
-            product={related}
-            img={img2}
-            selectedSize={isHoodie(related) ? hoodieSize : pantsSize}
-            onSizeSelect={isHoodie(related) ? setHoodieSize : setPantsSize}
-          />
+          <BundleCard product={related} img={img2}
+            selectedSize={isHoodie(related)?hSize:pSize}
+            onSize={isHoodie(related)?setHSize:setPSize} />
 
           {/* 4. Bundle CTA */}
-          <div className="flex flex-col justify-center">
-            {/* Box icon */}
-            <div className="mb-5">
-              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" className="opacity-50">
-                <rect x="4" y="11" width="28" height="22" rx="1" stroke="#1A1A1A" strokeWidth="1.3"/>
-                <path d="M4 16h28" stroke="#1A1A1A" strokeWidth="1.3"/>
-                <path d="M13 11V7a5 5 0 0 1 10 0v4" stroke="#1A1A1A" strokeWidth="1.3" strokeLinecap="round"/>
-                <path d="M14 16v4h8v-4" stroke="#1A1A1A" strokeWidth="1.3" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <p className="text-[14px] font-light text-[#1A1A1A] leading-snug mb-1">
-              Complete the set.
-            </p>
-            <p className="text-[14px] font-light text-[#6B6B6B] mb-6">
-              Save when you add both.
-            </p>
-            <div className="border-t border-[#D8D4CC] pt-5 mb-5">
-              <div className="flex items-baseline justify-between">
-                <span className="text-[12px] font-light tracking-[0.08em] uppercase text-[#9B9B9B]">Total</span>
-                <span className="text-[20px] font-light tabular-nums text-[#1A1A1A]">$160</span>
+          <div style={{ display:'flex', flexDirection:'column' }}>
+            <svg width="34" height="34" viewBox="0 0 34 34" fill="none" style={{ marginBottom:20, opacity:.45 }}>
+              <rect x="3" y="10" width="28" height="21" rx="1" stroke="#1A1A1A" strokeWidth="1.2"/>
+              <path d="M3 15h28" stroke="#1A1A1A" strokeWidth="1.2"/>
+              <path d="M12 10V7a5 5 0 0 1 10 0v3" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
+              <path d="M13 15v3h8v-3" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            <p style={{ fontSize:14, fontWeight:300, color:'#1A1A1A', marginBottom:4 }}>Complete the set.</p>
+            <p style={{ fontSize:14, fontWeight:300, color:'#6B6B6B', marginBottom:24 }}>Save when you add both.</p>
+            <div style={{ borderTop:'1px solid #C8C4BC', paddingTop:20, marginBottom:20 }}>
+              <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between' }}>
+                <span style={{ fontSize:10, fontWeight:300, letterSpacing:'0.1em',
+                               textTransform:'uppercase', color:'#9B9B9B' }}>Total</span>
+                <span style={{ fontSize:22, fontWeight:300, fontVariantNumeric:'tabular-nums' }}>$160</span>
               </div>
             </div>
             <button onClick={onAddBoth}
-              className="w-full text-[11px] font-light tracking-[0.12em] uppercase text-white bg-[#1A1A1A] hover:bg-[#333] transition-colors"
-              style={{ minHeight: 52 }}>
+              style={{ width:'100%', minHeight:52, fontSize:11, fontWeight:300,
+                       letterSpacing:'0.12em', textTransform:'uppercase',
+                       background:'#1A1A1A', color:'#fff', border:'none',
+                       cursor:'pointer', transition:'background 200ms',
+                       marginBottom:14 }}
+              onMouseEnter={e=>(e.currentTarget.style.background='#333')}
+              onMouseLeave={e=>(e.currentTarget.style.background='#1A1A1A')}>
               Add the Complete Set — $160
             </button>
             <Link href={`/products/${related.slug}`}
-              className="block text-center mt-4 text-[11px] text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors underline underline-offset-2">
-              View {related.name.includes('Hoodie') ? 'Hoodie' : 'Sweatpants'} separately
+              style={{ display:'block', textAlign:'center', fontSize:11, color:'#9B9B9B',
+                       textDecoration:'underline', textUnderlineOffset:2 }}
+              className="hover:text-[#1A1A1A] transition-colors">
+              View {related.name.includes('Hoodie')?'Hoodie':'Sweatpants'} separately
             </Link>
           </div>
         </div>
@@ -1324,34 +1388,35 @@ function CompleteSet({ product, related, onAddBoth }: any) {
   )
 }
 
-function BundleProductCard({ product, img, selectedSize, onSizeSelect }: {
-  product: any; img: any; selectedSize: string | null; onSizeSelect: (s: string) => void
+function BundleCard({ product, img, selectedSize, onSize }: {
+  product:any; img:any; selectedSize:string|null; onSize:(s:string)=>void
 }) {
   return (
-    <div style={{ background: '#fff', padding: '0 0 20px' }}>
-      {/* Portrait image */}
-      <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4',
-                    overflow: 'hidden', background: '#EDEAE4', marginBottom: 16 }}>
-        {img?.src ? (
-          <img src={img.src} alt={product.name} loading="lazy"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-                     objectFit: 'cover', objectPosition: 'center 30%' }}
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-        ) : (
-          <div style={{ position: 'absolute', inset: 0, background: '#DDD9D2' }} />
-        )}
+    <div style={{ background:'#fff' }}>
+      <div style={{ position:'relative', width:'100%', aspectRatio:'3/4',
+                    overflow:'hidden', background:'#EDEAE4', marginBottom:14 }}>
+        {img?.src && <img src={img.src} alt={product.name} loading="lazy"
+          style={{ position:'absolute', inset:0, width:'100%', height:'100%',
+                   objectFit:'cover', objectPosition:'center top' }}
+          onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />}
       </div>
-      <div style={{ padding: '0 16px' }}>
-        <p className="text-[13px] font-light text-[#1A1A1A] leading-snug mb-1">{product.name}</p>
-        <p className="text-[13px] font-light text-[#9B9B9B] tabular-nums mb-4">$80</p>
-        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">Size</p>
-        <div className="flex flex-wrap gap-1.5">
-          {product.sizes.filter((s: any) => s.inStock).map((s: any) => (
-            <button key={s.value} onClick={() => onSizeSelect(s.label)}
-              className={cn('h-8 min-w-[36px] px-1.5 text-[11px] font-light border transition-all',
-                selectedSize === s.label
-                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                  : 'border-[#D5D1CB] text-[#1A1A1A] hover:border-[#1A1A1A]')}>
+      <div style={{ padding:'0 16px 20px' }}>
+        <p style={{ fontSize:13, fontWeight:300, color:'#1A1A1A', marginBottom:4, lineHeight:1.3 }}>
+          {product.name}
+        </p>
+        <p style={{ fontSize:13, fontWeight:300, color:'#9B9B9B', marginBottom:14, fontVariantNumeric:'tabular-nums' }}>
+          $80
+        </p>
+        <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.1em',
+                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:8 }}>Size</p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {product.sizes.filter((s:any)=>s.inStock).map((s:any)=>(
+            <button key={s.value} onClick={()=>onSize(s.label)}
+              style={{ height:34, minWidth:36, padding:'0 8px', fontSize:11, fontWeight:300,
+                       cursor:'pointer', transition:'all 150ms',
+                       border: selectedSize===s.label ? '1.5px solid #1A1A1A' : '1px solid #D5D1CB',
+                       background: selectedSize===s.label ? '#1A1A1A' : 'transparent',
+                       color: selectedSize===s.label ? '#fff' : '#1A1A1A' }}>
               {s.label}
             </button>
           ))}
@@ -1365,7 +1430,7 @@ function BundleProductCard({ product, img, selectedSize, onSizeSelect }: {
 // ─── Sticky ATC ───────────────────────────────────────────────────────────────
 function StickyATC({ product, color, size, cta, ctaLabel, soldOut, onAdd, t, visible }: any) {
   return (
-    <div className={cn('fixed bottom-0 left-0 right-0 z-[200] overflow-hidden',
+    <div className={cn('fixed bottom-0 left-0 right-0 z-[200] overflow-hidden lg:hidden',
       'bg-white border-t border-[#E8E5E0] transition-transform duration-300',
       visible ? 'translate-y-0 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]' : 'translate-y-full')}
       aria-hidden={!visible}>
