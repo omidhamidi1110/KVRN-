@@ -217,15 +217,18 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
       {/* DESKTOP: single static hero image — no swipe, no counter */}
       <div className="hidden lg:block relative flex-shrink-0 bg-[#EDEAE4] w-[62%] h-full overflow-hidden">
         {heroImage?.src ? (
-          <Image
-            src={heroImage.src}
-            alt={heroImage.alt || product.name}
-            fill priority fetchPriority="high"
-            sizes="62vw"
-            className="object-cover object-[center_15%]"
-            quality={92}
-            onError={() => {}}
-          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Image
+              src={heroImage.src}
+              alt={heroImage.alt || product.name}
+              fill priority fetchPriority="high"
+              sizes="62vw"
+              className="object-cover object-[center_12%]"
+              quality={92}
+              onError={() => {}}
+              style={{ transform: 'scale(0.91)', transformOrigin: 'center center' }}
+            />
+          </div>
         ) : (
           <div className="absolute inset-0 bg-[#DDD9D2]" />
         )}
@@ -504,87 +507,197 @@ function GalleryStage({ images, productName, onShop }: {
 }
 
 // ─── Desktop gallery: horizontal scroll, wheel/trackpad driven ────────────────
+// ─── Desktop gallery: luxury 70/30 accordion ─────────────────────────────────
+// Active image = ~70% width. Remaining images = narrow vertical strips sharing ~30%.
+// Width transitions smoothly (not fade). One scroll = exactly one image advance.
+// Scroll events are throttled: a new one is only accepted after the current
+// transition completes (450ms lock). This prevents any image skipping.
 function DesktopGallery({ images, productName }: any) {
-  const [active, setActive] = useState(0)
-  const trackRef = useRef<HTMLDivElement>(null)
-  const total    = images.length
+  const [active,       setActive]       = useState(0)
+  const [transitioning, setTransitioning] = useState(false)  // scroll lock
+  const total = images.length
 
-  const onScroll = useCallback(() => {
-    const el = trackRef.current
-    if (!el) return
-    const itemW = el.scrollWidth / total
-    setActive(Math.min(Math.round(el.scrollLeft / itemW), total - 1))
+  // TRANSITION DURATION — must match CSS transition below
+  const DURATION_MS = 480
+
+  // Advance active index by ±1, with transition lock
+  const go = useCallback((dir: 1 | -1) => {
+    setActive(prev => {
+      const next = prev + dir
+      if (next < 0 || next >= total) return prev   // at boundary — ignore
+      return next
+    })
+    setTransitioning(true)
+    setTimeout(() => setTransitioning(false), DURATION_MS)
   }, [total])
+
+  // Wheel handler — one event = one image, locked during transition
+  const wheelAccum = useRef(0)
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const onWheel = useCallback((e: React.WheelEvent) => {
-    const el = trackRef.current
-    if (!el) return
-    const atStart = el.scrollLeft <= 0
-    const atEnd   = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2
-    if ((e.deltaY < 0 && atStart) || (e.deltaY > 0 && atEnd)) return
     e.preventDefault()
-    el.scrollLeft += e.deltaY + e.deltaX
-  }, [])
+    if (transitioning) return   // locked — ignore all events during animation
 
-  const goTo = useCallback((i: number) => {
-    const el = trackRef.current
-    if (!el) return
-    el.scrollTo({ left: (el.scrollWidth / total) * i, behavior: 'smooth' })
-  }, [total])
+    // Accumulate delta — reset after short idle
+    const delta = e.deltaX + e.deltaY
+    wheelAccum.current += delta
+    if (wheelTimer.current) clearTimeout(wheelTimer.current)
+    wheelTimer.current = setTimeout(() => { wheelAccum.current = 0 }, 150)
+
+    // Threshold: require meaningful intent before advancing
+    const THRESHOLD = 30
+    if (wheelAccum.current > THRESHOLD) {
+      wheelAccum.current = 0
+      go(1)
+    } else if (wheelAccum.current < -THRESHOLD) {
+      wheelAccum.current = 0
+      go(-1)
+    }
+  }, [go, transitioning])
+
+  // Width calculation
+  // Active: ~70% of container. Each inactive: share remaining ~30% equally.
+  const inactiveCount  = total - 1
+  const activeWidthPct = 70
+  const inactiveWidthPct = inactiveCount > 0 ? (30 / inactiveCount) : 30
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#F9F8F6]">
-      <div ref={trackRef} onScroll={onScroll} onWheel={onWheel}
-        className="flex h-full overflow-x-scroll"
-        style={{
-          scrollSnapType: 'x mandatory', scrollBehavior: 'smooth',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none', msOverflowStyle: 'none',
-        }}>
-        {images.map((img: any, i: number) => (
-          <div key={i} className="relative flex-shrink-0 h-full bg-[#EDEAE4]"
-            style={{ width: '100%', scrollSnapAlign: 'start', scrollSnapStop: 'always',
-                     borderRight: i < total - 1 ? '2px solid #F9F8F6' : 'none' }}>
-            {img.src
-              ? <Image src={img.src} alt={img.alt || productName} fill
-                  sizes="100vw"
-                  className="object-cover object-[center_15%] pointer-events-none"
-                  loading={i < 2 ? 'eager' : 'lazy'}
-                  onError={() => {}} />
-              : <div className="absolute inset-0 bg-[#DDD9D2]" />}
+    <div
+      className="relative w-full h-full overflow-hidden bg-[#0E0E0E] flex"
+      onWheel={onWheel}
+      role="region"
+      aria-label={`${productName} gallery`}
+    >
+      {/* ── Image panels ── */}
+      {images.map((img: any, i: number) => {
+        const isActive = i === active
+        const widthPct = isActive ? activeWidthPct : inactiveWidthPct
+        return (
+          <div
+            key={i}
+            role="button"
+            tabIndex={0}
+            aria-label={`Image ${i + 1}${isActive ? ' (current)' : ' — click to view'}`}
+            onClick={() => {
+              if (!isActive && !transitioning) {
+                const dir = i > active ? 1 : -1
+                go(dir)
+              }
+            }}
+            onKeyDown={e => {
+              if ((e.key === 'Enter' || e.key === ' ') && !isActive && !transitioning) {
+                e.preventDefault()
+                go(i > active ? 1 : -1)
+              }
+            }}
+            style={{
+              width:      `${widthPct}%`,
+              transition: `width ${DURATION_MS}ms cubic-bezier(0.4,0,0.2,1)`,
+              position:   'relative',
+              height:     '100%',
+              flexShrink: 0,
+              overflow:   'hidden',
+              cursor:     isActive ? 'default' : 'pointer',
+              backgroundColor: '#0E0E0E',
+              // 1px separator between panels (uses bg color as gap)
+              borderRight: i < total - 1 ? '1px solid #1A1A1A' : 'none',
+            }}
+          >
+            {img.src ? (
+              <Image
+                key={img.src}
+                src={img.src}
+                alt={isActive ? (img.alt || productName) : ''}
+                fill
+                sizes="(max-width: 1600px) 70vw, 1100px"
+                // object-contain: shows entire garment, no aggressive crop
+                className="pointer-events-none"
+                style={{
+                  objectFit:      'contain',
+                  objectPosition: 'center center',
+                  // Inactive strips: slightly zoomed/cropped to tease
+                  // Active image: full contain, full garment visible
+                  transform:      isActive ? 'scale(1)' : 'scale(1.15)',
+                  transformOrigin:'center top',
+                  transition:     `transform ${DURATION_MS}ms cubic-bezier(0.4,0,0.2,1), filter ${DURATION_MS}ms ease`,
+                  filter:         isActive ? 'none' : 'brightness(0.45)',
+                }}
+                loading={i < 2 ? 'eager' : 'lazy'}
+                onError={() => {}}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-[#1A1A1A]" />
+            )}
+
+            {/* Number label on inactive strips */}
+            {!isActive && (
+              <div
+                className="absolute inset-0 flex items-end justify-center pb-4"
+                aria-hidden="true">
+                <span
+                  className="text-[10px] font-light tabular-nums text-white/40"
+                  style={{ letterSpacing: '0.1em', writingMode: 'vertical-lr' }}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+              </div>
+            )}
           </div>
-        ))}
+        )
+      })}
+
+      {/* ── Overlay UI on active image ── */}
+
+      {/* Counter — top right of active area */}
+      <div
+        className="absolute top-5 left-5 text-[11px] font-light tabular-nums text-white/50"
+        style={{ letterSpacing: '0.12em' }}
+        aria-live="polite">
+        {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       </div>
 
-      {/* Right-side vertical numbering */}
-      <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-3"
-        role="tablist" aria-label="Gallery image">
+      {/* Vertical number indicator — right edge, always visible */}
+      <div
+        className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-10"
+        role="tablist"
+        aria-label="Gallery position">
         {images.map((_: any, i: number) => (
-          <button key={i} role="tab" aria-selected={i === active}
-            onClick={() => goTo(i)}
-            className="text-[10px] font-light tabular-nums focus-visible:outline-none transition-all duration-300"
+          <button
+            key={i}
+            role="tab"
+            aria-selected={i === active}
+            onClick={() => {
+              if (!transitioning) go(i > active ? 1 : -1)
+            }}
+            className="focus-visible:outline-none"
             style={{
+              background:    'none',
+              border:        'none',
+              padding:       0,
+              fontFamily:    'inherit',
+              fontWeight:    300,
+              fontSize:      '10px',
               letterSpacing: '0.1em',
-              color: i === active ? 'rgba(26,26,26,0.75)' : 'rgba(26,26,26,0.2)',
+              lineHeight:    1,
+              color: i === active ? 'rgba(240,237,232,0.85)' : 'rgba(240,237,232,0.25)',
               transform: i === active ? 'translateX(-1px)' : 'none',
+              transition: `color ${DURATION_MS}ms ease, transform ${DURATION_MS}ms ease`,
+              cursor: i === active ? 'default' : 'pointer',
             }}>
             {String(i + 1).padStart(2, '0')}
           </button>
         ))}
       </div>
 
-      {/* Counter */}
-      <div className="absolute top-5 right-16 text-[11px] font-light tabular-nums text-[#1A1A1A]/35"
-        style={{ letterSpacing: '0.1em' }} aria-live="polite">
-        {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-      </div>
-
-      {/* Scroll hint — only on first image */}
+      {/* Scroll cue — bottom center, fades after first advance */}
       {active === 0 && (
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-25 pointer-events-none">
+        <div
+          className="absolute bottom-5 left-[35%] -translate-x-1/2 flex items-center gap-2 pointer-events-none"
+          style={{ opacity: 0.45 }}
+          aria-hidden="true">
           <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Scroll</span>
           <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
-            <path d="M1 4.5h12M8 1l4 3.5-4 3.5" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M1 4.5h12M8 1l4 3.5-4 3.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </div>
       )}
