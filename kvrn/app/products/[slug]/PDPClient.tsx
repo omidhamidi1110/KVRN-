@@ -1201,43 +1201,45 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
     <div className="bg-[#F9F8F6]">
 
       {/* ══ MOBILE LAYOUT (< lg) ══ */}
-      <div className="lg:hidden" style={{ padding:'40px 20px 120px' }}>
-        {/* Title block */}
-        <p style={{ fontSize:11, fontWeight:300, letterSpacing:'0.26em',
-                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:14 }}>
+      <div className="lg:hidden" style={{ padding:'0 0 100px' }}>
+        {/* Portrait carousel — full width, edge to edge */}
+        <MobileCarousel3 images={color.images} productName={product.name} />
+
+        {/* Title + price below carousel */}
+        <div style={{ padding:'24px 20px 0' }}>
+        <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.26em',
+                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
           {eyebrow}
         </p>
-        <h2 style={{ fontFamily:'var(--font-display)', fontWeight:300, lineHeight:1.08,
-                     letterSpacing:'-0.035em', color:'#1A1A1A', marginBottom:16,
-                     fontSize:'clamp(30px, 8.5vw, 38px)' }}>
+        <h2 style={{ fontFamily:'var(--font-display)', fontWeight:300, lineHeight:1.06,
+                     letterSpacing:'-0.03em', color:'#1A1A1A', marginBottom:12,
+                     fontSize:'clamp(26px, 7.5vw, 34px)' }}>
           {product.name}
         </h2>
-        <p style={{ fontSize:28, fontWeight:300, fontVariantNumeric:'tabular-nums',
-                    color:'#1A1A1A', marginBottom: product.founderNote ? 8 : 20 }}>
+        <p style={{ fontSize:24, fontWeight:300, fontVariantNumeric:'tabular-nums',
+                    color:'#1A1A1A', marginBottom: product.founderNote ? 6 : 0 }}>
           $80
         </p>
         {product.founderNote && (
-          <p style={{ fontSize:13, color:'#9B9B9B', lineHeight:1.55, marginBottom:20 }}>
+          <p style={{ fontSize:12, color:'#9B9B9B', lineHeight:1.5, marginBottom:0 }}>
             {product.founderNote}
           </p>
         )}
-
-        <div style={{ borderTop:'1px solid #E8E5E0', marginBottom:24 }} />
-
-        {/* Portrait carousel */}
-        <MobileCarousel3 images={color.images} productName={product.name} />
+        </div>
 
         {/* Purchase controls */}
+        <div style={{ padding:'0 20px' }}>
         <PurchasePanel
           product={product} color={color} setColor={setColor}
           size={size} setSize={setSize} sizeErr={sizeErr} setSizeErr={setSizeErr}
           cta={cta} ctaLabel={ctaLabel} soldOut={soldOut} onAdd={onAdd}
         />
+        </div>
       </div>
 
       {/* ══ DESKTOP LAYOUT (≥ lg) ══ */}
       <div className="hidden lg:block"
-        style={{ maxWidth:1380, margin:'0 auto', padding:'64px 48px 80px' }}>
+        style={{ maxWidth:1380, margin:'0 auto', padding:'56px 48px 80px' }}>
         <div style={{ display:'grid',
                       gridTemplateColumns:'80px minmax(400px,620px) minmax(360px,440px)',
                       gap:40, alignItems:'start', justifyContent:'center' }}>
@@ -1305,19 +1307,9 @@ function CompleteSet({ product, related, onAddBoth }: any) {
 
   return (
     <section style={{ background:'#F3F0EA' }}>
-      <div style={{ maxWidth:1380, margin:'0 auto', padding:'88px 48px' }}>
+      <div style={{ maxWidth:1380, margin:'0 auto', padding:'64px 28px' }}>
 
-        {/* Mobile stacked / Desktop 4-col */}
-        <div className="flex flex-col lg:grid"
-          style={{ ['--cols' as any]:'minmax(200px,0.85fr) minmax(260px,1fr) minmax(260px,1fr) minmax(230px,0.9fr)' }}
-        >
-          {/* Force desktop grid via inline */}
-          <div className="hidden lg:contents">
-            {/* Desktop uses CSS grid applied on parent below */}
-          </div>
-        </div>
-
-        {/* Simpler: use a responsive flex/grid wrapper */}
+        {/* Responsive: stacked on mobile, 4-col grid on desktop */}
         <div className="flex flex-col lg:grid gap-8 lg:gap-10"
           style={{ gridTemplateColumns:'minmax(200px,0.85fr) minmax(260px,1fr) minmax(260px,1fr) minmax(230px,0.9fr)',
                    alignItems:'center' } as any}>
@@ -1392,7 +1384,7 @@ function BundleCard({ product, img, selectedSize, onSize }: {
   product:any; img:any; selectedSize:string|null; onSize:(s:string)=>void
 }) {
   return (
-    <div style={{ background:'#fff' }}>
+    <div style={{ background:'transparent' }}>
       <div style={{ position:'relative', width:'100%', aspectRatio:'3/4',
                     overflow:'hidden', background:'#EDEAE4', marginBottom:14 }}>
         {img?.src && <img src={img.src} alt={product.name} loading="lazy"
