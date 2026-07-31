@@ -223,10 +223,9 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
               alt={heroImage.alt || product.name}
               fill priority fetchPriority="high"
               sizes="62vw"
-              className="object-cover object-[center_12%]"
+              className="object-cover object-[center_30%]"
               quality={92}
               onError={() => {}}
-              style={{ transform: 'scale(0.91)', transformOrigin: 'center center' }}
             />
           </div>
         ) : (
@@ -535,18 +534,27 @@ function DesktopGallery({ images, productName }: any) {
   const wheelAccum = useRef(0)
   const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Touch handlers for swipe navigation
+  // Touch swipe — all coords in refs, zero state updates during gesture
   const touchStartX = useRef<number | null>(null)
+  const touchCurX   = useRef<number | null>(null)
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
+    touchCurX.current   = e.touches[0].clientX
   }, [])
 
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (touchStartX.current === null) return
-    const dx = e.changedTouches[0].clientX - touchStartX.current
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    touchCurX.current = e.touches[0].clientX
+  }, [])
+
+  const onTouchEnd = useCallback(() => {
+    const start = touchStartX.current
+    const cur   = touchCurX.current
     touchStartX.current = null
-    if (Math.abs(dx) < 40) return          // too small — ignore
+    touchCurX.current   = null
+    if (start === null || cur === null) return
+    const dx = cur - start
+    if (Math.abs(dx) < 36) return          // below threshold — ignore
     if (!transitioning) go(dx < 0 ? 1 : -1)
   }, [go, transitioning])
 
@@ -582,6 +590,7 @@ function DesktopGallery({ images, productName }: any) {
       className="relative w-full h-full overflow-hidden bg-[#0E0E0E] flex"
       onWheel={onWheel}
       onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       role="region"
       aria-label={`${productName} gallery`}
@@ -631,7 +640,7 @@ function DesktopGallery({ images, productName }: any) {
                 className="pointer-events-none"
                 style={{
                   objectFit:      'cover',
-                  objectPosition: 'center top',
+                  objectPosition: 'center 30%',  // torso/artwork focus, not face
                   transition:     `filter ${DURATION_MS}ms ease`,
                   filter:         isActive ? 'none' : 'brightness(0.7)',
                 }}
@@ -883,6 +892,27 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t }: any) {
   return (
     <div className="bg-[#F9F8F6] min-h-screen">
+
+      {/* Stage 3 image card — full-width hero image above purchase details */}
+      {color.images[0]?.src && (
+        <div className="w-full bg-[#EDEAE4] overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '75vh' }}>
+          <div className="relative w-full h-full">
+            <img
+              src={color.images[0].src}
+              alt={product.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center 30%',
+                display: 'block',
+              }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-[520px] mx-auto px-6 lg:px-0 py-16 md:py-20">
 
         <div className="mb-9">
