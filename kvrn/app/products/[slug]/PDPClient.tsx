@@ -1243,7 +1243,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
       {/* ══ DESKTOP LAYOUT (≥ lg) ══ */}
       <div className="hidden lg:block"
-        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 16px) 48px 80px', boxSizing:'border-box' }}>
+        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 16px) 48px 16px', boxSizing:'border-box' }}>
         <div style={{ display:'grid',
                       gridTemplateColumns:'88px minmax(480px,620px) minmax(380px,460px)',
                       gap:40, alignItems:'start', justifyContent:'center' }}>
