@@ -65,13 +65,24 @@ export function PDPClient({ product, relatedProduct }: Props) {
     return () => el.removeEventListener('scroll', fn)
   }, [snapOn])
 
-  // Sticky ATC: only after snap is done AND stage 3 trigger passes viewport
+  // Sticky ATC + navbar state: fire kvrn-slide-change whenever details section crosses viewport
   useEffect(() => {
     const el = detailRef.current
     if (!el) return
     const io = new IntersectionObserver(([e]) => {
-      setSticky(!e.isIntersecting && !snapOn)
-    }, { threshold: 0 })
+      const inDetails = e.isIntersecting
+      setSticky(!inDetails && !snapOn)
+      // When details enter view → light nav (Stage 3 is cream bg)
+      // When details leave view (scroll back up) → dispatch based on current snap stage
+      if (inDetails) {
+        window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
+      } else if (!snapOn) {
+        // Snapped out but scrolled back above details — shouldn't normally happen,
+        // but fire light just in case
+        window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
+      }
+      // If snap is still on, the snap scroll listener handles it
+    }, { threshold: 0, rootMargin: '-1px 0px 0px 0px' })
     io.observe(el)
     return () => io.disconnect()
   }, [snapOn])
@@ -888,34 +899,98 @@ function MobileGallery({ images, productName, onShop }: any) {
 // ════════════════════════════════════════════════════════════════════════════
 //  STAGE 3 — DETAILS (normal scroll)
 // ════════════════════════════════════════════════════════════════════════════
+// ─── Stage 3 portrait swipeable carousel ────────────────────────────────────
+function Stage3Carousel({ images, productName }: { images: any[]; productName: string }) {
+  const [active, setActive] = useState(0)
+  const [drag,   setDrag]   = useState(0)
+  const total = images.length
+
+  const txStart = useRef<number | null>(null)
+  const txCur   = useRef<number | null>(null)
+
+  // Reset to first image when images array changes (color switch)
+  useEffect(() => { setActive(0); setDrag(0) }, [images])
+
+  const go = (dir: 1 | -1) =>
+    setActive(i => Math.max(0, Math.min(total - 1, i + dir)))
+
+  return (
+    <div className="mb-8" style={{ userSelect: 'none' }}>
+      {/* Portrait image container */}
+      <div
+        className="w-full overflow-hidden bg-[#EDEAE4] relative"
+        style={{ aspectRatio: '3/4', touchAction: 'pan-y' }}
+        onTouchStart={e => {
+          txStart.current = e.touches[0].clientX
+          txCur.current   = e.touches[0].clientX
+        }}
+        onTouchMove={e => {
+          txCur.current = e.touches[0].clientX
+        }}
+        onTouchEnd={() => {
+          const start = txStart.current; const cur = txCur.current
+          txStart.current = null; txCur.current = null
+          if (start === null || cur === null) return
+          const dx = cur - start
+          if (Math.abs(dx) > 36) go(dx < 0 ? 1 : -1)
+        }}
+      >
+        {/* Slide track */}
+        <div style={{
+          display: 'flex', height: '100%',
+          transform: `translateX(calc(${-active * 100}% + ${drag}px))`,
+          transition: drag === 0 ? 'transform 0.38s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+          willChange: 'transform',
+        }}>
+          {images.map((img: any, i: number) => (
+            <div key={i} style={{ minWidth: '100%', height: '100%', flexShrink: 0, position: 'relative' }}>
+              {img?.src ? (
+                <img src={img.src} alt={i === active ? (img.alt || productName) : ''}
+                  loading={i < 2 ? 'eager' : 'lazy'}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
+                           objectFit: 'cover', objectPosition: 'center 30%', pointerEvents: 'none' }}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              ) : <div style={{ position: 'absolute', inset: 0, background: '#DDD9D2' }} />}
+            </div>
+          ))}
+        </div>
+
+        {/* Left / right buttons — desktop only */}
+        {active > 0 && (
+          <button onClick={() => go(-1)} aria-label="Previous"
+            className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 items-center justify-center bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
+            style={{ borderRadius: 0 }}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M7 1L3 5l4 4" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/></svg>
+          </button>
+        )}
+        {active < total - 1 && (
+          <button onClick={() => go(1)} aria-label="Next"
+            className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 items-center justify-center bg-white/80 backdrop-blur-sm hover:bg-white transition-colors"
+            style={{ borderRadius: 0 }}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 1l4 4-4 4" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/></svg>
+          </button>
+        )}
+      </div>
+
+      {/* Counter below image */}
+      {total > 1 && (
+        <p className="text-center text-[11px] font-light tabular-nums text-[#9B9B9B] mt-2.5"
+          style={{ letterSpacing: '0.1em' }}>
+          {String(active + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t }: any) {
   return (
     <div className="bg-[#F9F8F6] min-h-screen">
 
-      {/* Stage 3 image card — full-width hero image above purchase details */}
-      {color.images[0]?.src && (
-        <div className="w-full bg-[#EDEAE4] overflow-hidden" style={{ aspectRatio: '16/9', maxHeight: '75vh' }}>
-          <div className="relative w-full h-full">
-            <img
-              src={color.images[0].src}
-              alt={product.name}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center 30%',
-                display: 'block',
-              }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-          </div>
-        </div>
-      )}
+      <div className="max-w-[520px] mx-auto px-6 lg:px-0 pt-14 md:pt-20 pb-0">
 
-      <div className="max-w-[520px] mx-auto px-6 lg:px-0 py-16 md:py-20">
-
-        <div className="mb-9">
+        <div className="mb-6">
           <p className="text-[10px] font-light tracking-[0.2em] uppercase text-[#9B9B9B] mb-2">
             {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
           </p>
@@ -929,6 +1004,9 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
             )}
           </div>
         </div>
+
+        {/* Stage 3 portrait carousel */}
+        <Stage3Carousel images={color.images} productName={product.name} />
 
         {product.colors.length > 1 && (
           <div className="mb-6">
