@@ -38,7 +38,7 @@ export default function SizeGuidePage() {
       {/* Dark header */}
       <PageHero title="Size Guide" breadcrumb="Size Guide" />
 
-      <div className="container-kvrn max-w-3xl py-12">
+      <div data-nav-theme="light" className="container-kvrn max-w-3xl py-12">
         <p className="text-[14px] text-[#6B6B6B] mb-12 leading-relaxed max-w-[540px]">
           All measurements refer to the garment, not body size. KVRN is designed oversized.
           Order your usual size for the intended silhouette. Size down if you prefer a slightly closer fit.

@@ -12,7 +12,7 @@ export default function ShippingReturnsPage() {
     <div>
       {/* Dark header band */}
       <PageHero title="Shipping & Returns" breadcrumb="Shipping & Returns" />
-      <div className="container-kvrn section-padding max-w-3xl">
+      <div data-nav-theme="light" className="container-kvrn section-padding max-w-3xl">
 
         {/* Shipping */}
         <section className="mb-14" aria-labelledby="shipping-h">

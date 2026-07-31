@@ -179,7 +179,7 @@ export default function FAQPage() {
       {/* Dark header band */}
       <PageHero title="FAQ" breadcrumb="FAQ" />
 
-      <div className="container-kvrn max-w-3xl py-14">
+      <div data-nav-theme="light" className="container-kvrn max-w-3xl py-14">
         {FAQ_SECTIONS.map(section => (
           <section key={section.heading} className="mb-12 last:mb-0">
             <h2 className="text-[11px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-5 pb-3 border-b border-[#E8E5E0]">

@@ -41,12 +41,11 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Homepage + PDP: listen for kvrn-slide-change events
+  // All pages: listen for kvrn-slide-change events
+  // Homepage/PDP fire these via scroll events; inner pages via IntersectionObserver below
   useEffect(() => {
-    if (!isHome && !isPDP) return
-    // Homepage default: dark (first slide is dark hero)
-    // PDP default: light (Stage 1 hero has light/cream bg → black text nav)
-    setNavTheme(isHome ? 'dark' : 'light')
+    const defaultTheme = isHome ? 'dark' : 'light'
+    setNavTheme(defaultTheme)
 
     const onSlideChange = (e: Event) => {
       const detail = (e as CustomEvent<{ dark: boolean }>).detail
@@ -54,6 +53,30 @@ export function Nav() {
     }
     window.addEventListener('kvrn-slide-change', onSlideChange)
     return () => window.removeEventListener('kvrn-slide-change', onSlideChange)
+  }, [isHome])
+
+  // Inner pages (not homepage, not PDP): watch data-nav-theme sections
+  useEffect(() => {
+    if (isHome || isPDP) return
+
+    const update = () => {
+      // Find which section the nav (at ~92px from top) is currently over
+      const navY = 92 // px — announcement bar + nav height
+      const els = document.querySelectorAll('[data-nav-theme]')
+      let theme: 'dark' | 'light' = 'light'
+      els.forEach(el => {
+        const rect = el.getBoundingClientRect()
+        // Section is "under" the nav if rect.top ≤ navY ≤ rect.bottom
+        if (rect.top <= navY && rect.bottom > navY) {
+          theme = (el.getAttribute('data-nav-theme') as 'dark' | 'light') ?? 'light'
+        }
+      })
+      setNavTheme(theme)
+    }
+
+    update() // run once immediately
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
   }, [isHome, isPDP])
 
   useEffect(() => {
@@ -68,9 +91,9 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state ──────────────────────────────────────────────────────
-  // Homepage + PDP: transparent, kvrn-slide-change events drive text color
-  // All other inner pages: black text always
-  const isWhiteText = (isHome || isPDP) ? navTheme === 'dark' : false
+  // Homepage + PDP: kvrn-slide-change events drive text color
+  // Inner pages: navTheme driven by data-nav-theme IntersectionObserver (see below)
+  const isWhiteText = navTheme === 'dark'  // all pages use navTheme now
   const textCls     = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls    = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 

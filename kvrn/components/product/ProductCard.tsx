@@ -41,12 +41,14 @@ export function ProductCard({ product, priority = false, className }: Props) {
                 src={frontImage.src} alt={frontImage.alt} fill priority={priority}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className="object-cover transition-opacity duration-700 group-hover:opacity-0"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
               {backImage?.src && (
                 <Image
                   src={backImage.src} alt={backImage.alt} fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-cover absolute inset-0 opacity-0 transition-opacity duration-700 group-hover:opacity-100"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
               )}
             </>
