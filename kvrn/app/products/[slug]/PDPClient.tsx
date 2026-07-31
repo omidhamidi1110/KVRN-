@@ -99,20 +99,24 @@ export function PDPClient({ product, relatedProduct }: Props) {
     setTimeout(() => { setCta('idle'); openCart() }, 700)
   }, [size, color, product, addItem, openCart])
 
-  const addBoth = useCallback(() => {
+  // addBoth receives independent sizes from the CompleteSet bundle cards
+  const addBoth = useCallback((bundleHoodieSize: string, bundlePantsSize: string) => {
     if (!relatedProduct) return
-    const s = size ?? 'M'
+    const isHoodie = (p: any) => p.name.toLowerCase().includes('hoodie')
+    const productSize  = isHoodie(product)        ? bundleHoodieSize : bundlePantsSize
+    const relatedSize  = isHoodie(relatedProduct) ? bundleHoodieSize : bundlePantsSize
     addItem({ productId: product.id, productName: product.name, slug: product.slug,
-      color: color.value, colorName: color.name, colorHex: color.hex, size: s,
+      color: color.value, colorName: color.name, colorHex: color.hex, size: productSize as any,
       price: product.price, quantity: 1,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     addItem({ productId: relatedProduct.id, productName: relatedProduct.name,
       slug: relatedProduct.slug,
       color: relatedProduct.colors[0].value, colorName: relatedProduct.colors[0].name,
-      colorHex: relatedProduct.colors[0].hex, size: s, price: relatedProduct.price, quantity: 1,
+      colorHex: relatedProduct.colors[0].hex, size: relatedSize as any,
+      price: relatedProduct.price, quantity: 1,
       image: relatedProduct.colors[0].images.find(i => i.type === 'front')?.src ?? '' })
     openCart()
-  }, [size, color, product, relatedProduct, addItem, openCart])
+  }, [color, product, relatedProduct, addItem, openCart])
 
   const exitSnap = useCallback(() => {
     document.body.style.overflow = ''
@@ -1239,7 +1243,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
       {/* ══ DESKTOP LAYOUT (≥ lg) ══ */}
       <div className="hidden lg:block"
-        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 40px) 48px 80px', boxSizing:'border-box' }}>
+        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 16px) 48px 80px', boxSizing:'border-box' }}>
         <div style={{ display:'grid',
                       gridTemplateColumns:'88px minmax(480px,620px) minmax(380px,460px)',
                       gap:40, alignItems:'start', justifyContent:'center' }}>
@@ -1357,19 +1361,31 @@ function CompleteSet({ product, related, onAddBoth }: any) {
                 <span style={{ fontSize:22, fontWeight:300, fontVariantNumeric:'tabular-nums' }}>$160</span>
               </div>
             </div>
-            <button onClick={onAddBoth}
-              style={{ width:'100%', minWidth:0, minHeight:60, fontSize:11, fontWeight:300,
-                       letterSpacing:'0.08em', textTransform:'uppercase',
-                       background:'#1A1A1A', color:'#fff', border:'none',
-                       cursor:'pointer', transition:'background 200ms',
-                       marginBottom:14, padding:'0 12px',
-                       display:'flex', alignItems:'center', justifyContent:'center',
-                       boxSizing:'border-box', overflow:'hidden',
-                       whiteSpace:'nowrap', textAlign:'center', lineHeight:1 }}
-              onMouseEnter={e=>(e.currentTarget.style.background='#333')}
-              onMouseLeave={e=>(e.currentTarget.style.background='#1A1A1A')}>
-              Add the Complete Set — $160
-            </button>
+            {/* Button label guides user to select missing sizes */}
+            {(() => {
+              const bundleReady = Boolean(hSize) && Boolean(pSize)
+              const label = !hSize && !pSize
+                ? 'Select Both Sizes'
+                : !hSize ? 'Select Hoodie Size'
+                : !pSize ? 'Select Sweatpants Size'
+                : 'Add the Complete Set — $160'
+              return (
+                <button
+                  disabled={!bundleReady}
+                  onClick={() => bundleReady && onAddBoth(hSize!, pSize!)}
+                  style={{ width:'100%', minWidth:0, minHeight:60, fontSize:11, fontWeight:300,
+                           letterSpacing:'0.08em', textTransform:'uppercase',
+                           background: bundleReady ? '#1A1A1A' : '#E8E5E0',
+                           color: bundleReady ? '#fff' : '#9B9B9B',
+                           border:'none', cursor: bundleReady ? 'pointer' : 'default',
+                           transition:'background 200ms', marginBottom:14, padding:'0 12px',
+                           display:'flex', alignItems:'center', justifyContent:'center',
+                           boxSizing:'border-box', overflow:'hidden',
+                           whiteSpace:'nowrap', textAlign:'center', lineHeight:1 }}>
+                  {label}
+                </button>
+              )
+            })()}
             <Link href={`/products/${related.slug}`}
               style={{ display:'block', textAlign:'center', fontSize:11, color:'#9B9B9B',
                        textDecoration:'underline', textUnderlineOffset:2 }}
