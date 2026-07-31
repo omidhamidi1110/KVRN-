@@ -1239,9 +1239,9 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
       {/* ══ DESKTOP LAYOUT (≥ lg) ══ */}
       <div className="hidden lg:block"
-        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 36px) 48px 80px' }}>
+        style={{ maxWidth:1380, margin:'0 auto', padding:'calc(36px + 56px + 40px) 48px 80px', boxSizing:'border-box' }}>
         <div style={{ display:'grid',
-                      gridTemplateColumns:'80px minmax(400px,620px) minmax(360px,440px)',
+                      gridTemplateColumns:'88px minmax(480px,620px) minmax(380px,460px)',
                       gap:40, alignItems:'start', justifyContent:'center' }}>
 
           {/* Column 1: thumbnail rail (rendered inside DesktopGallery3) */}
@@ -1252,12 +1252,12 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
           {/* Use a sub-grid approach: outer grid col1=80px, col2=gallery, col3=panel */}
 
           {/* Thumbnail + gallery spanning cols 1-2 */}
-          <div style={{ gridColumn:'1 / 3' }}>
+          <div style={{ gridColumn:'1 / 3', marginTop:0, alignSelf:'start' }}>
             <DesktopGallery3 images={color.images} productName={product.name} />
           </div>
 
           {/* Purchase panel col 3 */}
-          <div style={{ position:'sticky', top:120, alignSelf:'start' }}>
+          <div style={{ marginTop:0, alignSelf:'start', position:'sticky', top:'calc(36px + 56px + 24px)' }}>
             <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.22em',
                         textTransform:'uppercase', color:'#9B9B9B', marginBottom:14 }}>
               {eyebrow}
