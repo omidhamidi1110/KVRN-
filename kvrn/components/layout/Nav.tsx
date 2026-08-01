@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useCart }          from '@/context/CartContext'
 import { useWishlist }      from '@/context/WishlistContext'
 import { useCookiePrefs }   from '@/context/CookiePrefsContext'
@@ -23,23 +23,41 @@ export function Nav() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  type NavbarMode = 'standard' | 'product-transparent' | 'product-cream'
+  type NavbarMode = 'standard' | 'product-transparent' | 'product-cream' | 'collection-top' | 'collection-scrolled'
 
-  const isHome = pathname === '/'
-  const isPDP  = pathname.startsWith('/products/')
+  const isHome       = pathname === '/'
+  const isPDP        = pathname.startsWith('/products/')
+  const isCollection = pathname === '/shop' || pathname.startsWith('/collections/')
+
+  // Scroll offset for collection pages
+  const [collectionScrolled, setCollectionScrolled] = useState(false)
 
   // Single source of truth for navbar appearance
-  // Initialized synchronously from pathname — no flash
   const [productStageMode, setProductStageMode] = useState<NavbarMode>('product-transparent')
-  const effectiveMode: NavbarMode = isPDP ? productStageMode : isHome ? 'product-transparent' : 'standard'
+  const effectiveMode: NavbarMode =
+    isPDP        ? productStageMode :
+    isCollection ? (collectionScrolled ? 'collection-scrolled' : 'collection-top') :
+    isHome       ? 'product-transparent' :
+                   'standard'
 
   // Reset on every route change — kills stale state from previous page
   useEffect(() => {
     if (isPDP) {
       setProductStageMode('product-transparent')
     }
-    // Standard and homepage modes derive from pathname synchronously via effectiveMode
-  }, [pathname, isPDP])
+    if (isCollection) {
+      setCollectionScrolled(false)  // always start at top
+    }
+  }, [pathname, isPDP, isCollection])
+
+  // Collection scroll listener
+  useEffect(() => {
+    if (!isCollection) return
+    const onScroll = () => setCollectionScrolled(window.scrollY > 16)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isCollection, pathname])
 
   // Listen for product-stage mode events
   useEffect(() => {
@@ -87,15 +105,12 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state — derived from single effectiveMode ─────────────────
-  const isTransparent = effectiveMode === 'product-transparent'
-  const isCream       = effectiveMode === 'standard' || effectiveMode === 'product-cream'
-  // Text: white on transparent (dark bg behind), dark on cream/standard (light bg)
-  // Exception: homepage dark slides use white text
-  const isWhiteText = isTransparent
-    ? true
-    : isHome
-    ? false
-    : innerDark
+  const isTransparent = effectiveMode === 'product-transparent' || effectiveMode === 'collection-top'
+  const isCollectionMode = effectiveMode === 'collection-top' || effectiveMode === 'collection-scrolled'
+  // Collection pages: always white text/icons
+  // Transparent product stages: white text
+  // Standard: dark or section-aware
+  const isWhiteText = isCollectionMode ? true : isTransparent ? true : isHome ? false : innerDark
   const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
@@ -128,14 +143,34 @@ export function Nav() {
           // Homepage: transparent, no border — slide system controls colors
           // All other pages: solid cream bg + subtle border + black text, always
           // Transparent always — bg only for inner pages after scrolling
-          // product-transparent: fully transparent, no border, no blur, no shadow
-          // standard/product-cream: cream bg + border
-          effectiveMode === 'product-transparent'
+          // collection-top: fully transparent, no border (overlays dark hero)
+          // collection-scrolled: dark translucent bg + visible border + blur
+          // product-transparent: fully transparent, no border
+          // standard/cream: cream bg + border
+          effectiveMode === 'collection-top' || effectiveMode === 'product-transparent'
             ? 'bg-transparent border-0 shadow-none'
+            : effectiveMode === 'collection-scrolled'
+            ? 'border-b border-white/35'
             : 'bg-[#F9F8F6]/97 backdrop-blur-[14px] border-b border-[#E8E5E0]',
           textCls
         )}
-        style={{ top: '36px' }}
+        style={{
+          top: '36px',
+          backgroundColor:
+            effectiveMode === 'collection-scrolled'
+              ? 'rgba(8,8,8,0.72)'
+              : undefined,
+          backdropFilter:
+            effectiveMode === 'collection-scrolled'
+              ? 'blur(14px)'
+              : undefined,
+          WebkitBackdropFilter:
+            effectiveMode === 'collection-scrolled'
+              ? 'blur(14px)'
+              : undefined,
+          transition:
+            'background-color 220ms ease, border-color 220ms ease, backdrop-filter 220ms ease',
+        }}
         aria-label="Main navigation"
       >
         <div className="container-kvrn flex items-center justify-between">
