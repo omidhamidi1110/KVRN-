@@ -24,7 +24,7 @@ export function ShopClient({ products, type }: Props) {
         desktopLink={{
           name:'HEAVYWEIGHT HOODIE', price:'$80',
           href:'/products/kvrn-phantom-hoodie',
-          desktopStyle:{ top:'76%', right:'clamp(62px,7vw,132px)', width:'clamp(190px,15vw,240px)' },
+          desktopStyle:{ top:'63%', right:'clamp(24px,2.5vw,40px)', width:'clamp(180px,14vw,210px)' },
         }}
         mobileLinks={[{
           name:'HEAVYWEIGHT HOODIE', price:'$80',
@@ -50,7 +50,7 @@ export function ShopClient({ products, type }: Props) {
         desktopLink={{
           name:'HEAVYWEIGHT SWEATPANTS', price:'$80',
           href:'/products/kvrn-phantom-sweatpants',
-          desktopStyle:{ top:'67%', right:'clamp(72px,7.4vw,142px)', width:'clamp(220px,18vw,285px)' },
+          desktopStyle:{ top:'61%', right:'clamp(24px,2.5vw,40px)', width:'clamp(190px,15vw,220px)' },
         }}
         mobileLinks={[{
           name:'HEAVYWEIGHT SWEATPANTS', price:'$80',

@@ -68,6 +68,8 @@ export function Nav() {
       const detail = (e as CustomEvent<{ mode?: NavbarMode }>).detail
       if (detail?.mode === 'product-stage-1' || detail?.mode === 'product-stage-2' || detail?.mode === 'product-stage-3') {
         setProductStageMode(detail.mode)
+      } else if (detail?.mode === 'home-light') {
+        setHomeMode('home-light')
       }
     }
     window.addEventListener('kvrn-navbar-mode', handler)

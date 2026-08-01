@@ -43,6 +43,12 @@ export function HomepageClient() {
       window.dispatchEvent(new CustomEvent('kvrn-slide-change', {
         detail: { dark: DARK_SLIDES.has(clamped) }
       }))
+      // Also dispatch explicit navbar mode for Stage 5 (footer slide)
+      if (!DARK_SLIDES.has(clamped)) {
+        window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
+          detail: { mode: 'home-light' }
+        }))
+      }
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
