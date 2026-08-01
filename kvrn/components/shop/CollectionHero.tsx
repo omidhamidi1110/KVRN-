@@ -151,13 +151,34 @@ export function CollectionHero({
           </Link>
         ))}
 
-        {/* ── Single product link for Hoodies/Sweatpants desktop ── */}
-        {!productLinks && (
-          <div style={{
-            position: 'absolute', zIndex: 2,
-            right: 'clamp(48px,7vw,120px)', top: '38%',
-            textDecoration: 'none', color: 'rgba(255,255,255,0.92)',
-          }} />
+        {/* Single desktop product link for Hoodies/Sweatpants */}
+        {desktopLink && (
+          <Link href={desktopLink.href}
+            style={{
+              position:'absolute', zIndex:5,
+              right:'clamp(42px,6vw,112px)',
+              width:'clamp(175px,15vw,235px)',
+              textDecoration:'none', color:'rgba(255,255,255,0.92)',
+              ...desktopLink.desktopStyle,
+            }}
+            className="group"
+          >
+            <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
+                        textTransform:'uppercase', margin:0, fontWeight:300 }}>
+              {desktopLink.name}
+            </p>
+            <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
+                        textTransform:'uppercase', margin:0, fontWeight:300 }}>
+              {desktopLink.price}
+            </p>
+            <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
+                        textTransform:'uppercase', marginTop:6, fontWeight:300,
+                        display:'flex', alignItems:'center', gap:6 }}>
+              VIEW PIECE
+              <span style={{ display:'inline-block', transition:'transform 200ms ease' }}
+                className="group-hover:[transform:translateX(4px)]">→</span>
+            </p>
+          </Link>
         )}
       </section>
 
@@ -201,7 +222,7 @@ export function CollectionHero({
           top:      'clamp(112px, 17svh, 158px)',
           maxWidth: 'min(66vw, 390px)',
         }}>
-          <p style={{ fontSize:13, lineHeight:1.5, letterSpacing:'0.16em',
+          <p style={{ fontSize:'clamp(11px,3vw,13px)', lineHeight:1.45, letterSpacing:'0.15em',
                       textTransform:'uppercase', margin:0,
                       color:'rgba(255,255,255,0.85)' }}>
             {eyebrow1}
@@ -213,7 +234,7 @@ export function CollectionHero({
           </p>
 
           <h1 style={{ fontFamily:"Georgia,'Times New Roman',serif",
-                       fontSize:'clamp(42px, 11.2vw, 58px)',
+                       fontSize:'clamp(38px, 10.4vw, 50px)',
                        lineHeight:0.96, letterSpacing:'-0.025em', fontWeight:400,
                        margin:0 }}>
             {headlineLines.map(line => (
@@ -222,24 +243,24 @@ export function CollectionHero({
           </h1>
 
           <div style={{ width:76, height:1, background:'rgba(255,255,255,0.9)',
-                        margin:'30px 0' }} />
+                        margin:'25px 0' }} />
 
           <div style={{ marginBottom:20 }}>
             {specs1.map(s => (
-              <p key={s} style={{ fontSize:'clamp(13px,3.7vw,16px)', lineHeight:1.48,
-                                  letterSpacing:'0.11em', textTransform:'uppercase',
+              <p key={s} style={{ fontSize:'clamp(11px,3.15vw,13px)', lineHeight:1.48,
+                                  letterSpacing:'0.10em', textTransform:'uppercase',
                                   margin:0, color:'rgba(255,255,255,0.88)' }}>{s}</p>
             ))}
           </div>
           <div style={{ marginBottom:20 }}>
             {specs2.map(s => (
-              <p key={s} style={{ fontSize:'clamp(13px,3.7vw,16px)', lineHeight:1.48,
-                                  letterSpacing:'0.11em', textTransform:'uppercase',
+              <p key={s} style={{ fontSize:'clamp(11px,3.15vw,13px)', lineHeight:1.48,
+                                  letterSpacing:'0.10em', textTransform:'uppercase',
                                   margin:0, color:'rgba(255,255,255,0.88)' }}>{s}</p>
             ))}
           </div>
-          <p style={{ fontSize:'clamp(13px,3.7vw,16px)', lineHeight:1.48,
-                      letterSpacing:'0.11em', textTransform:'uppercase',
+          <p style={{ fontSize:'clamp(11px,3.15vw,13px)', lineHeight:1.48,
+                      letterSpacing:'0.10em', textTransform:'uppercase',
                       margin:0, color:'rgba(255,255,255,0.88)' }}>
             AVAILABLE NOW.
           </p>
@@ -247,36 +268,10 @@ export function CollectionHero({
 
         </div>
 
-        {/* Single product link — absolute bottom-left for Hoodies/Sweatpants */}
-        {mobileLinks && mobileLinks.length === 1 && (
+        {/* Mobile product selector rows — compact, anchored at hero bottom */}
+        {mobileLinks && mobileLinks.length > 0 && (
           <div style={{
-            position:'absolute', zIndex:4,
-            left:24, right:24,
-            bottom:'calc(58px + env(safe-area-inset-bottom))',
-          }}>
-            <Link href={mobileLinks[0].href} style={{ color:'#fff', textDecoration:'none', display:'block' }}>
-              <span style={{ display:'block', fontSize:12, lineHeight:1.35,
-                             letterSpacing:'0.16em', textTransform:'uppercase' }}>
-                {mobileLinks[0].name}
-              </span>
-              <span style={{ display:'block', marginTop:8, fontSize:12,
-                             lineHeight:1.35, letterSpacing:'0.12em',
-                             color:'rgba(255,255,255,0.75)' }}>
-                {mobileLinks[0].price}
-              </span>
-              <span style={{ display:'inline-flex', gap:9, alignItems:'center',
-                             marginTop:12, fontSize:11, letterSpacing:'0.16em',
-                             textTransform:'uppercase', color:'rgba(255,255,255,0.9)' }}>
-                VIEW PIECE →
-              </span>
-            </Link>
-          </div>
-        )}
-
-        {/* Shop All compact two-row selector — absolute bottom */}
-        {mobileLinks && mobileLinks.length >= 2 && (
-          <div style={{
-            position:'absolute', zIndex:4,
+            position:'absolute', zIndex:5,
             left:24, right:24,
             bottom:'calc(48px + env(safe-area-inset-bottom))',
           }}>
@@ -284,21 +279,22 @@ export function CollectionHero({
               <Link key={link.href} href={link.href}
                 style={{
                   display:'flex', alignItems:'center', justifyContent:'space-between',
-                  gap:16, padding:'17px 0', color:'#fff', textDecoration:'none',
+                  gap:14, padding:'15px 0',
+                  color:'#fff', textDecoration:'none',
                   borderTop:'1px solid rgba(255,255,255,0.18)',
                 }}>
                 <span>
                   <span style={{ display:'block', fontSize:10, lineHeight:1.35,
-                                 letterSpacing:'0.13em', textTransform:'uppercase',
+                                 letterSpacing:'0.12em', textTransform:'uppercase',
                                  whiteSpace:'nowrap' }}>
                     {link.name}
                   </span>
                   <span style={{ display:'block', marginTop:5, fontSize:10,
-                                 letterSpacing:'0.10em' }}>
+                                 letterSpacing:'0.09em' }}>
                     {link.price}
                   </span>
                 </span>
-                <span style={{ flexShrink:0, fontSize:10, letterSpacing:'0.14em',
+                <span style={{ flexShrink:0, fontSize:10, letterSpacing:'0.13em',
                                textTransform:'uppercase', whiteSpace:'nowrap' }}>
                   VIEW →
                 </span>

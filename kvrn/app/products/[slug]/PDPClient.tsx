@@ -54,21 +54,21 @@ export function PDPClient({ product, relatedProduct }: Props) {
     const fn = () => {
       const idx = Math.round(el.scrollTop / el.clientHeight) as 0|1
       setStage(idx)
-      // Both Stage 0 (hero) and Stage 1 (gallery) are product-transparent
+      // Stage 0 (hero) = product-stage-1 (black nav), Stage 1 (gallery) = product-stage-2 (white nav)
       window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
-        detail: { mode: 'product-transparent' }
+        detail: { mode: idx === 0 ? 'product-stage-1' : 'product-stage-2' }
       }))
     }
     el.addEventListener('scroll', fn, { passive: true })
     // Fire immediately for initial state (hero has light bg → dark nav)
-    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode: 'product-transparent' } }))
+    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode: 'product-stage-1' } }))
     return () => el.removeEventListener('scroll', fn)
   }, [snapOn])
 
   // On mount: immediately initialize navbar to product-transparent (Stage 1)
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
-      detail: { mode: 'product-transparent' }
+      detail: { mode: 'product-stage-1' }
     }))
   }, [])
 
@@ -82,7 +82,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
     const onScroll = () => {
       // If user somehow scrolls back above Stage 3 content, restore transparent
       // Stage 3 content begins at scrollY > 0 when snap is off
-      const mode = window.scrollY > 10 ? 'product-cream' : 'product-transparent'
+      const mode = window.scrollY > 10 ? 'product-stage-3' : 'product-stage-1'
       window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode } }))
       setSticky(window.scrollY > 80)
     }
@@ -127,7 +127,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
     document.documentElement.style.overflow = ''
     setSnapOn(false)
     // Stage 3 is light bg — switch nav to dark text
-    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode: 'product-transparent' } }))
+    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode: 'product-stage-3' } }))
     setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }, [])
 

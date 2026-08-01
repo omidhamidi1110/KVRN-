@@ -23,7 +23,7 @@ export function Nav() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  type NavbarMode = 'standard' | 'product-transparent' | 'product-cream' | 'collection-top' | 'collection-scrolled'
+  type NavbarMode = 'standard' | 'product-stage-1' | 'product-stage-2' | 'product-stage-3' | 'collection-top' | 'collection-scrolled'
 
   const isHome       = pathname === '/'
   const isPDP        = pathname.startsWith('/products/')
@@ -33,17 +33,17 @@ export function Nav() {
   const [collectionScrolled, setCollectionScrolled] = useState(false)
 
   // Single source of truth for navbar appearance
-  const [productStageMode, setProductStageMode] = useState<NavbarMode>('product-transparent')
+  const [productStageMode, setProductStageMode] = useState<NavbarMode>('product-stage-1')
   const effectiveMode: NavbarMode =
     isPDP        ? productStageMode :
     isCollection ? (collectionScrolled ? 'collection-scrolled' : 'collection-top') :
-    isHome       ? 'product-transparent' :
+    isHome       ? 'collection-top' :
                    'standard'
 
   // Reset on every route change — kills stale state from previous page
   useEffect(() => {
     if (isPDP) {
-      setProductStageMode('product-transparent')
+      setProductStageMode('product-stage-1')
     }
     if (isCollection) {
       setCollectionScrolled(false)  // always start at top
@@ -64,7 +64,7 @@ export function Nav() {
     const handler = (e: Event) => {
       if (!isPDP) return   // ignore events when not on a product route
       const detail = (e as CustomEvent<{ mode?: NavbarMode }>).detail
-      if (detail?.mode === 'product-transparent' || detail?.mode === 'product-cream') {
+      if (detail?.mode === 'product-stage-1' || detail?.mode === 'product-stage-2' || detail?.mode === 'product-stage-3') {
         setProductStageMode(detail.mode)
       }
     }
@@ -105,21 +105,21 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state — derived from single effectiveMode ─────────────────
-  const isTransparent = effectiveMode === 'product-transparent' || effectiveMode === 'collection-top'
+  const isTransparent = effectiveMode === 'product-stage-2' || effectiveMode === 'collection-top'
   const isCollectionMode = effectiveMode === 'collection-top' || effectiveMode === 'collection-scrolled'
   // Collection pages: always white text/icons
   // Transparent product stages: white text
   // Standard: dark or section-aware
-  // Explicit: product-cream → black text; product-transparent → white; collection → white
+  // Stage 1 → black, Stage 2 → white, Stage 3 → black; collection → white
   const isWhiteText = isCollectionMode
-    ? true                          // collection: always white
-    : effectiveMode === 'product-transparent'
-    ? true                          // PDP Stage 1/2: white
-    : effectiveMode === 'product-cream'
-    ? false                         // PDP Stage 3: BLACK (cream bg)
+    ? true
+    : effectiveMode === 'product-stage-2'
+    ? true                          // Stage 2 gallery: white on dark image
+    : effectiveMode === 'product-stage-1' || effectiveMode === 'product-stage-3'
+    ? false                         // Stage 1 hero + Stage 3 cream: BLACK
     : isHome
-    ? false                         // homepage: dark slides handled by events
-    : innerDark                     // inner pages: section-aware
+    ? false
+    : innerDark
   const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
@@ -156,10 +156,12 @@ export function Nav() {
           // collection-scrolled: dark translucent bg + visible border + blur
           // product-transparent: fully transparent, no border
           // standard/cream: cream bg + border
-          effectiveMode === 'collection-top' || effectiveMode === 'product-transparent'
+          effectiveMode === 'collection-top' || effectiveMode === 'product-stage-2'
             ? 'bg-transparent border-0 shadow-none'
             : effectiveMode === 'collection-scrolled'
             ? 'border-b border-white/35'
+            : effectiveMode === 'product-stage-1'
+            ? 'bg-transparent border-0 shadow-none'
             : 'bg-[#F9F8F6]/97 backdrop-blur-[14px] border-b border-[#E8E5E0]',
           textCls
         )}
