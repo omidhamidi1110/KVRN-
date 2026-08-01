@@ -72,19 +72,23 @@ export function PDPClient({ product, relatedProduct }: Props) {
     }))
   }, [])
 
-  // Sticky ATC + navbar: stage 3 → cream, scroll back → transparent
+  // Sticky ATC + navbar: when snap is off (Stage 3), track scroll position
   useEffect(() => {
-    const el = detailRef.current
-    if (!el) return
-    const io = new IntersectionObserver(([e]) => {
-      const inDetails = e.isIntersecting
-      setSticky(!inDetails && !snapOn)
-      window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
-        detail: { mode: inDetails ? 'product-cream' : 'product-transparent' }
-      }))
-    }, { threshold: 0, rootMargin: '-1px 0px 0px 0px' })
-    io.observe(el)
-    return () => io.disconnect()
+    if (snapOn) return   // snap container handles Stage 1/2 events
+    // Dispatch cream immediately on entering Stage 3
+    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
+      detail: { mode: 'product-cream' }
+    }))
+    const onScroll = () => {
+      // If user somehow scrolls back above Stage 3 content, restore transparent
+      // Stage 3 content begins at scrollY > 0 when snap is off
+      const mode = window.scrollY > 10 ? 'product-cream' : 'product-transparent'
+      window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode } }))
+      setSticky(window.scrollY > 80)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
   }, [snapOn])
 
   const addOne = useCallback(async (s?: SizeLabel) => {

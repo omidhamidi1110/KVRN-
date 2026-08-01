@@ -244,32 +244,68 @@ export function CollectionHero({
             AVAILABLE NOW.
           </p>
 
-          {/* Product links embedded inside hero — no separate black section */}
-          {mobileLinks && mobileLinks.length > 0 && (
-            <div style={{ marginTop:34, display:'grid', gap:28 }}>
-              {mobileLinks.map((link, i) => (
-                <Link key={link.href} href={link.href}
-                  style={{
-                    color:'#fff', textDecoration:'none',
-                    paddingTop: i > 0 ? 28 : 0,
-                    borderTop: i > 0 ? '1px solid rgba(255,255,255,0.16)' : 'none',
-                    display:'block',
-                  }}>
-                  <p style={{ fontSize:13, letterSpacing:'0.16em', textTransform:'uppercase',
-                              margin:0, marginBottom:4, fontWeight:300 }}>{link.name}</p>
-                  <p style={{ fontSize:13, letterSpacing:'0.08em', textTransform:'uppercase',
-                              margin:0, marginBottom:8,
-                              color:'rgba(255,255,255,0.65)' }}>{link.price}</p>
-                  <p style={{ fontSize:12, letterSpacing:'0.12em', textTransform:'uppercase',
-                              margin:0, color:'rgba(255,255,255,0.75)',
-                              display:'flex', alignItems:'center', gap:6 }}>
-                    VIEW PIECE →
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
+
         </div>
+
+        {/* Single product link — absolute bottom-left for Hoodies/Sweatpants */}
+        {mobileLinks && mobileLinks.length === 1 && (
+          <div style={{
+            position:'absolute', zIndex:4,
+            left:24, right:24,
+            bottom:'calc(58px + env(safe-area-inset-bottom))',
+          }}>
+            <Link href={mobileLinks[0].href} style={{ color:'#fff', textDecoration:'none', display:'block' }}>
+              <span style={{ display:'block', fontSize:12, lineHeight:1.35,
+                             letterSpacing:'0.16em', textTransform:'uppercase' }}>
+                {mobileLinks[0].name}
+              </span>
+              <span style={{ display:'block', marginTop:8, fontSize:12,
+                             lineHeight:1.35, letterSpacing:'0.12em',
+                             color:'rgba(255,255,255,0.75)' }}>
+                {mobileLinks[0].price}
+              </span>
+              <span style={{ display:'inline-flex', gap:9, alignItems:'center',
+                             marginTop:12, fontSize:11, letterSpacing:'0.16em',
+                             textTransform:'uppercase', color:'rgba(255,255,255,0.9)' }}>
+                VIEW PIECE →
+              </span>
+            </Link>
+          </div>
+        )}
+
+        {/* Shop All compact two-row selector — absolute bottom */}
+        {mobileLinks && mobileLinks.length >= 2 && (
+          <div style={{
+            position:'absolute', zIndex:4,
+            left:24, right:24,
+            bottom:'calc(48px + env(safe-area-inset-bottom))',
+          }}>
+            {mobileLinks.map((link) => (
+              <Link key={link.href} href={link.href}
+                style={{
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  gap:16, padding:'17px 0', color:'#fff', textDecoration:'none',
+                  borderTop:'1px solid rgba(255,255,255,0.18)',
+                }}>
+                <span>
+                  <span style={{ display:'block', fontSize:10, lineHeight:1.35,
+                                 letterSpacing:'0.13em', textTransform:'uppercase',
+                                 whiteSpace:'nowrap' }}>
+                    {link.name}
+                  </span>
+                  <span style={{ display:'block', marginTop:5, fontSize:10,
+                                 letterSpacing:'0.10em' }}>
+                    {link.price}
+                  </span>
+                </span>
+                <span style={{ flexShrink:0, fontSize:10, letterSpacing:'0.14em',
+                               textTransform:'uppercase', whiteSpace:'nowrap' }}>
+                  VIEW →
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </>
   )
