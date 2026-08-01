@@ -61,15 +61,26 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [isCollection, pathname])
 
+  // Homepage: listen for kvrn-slide-change events (HomepageClient dispatches these)
+  useEffect(() => {
+    if (!isHome) return
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ dark: boolean }>).detail
+      setHomeMode(detail.dark ? 'home-dark' : 'home-light')
+    }
+    window.addEventListener('kvrn-slide-change', handler)
+    return () => window.removeEventListener('kvrn-slide-change', handler)
+  }, [isHome])
+
   // Listen for product-stage mode events
   useEffect(() => {
     const handler = (e: Event) => {
-      if (!isPDP) return   // ignore events when not on a product route
       const detail = (e as CustomEvent<{ mode?: NavbarMode }>).detail
+      // Route to correct state based on mode type
       if (detail?.mode === 'product-stage-1' || detail?.mode === 'product-stage-2' || detail?.mode === 'product-stage-3') {
-        setProductStageMode(detail.mode)
+        if (isPDP) setProductStageMode(detail.mode)
       } else if (detail?.mode === 'home-light') {
-        setHomeMode('home-light')
+        if (isHome) setHomeMode('home-light')
       }
     }
     window.addEventListener('kvrn-navbar-mode', handler)
