@@ -20,7 +20,9 @@ interface CollectionHeroProps {
   headlineLines: string[]   // exactly 2 strings, each becomes a block span
   specs1:        string[]
   specs2:        string[]
-  productLinks?: ProductLink[]
+  productLinks?: ProductLink[]  // desktop: multiple right-side links (Shop All)
+  desktopLink?:  ProductLink    // desktop: single right-side link (Hoodies/Sweatpants)
+  mobileLinks?:  ProductLink[]  // mobile links inside hero
 }
 
 export function CollectionHero({
@@ -30,6 +32,8 @@ export function CollectionHero({
   headlineLines,
   specs1, specs2,
   productLinks,
+  desktopLink,
+  mobileLinks,
 }: CollectionHeroProps) {
   const NAV_H = 92 // announcement bar 36px + navbar 56px
 
@@ -239,66 +243,34 @@ export function CollectionHero({
                       margin:0, color:'rgba(255,255,255,0.88)' }}>
             AVAILABLE NOW.
           </p>
+
+          {/* Product links embedded inside hero — no separate black section */}
+          {mobileLinks && mobileLinks.length > 0 && (
+            <div style={{ marginTop:34, display:'grid', gap:28 }}>
+              {mobileLinks.map((link, i) => (
+                <Link key={link.href} href={link.href}
+                  style={{
+                    color:'#fff', textDecoration:'none',
+                    paddingTop: i > 0 ? 28 : 0,
+                    borderTop: i > 0 ? '1px solid rgba(255,255,255,0.16)' : 'none',
+                    display:'block',
+                  }}>
+                  <p style={{ fontSize:13, letterSpacing:'0.16em', textTransform:'uppercase',
+                              margin:0, marginBottom:4, fontWeight:300 }}>{link.name}</p>
+                  <p style={{ fontSize:13, letterSpacing:'0.08em', textTransform:'uppercase',
+                              margin:0, marginBottom:8,
+                              color:'rgba(255,255,255,0.65)' }}>{link.price}</p>
+                  <p style={{ fontSize:12, letterSpacing:'0.12em', textTransform:'uppercase',
+                              margin:0, color:'rgba(255,255,255,0.75)',
+                              display:'flex', alignItems:'center', gap:6 }}>
+                    VIEW PIECE →
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
-
-      {/* Mobile product links — dark continuation below hero */}
-      {productLinks && productLinks.length > 0 && (
-        <div className="lg:hidden"
-          style={{ padding:'42px 28px 64px', background:'#080808' }}>
-          {productLinks.map((link, i) => (
-            <Link key={link.href} href={link.href}
-              style={{
-                display:'block', padding:'22px 0',
-                color:'#fff', textDecoration:'none',
-                marginTop: i > 0 ? 18 : 0,
-                borderTop: i > 0 ? '1px solid rgba(255,255,255,0.1)' : 'none',
-              }}>
-              <p style={{ fontSize:13, letterSpacing:'0.16em', textTransform:'uppercase',
-                          margin:0, marginBottom:4, fontWeight:300 }}>{link.name}</p>
-              <p style={{ fontSize:13, letterSpacing:'0.08em', textTransform:'uppercase',
-                          margin:0, marginBottom:8,
-                          color:'rgba(255,255,255,0.65)' }}>{link.price}</p>
-              <p style={{ fontSize:12, letterSpacing:'0.12em', textTransform:'uppercase',
-                          margin:0, color:'rgba(255,255,255,0.75)',
-                          display:'flex', alignItems:'center', gap:6 }}>
-                VIEW PIECE →
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Mobile single-product link for Hoodies/Sweatpants */}
-      {!productLinks && (
-        <MobileSingleProductLink headlineLines={headlineLines} />
-      )}
     </>
-  )
-}
-
-// On Hoodies/Sweatpants mobile: show a single "VIEW PIECE →" below the hero
-function MobileSingleProductLink({ headlineLines }: { headlineLines: string[] }) {
-  const isHoodie = headlineLines[0] === 'STRUCTURE'
-  const href  = isHoodie ? '/products/kvrn-phantom-hoodie' : '/products/kvrn-phantom-sweatpants'
-  const name  = isHoodie ? 'HEAVYWEIGHT HOODIE' : 'HEAVYWEIGHT SWEATPANTS'
-
-  return (
-    <div className="lg:hidden" style={{ padding:'0 28px 64px', background:'#080808' }}>
-      <Link href={href} style={{
-        display:'block', padding:'28px 0',
-        color:'#fff', textDecoration:'none',
-      }}>
-        <p style={{ fontSize:13, letterSpacing:'0.16em', textTransform:'uppercase',
-                    margin:0, marginBottom:4, fontWeight:300 }}>{name}</p>
-        <p style={{ fontSize:13, letterSpacing:'0.08em', textTransform:'uppercase',
-                    margin:0, marginBottom:8, color:'rgba(255,255,255,0.65)' }}>$80</p>
-        <p style={{ fontSize:12, letterSpacing:'0.12em', textTransform:'uppercase',
-                    margin:0, color:'rgba(255,255,255,0.75)',
-                    display:'flex', alignItems:'center', gap:6 }}>
-          VIEW PIECE →
-        </p>
-      </Link>
-    </div>
   )
 }

@@ -110,7 +110,16 @@ export function Nav() {
   // Collection pages: always white text/icons
   // Transparent product stages: white text
   // Standard: dark or section-aware
-  const isWhiteText = isCollectionMode ? true : isTransparent ? true : isHome ? false : innerDark
+  // Explicit: product-cream → black text; product-transparent → white; collection → white
+  const isWhiteText = isCollectionMode
+    ? true                          // collection: always white
+    : effectiveMode === 'product-transparent'
+    ? true                          // PDP Stage 1/2: white
+    : effectiveMode === 'product-cream'
+    ? false                         // PDP Stage 3: BLACK (cream bg)
+    : isHome
+    ? false                         // homepage: dark slides handled by events
+    : innerDark                     // inner pages: section-aware
   const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 

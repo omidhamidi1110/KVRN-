@@ -20,7 +20,17 @@ export function ShopClient({ products, type }: Props) {
         eyebrow2="DROP 001"
         headlineLines={['STRUCTURE', 'ABOVE ALL']}
         specs1={['500 GSM', 'ENZYME-WASHED', 'FRENCH TERRY']}
-        specs2={['CROPPED OVERSIZED FIT', 'DOUBLE-LAYER HOOD', 'DESIGNED TO LAST']}
+        specs2={['CROPPED OVERSIZED FIT', 'SIGNATURE SLEEVE GRAPHICS', 'DESIGNED TO LAST']}
+        desktopLink={{
+          name:'HEAVYWEIGHT HOODIE', price:'$80',
+          href:'/products/kvrn-phantom-hoodie',
+          desktopStyle:{ right:'clamp(48px,7vw,120px)', top:'40%' },
+        }}
+        mobileLinks={[{
+          name:'HEAVYWEIGHT HOODIE', price:'$80',
+          href:'/products/kvrn-phantom-hoodie',
+          desktopStyle:{},
+        }]}
       />
     )
   }
@@ -37,6 +47,16 @@ export function ShopClient({ products, type }: Props) {
         headlineLines={['WEIGHT', 'IN MOTION']}
         specs1={['500 GSM', 'ENZYME-WASHED', 'FRENCH TERRY']}
         specs2={['WIDE-LEG FIT', 'DESIGNED TO DRAPE', 'DESIGNED TO LAST']}
+        desktopLink={{
+          name:'HEAVYWEIGHT SWEATPANTS', price:'$80',
+          href:'/products/kvrn-phantom-sweatpants',
+          desktopStyle:{ right:'clamp(48px,7vw,120px)', top:'42%' },
+        }}
+        mobileLinks={[{
+          name:'HEAVYWEIGHT SWEATPANTS', price:'$80',
+          href:'/products/kvrn-phantom-sweatpants',
+          desktopStyle:{},
+        }]}
       />
     )
   }
@@ -52,7 +72,7 @@ export function ShopClient({ products, type }: Props) {
       eyebrow2="DROP 001"
       headlineLines={['THE COMPLETE', 'UNIFORM']}
       specs1={['500 GSM', 'ENZYME-WASHED', 'FRENCH TERRY']}
-      specs2={['HOODIE + SWEATPANTS', 'DESIGNED AS ONE SYSTEM', 'DESIGNED TO LAST']}
+      specs2={['HOODIE + SWEATPANTS', 'BUILT TO BE WORN TOGETHER', 'DESIGNED TO LAST']}
       productLinks={[
         {
           name: 'HEAVYWEIGHT HOODIE',
@@ -66,6 +86,10 @@ export function ShopClient({ products, type }: Props) {
           href: '/products/kvrn-phantom-sweatpants',
           desktopStyle: { right: 'clamp(48px,7vw,120px)', top: '62%' },
         },
+      ]}
+      mobileLinks={[
+        { name:'HEAVYWEIGHT HOODIE', price:'$80', href:'/products/kvrn-phantom-hoodie', desktopStyle:{} },
+        { name:'HEAVYWEIGHT SWEATPANTS', price:'$80', href:'/products/kvrn-phantom-sweatpants', desktopStyle:{} },
       ]}
     />
   )
