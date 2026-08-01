@@ -55,7 +55,7 @@ export const products: Product[] = [
     description: '400 GSM brushed fleece, 100% cotton. The double-layered hood holds its shape without a drawstring. Two hidden zipper compartments sit inside the kangaroo pocket — secure and invisible from outside.',
     colors: HW_COLORS.map(c => ({
       ...c,
-      images: imgs('project-kvrn-heavyweight-hoodie', `KVRN Heavyweight Hoodie — ${c.name}`, 5),
+      images: imgs('kvrn-heavyweight-hoodie', `KVRN Heavyweight Hoodie — ${c.name}`, 5),
     })),
     sizes: STANDARD_SIZES,
     fitNote: 'Runs oversized. If between sizes, size down for a cleaner fit.',
@@ -91,7 +91,7 @@ export const products: Product[] = [
     description: 'The same 400 GSM brushed fleece as the hoodie. Wide-leg cut with a concealed elastic waistband and internal drawcord. Built for daily wear.',
     colors: HW_COLORS.map(c => ({
       ...c,
-      images: imgs('project-kvrn-heavyweight-sweatpants', `KVRN Heavyweight Sweatpants — ${c.name}`, 5),
+      images: imgs('kvrn-heavyweight-sweatpants', `KVRN Heavyweight Sweatpants — ${c.name}`, 5),
     })),
     sizes: STANDARD_SIZES,
     fitNote: 'Wide-leg. Sits at natural waist. True to size.',

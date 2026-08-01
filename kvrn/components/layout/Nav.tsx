@@ -20,64 +20,60 @@ export function Nav() {
   const { t }                     = useI18n()
   const pathname                  = usePathname()
 
-  const [scrolled,   setScrolled]   = useState(false)
-  const [onHero,     setOnHero]     = useState(true)
   const [drawerOpen, setDrawerOpen] = useState(false)
-  // Section-aware nav color (homepage only)
-  const [navTheme,   setNavTheme]   = useState<'dark' | 'light'>('light')  // PDP uses light default; homepage overrides
   const drawerRef = useRef<HTMLDivElement>(null)
+
+  type NavbarMode = 'standard' | 'product-transparent' | 'product-cream'
 
   const isHome = pathname === '/'
   const isPDP  = pathname.startsWith('/products/')
 
+  // Single source of truth for navbar appearance
+  // Initialized synchronously from pathname — no flash
+  const [productStageMode, setProductStageMode] = useState<NavbarMode>('product-transparent')
+  const effectiveMode: NavbarMode = isPDP ? productStageMode : isHome ? 'product-transparent' : 'standard'
+
+  // Reset on every route change — kills stale state from previous page
   useEffect(() => {
-    const onScroll = () => {
-      const threshold = isHome ? 24 : 100  // inner pages: stay white over dark header
-      setScrolled(window.scrollY > threshold)
-      setOnHero(window.scrollY < window.innerHeight * 0.75)
+    if (isPDP) {
+      setProductStageMode('product-transparent')
     }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    // Standard and homepage modes derive from pathname synchronously via effectiveMode
+  }, [pathname, isPDP])
 
-  // All pages: listen for kvrn-slide-change events
-  // Homepage/PDP fire these via scroll events; inner pages via IntersectionObserver below
+  // Listen for product-stage mode events
   useEffect(() => {
-    const defaultTheme = isHome ? 'dark' : 'light'
-    setNavTheme(defaultTheme)
-
-    const onSlideChange = (e: Event) => {
-      const detail = (e as CustomEvent<{ dark: boolean }>).detail
-      setNavTheme(detail.dark ? 'dark' : 'light')
+    const handler = (e: Event) => {
+      if (!isPDP) return   // ignore events when not on a product route
+      const detail = (e as CustomEvent<{ mode?: NavbarMode }>).detail
+      if (detail?.mode === 'product-transparent' || detail?.mode === 'product-cream') {
+        setProductStageMode(detail.mode)
+      }
     }
-    window.addEventListener('kvrn-slide-change', onSlideChange)
-    return () => window.removeEventListener('kvrn-slide-change', onSlideChange)
-  }, [isHome])
+    window.addEventListener('kvrn-navbar-mode', handler)
+    return () => window.removeEventListener('kvrn-navbar-mode', handler)
+  }, [isPDP, pathname])
 
-  // Inner pages (not homepage, not PDP): watch data-nav-theme sections
+  // Inner pages (not homepage, not PDP): watch data-nav-theme sections for text color
+  const [innerDark, setInnerDark] = useState(false)
   useEffect(() => {
     if (isHome || isPDP) return
-
     const update = () => {
-      // Find which section the nav (at ~92px from top) is currently over
-      const navY = 92 // px — announcement bar + nav height
+      const navY = 92
       const els = document.querySelectorAll('[data-nav-theme]')
-      let theme: 'dark' | 'light' = 'light'
+      let dark = false
       els.forEach(el => {
         const rect = el.getBoundingClientRect()
-        // Section is "under" the nav if rect.top ≤ navY ≤ rect.bottom
         if (rect.top <= navY && rect.bottom > navY) {
-          theme = (el.getAttribute('data-nav-theme') as 'dark' | 'light') ?? 'light'
+          dark = el.getAttribute('data-nav-theme') === 'dark'
         }
       })
-      setNavTheme(theme)
+      setInnerDark(dark)
     }
-
-    update() // run once immediately
+    update()
     window.addEventListener('scroll', update, { passive: true })
     return () => window.removeEventListener('scroll', update)
-  }, [isHome, isPDP])
+  }, [isHome, isPDP, pathname])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false) }
@@ -90,12 +86,18 @@ export function Nav() {
     return () => { document.body.style.overflow = '' }
   }, [drawerOpen])
 
-  // ── Nav visual state ──────────────────────────────────────────────────────
-  // Homepage + PDP: kvrn-slide-change events drive text color
-  // Inner pages: navTheme driven by data-nav-theme IntersectionObserver (see below)
-  const isWhiteText = navTheme === 'dark'  // all pages use navTheme now
-  const textCls     = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
-  const linesCls    = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
+  // ── Nav visual state — derived from single effectiveMode ─────────────────
+  const isTransparent = effectiveMode === 'product-transparent'
+  const isCream       = effectiveMode === 'standard' || effectiveMode === 'product-cream'
+  // Text: white on transparent (dark bg behind), dark on cream/standard (light bg)
+  // Exception: homepage dark slides use white text
+  const isWhiteText = isTransparent
+    ? true
+    : isHome
+    ? false
+    : innerDark
+  const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
+  const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
   const desktopLinks = [
     { label: t.shopAll,    href: '/shop' },
@@ -126,9 +128,11 @@ export function Nav() {
           // Homepage: transparent, no border — slide system controls colors
           // All other pages: solid cream bg + subtle border + black text, always
           // Transparent always — bg only for inner pages after scrolling
-          (!isHome && scrolled)
-            ? 'bg-[#F9F8F6]/97 backdrop-blur-[14px] border-b border-[#E8E5E0]'
-            : 'transition-colors duration-300',
+          // product-transparent: fully transparent, no border, no blur, no shadow
+          // standard/product-cream: cream bg + border
+          effectiveMode === 'product-transparent'
+            ? 'bg-transparent border-0 shadow-none'
+            : 'bg-[#F9F8F6]/97 backdrop-blur-[14px] border-b border-[#E8E5E0]',
           textCls
         )}
         style={{ top: '36px' }}
