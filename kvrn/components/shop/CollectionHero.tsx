@@ -48,9 +48,8 @@ export function CollectionHero({
         style={{
           position:   'relative',
           width:      '100%',
-          minHeight:  720,
-          height:     `calc(100vh - ${NAV_H}px)`,
-          maxHeight:  920,
+          minHeight:  '100svh',
+          height:     'auto',
           overflow:   'hidden',
           background: '#090909',
           color:      '#fff',
@@ -156,23 +155,26 @@ export function CollectionHero({
           <Link href={desktopLink.href}
             style={{
               position:'absolute', zIndex:5,
-              right:'clamp(42px,6vw,112px)',
-              width:'clamp(175px,15vw,235px)',
+              right:'clamp(42px,4.6vw,82px)',
+              width:'clamp(210px,17vw,265px)',
               textDecoration:'none', color:'rgba(255,255,255,0.92)',
               ...desktopLink.desktopStyle,
             }}
             className="group"
           >
-            <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
-                        textTransform:'uppercase', margin:0, fontWeight:300 }}>
+            <p style={{ fontSize:'clamp(11px,0.95vw,14px)', lineHeight:1.55,
+                        letterSpacing:'0.07em', textTransform:'uppercase',
+                        margin:0, fontWeight:300, whiteSpace:'nowrap' }}>
               {desktopLink.name}
             </p>
-            <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
-                        textTransform:'uppercase', margin:0, fontWeight:300 }}>
+            <p style={{ fontSize:'clamp(11px,0.95vw,14px)', lineHeight:1.55,
+                        letterSpacing:'0.07em', textTransform:'uppercase',
+                        margin:0, fontWeight:300 }}>
               {desktopLink.price}
             </p>
-            <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
-                        textTransform:'uppercase', marginTop:6, fontWeight:300,
+            <p style={{ fontSize:'clamp(11px,0.95vw,14px)', lineHeight:1.55,
+                        letterSpacing:'0.07em', textTransform:'uppercase',
+                        marginTop:6, fontWeight:300,
                         display:'flex', alignItems:'center', gap:6 }}>
               VIEW PIECE
               <span style={{ display:'inline-block', transition:'transform 200ms ease' }}
@@ -190,7 +192,7 @@ export function CollectionHero({
           position:    'relative',
           width:       '100%',
           aspectRatio: '941/1672',
-          minHeight:   `calc(100svh - ${NAV_H}px)`,
+          minHeight:   '100svh',
           overflow:    'hidden',
           background:  '#080808',
           color:       '#fff',
@@ -221,6 +223,7 @@ export function CollectionHero({
           right:    20,
           top:      'clamp(112px, 17svh, 158px)',
           maxWidth: 'min(66vw, 390px)',
+          paddingBottom: mobileLinks && mobileLinks.length >= 2 ? 220 : 180,
         }}>
           <p style={{ fontSize:'clamp(11px,3vw,13px)', lineHeight:1.45, letterSpacing:'0.15em',
                       textTransform:'uppercase', margin:0,
@@ -273,7 +276,7 @@ export function CollectionHero({
           <div style={{
             position:'absolute', zIndex:5,
             left:24, right:24,
-            bottom:'calc(48px + env(safe-area-inset-bottom))',
+            bottom:'calc(16px + env(safe-area-inset-bottom))',
           }}>
             {mobileLinks.map((link) => (
               <Link key={link.href} href={link.href}
