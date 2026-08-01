@@ -54,34 +54,34 @@ export function PDPClient({ product, relatedProduct }: Props) {
     const fn = () => {
       const idx = Math.round(el.scrollTop / el.clientHeight) as 0|1
       setStage(idx)
-      // Stage 0 (hero): light bg → dark text nav. Stage 1 (gallery): dark bg → white text nav.
-      window.dispatchEvent(new CustomEvent('kvrn-slide-change', {
-        detail: { dark: idx === 1 }  // gallery is dark bg
+      // Both Stage 0 (hero) and Stage 1 (gallery) are product-transparent
+      window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
+        detail: { mode: 'product-transparent' }
       }))
     }
     el.addEventListener('scroll', fn, { passive: true })
     // Fire immediately for initial state (hero has light bg → dark nav)
-    window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
+    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode: 'product-transparent' } }))
     return () => el.removeEventListener('scroll', fn)
   }, [snapOn])
 
-  // Sticky ATC + navbar state: fire kvrn-slide-change whenever details section crosses viewport
+  // On mount: immediately initialize navbar to product-transparent (Stage 1)
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
+      detail: { mode: 'product-transparent' }
+    }))
+  }, [])
+
+  // Sticky ATC + navbar: stage 3 → cream, scroll back → transparent
   useEffect(() => {
     const el = detailRef.current
     if (!el) return
     const io = new IntersectionObserver(([e]) => {
       const inDetails = e.isIntersecting
       setSticky(!inDetails && !snapOn)
-      // When details enter view → light nav (Stage 3 is cream bg)
-      // When details leave view (scroll back up) → dispatch based on current snap stage
-      if (inDetails) {
-        window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
-      } else if (!snapOn) {
-        // Snapped out but scrolled back above details — shouldn't normally happen,
-        // but fire light just in case
-        window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
-      }
-      // If snap is still on, the snap scroll listener handles it
+      window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', {
+        detail: { mode: inDetails ? 'product-cream' : 'product-transparent' }
+      }))
     }, { threshold: 0, rootMargin: '-1px 0px 0px 0px' })
     io.observe(el)
     return () => io.disconnect()
@@ -123,7 +123,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
     document.documentElement.style.overflow = ''
     setSnapOn(false)
     // Stage 3 is light bg — switch nav to dark text
-    window.dispatchEvent(new CustomEvent('kvrn-slide-change', { detail: { dark: false } }))
+    window.dispatchEvent(new CustomEvent('kvrn-navbar-mode', { detail: { mode: 'product-transparent' } }))
     setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }, [])
 
