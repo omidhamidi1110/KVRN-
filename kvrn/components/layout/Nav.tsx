@@ -23,7 +23,7 @@ export function Nav() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  type NavbarMode = 'standard' | 'product-stage-1' | 'product-stage-2' | 'product-stage-3' | 'collection-top' | 'collection-scrolled'
+  type NavbarMode = 'standard' | 'product-stage-1' | 'product-stage-2' | 'product-stage-3' | 'collection-top' | 'collection-scrolled' | 'home-dark' | 'home-light'
 
   const isHome       = pathname === '/'
   const isPDP        = pathname.startsWith('/products/')
@@ -31,13 +31,15 @@ export function Nav() {
 
   // Scroll offset for collection pages
   const [collectionScrolled, setCollectionScrolled] = useState(false)
+  // Homepage slide mode
+  const [homeMode, setHomeMode] = useState<NavbarMode>('home-dark')
 
   // Single source of truth for navbar appearance
   const [productStageMode, setProductStageMode] = useState<NavbarMode>('product-stage-1')
   const effectiveMode: NavbarMode =
     isPDP        ? productStageMode :
     isCollection ? (collectionScrolled ? 'collection-scrolled' : 'collection-top') :
-    isHome       ? 'collection-top' :
+    isHome       ? homeMode :
                    'standard'
 
   // Reset on every route change — kills stale state from previous page
@@ -105,8 +107,8 @@ export function Nav() {
   }, [drawerOpen])
 
   // ── Nav visual state — derived from single effectiveMode ─────────────────
-  const isTransparent = effectiveMode === 'product-stage-2' || effectiveMode === 'collection-top'
-  const isCollectionMode = effectiveMode === 'collection-top' || effectiveMode === 'collection-scrolled'
+  const isTransparent = effectiveMode === 'product-stage-2' || effectiveMode === 'collection-top' || effectiveMode === 'home-dark'
+  const isCollectionMode = effectiveMode === 'collection-top' || effectiveMode === 'collection-scrolled' || effectiveMode === 'home-dark'
   // Collection pages: always white text/icons
   // Transparent product stages: white text
   // Standard: dark or section-aware
@@ -117,8 +119,8 @@ export function Nav() {
     ? true                          // Stage 2 gallery: white on dark image
     : effectiveMode === 'product-stage-1' || effectiveMode === 'product-stage-3'
     ? false                         // Stage 1 hero + Stage 3 cream: BLACK
-    : isHome
-    ? false
+    : effectiveMode === 'home-light'
+    ? false                         // Homepage Stage 5: BLACK
     : innerDark
   const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
@@ -156,7 +158,7 @@ export function Nav() {
           // collection-scrolled: dark translucent bg + visible border + blur
           // product-transparent: fully transparent, no border
           // standard/cream: cream bg + border
-          effectiveMode === 'collection-top' || effectiveMode === 'product-stage-2'
+          effectiveMode === 'collection-top' || effectiveMode === 'product-stage-2' || effectiveMode === 'home-dark'
             ? 'bg-transparent border-0 shadow-none'
             : effectiveMode === 'collection-scrolled'
             ? 'border-b border-white/35'

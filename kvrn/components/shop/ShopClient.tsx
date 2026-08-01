@@ -12,7 +12,7 @@ export function ShopClient({ products, type }: Props) {
   if (isHoodies) {
     return (
       <CollectionHero
-        desktopImage="/images/collections/hoodies-desktop-hero.png"
+        desktopImage="/images/collections/hoodies-desktop-hero-no-text.jpeg"
         desktopAlt="Model wearing the Project KVRN heavyweight graphic hoodie"
         mobileImage="/images/collections/hoodies-mobile-hero.png"
         mobileAlt="Model wearing the Project KVRN heavyweight graphic hoodie"
@@ -24,7 +24,7 @@ export function ShopClient({ products, type }: Props) {
         desktopLink={{
           name:'HEAVYWEIGHT HOODIE', price:'$80',
           href:'/products/kvrn-phantom-hoodie',
-          desktopStyle:{ top:'44%' },
+          desktopStyle:{ top:'76%', right:'clamp(62px,7vw,132px)', width:'clamp(190px,15vw,240px)' },
         }}
         mobileLinks={[{
           name:'HEAVYWEIGHT HOODIE', price:'$80',
@@ -50,7 +50,7 @@ export function ShopClient({ products, type }: Props) {
         desktopLink={{
           name:'HEAVYWEIGHT SWEATPANTS', price:'$80',
           href:'/products/kvrn-phantom-sweatpants',
-          desktopStyle:{ top:'45%' },
+          desktopStyle:{ top:'67%', right:'clamp(72px,7.4vw,142px)', width:'clamp(220px,18vw,285px)' },
         }}
         mobileLinks={[{
           name:'HEAVYWEIGHT SWEATPANTS', price:'$80',
