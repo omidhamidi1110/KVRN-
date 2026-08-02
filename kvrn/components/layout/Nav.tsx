@@ -69,7 +69,17 @@ export function Nav() {
       setHomeMode(detail.dark ? 'home-dark' : 'home-light')
     }
     window.addEventListener('kvrn-slide-change', handler)
-    return () => window.removeEventListener('kvrn-slide-change', handler)
+    // Also check current scroll position immediately in case already at Stage 5
+    // HomepageClient fires on every scroll tick, so this will sync on next scroll
+    // For the initial mount case, set a small timeout to let HomepageClient fire
+    const t = setTimeout(() => {
+      const container = document.querySelector('[data-homepage-container]') as HTMLElement | null
+      if (!container) return
+      const raw = Math.round(container.scrollTop / (container.clientHeight || 1))
+      const DARK = new Set([0, 1, 2, 3])
+      setHomeMode(DARK.has(raw) ? 'home-dark' : 'home-light')
+    }, 80)
+    return () => { window.removeEventListener('kvrn-slide-change', handler); clearTimeout(t) }
   }, [isHome])
 
   // Listen for product-stage mode events

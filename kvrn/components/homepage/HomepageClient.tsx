@@ -65,7 +65,7 @@ export function HomepageClient() {
 
   return (
     <div
-      ref={containerRef}
+      ref={containerRef} data-homepage-container="true"
       style={{
         position:               'fixed',
         inset:                  0,

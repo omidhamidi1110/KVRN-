@@ -24,7 +24,7 @@ export function ShopClient({ products, type }: Props) {
         desktopLink={{
           name:'HEAVYWEIGHT HOODIE', price:'$80',
           href:'/products/kvrn-phantom-hoodie',
-          desktopStyle:{ top:'72%', right:'clamp(34px,3.8vw,58px)', width:'clamp(175px,13.5vw,205px)' },
+          desktopStyle:{ top:'86%', right:'clamp(34px,3.8vw,58px)', width:'clamp(175px,13.5vw,205px)' },
         }}
         mobileLinks={[{
           name:'HEAVYWEIGHT HOODIE', price:'$80',
