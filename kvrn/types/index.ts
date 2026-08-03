@@ -81,6 +81,7 @@ export interface CartItem {
   colorName: string      // Display name: "Stone"
   colorHex: string       // Hex: "#C8B89A"
   size: SizeLabel
+  sku?: string           // Permanent Drop 001 SKU e.g. KVRN-D001-PKHH-BLK-M
   price: number          // In pence
   quantity: number
   image: string          // Front image src for cart display

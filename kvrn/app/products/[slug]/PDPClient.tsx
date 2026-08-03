@@ -8,6 +8,7 @@ import { useCurrency } from '@/context/CurrencyContext'
 import { useI18n }     from '@/context/I18nContext'
 import { cn }          from '@/lib/utils'
 import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
+import { PUBLIC_SLUG_TO_PRODUCT_CODE, buildSku } from '@/lib/catalog'
 
 const NAV = 92 // announcement bar (36) + nav (56)
 
@@ -27,10 +28,73 @@ export function PDPClient({ product, relatedProduct }: Props) {
   const [stage,   setStage]   = useState<0|1>(0)
   const [sticky,  setSticky]  = useState(false)
 
+  // Live Neon inventory — keyed by size label
+  type AvailMap = Record<string, { sku: string; available: number; active: boolean }>
+  const [availability,        setAvailability]        = useState<AvailMap | null>(null)
+  const [inventoryError,      setInventoryError]      = useState(false)
+  const [inventoryLoading,    setInventoryLoading]    = useState(true)
+
+  // Separate live inventory for the related product (Complete the Set)
+  const [relatedAvailability, setRelatedAvailability] = useState<AvailMap | null>(null)
+  const [relatedInvError,     setRelatedInvError]     = useState(false)
+  const [relatedInvLoading,   setRelatedInvLoading]   = useState(!!relatedProduct)
+
+  /** Parse a public inventory response into an AvailMap */
+  const parseAvailMap = (variants: any[]): AvailMap => {
+    const map: AvailMap = {}
+    for (const v of variants ?? []) {
+      const isAvailable = v.in_stock === true
+      map[v.size] = { sku: v.sku, available: isAvailable ? 1 : 0, active: v.active !== false }
+    }
+    return map
+  }
+
+  // Fetch live inventory for this product
+  useEffect(() => {
+    let cancelled = false
+    setInventoryLoading(true)
+    setInventoryError(false)
+    fetch(`/api/inventory?slug=${product.slug}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => { if (!cancelled) { setAvailability(parseAvailMap(data.variants)); setInventoryLoading(false) } })
+      .catch(() => { if (!cancelled) { setInventoryError(true); setInventoryLoading(false) } })
+    return () => { cancelled = true }
+  }, [product.slug])
+
+  // Fetch live inventory for the related product (used only by Complete the Set)
+  useEffect(() => {
+    if (!relatedProduct) { setRelatedInvLoading(false); return }
+    let cancelled = false
+    setRelatedInvLoading(true)
+    setRelatedInvError(false)
+    fetch(`/api/inventory?slug=${relatedProduct.slug}`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => { if (!cancelled) { setRelatedAvailability(parseAvailMap(data.variants)); setRelatedInvLoading(false) } })
+      .catch(() => { if (!cancelled) { setRelatedInvError(true); setRelatedInvLoading(false) } })
+    return () => { cancelled = true }
+  }, [relatedProduct?.slug])
+
+  // Compute effective sizes merged with live availability
+  // If inventory is loading or errored, block all sizes (fail safely)
+  const effectiveSizes: SizeOption[] = product.sizes.map(s => {
+    if (inventoryLoading || inventoryError || availability === null) {
+      return { ...s, inStock: false }
+    }
+    const av = availability[s.label]
+    if (!av) return { ...s, inStock: false }
+    return { ...s, inStock: av.active && av.available > 0 }
+  })
+
+  // Derive SKU for selected size
+  const selectedSku: string | undefined = (() => {
+    if (!size || availability === null) return undefined
+    return availability[size]?.sku
+  })()
+
   const snapRef   = useRef<HTMLDivElement>(null)
   const detailRef = useRef<HTMLDivElement>(null)
 
-  const soldOut  = !product.sizes.some(s => s.inStock)
+  const soldOut  = !effectiveSizes.some(s => s.inStock)
   const ctaLabel = soldOut         ? t.soldOut
     : cta === 'done'               ? t.addedToBag
     : cta === 'busy'               ? '...'
@@ -94,33 +158,63 @@ export function PDPClient({ product, relatedProduct }: Props) {
   const addOne = useCallback(async (s?: SizeLabel) => {
     const chosen = s ?? size
     if (!chosen) { setSizeErr(true); return }
+    if (inventoryLoading || inventoryError) return  // block if inventory unverified
     setSizeErr(false); setCta('busy')
+    // Derive SKU from live availability map
+    const itemSku = availability?.[chosen]?.sku
     addItem({ productId: product.id, productName: product.name, slug: product.slug,
       color: color.value, colorName: color.name, colorHex: color.hex, size: chosen,
+      sku: itemSku,
       price: product.price, quantity: 1,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     setCta('done')
     setTimeout(() => { setCta('idle'); openCart() }, 700)
-  }, [size, color, product, addItem, openCart])
+  }, [size, color, product, addItem, openCart, availability, inventoryLoading, inventoryError])
 
-  // addBoth receives independent sizes from the CompleteSet bundle cards
+  // addBoth — verifies BOTH products' live inventory before adding either
   const addBoth = useCallback((bundleHoodieSize: string, bundlePantsSize: string) => {
     if (!relatedProduct) return
-    const isHoodie = (p: any) => p.name.toLowerCase().includes('hoodie')
-    const productSize  = isHoodie(product)        ? bundleHoodieSize : bundlePantsSize
-    const relatedSize  = isHoodie(relatedProduct) ? bundleHoodieSize : bundlePantsSize
+    // Fail closed: block if either inventory is loading or errored
+    if (inventoryLoading || inventoryError || relatedInvLoading || relatedInvError) return
+    if (availability === null || relatedAvailability === null) return
+
+    // Use catalog mapping — not name string matching — to identify each product
+    const productCode  = PUBLIC_SLUG_TO_PRODUCT_CODE[product.slug]
+    const relatedCode  = PUBLIC_SLUG_TO_PRODUCT_CODE[relatedProduct.slug]
+    if (!productCode || !relatedCode) return  // unrecognised slug — block
+
+    const productIsHoodie = productCode === 'PKHH'
+    const productSize     = productIsHoodie ? bundleHoodieSize : bundlePantsSize
+    const relatedSize     = productIsHoodie ? bundlePantsSize  : bundleHoodieSize
+
+    // Verify current product variant from its own availability map
+    const productAvail = availability[productSize]
+    if (!productAvail || !productAvail.active || productAvail.available <= 0) return
+
+    // Verify related product variant from the RELATED inventory map (not the same map)
+    const relatedAvail = relatedAvailability[relatedSize]
+    if (!relatedAvail || !relatedAvail.active || relatedAvail.available <= 0) return
+
+    // Both variants verified — get permanent SKUs from the live inventory responses
+    // (not from buildSku alone, which cannot confirm existence or availability)
+    const productSku = productAvail.sku
+    const relatedSku = relatedAvail.sku
+    if (!productSku || !relatedSku) return  // no SKU in response — block
+
     addItem({ productId: product.id, productName: product.name, slug: product.slug,
       color: color.value, colorName: color.name, colorHex: color.hex, size: productSize as any,
-      price: product.price, quantity: 1,
+      sku: productSku, price: product.price, quantity: 1,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     addItem({ productId: relatedProduct.id, productName: relatedProduct.name,
       slug: relatedProduct.slug,
       color: relatedProduct.colors[0].value, colorName: relatedProduct.colors[0].name,
       colorHex: relatedProduct.colors[0].hex, size: relatedSize as any,
-      price: relatedProduct.price, quantity: 1,
+      sku: relatedSku, price: relatedProduct.price, quantity: 1,
       image: relatedProduct.colors[0].images.find(i => i.type === 'front')?.src ?? '' })
     openCart()
-  }, [color, product, relatedProduct, addItem, openCart])
+  }, [color, product, relatedProduct, addItem, openCart,
+      availability, inventoryLoading, inventoryError,
+      relatedAvailability, relatedInvLoading, relatedInvError])
 
   const exitSnap = useCallback(() => {
     document.body.style.overflow = ''
@@ -149,7 +243,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
 
           {/* STAGE 1 — HERO */}
           <HeroStage
-            product={product}
+            product={{ ...product, sizes: effectiveSizes }}
             heroImage={imgs[0]}
             mobileImages={imgs}
             color={color} setColor={setColor}
@@ -172,7 +266,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
       {/* ── Stage 3: Details (normal scroll) ────────────────────────────── */}
       <div ref={detailRef} />
       <DetailsStage
-        product={product} relatedProduct={relatedProduct}
+        product={{ ...product, sizes: effectiveSizes }} relatedProduct={relatedProduct}
         color={color} setColor={setColor}
         size={size} setSize={setSize}
         sizeErr={sizeErr} setSizeErr={setSizeErr}

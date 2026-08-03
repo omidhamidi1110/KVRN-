@@ -208,39 +208,46 @@ export default function CheckoutPage() {
   const totalPence   = subtotalPence + shippingCost
   const vatPence     = Math.round(totalPence * (1 - 1 / 1.2))
 
-  // Create Stripe PaymentIntent when moving to payment step
+  // Create Stripe Hosted Checkout Session (authoritative path — v45/v46)
+  // Uses /api/checkout/session which validates SKUs and prices from Neon.
+  // Browser-supplied prices and generated SKUs are NEVER trusted.
   const createPaymentIntent = useCallback(async () => {
     setCreatingIntent(true)
     setPaymentError('')
+
+    // Validate: every cart item must have a permanent SKU
+    const invalidItems = items.filter(i => !i.sku || !i.sku.startsWith('KVRN-'))
+    if (invalidItems.length > 0) {
+      setPaymentError(
+        'One or more items need to be reselected. Please return to the product page and choose your size again.'
+      )
+      setCreatingIntent(false)
+      return
+    }
+
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch('/api/checkout/session', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Only permanent SKU and quantity — server fetches price and name from Neon
           items: items.map(i => ({
-            productId: i.productId,
-            sku:       `${i.productId}-${i.color}-${i.size.toLowerCase()}`,
-            name:      i.productName,
-            color:     i.colorName,
-            size:      i.size,
-            price:     i.price,
-            quantity:  i.quantity,
+            sku:      i.sku,
+            quantity: i.quantity,
           })),
-          email:           contact.email,
-          shippingAddress: address,
-          shippingMethod,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to initialise checkout.')
-      setClientSecret(data.clientSecret)
-      setStep('payment')
+      if (!data.url) throw new Error('No checkout URL returned.')
+      // Redirect to Stripe Hosted Checkout
+      window.location.href = data.url
     } catch (err) {
       setPaymentError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setCreatingIntent(false)
     }
-  }, [items, contact.email, address, shippingMethod])
+  }, [items])
 
   const handlePaymentSuccess = useCallback((paymentIntentId: string) => {
     clearCart()

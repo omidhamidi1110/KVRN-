@@ -1,64 +1,30 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN ROUTE PROTECTION
+// Admin route protection — production uses Cloudflare Access at the edge.
+// Cloudflare Access performs sign-in before requests reach this application.
+// The application's server-side requireAdmin() then verifies the CF-Access-Jwt-Assertion header.
 //
-// MVP: Basic token-based protection via query param or cookie.
-// Production options (choose one):
+// DO NOT redirect /admin/* to /admin/login — there is no login page.
+// Redirecting causes "too many redirects" because /admin/login is also matched.
 //
-// Option A (RECOMMENDED): Cloudflare Zero Trust Access
-//   - Free for personal projects
-//   - Cloudflare Dashboard → Zero Trust → Access → Applications
-//   - Protect https://kvrn.com/admin with email-based auth
-//   - Zero code changes required — Cloudflare handles it at the edge
+// In production:
+//   - Cloudflare Access blocks unauthenticated requests before they reach here.
+//   - requireAdmin() returns 401/403 for any request that bypasses or lacks a valid JWT.
 //
-// Option B: Full auth system (Supabase Auth magic links)
-//   - Replace this middleware with proper session validation
-//   - See V4 Blueprint Section 8.2 for implementation spec
-//
-// Current: blocks access unless ADMIN_SECRET cookie is present.
-// Set the cookie by visiting /api/admin-login?token=YOUR_SECRET
-// ─────────────────────────────────────────────────────────────────────────────
+// In local development:
+//   - Set DEV_ADMIN_EMAIL in .env.local.
+//   - Pass x-dev-admin-email: <email> header to bypass CF Access verification.
+//   - This bypass is disabled when NODE_ENV=production (enforced in admin-auth.ts).
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET ?? 'change-this-before-launch'
-
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
-  // Only protect /admin routes
-  if (pathname.startsWith('/admin')) {
-    const adminCookie = request.cookies.get('kvrn_admin')?.value
-    const authHeader  = request.headers.get('authorization')
-
-    // Allow if valid cookie is present
-    if (adminCookie === ADMIN_SECRET) {
-      return NextResponse.next()
-    }
-
-    // Allow HTTP Basic auth (for curl / API testing)
-    if (authHeader?.startsWith('Basic ')) {
-      try {
-        const decoded = Buffer.from(authHeader.slice(6), 'base64').toString()
-        const [, password] = decoded.split(':')
-        if (password === ADMIN_SECRET) {
-          return NextResponse.next()
-        }
-      } catch {
-        // Invalid base64 — fall through to redirect
-      }
-    }
-
-    // In production with Cloudflare Access: this never runs (CF handles it)
-    // In development: redirect to login with return URL
-    const loginUrl = new URL('/admin/login', request.url)
-    loginUrl.searchParams.set('return', pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
+export function middleware(_request: NextRequest) {
+  // Pass all requests through to the application.
+  // Admin API security is enforced server-side via requireAdmin().
+  // Admin page security is enforced by Cloudflare Access at the edge.
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  // No middleware matching needed — CF Access handles /admin/* at the edge.
+  matcher: [],
 }
