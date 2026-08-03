@@ -21,7 +21,8 @@
     "stripe": "^16.2.0",
     "resend": "^3.3.0",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.4.0"
+    "tailwind-merge": "^2.4.0",
+    "@neondatabase/serverless": "^1.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
