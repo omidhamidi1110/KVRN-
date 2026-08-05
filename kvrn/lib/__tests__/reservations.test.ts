@@ -970,3 +970,199 @@ describe('checkout-validation — required and optional field helpers', () => {
     expect(r.ok).toBe(true)  // field length ok; route rejects non-US via country !== 'US' check
   })
 })
+
+// ── V50.6 tests ──────────────────────────────────────────────────────────────
+
+import { createStatusGetHandler } from '../checkout-status-handler'
+import { formatCheckoutPrice }    from '../format-money'
+
+// Helper: build a minimal NextRequest-like object for the status handler
+function makeStatusRequest(sessionId?: string): any {
+  const params = new URLSearchParams()
+  if (sessionId !== undefined) params.set('session_id', sessionId)
+  return { nextUrl: { searchParams: params } }
+}
+
+// ── Money formatter ────────────────────────────────────────────────────────────
+
+describe('formatCheckoutPrice', () => {
+  test('8000 → "$80" (whole dollar — no cents)', () => {
+    expect(formatCheckoutPrice(8000)).toBe('$80')
+  })
+  test('1999 → "$19.99"', () => {
+    expect(formatCheckoutPrice(1999)).toBe('$19.99')
+  })
+  test('2999 → "$29.99"', () => {
+    expect(formatCheckoutPrice(2999)).toBe('$29.99')
+  })
+  test('9999 → "$99.99"', () => {
+    expect(formatCheckoutPrice(9999)).toBe('$99.99')
+  })
+  test('10999 → "$109.99"', () => {
+    expect(formatCheckoutPrice(10999)).toBe('$109.99')
+  })
+  test('100 → "$1"', () => {
+    expect(formatCheckoutPrice(100)).toBe('$1')
+  })
+  test('150 → "$1.50"', () => {
+    expect(formatCheckoutPrice(150)).toBe('$1.50')
+  })
+})
+
+// ── Status API handler ─────────────────────────────────────────────────────────
+
+function makeStatusDeps(rows: any[], throws = false) {
+  return {
+    query: throws
+      ? async () => { throw new Error('DB down') }
+      : async (_id: string) => rows,
+  }
+}
+
+describe('createStatusGetHandler — real production handler', () => {
+  test('missing session_id → 400', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([]))
+    const response = await handler(makeStatusRequest() as any)
+    expect(response.status).toBe(400)
+  })
+
+  test('invalid session format → 400', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([]))
+    const response = await handler(makeStatusRequest('not-a-valid-session') as any)
+    expect(response.status).toBe(400)
+  })
+
+  test('cs_live_ session → 400 (test mode only)', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([]))
+    const response = await handler(makeStatusRequest('cs_live_' + 'a'.repeat(20)) as any)
+    expect(response.status).toBe(400)
+  })
+
+  test('valid unknown session → 404', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([]))
+    const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+    expect(response.status).toBe(404)
+  })
+
+  test('pending reservation → 200 with null order/payment', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([
+      { reservation_status: 'open', order_number: null, payment_status: null }
+    ]))
+    const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.reservationStatus).toBe('open')
+    expect(body.orderNumber).toBeNull()
+    expect(body.paymentStatus).toBeNull()
+  })
+
+  test('paid order → 200 with completed/paid/order number', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([
+      { reservation_status: 'completed', order_number: 'KVRN-001001', payment_status: 'paid' }
+    ]))
+    const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.reservationStatus).toBe('completed')
+    expect(body.orderNumber).toBe('KVRN-001001')
+    expect(body.paymentStatus).toBe('paid')
+  })
+
+  test('response excludes PII and internal IDs', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([
+      { reservation_status: 'completed', order_number: 'KVRN-001001', payment_status: 'paid' }
+    ]))
+    const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+    const body = await response.json()
+    expect(Object.keys(body)).toEqual(['reservationStatus', 'orderNumber', 'paymentStatus'])
+    expect(body).not.toHaveProperty('customerEmail')
+    expect(body).not.toHaveProperty('totalCents')
+    expect(body).not.toHaveProperty('currency')
+    expect(body).not.toHaveProperty('fulfillmentStatus')
+    expect(body).not.toHaveProperty('id')
+  })
+
+  test('works when checkout flag is false (independent of ENABLE_STRIPE_TEST_CHECKOUT)', async () => {
+    const orig = process.env.ENABLE_STRIPE_TEST_CHECKOUT
+    process.env.ENABLE_STRIPE_TEST_CHECKOUT = 'false'
+    try {
+      const handler  = createStatusGetHandler(makeStatusDeps([
+        { reservation_status: 'completed', order_number: 'KVRN-001001', payment_status: 'paid' }
+      ]))
+      const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+      expect(response.status).toBe(200)
+    } finally {
+      process.env.ENABLE_STRIPE_TEST_CHECKOUT = orig
+    }
+  })
+
+  test('database error → generic 500', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([], true))
+    const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+    expect(response.status).toBe(500)
+    const body = await response.json()
+    expect(body.error).not.toContain('DB')
+    expect(body.error).not.toContain('sql')
+    expect(body.error).not.toContain('undefined')
+  })
+
+  test('response includes Cache-Control: no-store', async () => {
+    const handler  = createStatusGetHandler(makeStatusDeps([]))
+    const response = await handler(makeStatusRequest('cs_test_' + 'a'.repeat(20)) as any)
+    const cc = response.headers.get('Cache-Control')
+    expect(cc).toContain('no-store')
+  })
+})
+
+// ── Input styling structural tests ────────────────────────────────────────────
+
+describe('checkout page input styling', () => {
+  test('checkout.tsx uses checkout-input class on all text/email/tel inputs', () => {
+    const fs = require('fs')
+    const src = fs.readFileSync(
+      require('path').join(__dirname, '../../app/checkout/page.tsx'),
+      'utf8'
+    )
+    // All inputs must use checkout-input — not the old input-base
+    expect(src).not.toContain('className="input-base"')
+    expect(src).toContain('className="checkout-input"')
+    // Phone input must also use checkout-input
+    const phoneIdx = src.indexOf('type="tel"')
+    const classAfter = src.slice(phoneIdx, phoneIdx + 200)
+    expect(classAfter).toContain('checkout-input')
+  })
+
+  test('globals.css defines .checkout-input with border', () => {
+    const fs = require('fs')
+    const css = fs.readFileSync(
+      require('path').join(__dirname, '../../app/globals.css'),
+      'utf8'
+    )
+    expect(css).toContain('.checkout-input')
+    expect(css).toContain('.checkout-input:focus')
+    expect(css).toContain('.checkout-input.error')
+    // Must have a visible border definition
+    const startIdx = css.indexOf('.checkout-input {')
+    const block    = css.slice(startIdx, startIdx + 300)
+    expect(block).toContain('border:')
+  })
+})
+
+// ── Mobile layout structural test ─────────────────────────────────────────────
+
+describe('checkout mobile order-summary layout', () => {
+  test('order summary card uses centered full-width — no fixed left-shifting width', () => {
+    const fs  = require('fs')
+    const src = fs.readFileSync(
+      require('path').join(__dirname, '../../app/checkout/page.tsx'),
+      'utf8'
+    )
+    // Should NOT have the old fixed-width shorthand that causes left-shift
+    expect(src).not.toContain("flex:'0 0 340px'")
+    // Should use fluid/centered approach
+    expect(src).toContain("margin:'0 auto'")
+    // No negative margins or translate hacks
+    expect(src).not.toContain('marginLeft:-')
+    expect(src).not.toContain('translateX(-')
+  })
+})

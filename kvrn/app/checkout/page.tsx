@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/data/products'
+import { formatCheckoutPrice } from '@/lib/format-money'
 import { calculateShipping, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
 import { cn } from '@/lib/utils'
 
@@ -201,7 +202,7 @@ export default function CheckoutPage() {
                     type="email" autoComplete="email" value={contact.email}
                     onChange={e => setContact(c => ({ ...c, email: e.target.value }))}
                     style={contact.email ? inputStyle : inputStyle}
-                    className="input-base"
+                    className="checkout-input"
                     placeholder="you@example.com"
                   />
                   {contactErrors.email && <p style={errStyle}>{contactErrors.email}</p>}
@@ -219,7 +220,7 @@ export default function CheckoutPage() {
                     <input
                       type="tel" autoComplete="tel" value={contact.phone}
                       onChange={e => setContact(c => ({ ...c, phone: e.target.value }))}
-                      className="input-base" placeholder="+1 555 000 0000"
+                      className="checkout-input" placeholder="+1 555 000 0000"
                     />
                   </div>
                 )}
@@ -265,14 +266,14 @@ export default function CheckoutPage() {
                     <label style={labelStyle}>First name *</label>
                     <input value={address.firstName} autoComplete="given-name"
                       onChange={e => setAddress(a => ({ ...a, firstName: e.target.value }))}
-                      className="input-base" />
+                      className="checkout-input" />
                     {addressErrors.firstName && <p style={errStyle}>{addressErrors.firstName}</p>}
                   </div>
                   <div>
                     <label style={labelStyle}>Last name *</label>
                     <input value={address.lastName} autoComplete="family-name"
                       onChange={e => setAddress(a => ({ ...a, lastName: e.target.value }))}
-                      className="input-base" />
+                      className="checkout-input" />
                     {addressErrors.lastName && <p style={errStyle}>{addressErrors.lastName}</p>}
                   </div>
                 </div>
@@ -281,7 +282,7 @@ export default function CheckoutPage() {
                   <label style={labelStyle}>Address *</label>
                   <input value={address.line1} autoComplete="address-line1"
                     onChange={e => setAddress(a => ({ ...a, line1: e.target.value }))}
-                    className="input-base" placeholder="123 Main St" />
+                    className="checkout-input" placeholder="123 Main St" />
                   {addressErrors.line1 && <p style={errStyle}>{addressErrors.line1}</p>}
                 </div>
 
@@ -289,14 +290,14 @@ export default function CheckoutPage() {
                   <label style={labelStyle}>Apartment, suite, etc. (optional)</label>
                   <input value={address.line2} autoComplete="address-line2"
                     onChange={e => setAddress(a => ({ ...a, line2: e.target.value }))}
-                    className="input-base" />
+                    className="checkout-input" />
                 </div>
 
                 <div>
                   <label style={labelStyle}>City *</label>
                   <input value={address.city} autoComplete="address-level2"
                     onChange={e => setAddress(a => ({ ...a, city: e.target.value }))}
-                    className="input-base" />
+                    className="checkout-input" />
                   {addressErrors.city && <p style={errStyle}>{addressErrors.city}</p>}
                 </div>
 
@@ -305,14 +306,14 @@ export default function CheckoutPage() {
                     <label style={labelStyle}>State *</label>
                     <input value={address.state} autoComplete="address-level1"
                       onChange={e => setAddress(a => ({ ...a, state: e.target.value }))}
-                      className="input-base" placeholder="CA" maxLength={2} />
+                      className="checkout-input" placeholder="CA" maxLength={2} />
                     {addressErrors.state && <p style={errStyle}>{addressErrors.state}</p>}
                   </div>
                   <div>
                     <label style={labelStyle}>ZIP code *</label>
                     <input value={address.postalCode} autoComplete="postal-code"
                       onChange={e => setAddress(a => ({ ...a, postalCode: e.target.value }))}
-                      className="input-base" placeholder="90210" />
+                      className="checkout-input" placeholder="90210" />
                     {addressErrors.postalCode && <p style={errStyle}>{addressErrors.postalCode}</p>}
                   </div>
                 </div>
@@ -340,7 +341,7 @@ export default function CheckoutPage() {
                         <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>{opt.estimate}</span>
                       </span>
                     </div>
-                    <span style={{ fontSize:13 }}>{formatPrice(opt.cents)}</span>
+                    <span style={{ fontSize:13 }}>{formatCheckoutPrice(opt.cents)}</span>
                   </label>
                 ))}
               </div>
@@ -366,7 +367,7 @@ export default function CheckoutPage() {
         </div>
 
         {/* ── Right: Order summary ─────────────────────────────────────── */}
-        <div style={{ flex:'0 0 340px', minWidth:280 }}>
+        <div style={{ flex:'1 1 280px', maxWidth:380, width:'100%', margin:'0 auto' }}>
           <div style={{ background:'#fff', border:'1px solid #E8E5E0', padding:'24px' }}>
             <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
                          color:'#1A1A1A', marginBottom:20 }}>
@@ -404,12 +405,12 @@ export default function CheckoutPage() {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
                 <span style={{ color:'#6b7280' }}>Shipping</span>
-                <span>{formatPrice(shippingCents)}</span>
+                <span>{formatCheckoutPrice(shippingCents)}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:500,
                             borderTop:'1px solid #E8E5E0', paddingTop:12, marginTop:4 }}>
                 <span>Total</span>
-                <span>{formatPrice(totalCents)}</span>
+                <span>{formatCheckoutPrice(totalCents)}</span>
               </div>
             </div>
           </div>

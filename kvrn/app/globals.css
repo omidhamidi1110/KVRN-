@@ -245,6 +245,26 @@ html {
   .kvrn-input:focus         { border-color: var(--color-text); }
   .kvrn-input.error         { border-color: var(--color-error); }
 
+  /* Checkout form inputs — visible border, focus darkening, error override */
+  .checkout-input {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--color-text);
+    background: #fff;
+    border: 1px solid #D1CCBF;
+    border-radius: 0;
+    appearance: none;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 120ms ease-out;
+  }
+  .checkout-input::placeholder { color: #ABABAB; }
+  .checkout-input:focus         { border-color: #1A1A1A; }
+  .checkout-input.error         { border-color: #B91C1C; }
+
   /* Textarea */
   .kvrn-textarea {
     width: 100%;
