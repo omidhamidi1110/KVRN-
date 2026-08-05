@@ -1,3 +1,5 @@
+keep_vars = true
+
 # ─── Cloudflare Workers — KVRN ────────────────────────────────────────────────
 # Deploy: npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy
 # Secrets (set once via CLI, never stored here):
