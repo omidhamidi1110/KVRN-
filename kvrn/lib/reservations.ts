@@ -4,6 +4,7 @@
 // Tests:      createReservationService(neon(TEST_DATABASE_URL)).
 
 import type { NeonQueryFunction } from '@neondatabase/serverless'
+import { sql as productionSql } from './db'
 
 const PROVISIONAL_TTL_MINUTES = 35
 const MAX_QTY_PER_SKU         = 10
@@ -253,8 +254,7 @@ let _svc: ReservationService | null = null
 
 function getProductionService(): ReservationService {
   if (!_svc) {
-    const { sql } = require('./db')
-    _svc = createReservationService(sql)
+    _svc = createReservationService(productionSql)
   }
   return _svc
 }
