@@ -77,7 +77,7 @@ function Content() {
           Session not found.
         </h1>
         <p style={{ color: '#6b7280', lineHeight: 1.7, fontSize: 15, maxWidth: 420, margin: '0 auto' }}>
-          If you completed a checkout, please check your email or contact support.
+          If you completed a checkout, your session reference may have expired. Contact support with your order details.
         </p>
       </div>
     )
@@ -85,20 +85,26 @@ function Content() {
 
   const isPaid   = data?.paymentStatus === 'paid'
   const isFailed = data?.reservationStatus === 'released' || data?.reservationStatus === 'failed'
-  const timedOut = !polling && !isPaid && !isFailed && Boolean(data)
+  // isTimeout: polling exhausted without terminal state (data may still be null)
+  const isTimeout = !polling && !isPaid && !isFailed
+
+  // Shortened session ref for pending/timeout support queries
+  const sessionRef = sessionId && !isPaid
+    ? sessionId.replace('cs_test_', '').slice(0, 12) + '...'
+    : null
 
   const headline = isPaid   ? 'Payment confirmed.'
                  : isFailed ? 'Payment not confirmed.'
-                 : timedOut ? 'Still verifying.'
-                 :             'Thank you.'
+                 : isTimeout ? "We're still confirming your payment."
+                 :             'Processing payment.'
 
   const message  = isPaid
     ? 'Your order has been received.'
     : isFailed
     ? 'Payment was not confirmed. Check your payment method or contact support if you see a charge.'
-    : timedOut
-    ? 'Payment verification is taking longer than expected. Please check back shortly or contact support.'
-    : 'Payment verification is still processing. This page will update automatically.'
+    : isTimeout
+    ? 'We could not confirm your payment in the expected time. Please check back or contact support.'
+    : 'Payment verification is in progress. This page updates automatically.'
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -108,6 +114,11 @@ function Content() {
       {data?.orderNumber && (
         <p style={{ fontSize: 13, color: '#9B9B9B', marginBottom: 12 }}>
           {'Order ' + data.orderNumber}
+        </p>
+      )}
+      {!isPaid && sessionRef && (
+        <p style={{ fontSize: 11, color: '#C8C4BF', marginBottom: 12, fontFamily: 'monospace' }}>
+          {'Ref: ' + sessionRef}
         </p>
       )}
       <p style={{ color: '#6b7280', lineHeight: 1.7, fontSize: 15, maxWidth: 440, margin: '0 auto' }}>

@@ -68,7 +68,14 @@ export async function POST(req: NextRequest) {
 }
 
 async function handlePaid(session: any, eventId: string, eventType: string) {
-  const sa   = session.shipping_details?.address
+  // Prefer new Stripe field; fall back to legacy field
+  const shippingDetails =
+    session.collected_information?.shipping_details ??
+    session.shipping_details ??
+    null
+  const sa   = shippingDetails?.address
+  // Prefer shippingDetails.name; fallback to customer_details.name
+  const recipientName = shippingDetails?.name ?? session.customer_details?.name ?? null
   const addr = sa ? {
     line1: sa.line1, line2: sa.line2 ?? null,
     city: sa.city, state: sa.state,
@@ -86,7 +93,7 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
     currency:            session.currency ?? 'usd',
     amountTotal:         session.amount_total ?? 0,
     customerEmail:       session.customer_details?.email ?? null,
-    customerName:        session.customer_details?.name  ?? null,
+    customerName:        recipientName,
     customerPhone:       session.customer_details?.phone ?? null,
     shippingAddress:     addr,
   })

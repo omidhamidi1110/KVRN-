@@ -1,720 +1,435 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/data/products'
-import { calculateShipping } from '@/lib/stripe'
+import { calculateShipping, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
 import { cn } from '@/lib/utils'
 
-// ── Stripe Elements (uncomment once stripe packages installed) ──────────────
-// import { loadStripe } from '@stripe/stripe-js'
-// import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
-// const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
-
-type Step = 'contact' | 'shipping' | 'payment'
-
-const COUNTRIES = [
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'US', name: 'United States' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'FR', name: 'France' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'PL', name: 'Poland' },
-]
+type Step = 'contact' | 'shipping'
 
 interface ContactData {
-  email:      string
-  smsOptIn:   boolean
-  phone:      string
+  email:     string
+  smsOptIn:  boolean
+  phone:     string
 }
 
 interface AddressData {
   firstName: string
   lastName:  string
-  address1:  string
-  address2:  string
+  line1:     string
+  line2:     string
   city:      string
-  postcode:  string
-  country:   string
-}
-
-// ─── Inner payment form (will wrap with <Elements> when Stripe connected) ────
-function PaymentForm({
-  clientSecret,
-  totalPence,
-  onSuccess,
-}: {
-  clientSecret: string
-  totalPence:   number
-  onSuccess:    (paymentIntentId: string) => void
-}) {
-  const [paying, setPaying] = useState(false)
-  const [error,  setError]  = useState('')
-
-  // ── With Stripe Elements (uncomment once connected): ───────────────────────
-  // const stripe   = useStripe()
-  // const elements = useElements()
-  //
-  // const handlePay = async () => {
-  //   if (!stripe || !elements) return
-  //   setPaying(true)
-  //   setError('')
-  //
-  //   const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-  //     elements,
-  //     redirect: 'if_required',
-  //   })
-  //
-  //   if (stripeError) {
-  //     setError(stripeError.message ?? 'Payment failed. Please try again.')
-  //     setPaying(false)
-  //     return
-  //   }
-  //   if (paymentIntent?.status === 'succeeded') {
-  //     onSuccess(paymentIntent.id)
-  //   }
-  // }
-  //
-  // return (
-  //   <div className="space-y-4">
-  //     <PaymentElement options={{ layout: 'tabs' }} />
-  //     {error && <p className="text-[13px] text-kvrn-error">{error}</p>}
-  //     <Button variant="primary" size="lg" fullWidth onClick={handlePay} loading={paying}>
-  //       Pay {formatPrice(totalPence)}
-  //     </Button>
-  //   </div>
-  // )
-
-  // ── MVP placeholder (remove once Stripe connected): ───────────────────────
-  return (
-    <div className="space-y-4">
-      <div className="border border-kvrn-border bg-kvrn-bg-raised p-5 space-y-3">
-        <p className="label-11 text-kvrn-muted mb-4">Card details</p>
-
-        <div>
-          <label htmlFor="card-number" className="label-11 block mb-2">Card number</label>
-          <input
-            id="card-number"
-            type="text"
-            placeholder="1234 5678 9012 3456"
-            className="input-base"
-            maxLength={19}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="card-expiry" className="label-11 block mb-2">Expiry</label>
-            <input
-              id="card-expiry"
-              type="text"
-              placeholder="MM / YY"
-              className="input-base"
-              maxLength={7}
-            />
-          </div>
-          <div>
-            <label htmlFor="card-cvc" className="label-11 block mb-2">CVC</label>
-            <input
-              id="card-cvc"
-              type="text"
-              placeholder="123"
-              className="input-base"
-              maxLength={4}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="card-name" className="label-11 block mb-2">Name on card</label>
-          <input
-            id="card-name"
-            type="text"
-            placeholder="James Taylor"
-            autoComplete="cc-name"
-            className="input-base"
-          />
-        </div>
-      </div>
-
-      <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 leading-relaxed">
-        <strong className="font-medium">Dev mode:</strong> Stripe not yet connected.
-        Add <code className="bg-amber-100 px-1">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> to activate real payments.
-        This form is a UI placeholder only — no card details are transmitted.
-      </div>
-
-      {error && <p role="alert" className="text-[13px] text-kvrn-error">{error}</p>}
-
-      <Button
-        variant="primary"
-        size="lg"
-        fullWidth
-        loading={paying}
-        onClick={() => {
-          setPaying(true)
-          // Simulate success for UI testing
-          setTimeout(() => onSuccess('pi_test_placeholder'), 1500)
-        }}
-      >
-        Pay {formatPrice(totalPence)} — Demo
-      </Button>
-    </div>
-  )
+  state:     string
+  postalCode: string
 }
 
 // ─── Main checkout page ───────────────────────────────────────────────────────
 export default function CheckoutPage() {
-  const router = useRouter()
-  const { items, subtotalPence, clearCart } = useCart()
+  const { items, subtotalPence } = useCart()
 
-  const [isClient,      setIsClient]      = useState(false)
-  const [step,          setStep]          = useState<Step>('contact')
-  const [clientSecret,  setClientSecret]  = useState('')
-  const [paymentError,  setPaymentError]  = useState('')
-  const [creatingIntent,setCreatingIntent]= useState(false)
+  const [isClient,       setIsClient]       = useState(false)
+  const [step,           setStep]           = useState<Step>('contact')
+  const [paymentError,   setPaymentError]   = useState('')
+  const [creatingSession, setCreatingSession] = useState(false)
 
-  const [contact, setContact] = useState<ContactData>({
-    email: '', smsOptIn: false, phone: '',
-  })
+  const [contact, setContact] = useState<ContactData>({ email: '', smsOptIn: false, phone: '' })
   const [address, setAddress] = useState<AddressData>({
-    firstName: '', lastName:  '',
-    address1:  '', address2:  '',
-    city:      '', postcode:  '',
-    country:   'GB',
+    firstName: '', lastName: '', line1: '', line2: '', city: '', state: '', postalCode: '',
   })
-  const [shippingMethod, setShippingMethod] = useState<'standard' | 'express'>('standard')
-  const [contactErrors, setContactErrors]   = useState<Partial<ContactData>>({})
-  const [addressErrors, setAddressErrors]   = useState<Partial<AddressData>>({})
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('standard')
+  const [contactErrors,  setContactErrors]  = useState<Record<string, string>>({})
+  const [addressErrors,  setAddressErrors]  = useState<Record<string, string>>({})
 
   useEffect(() => { setIsClient(true) }, [])
 
-  const shippingCost = calculateShipping(address.country, shippingMethod)
-  const totalPence   = subtotalPence + shippingCost
-  const vatPence     = Math.round(totalPence * (1 - 1 / 1.2))
+  const shippingCents = calculateShipping('US', shippingMethod)
+  const totalCents    = subtotalPence + shippingCents
 
-  // Create Stripe Hosted Checkout Session (authoritative path — v45/v46)
-  // Uses /api/checkout/session which validates SKUs and prices from Neon.
-  // Browser-supplied prices and generated SKUs are NEVER trusted.
-  const createPaymentIntent = useCallback(async () => {
-    setCreatingIntent(true)
-    setPaymentError('')
+  // ── Validate contact ──────────────────────────────────────────────────────
+  const validateContact = () => {
+    const errs: Record<string, string> = {}
+    if (!contact.email.trim()) errs.email = 'Email is required.'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) errs.email = 'Enter a valid email.'
+    setContactErrors(errs)
+    return Object.keys(errs).length === 0
+  }
 
-    // Validate: every cart item must have a permanent SKU
+  // ── Validate address ──────────────────────────────────────────────────────
+  const US_STATES = new Set([
+    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+    'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+    'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+    'VA','WA','WV','WI','WY','DC','PR','VI','GU','AS','MP',
+  ])
+  const validateAddress = () => {
+    const errs: Record<string, string> = {}
+    if (!address.firstName.trim()) errs.firstName = 'First name is required.'
+    if (!address.lastName.trim())  errs.lastName  = 'Last name is required.'
+    if (!address.line1.trim())     errs.line1     = 'Address is required.'
+    if (!address.city.trim())      errs.city      = 'City is required.'
+    const state = address.state.trim().toUpperCase()
+    if (!state || !US_STATES.has(state)) errs.state = 'Enter a valid US state code (e.g. CA).'
+    if (!/^\d{5}(-\d{4})?$/.test(address.postalCode.trim())) errs.postalCode = 'Enter a valid ZIP code.'
+    setAddressErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  const handleCheckout = useCallback(async () => {
+    if (!validateAddress()) return
+
     const invalidItems = items.filter(i => !i.sku || !i.sku.startsWith('KVRN-'))
     if (invalidItems.length > 0) {
-      setPaymentError(
-        'One or more items need to be reselected. Please return to the product page and choose your size again.'
-      )
-      setCreatingIntent(false)
+      setPaymentError('One or more items need to be reselected. Please return to the product page and choose your size.')
       return
     }
+
+    setCreatingSession(true)
+    setPaymentError('')
 
     try {
       const res = await fetch('/api/checkout/session', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // Only permanent SKU and quantity — server fetches price and name from Neon
-          items: items.map(i => ({
-            sku:      i.sku,
-            quantity: i.quantity,
-          })),
+          items:          items.map(i => ({ sku: i.sku, quantity: i.quantity })),
+          email:          contact.email.trim(),
+          phone:          contact.smsOptIn ? (contact.phone.trim() || undefined) : undefined,
+          shippingMethod,
+          shippingAddress: {
+            firstName:  address.firstName.trim(),
+            lastName:   address.lastName.trim(),
+            line1:      address.line1.trim(),
+            line2:      address.line2.trim() || undefined,
+            city:       address.city.trim(),
+            state:      address.state.trim().toUpperCase(),
+            postalCode: address.postalCode.trim(),
+            country:    'US',
+          },
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to initialise checkout.')
+      if (!res.ok) {
+        // For stock errors, build a customer-friendly message using cart display names
+        if (data.code === 'OUT_OF_STOCK' || data.code === 'INSUFFICIENT_STOCK') {
+          const cartItem = data.sku ? items.find(i => i.sku === data.sku) : null
+          if (cartItem) {
+            setPaymentError(
+              `${cartItem.productName} — ${cartItem.colorName} / ${cartItem.size} is sold out.`
+            )
+          } else {
+            setPaymentError('An item in your bag is sold out.')
+          }
+        } else {
+          setPaymentError(data.error ?? 'Checkout unavailable. Please try again.')
+        }
+        return
+      }
       if (!data.url) throw new Error('No checkout URL returned.')
-      // Redirect to Stripe Hosted Checkout
       window.location.href = data.url
     } catch (err) {
       setPaymentError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
-      setCreatingIntent(false)
+      setCreatingSession(false)
     }
-  }, [items])
-
-  const handlePaymentSuccess = useCallback((paymentIntentId: string) => {
-    clearCart()
-    router.push(`/order-confirmation?pi=${paymentIntentId}`)
-  }, [clearCart, router])
-
-  // ─── Contact validation ───────────────────────────────────────────────────
-  const validateContact = () => {
-    const errs: Partial<ContactData> = {}
-    if (!contact.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
-      errs.email = 'A valid email is required.' as never
-    }
-    setContactErrors(errs)
-    return Object.keys(errs).length === 0
-  }
-
-  // ─── Address validation ───────────────────────────────────────────────────
-  const validateAddress = () => {
-    const errs: Partial<AddressData> = {}
-    if (!address.firstName.trim()) errs.firstName = 'Required' as never
-    if (!address.lastName.trim())  errs.lastName  = 'Required' as never
-    if (!address.address1.trim())  errs.address1  = 'Required' as never
-    if (!address.city.trim())      errs.city      = 'Required' as never
-    if (!address.postcode.trim())  errs.postcode  = 'Required' as never
-    setAddressErrors(errs)
-    return Object.keys(errs).length === 0
-  }
+  }, [items, contact, address, shippingMethod])
 
   if (!isClient) return null
 
   if (items.length === 0) {
     return (
-      <div className="pt-[56px] min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-5">
-          <p className="text-[15px] font-light">Your bag is empty.</p>
-          <Link href="/shop">
-            <Button variant="secondary" size="md">Browse products</Button>
-          </Link>
+      <div style={{ minHeight:'100vh', paddingTop:'calc(36px + 56px + 80px)', background:'#F9F8F6' }}>
+        <div style={{ maxWidth:480, margin:'0 auto', padding:'0 24px', textAlign:'center' }}>
+          <p style={{ fontSize:15, color:'#6b7280' }}>Your cart is empty.</p>
         </div>
       </div>
     )
   }
 
+  const stepLabels: Step[] = ['contact', 'shipping']
+
   return (
-    <div className="pt-[56px] min-h-screen bg-kvrn-bg">
-      <div className="container-kvrn py-8 md:py-12">
+    <div style={{ minHeight:'100vh', background:'#F9F8F6', paddingTop:'calc(36px + 56px)' }}>
+      <div style={{ maxWidth:1100, margin:'0 auto', padding:'40px 24px', display:'flex', gap:48, flexWrap:'wrap', alignItems:'start' }}>
 
-        {/* ─── Header ─── */}
-        <div className="flex items-center justify-between mb-8 md:mb-12">
-          <Link href="/" className="text-[15px] font-display font-light tracking-wider uppercase">
-            KVRN
-          </Link>
+        {/* ── Left: Form ──────────────────────────────────────────────── */}
+        <div style={{ flex:'1 1 400px', minWidth:0 }}>
 
-          <nav aria-label="Checkout progress" className="hidden sm:flex items-center gap-2 text-[11px] tracking-widest">
-            {(['contact', 'shipping', 'payment'] as Step[]).map((s, i) => (
-              <span key={s} className="flex items-center gap-2">
-                {i > 0 && <span className="text-kvrn-border" aria-hidden="true">›</span>}
-                <span className={cn(
-                  'uppercase',
-                  step === s ? 'text-kvrn-text' : 'text-kvrn-subtle'
-                )}>
-                  {s}
+          {/* Header */}
+          <h1 style={{ fontSize:22, fontWeight:400, letterSpacing:'0.06em', textTransform:'uppercase',
+                       color:'#1A1A1A', marginBottom:32 }}>
+            Checkout
+          </h1>
+
+          {/* Progress indicator */}
+          <div style={{ display:'flex', gap:16, marginBottom:40 }}>
+            {stepLabels.map((s, i) => (
+              <div key={s} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{
+                  width:20, height:20, borderRadius:'50%', fontSize:11, fontWeight:500,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  background: step === s || (i === 0 && step === 'shipping') ? '#1A1A1A' : '#E8E5E0',
+                  color:      step === s || (i === 0 && step === 'shipping') ? '#fff' : '#9B9B9B',
+                }}>
+                  {i < stepLabels.indexOf(step) ? '✓' : i + 1}
+                </div>
+                <span style={{ fontSize:11, letterSpacing:'0.08em', textTransform:'uppercase',
+                               color: step === s ? '#1A1A1A' : '#9B9B9B' }}>
+                  {s === 'contact' ? 'Contact' : 'Shipping'}
                 </span>
-              </span>
+                {i < stepLabels.length - 1 && (
+                  <div style={{ width:32, height:1, background:'#E8E5E0', marginLeft:4 }} />
+                )}
+              </div>
             ))}
-          </nav>
-        </div>
-
-        {/* ─── Two-column layout ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-10 lg:gap-16 items-start">
-
-          {/* ════ LEFT: Form ════ */}
-          <div className="space-y-8 min-w-0">
-
-            {/* Express checkout */}
-            <div>
-              <p className="label-11 mb-4">Express checkout</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[{ id: 'apple', label: ' Pay' }, { id: 'google', label: 'G Pay' }].map(opt => (
-                  <button
-                    key={opt.id}
-                    disabled
-                    title="Available once Stripe is connected"
-                    className="h-12 border border-kvrn-border text-[13px] font-light text-kvrn-muted flex items-center justify-center gap-2 cursor-not-allowed opacity-50"
-                    aria-label={`Pay with ${opt.label}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-4 mt-5">
-                <div className="flex-1 h-px bg-kvrn-border" />
-                <span className="label-11 text-kvrn-subtle">or continue below</span>
-                <div className="flex-1 h-px bg-kvrn-border" />
-              </div>
-            </div>
-
-            {/* ── STEP 1: Contact ── */}
-            <section aria-labelledby="step-contact">
-              <div className="flex items-center justify-between mb-5">
-                <h2 id="step-contact" className="label-11">
-                  {step !== 'contact'
-                    ? <span className="flex items-center gap-2">
-                        <CheckIcon /> Contact
-                      </span>
-                    : 'Contact'
-                  }
-                </h2>
-                {step !== 'contact' && (
-                  <button
-                    onClick={() => setStep('contact')}
-                    className="text-[11px] text-kvrn-muted hover:text-kvrn-text transition-colors underline underline-offset-2"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-
-              {step === 'contact' ? (
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="email" className="sr-only">Email address</label>
-                    <input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="Email address"
-                      value={contact.email}
-                      onChange={e => { setContact(c => ({ ...c, email: e.target.value })); setContactErrors({}) }}
-                      className={cn('input-base', contactErrors.email && 'error')}
-                    />
-                    {contactErrors.email && (
-                      <p role="alert" className="text-[12px] text-kvrn-error mt-1">{String(contactErrors.email)}</p>
-                    )}
-                  </div>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={contact.smsOptIn}
-                      onChange={e => setContact(c => ({ ...c, smsOptIn: e.target.checked }))}
-                      className="accent-kvrn-text w-4 h-4"
-                    />
-                    <span className="text-[13px] text-kvrn-muted font-light">
-                      Text me shipping updates
-                    </span>
-                  </label>
-
-                  {contact.smsOptIn && (
-                    <div>
-                      <label htmlFor="phone" className="sr-only">Phone number</label>
-                      <input
-                        id="phone"
-                        type="tel"
-                        autoComplete="tel"
-                        placeholder="+44 7700 900000"
-                        value={contact.phone}
-                        onChange={e => setContact(c => ({ ...c, phone: e.target.value }))}
-                        className="input-base"
-                      />
-                      <p className="text-[11px] text-kvrn-subtle mt-1.5">Reply STOP to unsubscribe.</p>
-                    </div>
-                  )}
-
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={() => { if (validateContact()) setStep('shipping') }}
-                  >
-                    Continue to shipping
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-[14px] text-kvrn-muted">{contact.email}</p>
-              )}
-            </section>
-
-            <div className="rule" />
-
-            {/* ── STEP 2: Shipping ── */}
-            <section aria-labelledby="step-shipping">
-              <div className="flex items-center justify-between mb-5">
-                <h2 id="step-shipping" className="label-11">
-                  {step === 'payment'
-                    ? <span className="flex items-center gap-2"><CheckIcon /> Shipping</span>
-                    : 'Shipping address'
-                  }
-                </h2>
-                {step === 'payment' && (
-                  <button
-                    onClick={() => setStep('shipping')}
-                    className="text-[11px] text-kvrn-muted hover:text-kvrn-text transition-colors underline underline-offset-2"
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
-
-              {step === 'shipping' ? (
-                <div className="space-y-4">
-                  {/* Name row */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="firstName" className="sr-only">First name</label>
-                      <input
-                        id="firstName" type="text" autoComplete="given-name" placeholder="First name"
-                        value={address.firstName}
-                        onChange={e => { setAddress(a => ({ ...a, firstName: e.target.value })); setAddressErrors(v => ({ ...v, firstName: undefined })) }}
-                        className={cn('input-base', addressErrors.firstName && 'error')}
-                      />
-                      {addressErrors.firstName && <p role="alert" className="text-[12px] text-kvrn-error mt-1">Required</p>}
-                    </div>
-                    <div>
-                      <label htmlFor="lastName" className="sr-only">Last name</label>
-                      <input
-                        id="lastName" type="text" autoComplete="family-name" placeholder="Last name"
-                        value={address.lastName}
-                        onChange={e => { setAddress(a => ({ ...a, lastName: e.target.value })); setAddressErrors(v => ({ ...v, lastName: undefined })) }}
-                        className={cn('input-base', addressErrors.lastName && 'error')}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Address */}
-                  <div>
-                    <label htmlFor="address1" className="sr-only">Address</label>
-                    <input
-                      id="address1" type="text" autoComplete="address-line1" placeholder="Address"
-                      value={address.address1}
-                      onChange={e => { setAddress(a => ({ ...a, address1: e.target.value })); setAddressErrors(v => ({ ...v, address1: undefined })) }}
-                      className={cn('input-base', addressErrors.address1 && 'error')}
-                    />
-                    {addressErrors.address1 && <p role="alert" className="text-[12px] text-kvrn-error mt-1">Required</p>}
-                  </div>
-
-                  <div>
-                    <label htmlFor="address2" className="sr-only">Apartment, suite, etc. (optional)</label>
-                    <input
-                      id="address2" type="text" autoComplete="address-line2" placeholder="Apartment, suite, etc. (optional)"
-                      value={address.address2}
-                      onChange={e => setAddress(a => ({ ...a, address2: e.target.value }))}
-                      className="input-base"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label htmlFor="city" className="sr-only">City</label>
-                      <input
-                        id="city" type="text" autoComplete="address-level2" placeholder="City"
-                        value={address.city}
-                        onChange={e => { setAddress(a => ({ ...a, city: e.target.value })); setAddressErrors(v => ({ ...v, city: undefined })) }}
-                        className={cn('input-base', addressErrors.city && 'error')}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="postcode" className="sr-only">Postcode</label>
-                      <input
-                        id="postcode" type="text" autoComplete="postal-code" placeholder="Postcode"
-                        value={address.postcode}
-                        onChange={e => { setAddress(a => ({ ...a, postcode: e.target.value })); setAddressErrors(v => ({ ...v, postcode: undefined })) }}
-                        className={cn('input-base', addressErrors.postcode && 'error')}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="country" className="sr-only">Country</label>
-                    <select
-                      id="country"
-                      autoComplete="country"
-                      value={address.country}
-                      onChange={e => setAddress(a => ({ ...a, country: e.target.value }))}
-                      className="input-base appearance-none cursor-pointer"
-                    >
-                      {COUNTRIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Shipping method */}
-                  <div className="pt-2" role="radiogroup" aria-labelledby="shipping-method-label">
-                    <p id="shipping-method-label" className="label-11 mb-3">Shipping method</p>
-                    <div className="space-y-2">
-                      {([
-                        {
-                          id:    'standard' as const,
-                          label: address.country === 'GB' ? 'Standard — 3–5 days' : 'Standard — 7–14 days',
-                          cost:  calculateShipping(address.country, 'standard'),
-                        },
-                        {
-                          id:    'express' as const,
-                          label: address.country === 'GB' ? 'Express — 1–2 days' : 'Express — 3–7 days',
-                          cost:  calculateShipping(address.country, 'express'),
-                        },
-                      ]).map(opt => (
-                        <label
-                          key={opt.id}
-                          className={cn(
-                            'flex items-center justify-between border p-4 cursor-pointer transition-colors duration-150',
-                            shippingMethod === opt.id ? 'border-kvrn-text' : 'border-kvrn-border hover:border-kvrn-border-strong'
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="radio"
-                              name="shipping"
-                              value={opt.id}
-                              checked={shippingMethod === opt.id}
-                              onChange={() => setShippingMethod(opt.id)}
-                              className="accent-kvrn-text"
-                            />
-                            <span className="text-[13px] font-light">{opt.label}</span>
-                          </div>
-                          <span className="text-[13px] font-light">{formatPrice(opt.cost)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {paymentError && (
-                    <p role="alert" className="text-[13px] text-kvrn-error">{paymentError}</p>
-                  )}
-
-                  <Button
-                    variant="primary"
-                    size="md"
-                    loading={creatingIntent}
-                    onClick={() => { if (validateAddress()) createPaymentIntent() }}
-                  >
-                    Continue to payment
-                  </Button>
-                </div>
-              ) : step === 'payment' ? (
-                <div className="text-[13px] text-kvrn-muted space-y-0.5">
-                  <p>{address.firstName} {address.lastName}</p>
-                  <p>{address.address1}{address.address2 && `, ${address.address2}`}</p>
-                  <p>{address.city}, {address.postcode}</p>
-                  <p>{COUNTRIES.find(c => c.code === address.country)?.name}</p>
-                  <p className="mt-1 text-kvrn-text">
-                    {shippingMethod === 'standard' ? 'Standard' : 'Express'} shipping — {formatPrice(shippingCost)}
-                  </p>
-                </div>
-              ) : null}
-            </section>
-
-            <div className="rule" />
-
-            {/* ── STEP 3: Payment ── */}
-            {step === 'payment' && (
-              <section aria-labelledby="step-payment">
-                <h2 id="step-payment" className="label-11 mb-5">Payment</h2>
-
-                {/* When Stripe is connected, wrap PaymentForm in <Elements stripe={stripePromise} options={{ clientSecret }}> */}
-                {clientSecret ? (
-                  <PaymentForm
-                    clientSecret={clientSecret}
-                    totalPence={totalPence}
-                    onSuccess={handlePaymentSuccess}
-                  />
-                ) : (
-                  <PaymentForm
-                    clientSecret=""
-                    totalPence={totalPence}
-                    onSuccess={handlePaymentSuccess}
-                  />
-                )}
-
-                <div className="flex items-center gap-2 mt-4 text-[12px] text-kvrn-muted">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                    <rect x="1" y="4" width="12" height="9" rx="1" stroke="currentColor" strokeWidth="1"/>
-                    <path d="M4 4V3a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                  </svg>
-                  <span>Secured by Stripe. Card details never stored by KVRN.</span>
-                </div>
-              </section>
-            )}
           </div>
 
-          {/* ════ RIGHT: Order summary ════ */}
-          <aside
-            className="border border-kvrn-border p-6 bg-kvrn-bg-raised space-y-5 lg:sticky lg:top-[72px]"
-            aria-label="Order summary"
-          >
-            <h2 className="label-11">Order summary</h2>
-
-            <ul className="space-y-4 divide-y divide-kvrn-border" aria-label="Items">
-              {items.map(item => (
-                <li key={item.cartItemId} className="flex items-start gap-4 pt-4 first:pt-0">
-                  <div className="relative w-16 h-[85px] flex-shrink-0 bg-kvrn-bg overflow-hidden">
-                    {item.image ? (
-                      <Image src={item.image} alt={item.productName} fill sizes="64px" className="object-cover" />
-                    ) : (
-                      <div className="absolute inset-0" style={{ backgroundColor: item.colorHex + '30' }} />
-                    )}
-                    {/* Quantity badge */}
-                    {item.quantity > 1 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-kvrn-text text-kvrn-bg text-[10px] flex items-center justify-center">
-                        {item.quantity}
-                      </span>
-                    )}
+          {/* ── Contact ── */}
+          {step === 'contact' && (
+            <section>
+              <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
+                           color:'#1A1A1A', marginBottom:20 }}>
+                Contact
+              </h2>
+              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                <div>
+                  <label style={labelStyle}>Email *</label>
+                  <input
+                    type="email" autoComplete="email" value={contact.email}
+                    onChange={e => setContact(c => ({ ...c, email: e.target.value }))}
+                    style={contact.email ? inputStyle : inputStyle}
+                    className="input-base"
+                    placeholder="you@example.com"
+                  />
+                  {contactErrors.email && <p style={errStyle}>{contactErrors.email}</p>}
+                </div>
+                <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+                  <input type="checkbox" checked={contact.smsOptIn}
+                    onChange={e => setContact(c => ({ ...c, smsOptIn: e.target.checked, phone: e.target.checked ? c.phone : '' }))} />
+                  <span style={{ fontSize:13, color:'#6b7280' }}>
+                    Text me shipping updates (optional)
+                  </span>
+                </label>
+                {contact.smsOptIn && (
+                  <div>
+                    <label style={labelStyle}>Phone</label>
+                    <input
+                      type="tel" autoComplete="tel" value={contact.phone}
+                      onChange={e => setContact(c => ({ ...c, phone: e.target.value }))}
+                      className="input-base" placeholder="+1 555 000 0000"
+                    />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-light leading-snug">{item.productName}</p>
-                    <p className="text-[12px] text-kvrn-muted mt-0.5">
-                      {item.colorName} / {item.size}
-                    </p>
-                  </div>
-                  <p className="text-[13px] font-light flex-shrink-0">
-                    {formatPrice(item.price * item.quantity)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-
-            <div className="rule" />
-
-            <div className="space-y-2 text-[13px]">
-              <div className="flex justify-between">
-                <span className="text-kvrn-muted">Subtotal</span>
-                <span className="font-light">{formatPrice(subtotalPence)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-kvrn-muted">Shipping</span>
-                <span className="font-light">
-                  {step === 'contact' ? '—' : formatPrice(shippingCost)}
-                </span>
-              </div>
-            </div>
-
-            <div className="rule" />
-
-            <div className="flex justify-between text-[15px]">
-              <span className="font-light">Total</span>
-              <div className="text-right">
-                <span className="font-light">
-                  {step === 'contact' ? formatPrice(subtotalPence) : formatPrice(totalPence)}
-                </span>
-                {step !== 'contact' && (
-                  <p className="text-[11px] text-kvrn-muted mt-0.5">
-                    incl. VAT {formatPrice(vatPence)}
-                  </p>
                 )}
               </div>
+              <Button variant="primary" size="lg" fullWidth
+                style={{ marginTop:28 }}
+                onClick={() => { if (validateContact()) setStep('shipping') }}>
+                Continue to shipping
+              </Button>
+            </section>
+          )}
+
+          {/* ── Shipping ── */}
+          {step === 'shipping' && (
+            <section>
+              {/* Contact summary */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                            padding:'12px 0', borderBottom:'1px solid #E8E5E0', marginBottom:24 }}>
+                <span style={{ fontSize:13, color:'#6b7280' }}>{contact.email}</span>
+                <button onClick={() => setStep('contact')}
+                  style={{ fontSize:12, color:'#1A1A1A', background:'none', border:'none',
+                           cursor:'pointer', letterSpacing:'0.06em', textDecoration:'underline' }}>
+                  Edit
+                </button>
+              </div>
+
+              <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
+                           color:'#1A1A1A', marginBottom:20 }}>
+                Shipping address
+              </h2>
+
+              <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                {/* Country (locked to US) */}
+                <div>
+                  <label style={labelStyle}>Country</label>
+                  <div style={{ ...inputStyle, background:'#F1EEE8', color:'#9B9B9B', display:'flex', alignItems:'center' }}>
+                    United States
+                  </div>
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  <div>
+                    <label style={labelStyle}>First name *</label>
+                    <input value={address.firstName} autoComplete="given-name"
+                      onChange={e => setAddress(a => ({ ...a, firstName: e.target.value }))}
+                      className="input-base" />
+                    {addressErrors.firstName && <p style={errStyle}>{addressErrors.firstName}</p>}
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Last name *</label>
+                    <input value={address.lastName} autoComplete="family-name"
+                      onChange={e => setAddress(a => ({ ...a, lastName: e.target.value }))}
+                      className="input-base" />
+                    {addressErrors.lastName && <p style={errStyle}>{addressErrors.lastName}</p>}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Address *</label>
+                  <input value={address.line1} autoComplete="address-line1"
+                    onChange={e => setAddress(a => ({ ...a, line1: e.target.value }))}
+                    className="input-base" placeholder="123 Main St" />
+                  {addressErrors.line1 && <p style={errStyle}>{addressErrors.line1}</p>}
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Apartment, suite, etc. (optional)</label>
+                  <input value={address.line2} autoComplete="address-line2"
+                    onChange={e => setAddress(a => ({ ...a, line2: e.target.value }))}
+                    className="input-base" />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>City *</label>
+                  <input value={address.city} autoComplete="address-level2"
+                    onChange={e => setAddress(a => ({ ...a, city: e.target.value }))}
+                    className="input-base" />
+                  {addressErrors.city && <p style={errStyle}>{addressErrors.city}</p>}
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  <div>
+                    <label style={labelStyle}>State *</label>
+                    <input value={address.state} autoComplete="address-level1"
+                      onChange={e => setAddress(a => ({ ...a, state: e.target.value }))}
+                      className="input-base" placeholder="CA" maxLength={2} />
+                    {addressErrors.state && <p style={errStyle}>{addressErrors.state}</p>}
+                  </div>
+                  <div>
+                    <label style={labelStyle}>ZIP code *</label>
+                    <input value={address.postalCode} autoComplete="postal-code"
+                      onChange={e => setAddress(a => ({ ...a, postalCode: e.target.value }))}
+                      className="input-base" placeholder="90210" />
+                    {addressErrors.postalCode && <p style={errStyle}>{addressErrors.postalCode}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping method */}
+              <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
+                           color:'#1A1A1A', marginTop:32, marginBottom:16 }}>
+                Shipping method
+              </h2>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {(Object.values(US_SHIPPING_OPTIONS) as typeof US_SHIPPING_OPTIONS['standard'][]).map(opt => (
+                  <label key={opt.method}
+                    style={{
+                      display:'flex', alignItems:'center', justifyContent:'space-between',
+                      padding:'14px 16px', border:`1.5px solid ${shippingMethod === opt.method ? '#1A1A1A' : '#E8E5E0'}`,
+                      cursor:'pointer', background:'#fff',
+                    }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      <input type="radio" name="shipping" value={opt.method}
+                        checked={shippingMethod === opt.method}
+                        onChange={() => setShippingMethod(opt.method as ShippingMethod)} />
+                      <span>
+                        <span style={{ fontSize:13, fontWeight:500 }}>{opt.label}</span>
+                        <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>{opt.estimate}</span>
+                      </span>
+                    </div>
+                    <span style={{ fontSize:13 }}>{formatPrice(opt.cents)}</span>
+                  </label>
+                ))}
+              </div>
+
+              {paymentError && (
+                <div style={{ marginTop:16, padding:'12px 16px', background:'#FEF2F2',
+                              border:'1px solid #FECACA', color:'#B91C1C', fontSize:13 }}>
+                  {paymentError}
+                </div>
+              )}
+
+              <Button variant="primary" size="lg" fullWidth loading={creatingSession}
+                style={{ marginTop:28 }} onClick={handleCheckout}>
+                Continue to secure payment
+              </Button>
+
+              <p style={{ marginTop:16, fontSize:11, color:'#9B9B9B', textAlign:'center',
+                          letterSpacing:'0.04em' }}>
+                You will be redirected to Stripe Hosted Checkout to enter payment details securely.
+              </p>
+            </section>
+          )}
+        </div>
+
+        {/* ── Right: Order summary ─────────────────────────────────────── */}
+        <div style={{ flex:'0 0 340px', minWidth:280 }}>
+          <div style={{ background:'#fff', border:'1px solid #E8E5E0', padding:'24px' }}>
+            <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
+                         color:'#1A1A1A', marginBottom:20 }}>
+              Order summary
+            </h2>
+
+            {/* Items */}
+            <div style={{ display:'flex', flexDirection:'column', gap:16, marginBottom:24 }}>
+              {items.map(item => (
+                <div key={item.cartItemId} style={{ display:'flex', gap:12, alignItems:'center' }}>
+                  {item.image && (
+                    <div style={{ width:56, height:56, flexShrink:0, background:'#F1EEE8', overflow:'hidden' }}>
+                      <Image src={item.image} alt={item.productName} width={56} height={56}
+                        style={{ objectFit:'cover', width:'100%', height:'100%' }} />
+                    </div>
+                  )}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ fontSize:12, fontWeight:500, margin:0 }}>{item.productName}</p>
+                    <p style={{ fontSize:11, color:'#9B9B9B', margin:'2px 0 0' }}>
+                      {item.colorName} / {item.size}
+                      {item.quantity > 1 && ` × ${item.quantity}`}
+                    </p>
+                  </div>
+                  <span style={{ fontSize:13, fontWeight:500, flexShrink:0 }}>
+                    {formatPrice(item.price * item.quantity)}
+                  </span>
+                </div>
+              ))}
             </div>
 
-            <ul className="space-y-1.5 text-[12px] text-kvrn-muted pt-1 border-t border-kvrn-border">
-              <li>Free returns within 30 days</li>
-              <li>Tracked delivery on every order</li>
-              <li>
-                <Link href="/support/shipping-returns" className="underline underline-offset-2 hover:text-kvrn-text transition-colors">
-                  Shipping & returns policy
-                </Link>
-              </li>
-            </ul>
-          </aside>
+            <div style={{ borderTop:'1px solid #E8E5E0', paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+                <span style={{ color:'#6b7280' }}>Subtotal</span>
+                <span>{formatPrice(subtotalPence)}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
+                <span style={{ color:'#6b7280' }}>Shipping</span>
+                <span>{formatPrice(shippingCents)}</span>
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:500,
+                            borderTop:'1px solid #E8E5E0', paddingTop:12, marginTop:4 }}>
+                <span>Total</span>
+                <span>{formatPrice(totalCents)}</span>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   )
 }
 
-function CheckIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
+const labelStyle: React.CSSProperties = {
+  display:'block', fontSize:11, fontWeight:500, letterSpacing:'0.06em',
+  textTransform:'uppercase', color:'#1A1A1A', marginBottom:6,
+}
+
+const inputStyle: React.CSSProperties = {
+  width:'100%', padding:'10px 14px', fontSize:14, border:'1px solid #E8E5E0',
+  background:'#fff', outline:'none', boxSizing:'border-box',
+}
+
+const errStyle: React.CSSProperties = {
+  fontSize:11, color:'#B91C1C', marginTop:4,
 }

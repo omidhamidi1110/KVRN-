@@ -4,7 +4,6 @@
 // Tests:      createReservationService(neon(TEST_DATABASE_URL)).
 
 import type { NeonQueryFunction } from '@neondatabase/serverless'
-import { sql as productionSql } from './db'
 
 const PROVISIONAL_TTL_MINUTES = 35
 const MAX_QTY_PER_SKU         = 10
@@ -88,13 +87,16 @@ export function parseDbErr(msg: string): ReservationErr {
     ATTACH_FAILED:        'DB_ERROR',
   }
   const code = codeMap[raw] ?? 'DB_ERROR'
-  let message = 'Item unavailable. Please try again.'
-  if (code === 'OUT_OF_STOCK')        message = `${info} is sold out.`
-  if (code === 'INSUFFICIENT_STOCK')  message = `Insufficient stock for ${info}.`
-  if (code === 'INACTIVE_VARIANT')    message = `${info} is no longer available.`
-  if (code === 'INVALID_SKU')         message = `Product not found: ${info}`
-  if (code === 'DUPLICATE_SKU')       message = 'Duplicate items in cart.'
-  if (code === 'INVALID_QUANTITY')    message = `Invalid quantity for ${info}.`
+  // Never expose raw SKU in the customer-facing message.
+  // The caller may use `sku` to look up display info from the cart.
+  let message = 'An item in your bag is unavailable. Please try again.'
+  if (code === 'OUT_OF_STOCK' || code === 'INSUFFICIENT_STOCK') {
+    message = 'An item in your bag is sold out.'
+  }
+  if (code === 'INACTIVE_VARIANT')  message = 'An item in your bag is no longer available.'
+  if (code === 'INVALID_SKU')       message = 'An item in your bag could not be found.'
+  if (code === 'DUPLICATE_SKU')     message = 'Duplicate items in your bag.'
+  if (code === 'INVALID_QUANTITY')  message = 'Invalid quantity for an item in your bag.'
   return { ok: false, code, message, sku: info || undefined }
 }
 
@@ -109,6 +111,7 @@ export interface ReservationService {
   markAwaitingPayment(sessionId: string, eventId: string, eventType: string): Promise<string>
   releaseExpiredReservations(): Promise<number>
   webhookEventProcessed(eventId: string): Promise<boolean>
+  saveReservationCheckoutDetails(reservationId: string, details: CheckoutDetails): Promise<boolean>
 }
 
 export interface FinalizePaidOrderOpts {
@@ -130,6 +133,15 @@ export interface FinalizePaidOrderResult {
   orderId?:        string
   orderNumber?:    string
   alreadyProcessed: boolean
+}
+
+export interface CheckoutDetails {
+  customerEmail:   string
+  customerName:    string
+  customerPhone:   string | null
+  shippingAddress: Record<string, string>
+  shippingMethod:  'standard' | 'express'
+  shippingCents:   number
 }
 
 export function createReservationService(sql: NeonQueryFunction<false, false>): ReservationService {
@@ -245,12 +257,31 @@ export function createReservationService(sql: NeonQueryFunction<false, false>): 
       `
       return rows.length > 0
     },
+
+    async saveReservationCheckoutDetails(reservationId, details) {
+      const { customerEmail, customerName, customerPhone, shippingAddress, shippingMethod, shippingCents } = details
+      const rows = await sql`
+        SELECT save_reservation_checkout_details(
+          ${reservationId}::uuid,
+          ${customerEmail},
+          ${customerName},
+          ${customerPhone ?? null},
+          ${JSON.stringify(shippingAddress)}::jsonb,
+          ${shippingMethod},
+          ${shippingCents}::integer
+        ) AS result
+      `
+      return Boolean((rows[0] as any).result)
+    },
   }
 }
 
 // ── Production singletons (use DATABASE_URL automatically) ───────────────────
 
 let _svc: ReservationService | null = null
+
+// Static production SQL import (Cloudflare Workers compatible)
+import { sql as productionSql } from './db'
 
 function getProductionService(): ReservationService {
   if (!_svc) {
@@ -267,3 +298,4 @@ export const finalizePaidOrder      = (...a: Parameters<ReservationService['fina
 export const markAwaitingPayment    = (...a: Parameters<ReservationService['markAwaitingPayment']>)    => getProductionService().markAwaitingPayment(...a)
 export const releaseExpiredReservations = (...a: Parameters<ReservationService['releaseExpiredReservations']>) => getProductionService().releaseExpiredReservations(...a)
 export const webhookEventProcessed  = (...a: Parameters<ReservationService['webhookEventProcessed']>)  => getProductionService().webhookEventProcessed(...a)
+export const saveReservationCheckoutDetails = (...a: Parameters<ReservationService['saveReservationCheckoutDetails']>) => getProductionService().saveReservationCheckoutDetails(...a)
