@@ -1,0 +1,3 @@
+rm -f app/api/webhooks/stripe/route.ts
+rmdir app/api/webhooks/stripe 2>/dev/null || true
+rmdir app/api/webhooks 2>/dev/null || true
