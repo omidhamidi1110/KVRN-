@@ -1,7 +1,7 @@
 # ─── KVRN Deploy to Cloudflare Workers ────────────────────────────────────────
 #
 # Triggers:
-#   - Push to main         → deploys to production (kvrn.com)
+#   - Push to main         → deploys to production (kvrn.shop)
 #   - Push to any PR       → deploys to preview environment
 #
 # SETUP:
@@ -48,7 +48,7 @@ jobs:
         run: npm run build
         working-directory: ./kvrn
         env:
-          NEXT_PUBLIC_SITE_URL:          ${{ github.ref == 'refs/heads/main' && 'https://kvrn.com' || 'https://kvrn-preview.workers.dev' }}
+          NEXT_PUBLIC_SITE_URL:          ${{ github.ref == 'refs/heads/main' && 'https://kvrn.shop' || 'https://kvrn-preview.workers.dev' }}
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
 

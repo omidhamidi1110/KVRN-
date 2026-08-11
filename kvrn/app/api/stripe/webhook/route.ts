@@ -5,19 +5,21 @@ import {
   releaseReservationForEvent,
   markAwaitingPayment,
 } from '@/lib/reservations'
+import { sql } from '@/lib/db'
+import { processPendingTransactionalEmails } from '@/lib/transactional-email'
+import { getEmailProvider } from '@/lib/resend-adapter'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET
   if (!secret) {
-    console.error('STRIPE_WEBHOOK_SECRET not set.')
+    console.error('[WEBHOOK] STRIPE_WEBHOOK_SECRET not set.')
     return NextResponse.json({ error: 'Webhook not configured.' }, { status: 500 })
   }
 
-  // Raw body before any JSON parsing — signature covers raw bytes
-  const rawBody   = await req.text()
-  const sigHeader = req.headers.get('stripe-signature') ?? ''
+  const rawBody    = await req.text()
+  const sigHeader  = req.headers.get('stripe-signature') ?? ''
   if (!sigHeader) return NextResponse.json({ error: 'Missing Stripe-Signature.' }, { status: 400 })
 
   let event: Awaited<ReturnType<typeof verifyWebhookSignature>>
@@ -27,7 +29,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 })
   }
 
-  // No pre-check query — idempotency is handled inside each PL/pgSQL function
   const session = event.data.object as any
 
   try {
@@ -38,7 +39,9 @@ export async function POST(req: NextRequest) {
           await handlePaid(session, event.id, event.type)
         } else {
           const res = await markAwaitingPayment(session.id, event.id, event.type)
-          if (res === 'already_processed') return NextResponse.json({ received: true, idempotent: true })
+          if (res === 'already_processed') {
+            return NextResponse.json({ received: true, idempotent: true })
+          }
         }
         break
       }
@@ -61,32 +64,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true, handled: true })
 
   } catch (err: any) {
-    console.error(`Webhook error [${event.type}] ${event.id}:`, err?.message)
-    // Return 500 so Stripe retries (event row processed=false stays retryable)
+    console.error(`[WEBHOOK] Error [${event.type}] ${event.id}:`, err?.message)
     return NextResponse.json({ error: 'Processing error.' }, { status: 500 })
   }
 }
 
 async function handlePaid(session: any, eventId: string, eventType: string) {
-  // Prefer new Stripe field; fall back to legacy field
   const shippingDetails =
     session.collected_information?.shipping_details ??
     session.shipping_details ??
     null
-  const sa   = shippingDetails?.address
-  // Prefer shippingDetails.name; fallback to customer_details.name
+  const sa           = shippingDetails?.address
   const recipientName = shippingDetails?.name ?? session.customer_details?.name ?? null
-  const addr = sa ? {
-    line1: sa.line1, line2: sa.line2 ?? null,
-    city: sa.city, state: sa.state,
-    postal_code: sa.postal_code, country: sa.country,
-  } : null
 
-  const reservationIdHint = session.metadata?.reservation_id ?? null
+  const addr = sa ? {
+    line1:       sa.line1,
+    line2:       sa.line2  ?? null,
+    city:        sa.city,
+    state:       sa.state,
+    postal_code: sa.postal_code,
+    country:     sa.country,
+  } : null
 
   const result = await finalizePaidOrder({
     stripeSessionId:     session.id,
-    reservationIdHint,
+    reservationIdHint:   session.metadata?.reservation_id ?? null,
     stripePaymentIntent: session.payment_intent ?? '',
     stripeEventId:       eventId,
     eventType,
@@ -98,10 +100,14 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
     shippingAddress:     addr,
   })
 
-  // Log non-retryable outcomes (already marked processed in DB)
-  if (result.outcome === 'no_reservation') {
-    console.warn(`CRITICAL: No reservation for session ${session.id} event ${eventId}`)
-  } else if (result.outcome === 'reservation_not_eligible') {
-    console.warn(`CRITICAL: Reservation not eligible for session ${session.id} event ${eventId}`)
+  // Attempt to send outbox email — non-fatal: provider failure must NOT affect order
+  if (result.outcome === 'order_created') {
+    try {
+      const provider = getEmailProvider()
+      await processPendingTransactionalEmails({ sql, provider, limit: 1 })
+    } catch (emailErr: any) {
+      // Log without PII — order remains paid regardless
+      console.error('[WEBHOOK] Email send failed (non-fatal):', emailErr?.message?.slice(0, 100))
+    }
   }
 }

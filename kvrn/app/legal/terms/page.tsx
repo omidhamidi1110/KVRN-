@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const sections = [
   {
     heading: 'Use of the site',
-    body: 'By accessing kvrn.com, you agree to use it for lawful purposes only. You may not attempt to gain unauthorised access to any part of the site or its backend systems. Automated scraping or data collection without permission is prohibited.',
+    body: 'By accessing kvrn.shop, you agree to use it for lawful purposes only. You may not attempt to gain unauthorised access to any part of the site or its backend systems. Automated scraping or data collection without permission is prohibited.',
   },
   {
     heading: 'Orders and payment',
@@ -30,7 +30,7 @@ const sections = [
   },
   {
     heading: 'Intellectual property',
-    body: 'All content on kvrn.com — including copy, photography, brand assets, and design — is the property of KVRN and protected by copyright law. You may not reproduce, distribute, or create derivative works without written permission.',
+    body: 'All content on kvrn.shop — including copy, photography, brand assets, and design — is the property of KVRN and protected by copyright law. You may not reproduce, distribute, or create derivative works without written permission.',
   },
   {
     heading: 'Limitation of liability',

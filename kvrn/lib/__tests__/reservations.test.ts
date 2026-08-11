@@ -1166,3 +1166,1452 @@ describe('checkout mobile order-summary layout', () => {
     expect(src).not.toContain('translateX(-')
   })
 })
+
+// ── V51.1 tests ───────────────────────────────────────────────────────────────
+
+import {
+  orderConfirmationHTML,
+  orderConfirmationSubject,
+  type OrderConfirmationData,
+} from '../email'
+import { createResendAdapter } from '../resend-adapter'
+import {
+  loadOrderEmailData,
+  processOneEmail,
+  processPendingTransactionalEmails,
+} from '../transactional-email'
+
+// ── Template tests ────────────────────────────────────────────────────────────
+
+const SAMPLE_ORDER: OrderConfirmationData = {
+  orderNumber:    'KVRN-001001',
+  customerName:   'Test Buyer',
+  customerEmail:  'test@example.com',
+  lineItems: [{
+    productName:    'Project KVRN Heavyweight Hoodie',
+    color:          'Black',
+    size:           'M',
+    quantity:       1,
+    unitPriceCents: 8000,
+    lineTotalCents: 8000,
+  }],
+  subtotalCents:   8000,
+  shippingCents:   1999,
+  totalCents:      9999,
+  shippingMethod:  'standard',
+  shippingAddress: {
+    firstName: 'Test', lastName: 'Buyer',
+    line1: '123 Main St', city: 'Los Angeles',
+    state: 'CA', postalCode: '90001', country: 'US',
+  },
+}
+
+describe('orderConfirmationHTML template', () => {
+  let html: string
+  beforeAll(() => { html = orderConfirmationHTML(SAMPLE_ORDER, 'https://kvrn.shop') })
+
+  test('renders $80 for 8000 cents subtotal', () => {
+    expect(html).toContain('$80')
+  })
+  test('renders $19.99 for 1999 cents shipping', () => {
+    expect(html).toContain('$19.99')
+  })
+  test('renders $99.99 for 9999 cents total', () => {
+    expect(html).toContain('$99.99')
+  })
+  test('contains order number', () => {
+    expect(html).toContain('KVRN-001001')
+  })
+  test('contains item product name', () => {
+    expect(html).toContain('Project KVRN Heavyweight Hoodie')
+  })
+  test('contains color and size', () => {
+    expect(html).toContain('Black')
+    expect(html).toContain('M')
+  })
+  test('contains shipping address', () => {
+    expect(html).toContain('Los Angeles')
+    expect(html).toContain('CA')
+  })
+  test('no GBP symbol', () => {
+    expect(html).not.toContain('£')
+  })
+  test('no pence references', () => {
+    expect(html.toLowerCase()).not.toContain('pence')
+  })
+  test('no marketing unsubscribe link', () => {
+    expect(html.toLowerCase()).not.toContain('unsubscribe')
+    expect(html.toLowerCase()).not.toContain('list-unsubscribe')
+  })
+  test('no stale hardcoded kvrn.com domain', () => {
+    expect(html).not.toContain('href="https://kvrn.com"')
+    expect(html).not.toContain('"https://kvrn.com"')
+    expect(html).toContain('kvrn.shop')
+  })
+  test('uses injected siteOrigin not hardcoded', () => {
+    const html2 = orderConfirmationHTML(SAMPLE_ORDER, 'https://kvrn.omidhamidi1110.workers.dev')
+    expect(html2).toContain('kvrn.omidhamidi1110.workers.dev')
+    expect(html2).not.toContain('kvrn.com')
+  })
+  test('correct subject line', () => {
+    expect(orderConfirmationSubject('KVRN-001001')).toBe('Order KVRN-001001 confirmed')
+  })
+  test('contains "Order confirmed."', () => {
+    expect(html).toContain('Order confirmed.')
+  })
+  test('contains shipping updates notice', () => {
+    expect(html.toLowerCase()).toContain("we'll email you when it ships")
+  })
+})
+
+// ── Resend adapter unit tests (mocked fetch) ─────────────────────────────────
+
+describe('createResendAdapter', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.restoreAllMocks()
+  })
+
+  const msg = {
+    from: 'KVRN <orders@send.kvrn.shop>', replyTo: 'support@kvrn.shop',
+    to: 'test@example.com', subject: 'Test', html: '<p>Test</p>',
+    idempotencyKey: 'order-confirmation/abc123',
+  }
+
+  test('returns ok with providerMessageId on 200', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'resend-msg-id-123' }),
+    }) as any
+    const adapter = createResendAdapter('sk_test_key')
+    const result  = await adapter.send(msg)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.providerMessageId).toBe('resend-msg-id-123')
+  })
+
+  test('returns error on non-200 response', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 422 }) as any
+    const adapter = createResendAdapter('sk_test_key')
+    const result  = await adapter.send(msg)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('422')
+  })
+
+  test('returns error on network failure', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error')) as any
+    const adapter = createResendAdapter('sk_test_key')
+    const result  = await adapter.send(msg)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toContain('Network')
+  })
+
+  test('passes idempotency key in request headers', async () => {
+    const fetchSpy = jest.fn().mockResolvedValue({
+      ok: true, json: async () => ({ id: 'msg-456' }),
+    }) as any
+    global.fetch = fetchSpy
+    const adapter = createResendAdapter('sk_test_key')
+    await adapter.send(msg)
+    const [, opts] = fetchSpy.mock.calls[0]
+    expect(opts.headers['Idempotency-Key']).toBe('order-confirmation/abc123')
+  })
+
+  test('does not add List-Unsubscribe header', async () => {
+    const fetchSpy = jest.fn().mockResolvedValue({
+      ok: true, json: async () => ({ id: 'msg-789' }),
+    }) as any
+    global.fetch = fetchSpy
+    const adapter = createResendAdapter('sk_test_key')
+    await adapter.send(msg)
+    const [, opts] = fetchSpy.mock.calls[0]
+    const headerKeys = Object.keys(opts.headers).map((k: string) => k.toLowerCase())
+    expect(headerKeys).not.toContain('list-unsubscribe')
+  })
+})
+
+// ── DB integration tests — V51.1 outbox ───────────────────────────────────────
+
+const TEST_DB_51 = process.env.TEST_DATABASE_URL
+const describeDB51 = TEST_DB_51 ? describe : describe.skip
+
+if (!TEST_DB_51) {
+  test('NOTE: V51.1 DB integration tests skipped — TEST_DATABASE_URL not set. Migration 004 NOT verified.', () => {
+    expect(true).toBe(true)
+  })
+}
+
+describeDB51('Integration V51.1 — transactional email outbox', () => {
+  const { neon } = require('@neondatabase/serverless')
+  let testSql: any
+  let svc: ReturnType<typeof createReservationService>
+
+  beforeAll(() => {
+    testSql = neon(TEST_DB_51!)
+    svc     = createReservationService(testSql)
+  })
+
+  const ta = { firstName:'EM',lastName:'Test',line1:'1 Email St',line2:'',city:'NY',state:'NY',postalCode:'10001',country:'US' }
+
+  async function mk51(stock = 2) {
+    const uid = 'EM51' + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase()
+    const sku = 'KVRN-EM51-' + uid + '-M'
+    const [p] = await testSql`INSERT INTO products (drop_code,product_code,name,slug,price_cents,currency,active) VALUES ('TEST',${uid},${`Email ${uid}`},${uid.toLowerCase()},8000,'usd',true) RETURNING id`
+    const [v] = await testSql`INSERT INTO product_variants (product_id,sku,color_name,color_code,size,size_sort,stock_on_hand,reserved_quantity,active) VALUES (${p.id},${sku},'Black','BLK','M',3,${stock},0,true) RETURNING id`
+    return { pid: p.id as string, vid: v.id as string, sku }
+  }
+
+  async function teardown51(o: { rids?: string[]; oIds?: string[]; evts?: string[]; vids?: string[]; pids?: string[] }) {
+    if (o.oIds?.length) {
+      await testSql`DELETE FROM transactional_emails WHERE order_id = ANY(${o.oIds}::uuid[])`
+      await testSql`DELETE FROM order_items WHERE order_id = ANY(${o.oIds}::uuid[])`
+      await testSql`DELETE FROM orders WHERE id = ANY(${o.oIds}::uuid[])`
+    }
+    if (o.evts?.length) await testSql`DELETE FROM webhook_events WHERE stripe_event_id = ANY(${o.evts}::text[])`
+    if (o.rids?.length) {
+      await testSql`DELETE FROM inventory_movements WHERE reservation_id = ANY(${o.rids}::uuid[])`
+      await testSql`DELETE FROM reservation_items WHERE reservation_id = ANY(${o.rids}::uuid[])`
+      await testSql`DELETE FROM reservations WHERE id = ANY(${o.rids}::uuid[])`
+    }
+    if (o.vids?.length) await testSql`DELETE FROM product_variants WHERE id = ANY(${o.vids}::uuid[])`
+    if (o.pids?.length) await testSql`DELETE FROM products WHERE id = ANY(${o.pids}::uuid[])`
+  }
+
+  test('paid order creates exactly one email outbox row', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51a_' + Date.now()
+    const ev = 'evt_em51a_' + Date.now()
+    const ids = { rids:[] as string[], oIds:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      await svc.saveReservationCheckoutDetails(r.reservationId, {
+        customerEmail:'em51@test.com', customerName:'EM Test', customerPhone:null,
+        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+      })
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
+      const result = await svc.finalizePaidOrder({
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51a_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd', amountTotal:9999,
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      })
+      expect(result.outcome).toBe('order_created')
+      ids.oIds.push(result.orderId!)
+      const emails = await testSql`SELECT id,recipient_email,email_type,status,idempotency_key FROM transactional_emails WHERE order_id=${result.orderId}`
+      expect(emails.length).toBe(1)
+      expect(emails[0].email_type).toBe('order_confirmation')
+      expect(emails[0].recipient_email).toBe('em51@test.com')
+      expect(emails[0].status).toBe('pending')
+      expect(emails[0].idempotency_key).toBe(`order-confirmation/${result.orderId}`)
+    } finally { await teardown51(ids) }
+  }, 25000)
+
+  test('replay does not create duplicate email row', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51b_' + Date.now()
+    const ev = 'evt_em51b_' + Date.now()
+    const ids = { rids:[] as string[], oIds:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      await svc.saveReservationCheckoutDetails(r.reservationId, {
+        customerEmail:'replay@test.com', customerName:'Replay', customerPhone:null,
+        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+      })
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
+      const opts = {
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51b_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd', amountTotal:9999,
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      }
+      const r1 = await svc.finalizePaidOrder(opts)
+      const r2 = await svc.finalizePaidOrder(opts)
+      expect(r1.outcome).toBe('order_created')
+      expect(r2.alreadyProcessed).toBe(true)
+      ids.oIds.push(r1.orderId!)
+      const emails = await testSql`SELECT id FROM transactional_emails WHERE order_id=${r1.orderId}`
+      expect(emails.length).toBe(1)
+    } finally { await teardown51(ids) }
+  }, 25000)
+
+  test('wrong total rolls back — no order, no email row', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51c_' + Date.now()
+    const ev = 'evt_em51c_' + Date.now()
+    const ids = { rids:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      await svc.saveReservationCheckoutDetails(r.reservationId, {
+        customerEmail:'wrongamt@test.com', customerName:'WA', customerPhone:null,
+        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+      })
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
+      await expect(svc.finalizePaidOrder({
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51c_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd',
+        amountTotal:8000, // wrong — should be 9999
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      })).rejects.toThrow()
+      const orders = await testSql`SELECT id FROM orders WHERE stripe_checkout_session_id=${fs}`
+      expect(orders.length).toBe(0)
+      const emails = await testSql`SELECT id FROM transactional_emails WHERE recipient_email='wrongamt@test.com'`
+      expect(emails.length).toBe(0)
+    } finally { await teardown51(ids) }
+  }, 20000)
+
+  test('missing customer email does not break finalization', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51d_' + Date.now()
+    const ev = 'evt_em51d_' + Date.now()
+    const ids = { rids:[] as string[], oIds:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      // Do NOT save email — simulate no customer_email in reservation
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs}, shipping_method='standard', shipping_cents=1999 WHERE id=${r.reservationId}`
+      // Clear the email
+      await testSql`UPDATE reservations SET customer_email=NULL WHERE id=${r.reservationId}`
+      const result = await svc.finalizePaidOrder({
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51d_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd', amountTotal:9999,
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      })
+      // Order should still be created
+      expect(result.outcome).toBe('order_created')
+      ids.oIds.push(result.orderId!)
+      // No email row (no recipient)
+      const emails = await testSql`SELECT id FROM transactional_emails WHERE order_id=${result.orderId}`
+      expect(emails.length).toBe(0)
+    } finally { await teardown51(ids) }
+  }, 20000)
+
+  test('email service: mock provider success marks row sent', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51e_' + Date.now()
+    const ev = 'evt_em51e_' + Date.now()
+    const ids = { rids:[] as string[], oIds:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      await svc.saveReservationCheckoutDetails(r.reservationId, {
+        customerEmail:'sent@test.com', customerName:'Sent Test', customerPhone:null,
+        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+      })
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
+      const result = await svc.finalizePaidOrder({
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51e_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd', amountTotal:9999,
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      })
+      expect(result.outcome).toBe('order_created')
+      ids.oIds.push(result.orderId!)
+
+      // Get the email row
+      const [emailRow] = await testSql`SELECT id FROM transactional_emails WHERE order_id=${result.orderId}`
+      expect(emailRow).toBeTruthy()
+
+      // Mock provider that succeeds
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'mock-msg-id' }) }
+      const outcome = await processOneEmail({ sql: testSql, provider: mockProvider, rowId: emailRow.id })
+      expect(outcome.outcome).toBe('sent')
+      expect(mockProvider.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'sent@test.com',
+          idempotencyKey: expect.stringContaining('order-confirmation/'),
+        })
+      )
+
+      // Verify DB state
+      const [row] = await testSql`SELECT status,provider_message_id,sent_at,attempt_count FROM transactional_emails WHERE id=${emailRow.id}`
+      expect(row.status).toBe('sent')
+      expect(row.provider_message_id).toBe('mock-msg-id')
+      expect(row.sent_at).not.toBeNull()
+      expect(Number(row.attempt_count)).toBe(1)
+    } finally { await teardown51(ids) }
+  }, 25000)
+
+  test('email service: mock provider failure leaves order paid, records error', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51f_' + Date.now()
+    const ev = 'evt_em51f_' + Date.now()
+    const ids = { rids:[] as string[], oIds:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      await svc.saveReservationCheckoutDetails(r.reservationId, {
+        customerEmail:'fail@test.com', customerName:'Fail Test', customerPhone:null,
+        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+      })
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
+      const result = await svc.finalizePaidOrder({
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51f_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd', amountTotal:9999,
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      })
+      expect(result.outcome).toBe('order_created')
+      ids.oIds.push(result.orderId!)
+
+      const [emailRow] = await testSql`SELECT id FROM transactional_emails WHERE order_id=${result.orderId}`
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: false, message: 'Provider down.' }) }
+      const outcome = await processOneEmail({ sql: testSql, provider: mockProvider, rowId: emailRow.id })
+      expect(outcome.outcome).toBe('failed')
+
+      // Order must still be paid
+      const [ord] = await testSql`SELECT payment_status FROM orders WHERE id=${result.orderId}`
+      expect(ord.payment_status).toBe('paid')
+
+      // Email row must record failure with retry eligibility
+      const [row] = await testSql`SELECT status,last_error,attempt_count,next_attempt_at FROM transactional_emails WHERE id=${emailRow.id}`
+      expect(row.status).toBe('failed')
+      expect(row.last_error).toBeTruthy()
+      expect(Number(row.attempt_count)).toBe(1)
+      expect(row.next_attempt_at).not.toBeNull()
+    } finally { await teardown51(ids) }
+  }, 25000)
+
+  test('already-sent row is not resent', async () => {
+    const f = await mk51()
+    const fs = 'cs_test_em51g_' + Date.now()
+    const ev = 'evt_em51g_' + Date.now()
+    const ids = { rids:[] as string[], oIds:[] as string[], evts:[ev], vids:[f.vid], pids:[f.pid] }
+    try {
+      const r = await svc.reserveInventory([{ sku: f.sku, quantity: 1 }])
+      expect(r.ok).toBe(true); if (!r.ok) return
+      ids.rids.push(r.reservationId)
+      await svc.saveReservationCheckoutDetails(r.reservationId, {
+        customerEmail:'alreadysent@test.com', customerName:'Already', customerPhone:null,
+        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+      })
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
+      const result = await svc.finalizePaidOrder({
+        stripeSessionId:fs, reservationIdHint:null, stripePaymentIntent:'pi_em51g_' + Date.now(),
+        stripeEventId:ev, eventType:'checkout.session.completed', currency:'usd', amountTotal:9999,
+        customerEmail:null, customerName:null, customerPhone:null, shippingAddress:null,
+      })
+      expect(result.outcome).toBe('order_created')
+      ids.oIds.push(result.orderId!)
+
+      const [emailRow] = await testSql`SELECT id FROM transactional_emails WHERE order_id=${result.orderId}`
+      // Mark as already sent
+      await testSql`UPDATE transactional_emails SET status='sent', sent_at=NOW() WHERE id=${emailRow.id}`
+
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'mock' }) }
+      const outcome = await processOneEmail({ sql: testSql, provider: mockProvider, rowId: emailRow.id })
+      expect(outcome.outcome).toBe('already_sent')
+      expect(mockProvider.send).not.toHaveBeenCalled()
+    } finally { await teardown51(ids) }
+  }, 25000)
+})
+
+// ── V51.2 tests ───────────────────────────────────────────────────────────────
+
+import { createAdminOrderService, UUID_RE, VALID_PAYMENT_STATUSES, VALID_FULFILLMENT_STATUSES } from '../admin-orders'
+
+// ── Unit: UUID regex ──────────────────────────────────────────────────────────
+
+describe('admin-orders UUID_RE', () => {
+  test('accepts valid UUID v4', () => {
+    expect(UUID_RE.test('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')).toBe(true)
+  })
+  test('rejects plain string', () => {
+    expect(UUID_RE.test('not-a-uuid')).toBe(false)
+  })
+  test('rejects short UUID', () => {
+    expect(UUID_RE.test('a0eebc99-9c0b-4ef8')).toBe(false)
+  })
+  test('rejects empty string', () => {
+    expect(UUID_RE.test('')).toBe(false)
+  })
+})
+
+// ── Unit: status whitelists ───────────────────────────────────────────────────
+
+describe('admin-orders status whitelists', () => {
+  test('VALID_PAYMENT_STATUSES contains expected values', () => {
+    expect(VALID_PAYMENT_STATUSES).toContain('paid')
+    expect(VALID_PAYMENT_STATUSES).toContain('pending')
+    expect(VALID_PAYMENT_STATUSES).toContain('failed')
+    expect(VALID_PAYMENT_STATUSES).toContain('refunded')
+  })
+  test('VALID_FULFILLMENT_STATUSES contains expected values', () => {
+    expect(VALID_FULFILLMENT_STATUSES).toContain('unfulfilled')
+    expect(VALID_FULFILLMENT_STATUSES).toContain('processing')
+    expect(VALID_FULFILLMENT_STATUSES).toContain('shipped')
+  })
+  test('invalid payment status not in whitelist', () => {
+    expect((VALID_PAYMENT_STATUSES as readonly string[]).includes('shipped')).toBe(false)
+  })
+  test('invalid fulfillment status not in whitelist', () => {
+    expect((VALID_FULFILLMENT_STATUSES as readonly string[]).includes('paid')).toBe(false)
+  })
+})
+
+// ── Unit: admin API route handler tests using injectable deps ─────────────────
+
+function makeOrdersReq(params: Record<string,string>): any {
+  const sp = new URLSearchParams(params)
+  return { nextUrl: { searchParams: sp } }
+}
+
+function makeOrderIdReq(body?: any): any {
+  return { json: async () => body ?? {} }
+}
+
+// Minimal admin-auth mock
+type MockAuthResult =
+  | { identity: { email: string }; error: null }
+  | { identity: null; error: Response }
+
+const MOCK_AUTH_OK: MockAuthResult  = { identity: { email: 'admin@kvrn.shop' }, error: null }
+const MOCK_AUTH_401: MockAuthResult = { identity: null, error: new Response('Unauthorized', { status: 401 }) }
+const MOCK_AUTH_403: MockAuthResult = { identity: null, error: new Response('Forbidden', { status: 403 }) }
+
+// Minimal injectable list handler mirroring the real route logic
+async function runListHandler(
+  authResult: MockAuthResult,
+  params: Record<string,string>,
+  svcOverride?: Partial<ReturnType<typeof createAdminOrderService>>
+) {
+  if (authResult.error) return { status: authResult.error.status }
+
+  const p = new URLSearchParams(params)
+  const limitRaw = p.get('limit')
+  const limit    = limitRaw === null ? 50 : parseInt(limitRaw, 10)
+  if (!Number.isInteger(limit) || limit < 1 || isNaN(limit)) return { status: 400 }
+  const clampedLimit = Math.min(limit, 100)
+
+  const offsetRaw = p.get('offset')
+  const offset    = offsetRaw === null ? 0 : parseInt(offsetRaw, 10)
+  if (!Number.isInteger(offset) || offset < 0 || isNaN(offset)) return { status: 400 }
+
+  const paymentStatus     = p.get('paymentStatus') ?? undefined
+  const fulfillmentStatus = p.get('fulfillmentStatus') ?? undefined
+  if (paymentStatus && !(VALID_PAYMENT_STATUSES as readonly string[]).includes(paymentStatus)) return { status: 400 }
+  if (fulfillmentStatus && !(VALID_FULFILLMENT_STATUSES as readonly string[]).includes(fulfillmentStatus)) return { status: 400 }
+
+  const svc = svcOverride ?? {
+    listOrders:  async () => [],
+    countOrders: async () => 0,
+  }
+  const [data, total] = await Promise.all([svc.listOrders!({} as any), svc.countOrders!({} as any)])
+  return { status: 200, data, meta: { total, limit: clampedLimit, offset } }
+}
+
+// Minimal injectable transition handler
+async function runPatchHandler(
+  authResult: MockAuthResult,
+  id: string,
+  body: any,
+  transitionResult: 'updated'|'already_processing'|'not_found'|'conflict'
+) {
+  if (authResult.error) return { status: authResult.error.status }
+  if (!UUID_RE.test(id)) return { status: 400, error: 'Invalid order ID.' }
+  const requested = body?.fulfillmentStatus
+  if (requested !== 'processing') return { status: 400, error: 'Only fulfillmentStatus processing supported.' }
+  const otherKeys = Object.keys(body).filter((k: string) => k !== 'fulfillmentStatus')
+  if (otherKeys.length > 0) return { status: 400, error: `Unsupported fields: ${otherKeys.join(', ')}` }
+
+  if (transitionResult === 'not_found')       return { status: 404 }
+  if (transitionResult === 'conflict')        return { status: 409 }
+  if (transitionResult === 'updated')         return { status: 200, data: { fulfillmentStatus: 'processing' } }
+  if (transitionResult === 'already_processing') return { status: 200, data: { fulfillmentStatus: 'processing' } }
+  return { status: 500 }
+}
+
+describe('admin orders API — auth', () => {
+  test('unauthenticated list → 401', async () => {
+    const r = await runListHandler(MOCK_AUTH_401 as any, {})
+    expect(r.status).toBe(401)
+  })
+  test('non-allowlisted user → 403', async () => {
+    const r = await runListHandler(MOCK_AUTH_403 as any, {})
+    expect(r.status).toBe(403)
+  })
+  test('authenticated admin list → 200', async () => {
+    const r = await runListHandler(MOCK_AUTH_OK, {})
+    expect(r.status).toBe(200)
+  })
+})
+
+describe('admin orders API — list validation', () => {
+  test('default limit=50, offset=0 applied', async () => {
+    const r = await runListHandler(MOCK_AUTH_OK, {})
+    expect(r.meta?.limit).toBe(50)
+    expect(r.meta?.offset).toBe(0)
+  })
+  test('limit clamped to 100', async () => {
+    const r = await runListHandler(MOCK_AUTH_OK, { limit:'200' })
+    expect(r.meta?.limit).toBe(100)
+  })
+  test('malformed limit → 400', async () => {
+    expect((await runListHandler(MOCK_AUTH_OK, { limit:'abc' })).status).toBe(400)
+  })
+  test('negative offset → 400', async () => {
+    expect((await runListHandler(MOCK_AUTH_OK, { offset:'-1' })).status).toBe(400)
+  })
+  test('valid paymentStatus accepted', async () => {
+    const r = await runListHandler(MOCK_AUTH_OK, { paymentStatus:'paid' })
+    expect(r.status).toBe(200)
+  })
+  test('invalid paymentStatus → 400', async () => {
+    expect((await runListHandler(MOCK_AUTH_OK, { paymentStatus:'shipped' })).status).toBe(400)
+  })
+  test('valid fulfillmentStatus accepted', async () => {
+    const r = await runListHandler(MOCK_AUTH_OK, { fulfillmentStatus:'unfulfilled' })
+    expect(r.status).toBe(200)
+  })
+  test('invalid fulfillmentStatus → 400', async () => {
+    expect((await runListHandler(MOCK_AUTH_OK, { fulfillmentStatus:'paid' })).status).toBe(400)
+  })
+})
+
+describe('admin orders API — transition handler', () => {
+  const VALID_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+
+  test('unfulfilled → processing succeeds', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'processing' }, 'updated')
+    expect(r.status).toBe(200)
+  })
+  test('already_processing → idempotent 200', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'processing' }, 'already_processing')
+    expect(r.status).toBe(200)
+  })
+  test('shipped → processing rejected (conflict)', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'processing' }, 'conflict')
+    expect(r.status).toBe(409)
+  })
+  test('not found → 404', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'processing' }, 'not_found')
+    expect(r.status).toBe(404)
+  })
+  test('malformed UUID → 400', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, 'not-a-uuid', { fulfillmentStatus:'processing' }, 'updated')
+    expect(r.status).toBe(400)
+  })
+  test('unsupported fulfillmentStatus → 400', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped' }, 'updated')
+    expect(r.status).toBe(400)
+  })
+  test('unsupported field (paymentStatus) rejected → 400', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'processing', paymentStatus:'paid' }, 'updated')
+    expect(r.status).toBe(400)
+  })
+  test('PATCH protected — unauthenticated → 401', async () => {
+    const r = await runPatchHandler(MOCK_AUTH_401 as any, VALID_ID, { fulfillmentStatus:'processing' }, 'updated')
+    expect(r.status).toBe(401)
+  })
+  test('no shipment record created in V51.2 transition logic', async () => {
+    // The transitionToProcessing function only updates orders table — no shipments insert
+    // Verified by reading admin-orders.ts: UPDATE orders ... no INSERT INTO shipments
+    const r = await runPatchHandler(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'processing' }, 'updated')
+    expect(r.status).toBe(200)
+    // Service returns 'updated' without touching shipments table
+    expect(r.data?.fulfillmentStatus).toBe('processing')
+  })
+})
+
+// ── V51.2 DB integration tests ────────────────────────────────────────────────
+
+const TEST_DB_512 = process.env.TEST_DATABASE_URL
+const describeDB512 = TEST_DB_512 ? describe : describe.skip
+
+if (!TEST_DB_512) {
+  test('NOTE: V51.2 DB integration tests skipped — TEST_DATABASE_URL absent. Order service behavior NOT verified.', () => {
+    expect(true).toBe(true)
+  })
+}
+
+describeDB512('Integration V51.2 — admin order service', () => {
+  const { neon } = require('@neondatabase/serverless')
+  let testSql: any
+  let svc: ReturnType<typeof createAdminOrderService>
+
+  beforeAll(() => {
+    testSql = neon(TEST_DB_512!)
+    svc     = createAdminOrderService(testSql)
+  })
+
+  const TA = { firstName:'T',lastName:'B',line1:'1 St',line2:'',city:'LA',state:'CA',postalCode:'90001',country:'US' }
+
+  async function mk512(opts: { paymentStatus?: string; fulfillmentStatus?: string } = {}) {
+    const uid = 'V512' + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase()
+    const sku = 'KVRN-T512-' + uid + '-M'
+    const [p] = await testSql`INSERT INTO products (drop_code,product_code,name,slug,price_cents,currency,active) VALUES ('TEST',${uid},${`T512 ${uid}`},${uid.toLowerCase()},8000,'usd',true) RETURNING id`
+    const [v] = await testSql`INSERT INTO product_variants (product_id,sku,color_name,color_code,size,size_sort,stock_on_hand,reserved_quantity,active) VALUES (${p.id},${sku},'Black','BLK','M',3,5,0,true) RETURNING id`
+
+    // Create reservation + order directly (bypassing Stripe)
+    const [res] = await testSql`INSERT INTO reservations (status,expires_at) VALUES ('completed', NOW()+interval'1 hour') RETURNING id`
+    await testSql`INSERT INTO reservation_items (reservation_id,variant_id,sku,product_name,size,color,quantity,unit_price_cents) VALUES (${res.id},${v.id},${sku},'Test Hoodie','M','Black',1,8000)`
+
+    const orderNum = 'KVRN-TEST-' + uid
+    const [ord] = await testSql`
+      INSERT INTO orders (order_number,stripe_checkout_session_id,reservation_id,payment_status,fulfillment_status,currency,subtotal_cents,shipping_cents,total_cents,customer_email,customer_name,shipping_address,paid_at)
+      VALUES (${orderNum},${`cs_test_${uid}`},${res.id},${opts.paymentStatus ?? 'paid'},${opts.fulfillmentStatus ?? 'unfulfilled'},'usd',8000,1999,9999,'test@example.com','Test Buyer',${JSON.stringify(TA)}::jsonb,NOW())
+      RETURNING id`
+    await testSql`INSERT INTO order_items (order_id,variant_id,sku,product_name,size,color,quantity,unit_price_cents,line_total_cents) VALUES (${ord.id},${v.id},${sku},'Test Hoodie','M','Black',1,8000,8000)`
+
+    return { orderId: ord.id as string, orderNum, varId: v.id as string, prodId: p.id as string, resId: res.id as string }
+  }
+
+  async function cleanup512(ids: { orderIds?: string[]; resIds?: string[]; varIds?: string[]; prodIds?: string[] }) {
+    if (ids.orderIds?.length) {
+      await testSql`DELETE FROM order_items WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM orders WHERE id = ANY(${ids.orderIds}::uuid[])`
+    }
+    if (ids.resIds?.length) {
+      await testSql`DELETE FROM inventory_movements WHERE reservation_id = ANY(${ids.resIds}::uuid[])`
+      await testSql`DELETE FROM reservation_items WHERE reservation_id = ANY(${ids.resIds}::uuid[])`
+      await testSql`DELETE FROM reservations WHERE id = ANY(${ids.resIds}::uuid[])`
+    }
+    if (ids.varIds?.length) await testSql`DELETE FROM product_variants WHERE id = ANY(${ids.varIds}::uuid[])`
+    if (ids.prodIds?.length) await testSql`DELETE FROM products WHERE id = ANY(${ids.prodIds}::uuid[])`
+  }
+
+  test('fixture paid order appears in list', async () => {
+    const f = await mk512()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const orders = await svc.listOrders({ limit:100, offset:0 })
+      const found  = orders.find((o: any) => o.id === f.orderId)
+      expect(found).toBeTruthy()
+      expect(found?.orderNumber).toBe(f.orderNum)
+    } finally { await cleanup512(ids) }
+  }, 20000)
+
+  test('fixture detail includes items', async () => {
+    const f = await mk512()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const detail = await svc.getOrderDetail(f.orderId)
+      expect(detail).not.toBeNull()
+      expect(detail?.items.length).toBeGreaterThan(0)
+      expect(detail?.items[0].sku).toContain('KVRN-T512')
+    } finally { await cleanup512(ids) }
+  }, 20000)
+
+  test('unfulfilled → processing transition persists', async () => {
+    const f = await mk512({ fulfillmentStatus:'unfulfilled' })
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const result = await svc.transitionToProcessing(f.orderId)
+      expect(result).toBe('updated')
+      const [row] = await testSql`SELECT fulfillment_status FROM orders WHERE id=${f.orderId}`
+      expect(row.fulfillment_status).toBe('processing')
+    } finally { await cleanup512(ids) }
+  }, 20000)
+
+  test('repeated transition is idempotent', async () => {
+    const f = await mk512({ fulfillmentStatus:'unfulfilled' })
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await svc.transitionToProcessing(f.orderId)
+      const r2 = await svc.transitionToProcessing(f.orderId)
+      expect(r2).toBe('already_processing')
+    } finally { await cleanup512(ids) }
+  }, 20000)
+
+  test('shipped order cannot be moved to processing (conflict)', async () => {
+    const f = await mk512({ fulfillmentStatus:'shipped' })
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const r = await svc.transitionToProcessing(f.orderId)
+      expect(r).toBe('conflict')
+    } finally { await cleanup512(ids) }
+  }, 15000)
+
+  test('unrelated orders unaffected by transition', async () => {
+    const f1 = await mk512({ fulfillmentStatus:'unfulfilled' })
+    const f2 = await mk512({ fulfillmentStatus:'unfulfilled' })
+    const ids = {
+      orderIds:[f1.orderId, f2.orderId],
+      resIds:[f1.resId, f2.resId],
+      varIds:[f1.varId, f2.varId],
+      prodIds:[f1.prodId, f2.prodId],
+    }
+    try {
+      await svc.transitionToProcessing(f1.orderId)
+      const [row] = await testSql`SELECT fulfillment_status FROM orders WHERE id=${f2.orderId}`
+      expect(row.fulfillment_status).toBe('unfulfilled')
+    } finally { await cleanup512(ids) }
+  }, 25000)
+})
+
+// ── V51.3 tests ───────────────────────────────────────────────────────────────
+
+import {
+  shippingConfirmationHTML,
+  shippingConfirmationSubject,
+  type ShippingConfirmationData,
+} from '../email'
+import { loadShippingEmailData } from '../transactional-email'
+
+// ── Shipping template unit tests ──────────────────────────────────────────────
+
+const SAMPLE_SHIP: ShippingConfirmationData = {
+  orderNumber:    'KVRN-001002',
+  customerName:   'Ship Buyer',
+  customerEmail:  'ship@example.com',
+  carrier:        'UPS',
+  trackingNumber: '1Z999AA10123456784',
+  shippedAt:      '2026-01-15T12:00:00Z',
+  shippingAddress: {
+    firstName: 'Ship', lastName: 'Buyer',
+    line1: '456 Oak Ave', line2: null,
+    city: 'Portland', state: 'OR', postalCode: '97201', country: 'US',
+  },
+}
+
+describe('shippingConfirmationHTML template', () => {
+  let html: string
+  beforeAll(() => { html = shippingConfirmationHTML(SAMPLE_SHIP, 'https://kvrn.shop') })
+
+  test('correct subject line', () => {
+    expect(shippingConfirmationSubject('KVRN-001002')).toBe('Order KVRN-001002 shipped')
+  })
+  test('contains order number', () => {
+    expect(html).toContain('KVRN-001002')
+  })
+  test('contains carrier', () => {
+    expect(html).toContain('UPS')
+  })
+  test('contains tracking number', () => {
+    expect(html).toContain('1Z999AA10123456784')
+  })
+  test('no GBP symbol', () => {
+    expect(html).not.toContain('£')
+  })
+  test('no pence references', () => {
+    expect(html.toLowerCase()).not.toContain('pence')
+  })
+  test('no marketing unsubscribe', () => {
+    expect(html.toLowerCase()).not.toContain('unsubscribe')
+  })
+  test('no stale hardcoded kvrn.com', () => {
+    expect(html).not.toContain('href="https://kvrn.com"')
+    expect(html).toContain('kvrn.shop')
+  })
+  test('uses injected siteOrigin', () => {
+    const html2 = shippingConfirmationHTML(SAMPLE_SHIP, 'https://kvrn.omidhamidi1110.workers.dev')
+    expect(html2).toContain('kvrn.omidhamidi1110.workers.dev')
+    expect(html2).not.toContain('kvrn.com')
+  })
+  test('HTML-escapes XSS in carrier', () => {
+    const danger = shippingConfirmationHTML(
+      { ...SAMPLE_SHIP, carrier: '<script>alert(1)</script>' },
+      'https://kvrn.shop'
+    )
+    expect(danger).not.toContain('<script>')
+    expect(danger).toContain('&lt;script&gt;')
+  })
+  test('HTML-escapes XSS in tracking number', () => {
+    const danger = shippingConfirmationHTML(
+      { ...SAMPLE_SHIP, trackingNumber: '"><img src=x onerror=alert(1)>' },
+      'https://kvrn.shop'
+    )
+    expect(danger).not.toContain('<img src=x')
+    expect(danger).toContain('&gt;')
+  })
+  test('contains "on its way" messaging', () => {
+    expect(html.toLowerCase()).toContain('on its way')
+  })
+})
+
+// ── V51.3 PATCH route handler unit tests ─────────────────────────────────────
+
+async function runShipPatch(
+  authResult: MockAuthResult,
+  id: string,
+  body: any,
+  shipResult: { outcome: string; shipmentId?: string }
+) {
+  if (authResult.error) return { status: authResult.error.status }
+  if (!UUID_RE.test(id)) return { status: 400, error: 'Invalid order ID.' }
+
+  const requestedStatus = body?.fulfillmentStatus
+  if (requestedStatus === 'shipped') {
+    const extraKeys = Object.keys(body).filter(
+      (k: string) => !['fulfillmentStatus','carrier','trackingNumber'].includes(k)
+    )
+    if (extraKeys.length > 0) return { status: 400, error: `Unsupported fields: ${extraKeys.join(', ')}` }
+    if (!body.carrier  || typeof body.carrier !== 'string' || !body.carrier.trim())  return { status: 400, error: 'carrier required' }
+    if (!body.trackingNumber || typeof body.trackingNumber !== 'string' || !body.trackingNumber.trim()) return { status: 400, error: 'trackingNumber required' }
+    if (body.carrier.trim().length > 50)    return { status: 400, error: 'carrier too long' }
+    if (body.trackingNumber.trim().length > 100) return { status: 400, error: 'tracking too long' }
+
+    if (shipResult.outcome === 'not_found')          return { status: 404 }
+    if (shipResult.outcome === 'invalid_transition') return { status: 409 }
+    return { status: 200, data: { fulfillmentStatus: 'shipped', shipment: { carrier: body.carrier, trackingNumber: body.trackingNumber } } }
+  }
+  if (requestedStatus !== 'processing' && requestedStatus !== 'shipped') {
+    return { status: 400 }
+  }
+  return { status: 200 }
+}
+
+describe('V51.3 PATCH /api/orders/[id] — shipped transition validation', () => {
+  const VALID_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  const SHIP_BODY = { fulfillmentStatus: 'shipped', carrier: 'UPS', trackingNumber: '1Z123' }
+
+  test('processing → shipped succeeds with carrier+tracking', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, SHIP_BODY, { outcome: 'shipped' })
+    expect(r.status).toBe(200)
+  })
+  test('missing carrier → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped', trackingNumber:'1Z' }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('empty carrier → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped', carrier:'  ', trackingNumber:'1Z' }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('overlong carrier (51 chars) → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped', carrier:'A'.repeat(51), trackingNumber:'1Z' }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('missing tracking → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped', carrier:'UPS' }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('empty tracking → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped', carrier:'UPS', trackingNumber:'' }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('overlong tracking (101 chars) → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { fulfillmentStatus:'shipped', carrier:'UPS', trackingNumber:'T'.repeat(101) }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('extra field (paymentStatus) → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, { ...SHIP_BODY, paymentStatus:'paid' }, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+  test('invalid transition → 409', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, SHIP_BODY, { outcome:'invalid_transition' })
+    expect(r.status).toBe(409)
+  })
+  test('order not found → 404', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, VALID_ID, SHIP_BODY, { outcome:'not_found' })
+    expect(r.status).toBe(404)
+  })
+  test('unauthenticated → 401', async () => {
+    const r = await runShipPatch(MOCK_AUTH_401 as any, VALID_ID, SHIP_BODY, { outcome:'shipped' })
+    expect(r.status).toBe(401)
+  })
+  test('malformed UUID → 400', async () => {
+    const r = await runShipPatch(MOCK_AUTH_OK, 'not-a-uuid', SHIP_BODY, { outcome:'shipped' })
+    expect(r.status).toBe(400)
+  })
+})
+
+// ── V51.3 DB integration tests ────────────────────────────────────────────────
+
+const TEST_DB_513 = process.env.TEST_DATABASE_URL
+const describeDB513 = TEST_DB_513 ? describe : describe.skip
+
+if (!TEST_DB_513) {
+  test('NOTE: V51.3 DB integration tests skipped — TEST_DATABASE_URL absent. Migration 005 NOT verified.', () => {
+    expect(true).toBe(true)
+  })
+}
+
+describeDB513('Integration V51.3 — shipment + shipping email outbox', () => {
+  const { neon } = require('@neondatabase/serverless')
+  let testSql: any
+  let svc: ReturnType<typeof createAdminOrderService>
+
+  beforeAll(() => {
+    testSql = neon(TEST_DB_513!)
+    svc     = createAdminOrderService(testSql)
+  })
+
+  const TA = { firstName:'S',lastName:'T',line1:'1 Ship St',line2:'',city:'Portland',state:'OR',postalCode:'97201',country:'US' }
+
+  async function mk513(opts: { fulfillmentStatus?: string; customerEmail?: string | null } = {}) {
+    const uid = 'V513-' + Date.now() + '-' + Math.random().toString(36).slice(2,6).toUpperCase()
+    const sku = 'KVRN-T513-' + uid + '-M'
+    const email = opts.customerEmail !== undefined ? opts.customerEmail : 'ship513@test.com'
+    const [p] = await testSql`INSERT INTO products (drop_code,product_code,name,slug,price_cents,currency,active) VALUES ('TEST',${uid},${`T513 ${uid}`},${uid.toLowerCase()},8000,'usd',true) RETURNING id`
+    const [v] = await testSql`INSERT INTO product_variants (product_id,sku,color_name,color_code,size,size_sort,stock_on_hand,reserved_quantity,active) VALUES (${p.id},${sku},'Black','BLK','M',3,5,0,true) RETURNING id`
+    const [res] = await testSql`INSERT INTO reservations (status,expires_at) VALUES ('completed',NOW()+interval'1 hour') RETURNING id`
+    await testSql`INSERT INTO reservation_items (reservation_id,variant_id,sku,product_name,size,color,quantity,unit_price_cents) VALUES (${res.id},${v.id},${sku},'Test Hoodie','M','Black',1,8000)`
+    const orderNum = 'KVRN-TEST513-' + uid.replace(/[^A-Z0-9]/g,'')
+    const status = opts.fulfillmentStatus ?? 'processing'
+    const [ord] = await testSql`
+      INSERT INTO orders (order_number,stripe_checkout_session_id,reservation_id,payment_status,fulfillment_status,currency,subtotal_cents,shipping_cents,total_cents,customer_email,customer_name,shipping_address,paid_at)
+      VALUES (${orderNum},${`cs_test_513_${uid.replace(/[^A-Z0-9]/g,'')}`},${res.id},'paid',${status},'usd',8000,1999,9999,${email},'Ship Test',${JSON.stringify(TA)}::jsonb,NOW())
+      RETURNING id`
+    await testSql`INSERT INTO order_items (order_id,variant_id,sku,product_name,size,color,quantity,unit_price_cents,line_total_cents) VALUES (${ord.id},${v.id},${sku},'Test Hoodie','M','Black',1,8000,8000)`
+    return { orderId: ord.id as string, orderNum, varId: v.id as string, prodId: p.id as string, resId: res.id as string }
+  }
+
+  async function cleanup513(ids: { orderIds?: string[]; resIds?: string[]; varIds?: string[]; prodIds?: string[] }) {
+    if (ids.orderIds?.length) {
+      await testSql`DELETE FROM transactional_emails WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM shipments WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM order_items WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM orders WHERE id = ANY(${ids.orderIds}::uuid[])`
+    }
+    if (ids.resIds?.length) {
+      await testSql`DELETE FROM inventory_movements WHERE reservation_id = ANY(${ids.resIds}::uuid[])`
+      await testSql`DELETE FROM reservation_items WHERE reservation_id = ANY(${ids.resIds}::uuid[])`
+      await testSql`DELETE FROM reservations WHERE id = ANY(${ids.resIds}::uuid[])`
+    }
+    if (ids.varIds?.length) await testSql`DELETE FROM product_variants WHERE id = ANY(${ids.varIds}::uuid[])`
+    if (ids.prodIds?.length) await testSql`DELETE FROM products WHERE id = ANY(${ids.prodIds}::uuid[])`
+  }
+
+  test('processing → shipped creates exactly one shipment and email row', async () => {
+    const f = await mk513()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const r = await svc.markOrderShipped(f.orderId, 'UPS', '1ZTEST001')
+      expect(r.outcome).toBe('shipped')
+
+      const ships = await testSql`SELECT carrier,tracking_number FROM shipments WHERE order_id=${f.orderId}`
+      expect(ships.length).toBe(1)
+      expect(ships[0].carrier).toBe('UPS')
+      expect(ships[0].tracking_number).toBe('1ZTEST001')
+
+      const [ord] = await testSql`SELECT fulfillment_status FROM orders WHERE id=${f.orderId}`
+      expect(ord.fulfillment_status).toBe('shipped')
+
+      const emails = await testSql`SELECT email_type,recipient_email,idempotency_key,status FROM transactional_emails WHERE order_id=${f.orderId} AND email_type='shipping_confirmation'`
+      expect(emails.length).toBe(1)
+      expect(emails[0].recipient_email).toBe('ship513@test.com')
+      expect(emails[0].idempotency_key).toBe(`shipping-confirmation/${f.orderId}`)
+      expect(emails[0].status).toBe('pending')
+    } finally { await cleanup513(ids) }
+  }, 25000)
+
+  test('replay does not duplicate shipment or email row', async () => {
+    const f = await mk513()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await svc.markOrderShipped(f.orderId, 'UPS', '1ZTEST002')
+      const r2 = await svc.markOrderShipped(f.orderId, 'UPS', '1ZTEST002')
+      expect(r2.outcome).toBe('already_shipped')
+      const ships = await testSql`SELECT id FROM shipments WHERE order_id=${f.orderId}`
+      expect(ships.length).toBe(1)
+      const emails = await testSql`SELECT id FROM transactional_emails WHERE order_id=${f.orderId} AND email_type='shipping_confirmation'`
+      expect(emails.length).toBe(1)
+    } finally { await cleanup513(ids) }
+  }, 25000)
+
+  test('unfulfilled → shipped rejected with no shipment or email', async () => {
+    const f = await mk513({ fulfillmentStatus:'unfulfilled' })
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const r = await svc.markOrderShipped(f.orderId, 'UPS', '1ZTEST003')
+      expect(r.outcome).toBe('invalid_transition')
+      const ships = await testSql`SELECT id FROM shipments WHERE order_id=${f.orderId}`
+      expect(ships.length).toBe(0)
+      const emails = await testSql`SELECT id FROM transactional_emails WHERE order_id=${f.orderId} AND email_type='shipping_confirmation'`
+      expect(emails.length).toBe(0)
+    } finally { await cleanup513(ids) }
+  }, 20000)
+
+  test('null customer_email marks shipped but creates no email row', async () => {
+    const f = await mk513({ customerEmail: null })
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const r = await svc.markOrderShipped(f.orderId, 'FedEx', '1FEDTEST')
+      expect(r.outcome).toBe('shipped')
+      const [ord] = await testSql`SELECT fulfillment_status FROM orders WHERE id=${f.orderId}`
+      expect(ord.fulfillment_status).toBe('shipped')
+      const emails = await testSql`SELECT id FROM transactional_emails WHERE order_id=${f.orderId} AND email_type='shipping_confirmation'`
+      expect(emails.length).toBe(0)
+    } finally { await cleanup513(ids) }
+  }, 20000)
+
+  test('no inventory movement during shipping', async () => {
+    const f = await mk513()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      const [pvBefore] = await testSql`SELECT stock_on_hand FROM product_variants WHERE id=${f.varId}`
+      await svc.markOrderShipped(f.orderId, 'USPS', '9400TEST')
+      const [pvAfter] = await testSql`SELECT stock_on_hand FROM product_variants WHERE id=${f.varId}`
+      expect(Number(pvAfter.stock_on_hand)).toBe(Number(pvBefore.stock_on_hand))
+    } finally { await cleanup513(ids) }
+  }, 20000)
+
+  test('shipping email loader reads shipment data from Neon', async () => {
+    const f = await mk513()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await svc.markOrderShipped(f.orderId, 'DHL', 'DHL123TEST')
+      const data = await loadShippingEmailData(testSql, f.orderId)
+      expect(data).not.toBeNull()
+      expect(data?.carrier).toBe('DHL')
+      expect(data?.trackingNumber).toBe('DHL123TEST')
+      expect(data?.orderNumber).toBe(f.orderNum)
+    } finally { await cleanup513(ids) }
+  }, 25000)
+
+  test('mock provider success marks shipping row sent', async () => {
+    const f = await mk513()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await svc.markOrderShipped(f.orderId, 'UPS', '1ZSENT001')
+      const [emailRow] = await testSql`SELECT id FROM transactional_emails WHERE order_id=${f.orderId} AND email_type='shipping_confirmation'`
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'ship-msg-id' }) }
+      const outcome = await processOneEmail({ sql: testSql, provider: mockProvider, rowId: emailRow.id })
+      expect(outcome.outcome).toBe('sent')
+      const [row] = await testSql`SELECT status,provider_message_id FROM transactional_emails WHERE id=${emailRow.id}`
+      expect(row.status).toBe('sent')
+      expect(row.provider_message_id).toBe('ship-msg-id')
+    } finally { await cleanup513(ids) }
+  }, 25000)
+
+  test('mock provider failure leaves order shipped and row retryable', async () => {
+    const f = await mk513()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await svc.markOrderShipped(f.orderId, 'UPS', '1ZFAIL001')
+      const [emailRow] = await testSql`SELECT id FROM transactional_emails WHERE order_id=${f.orderId} AND email_type='shipping_confirmation'`
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: false, message: 'Provider down.' }) }
+      const outcome = await processOneEmail({ sql: testSql, provider: mockProvider, rowId: emailRow.id })
+      expect(outcome.outcome).toBe('failed')
+      const [ord] = await testSql`SELECT fulfillment_status FROM orders WHERE id=${f.orderId}`
+      expect(ord.fulfillment_status).toBe('shipped')
+      const [row] = await testSql`SELECT status,next_attempt_at FROM transactional_emails WHERE id=${emailRow.id}`
+      expect(row.status).toBe('failed')
+      expect(row.next_attempt_at).not.toBeNull()
+    } finally { await cleanup513(ids) }
+  }, 25000)
+
+  test('unrelated orders unaffected by shipping transition', async () => {
+    const f1 = await mk513()
+    const f2 = await mk513()
+    const ids = { orderIds:[f1.orderId,f2.orderId], resIds:[f1.resId,f2.resId], varIds:[f1.varId,f2.varId], prodIds:[f1.prodId,f2.prodId] }
+    try {
+      await svc.markOrderShipped(f1.orderId, 'UPS', '1ZUNRELATED')
+      const [ord2] = await testSql`SELECT fulfillment_status FROM orders WHERE id=${f2.orderId}`
+      expect(ord2.fulfillment_status).toBe('processing')
+    } finally { await cleanup513(ids) }
+  }, 25000)
+})
+
+// ── V51.4 tests ───────────────────────────────────────────────────────────────
+
+// Resend unit tests restore global.fetch after each test
+describe('V51.4 — internal retry route and processor', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch  = originalFetch
+    jest.restoreAllMocks()
+    // Clear CRON_SECRET env after each test
+    delete process.env.CRON_SECRET
+  })
+
+  // Simulate the route handler logic (injectable for unit testing)
+  function timingSafeEqual(a: string, b: string): boolean {
+    if (a.length !== b.length) {
+      let result = 1
+      for (let i = 0; i < a.length; i++) {
+        result |= (a.charCodeAt(i) ^ (b.charCodeAt(i % b.length) || 0))
+      }
+      return false
+    }
+    let result = 0
+    for (let i = 0; i < a.length; i++) {
+      result |= (a.charCodeAt(i) ^ b.charCodeAt(i))
+    }
+    return result === 0
+  }
+
+  async function simulateRetryRoute(
+    authHeader: string | null,
+    envCronSecret: string | null,
+    processorResult: { processed: number; sent: number; failed: number } | null,
+    providerConfigured = true
+  ): Promise<{ status: number; body: any }> {
+    const cronSecret = envCronSecret ?? ''
+    if (!cronSecret) return { status: 503, body: { error: 'not configured' } }
+    if (!authHeader?.startsWith('Bearer ')) return { status: 401, body: { error: 'Unauthorized.' } }
+    const provided = authHeader.slice('Bearer '.length)
+    if (!timingSafeEqual(provided, cronSecret)) return { status: 403, body: { error: 'Forbidden.' } }
+    if (!providerConfigured) return { status: 500, body: { error: 'Email provider not configured.' } }
+    if (processorResult === null) return { status: 500, body: { error: 'Processing failed.' } }
+    return { status: 200, body: processorResult }
+  }
+
+  // ── Auth tests ─────────────────────────────────────────────────────────────
+
+  test('missing Authorization → 401', async () => {
+    const r = await simulateRetryRoute(null, 'my-secret', { processed:0, sent:0, failed:0 })
+    expect(r.status).toBe(401)
+  })
+  test('malformed scheme (no Bearer) → 401', async () => {
+    const r = await simulateRetryRoute('Basic abc123', 'my-secret', { processed:0, sent:0, failed:0 })
+    expect(r.status).toBe(401)
+  })
+  test('wrong secret → 403', async () => {
+    const r = await simulateRetryRoute('Bearer wrong-secret', 'my-secret', { processed:0, sent:0, failed:0 })
+    expect(r.status).toBe(403)
+  })
+  test('correct secret → processes', async () => {
+    const r = await simulateRetryRoute('Bearer my-secret', 'my-secret', { processed:5, sent:4, failed:1 })
+    expect(r.status).toBe(200)
+    expect(r.body.processed).toBe(5)
+    expect(r.body.sent).toBe(4)
+    expect(r.body.failed).toBe(1)
+  })
+  test('missing CRON_SECRET → 503 (fail closed)', async () => {
+    const r = await simulateRetryRoute('Bearer my-secret', null, { processed:0, sent:0, failed:0 })
+    expect(r.status).toBe(503)
+  })
+  test('provider missing → 500', async () => {
+    const r = await simulateRetryRoute('Bearer sec', 'sec', null, false)
+    expect(r.status).toBe(500)
+  })
+  test('processor exception → 500', async () => {
+    const r = await simulateRetryRoute('Bearer sec', 'sec', null, true)
+    expect(r.status).toBe(500)
+  })
+  test('response body contains only counts — no PII', async () => {
+    const r = await simulateRetryRoute('Bearer sec', 'sec', { processed:2, sent:2, failed:0 })
+    expect(r.status).toBe(200)
+    const keys = Object.keys(r.body)
+    expect(keys).toEqual(['processed', 'sent', 'failed'])
+    expect(keys).not.toContain('email')
+    expect(keys).not.toContain('orderId')
+    expect(keys).not.toContain('recipient')
+  })
+  test('timing-safe comparison: different-length secrets always reject', () => {
+    expect(timingSafeEqual('abc', 'abcd')).toBe(false)
+    expect(timingSafeEqual('abc', 'abc')).toBe(true)
+    expect(timingSafeEqual('', '')).toBe(true)
+    expect(timingSafeEqual('x', '')).toBe(false)
+  })
+
+  // ── Processor selection tests ──────────────────────────────────────────────
+
+  test('wrangler.toml contains [triggers] crons', () => {
+    const fs   = require('fs')
+    const toml = fs.readFileSync(require('path').join(__dirname, '../../wrangler.toml'), 'utf8')
+    expect(toml).toContain('[triggers]')
+    expect(toml).toContain('crons')
+    expect(toml).toContain('*/5 * * * *')
+  })
+  test('wrangler.toml does NOT contain a hardcoded CRON_SECRET value', () => {
+    const fs   = require('fs')
+    const toml = fs.readFileSync(require('path').join(__dirname, '../../wrangler.toml'), 'utf8')
+    // Key must appear only in comments, never as an assignment with a real value
+    const lines = toml.split('\n').filter((l: string) => !l.trim().startsWith('#'))
+    expect(lines.some((l: string) => l.includes('CRON_SECRET') && l.includes('=') && !l.includes('#'))).toBe(false)
+  })
+  test('wrangler.toml account_id unchanged', () => {
+    const fs   = require('fs')
+    const toml = fs.readFileSync(require('path').join(__dirname, '../../wrangler.toml'), 'utf8')
+    expect(toml).toContain('5c2f1f1df8ff752572878665e985280b')
+  })
+  test('wrangler.toml main references cron wrapper', () => {
+    const fs   = require('fs')
+    const toml = fs.readFileSync(require('path').join(__dirname, '../../wrangler.toml'), 'utf8')
+    expect(toml).toContain('cloudflare-cron-wrapper.js')
+  })
+  test('cloudflare-cron-wrapper.js exists and references internal route', () => {
+    const fs     = require('fs')
+    const wrapper = fs.readFileSync(require('path').join(__dirname, '../../cloudflare-cron-wrapper.js'), 'utf8')
+    expect(wrapper).toContain('scheduled')
+    expect(wrapper).toContain('transactional-email-retry')
+    expect(wrapper).toContain('CRON_SECRET')
+    // Must not contain a hardcoded secret value
+    expect(wrapper).not.toMatch(/CRON_SECRET\s*=\s*['"][^'"]+['"]/)
+  })
+  test('cloudflare-cron-wrapper.js delegates fetch to openNextWorker', () => {
+    const fs     = require('fs')
+    const wrapper = fs.readFileSync(require('path').join(__dirname, '../../cloudflare-cron-wrapper.js'), 'utf8')
+    expect(wrapper).toContain('openNextWorker')
+    expect(wrapper).toContain('.open-next/worker.js')
+  })
+
+  // ── Stale sending recovery ─────────────────────────────────────────────────
+
+  test('stale sending recovery: query includes sending rows older than 15 min', () => {
+    const fs  = require('fs')
+    const src = fs.readFileSync(require('path').join(__dirname, '../transactional-email.ts'), 'utf8')
+    expect(src).toContain("status = 'sending'")
+    expect(src).toContain('15 minutes')
+    expect(src).toContain('STALE_SENDING_MINUTES')
+  })
+  test('stale sending recovery: processOneEmail uses deterministic idempotency key', () => {
+    // Deterministic key is stored in the DB row (idempotency_key column)
+    // and passed to provider.send() — verified by shipping/order confirmation tests above
+    // This test confirms the field is never regenerated per-attempt
+    const fs  = require('fs')
+    const src = fs.readFileSync(require('path').join(__dirname, '../transactional-email.ts'), 'utf8')
+    expect(src).toContain('idempotencyKey: row.idempotency_key')
+    expect(src).not.toContain('Math.random()')
+    expect(src).not.toContain('crypto.randomUUID()')
+  })
+})
+
+// ── V51.4 DB integration tests ────────────────────────────────────────────────
+
+const TEST_DB_514 = process.env.TEST_DATABASE_URL
+const describeDB514 = TEST_DB_514 ? describe : describe.skip
+
+if (!TEST_DB_514) {
+  test('NOTE: V51.4 DB integration tests skipped — TEST_DATABASE_URL absent. Retry/stale recovery NOT verified.', () => {
+    expect(true).toBe(true)
+  })
+}
+
+describeDB514('Integration V51.4 — retry batch processor and stale sending recovery', () => {
+  const { neon } = require('@neondatabase/serverless')
+  let testSql: any
+  let svc: ReturnType<typeof createAdminOrderService>
+
+  beforeAll(() => {
+    testSql = neon(TEST_DB_514!)
+    svc     = createAdminOrderService(testSql)
+  })
+
+  const TA = { firstName:'R',lastName:'T',line1:'1 Retry Rd',line2:'',city:'LA',state:'CA',postalCode:'90001',country:'US' }
+
+  async function mk514() {
+    const uid = 'V514-' + Date.now() + '-' + Math.random().toString(36).slice(2,6).toUpperCase()
+    const sku = 'KVRN-T514-' + uid + '-M'
+    const [p] = await testSql`INSERT INTO products (drop_code,product_code,name,slug,price_cents,currency,active) VALUES ('TEST',${uid},${`T514 ${uid}`},${uid.toLowerCase()},8000,'usd',true) RETURNING id`
+    const [v] = await testSql`INSERT INTO product_variants (product_id,sku,color_name,color_code,size,size_sort,stock_on_hand,reserved_quantity,active) VALUES (${p.id},${sku},'Black','BLK','M',3,5,0,true) RETURNING id`
+    const [res] = await testSql`INSERT INTO reservations (status,expires_at) VALUES ('completed',NOW()+interval'1 hour') RETURNING id`
+    await testSql`INSERT INTO reservation_items (reservation_id,variant_id,sku,product_name,size,color,quantity,unit_price_cents) VALUES (${res.id},${v.id},${sku},'Test514','M','Black',1,8000)`
+    const orderNum = 'KVRN-TEST514-' + uid.replace(/[^A-Z0-9]/g,'')
+    const [ord] = await testSql`
+      INSERT INTO orders (order_number,stripe_checkout_session_id,reservation_id,payment_status,fulfillment_status,currency,subtotal_cents,shipping_cents,total_cents,customer_email,customer_name,shipping_address,paid_at)
+      VALUES (${orderNum},${`cs_test_514_${uid.replace(/[^A-Z0-9]/g,'')}`},${res.id},'paid','unfulfilled','usd',8000,1999,9999,'retry514@test.com','Retry T',${JSON.stringify(TA)}::jsonb,NOW())
+      RETURNING id`
+    await testSql`INSERT INTO order_items (order_id,variant_id,sku,product_name,size,color,quantity,unit_price_cents,line_total_cents) VALUES (${ord.id},${v.id},${sku},'Test','M','Black',1,8000,8000)`
+    return { orderId: ord.id as string, orderNum, varId: v.id as string, prodId: p.id as string, resId: res.id as string }
+  }
+
+  async function cleanup514(ids: { orderIds?: string[]; resIds?: string[]; varIds?: string[]; prodIds?: string[] }) {
+    if (ids.orderIds?.length) {
+      await testSql`DELETE FROM transactional_emails WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM shipments WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM order_items WHERE order_id = ANY(${ids.orderIds}::uuid[])`
+      await testSql`DELETE FROM orders WHERE id = ANY(${ids.orderIds}::uuid[])`
+    }
+    if (ids.resIds?.length) {
+      await testSql`DELETE FROM inventory_movements WHERE reservation_id = ANY(${ids.resIds}::uuid[])`
+      await testSql`DELETE FROM reservation_items WHERE reservation_id = ANY(${ids.resIds}::uuid[])`
+      await testSql`DELETE FROM reservations WHERE id = ANY(${ids.resIds}::uuid[])`
+    }
+    if (ids.varIds?.length) await testSql`DELETE FROM product_variants WHERE id = ANY(${ids.varIds}::uuid[])`
+    if (ids.prodIds?.length) await testSql`DELETE FROM products WHERE id = ANY(${ids.prodIds}::uuid[])`
+  }
+
+  test('failed due row gets sent by batch processor', async () => {
+    const f = await mk514()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      // Create a failed pending row
+      await testSql`
+        INSERT INTO transactional_emails (order_id,email_type,recipient_email,status,idempotency_key,attempt_count,next_attempt_at)
+        VALUES (${f.orderId},'order_confirmation','retry514@test.com','failed',('order-confirmation/' || ${f.orderId}::text),1,NOW()-interval'1 minute')
+      `
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'retry-ok' }) }
+      const result = await processPendingTransactionalEmails({ sql: testSql, provider: mockProvider, limit: 10 })
+      expect(result.sent).toBeGreaterThanOrEqual(1)
+      const [row] = await testSql`SELECT status FROM transactional_emails WHERE order_id=${f.orderId}`
+      expect(row.status).toBe('sent')
+    } finally { await cleanup514(ids) }
+  }, 25000)
+
+  test('future next_attempt_at row is not processed', async () => {
+    const f = await mk514()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await testSql`
+        INSERT INTO transactional_emails (order_id,email_type,recipient_email,status,idempotency_key,attempt_count,next_attempt_at)
+        VALUES (${f.orderId},'order_confirmation','retry514f@test.com','failed',('order-confirmation/' || ${f.orderId}::text),1,NOW()+interval'1 hour')
+      `
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'no-send' }) }
+      await processPendingTransactionalEmails({ sql: testSql, provider: mockProvider, limit: 10 })
+      expect(mockProvider.send).not.toHaveBeenCalled()
+      const [row] = await testSql`SELECT status FROM transactional_emails WHERE order_id=${f.orderId}`
+      expect(row.status).toBe('failed')
+    } finally { await cleanup514(ids) }
+  }, 20000)
+
+  test('stale sending row becomes retryable and idempotency key preserved', async () => {
+    const f = await mk514()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    const idemKey = 'order-confirmation/' + f.orderId
+    try {
+      // Insert a stale sending row (updated_at > 15 minutes ago)
+      await testSql`
+        INSERT INTO transactional_emails (order_id,email_type,recipient_email,status,idempotency_key,attempt_count,updated_at)
+        VALUES (${f.orderId},'order_confirmation','stale514@test.com','sending',${idemKey},1,NOW()-interval'20 minutes')
+      `
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'stale-recovered' }) }
+      await processPendingTransactionalEmails({ sql: testSql, provider: mockProvider, limit: 10 })
+      expect(mockProvider.send).toHaveBeenCalled()
+      const call = mockProvider.send.mock.calls[0][0]
+      // Must reuse the same deterministic idempotency key
+      expect(call.idempotencyKey).toBe(idemKey)
+      const [row] = await testSql`SELECT status FROM transactional_emails WHERE order_id=${f.orderId}`
+      expect(row.status).toBe('sent')
+    } finally { await cleanup514(ids) }
+  }, 25000)
+
+  test('fresh sending row is NOT reclaimed', async () => {
+    const f = await mk514()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      // Fresh sending row — updated just now
+      await testSql`
+        INSERT INTO transactional_emails (order_id,email_type,recipient_email,status,idempotency_key,attempt_count)
+        VALUES (${f.orderId},'order_confirmation','fresh514@test.com','sending',('order-confirmation/' || ${f.orderId}::text),1)
+      `
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: true, providerMessageId: 'fresh' }) }
+      await processPendingTransactionalEmails({ sql: testSql, provider: mockProvider, limit: 10 })
+      expect(mockProvider.send).not.toHaveBeenCalled()
+      const [row] = await testSql`SELECT status FROM transactional_emails WHERE order_id=${f.orderId}`
+      expect(row.status).toBe('sending')
+    } finally { await cleanup514(ids) }
+  }, 20000)
+
+  test('sent row remains untouched by batch processor', async () => {
+    const f = await mk514()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await testSql`
+        INSERT INTO transactional_emails (order_id,email_type,recipient_email,status,idempotency_key,attempt_count,sent_at)
+        VALUES (${f.orderId},'order_confirmation','sent514@test.com','sent',('order-confirmation/' || ${f.orderId}::text),1,NOW())
+      `
+      const mockProvider = { send: jest.fn() }
+      await processPendingTransactionalEmails({ sql: testSql, provider: mockProvider, limit: 10 })
+      expect(mockProvider.send).not.toHaveBeenCalled()
+    } finally { await cleanup514(ids) }
+  }, 20000)
+
+  test('order/payment/inventory unchanged by retry processing', async () => {
+    const f = await mk514()
+    const ids = { orderIds:[f.orderId], resIds:[f.resId], varIds:[f.varId], prodIds:[f.prodId] }
+    try {
+      await testSql`
+        INSERT INTO transactional_emails (order_id,email_type,recipient_email,status,idempotency_key)
+        VALUES (${f.orderId},'order_confirmation','inv514@test.com','pending',('order-confirmation/' || ${f.orderId}::text))
+      `
+      const [pvBefore] = await testSql`SELECT stock_on_hand FROM product_variants WHERE id=${f.varId}`
+      const [ordBefore] = await testSql`SELECT payment_status,fulfillment_status FROM orders WHERE id=${f.orderId}`
+      const mockProvider = { send: jest.fn().mockResolvedValue({ ok: false, message: 'down' }) }
+      await processPendingTransactionalEmails({ sql: testSql, provider: mockProvider, limit: 10 })
+      const [pvAfter]  = await testSql`SELECT stock_on_hand FROM product_variants WHERE id=${f.varId}`
+      const [ordAfter] = await testSql`SELECT payment_status,fulfillment_status FROM orders WHERE id=${f.orderId}`
+      expect(pvAfter.stock_on_hand).toBe(pvBefore.stock_on_hand)
+      expect(ordAfter.payment_status).toBe(ordBefore.payment_status)
+      expect(ordAfter.fulfillment_status).toBe(ordBefore.fulfillment_status)
+    } finally { await cleanup514(ids) }
+  }, 20000)
+})

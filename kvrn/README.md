@@ -170,7 +170,7 @@ Images are referenced in `data/products.ts`. Add your images to `public/images/p
 4. In `app/checkout/page.tsx`, uncomment the Stripe Elements integration
 5. In `app/api/checkout/route.ts`, uncomment the PaymentIntent creation
 6. Set up webhook at [dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks):
-   - Endpoint: `https://kvrn.com/api/webhooks/stripe`
+   - Endpoint: `https://kvrn.shop/api/webhooks/stripe`
    - Events: `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.dispute.created`
 
 ### Neon Postgres (Database)
@@ -183,7 +183,7 @@ Images are referenced in `data/products.ts`. Add your images to `public/images/p
 ### Resend (Email)
 
 1. Create account at [resend.com](https://resend.com)
-2. Verify your domain (kvrn.com) — adds DNS records to Cloudflare
+2. Verify your domain (kvrn.shop) — adds DNS records to Cloudflare
 3. Create API key → `RESEND_API_KEY`
 4. Uncomment email code in API routes
 
@@ -231,7 +231,7 @@ The admin at `/admin` currently shows placeholder data.
 Option A (recommended): Cloudflare Access
 - Free for personal projects
 - Go to Cloudflare → Zero Trust → Access → Applications
-- Add an application protecting `kvrn.com/admin`
+- Add an application protecting `kvrn.shop/admin`
 - Requires email authentication — no code changes needed
 
 Option B: Next.js middleware
@@ -301,4 +301,4 @@ Priority order from V4 Blueprint:
 ## Support
 
 Questions about the build: review V1–V4 Blueprint documents.  
-Technical issues: hello@kvrn.com
+Technical issues: hello@kvrn.shop

@@ -33,7 +33,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-[15px] font-light text-kvrn-text mb-3">Who you are contracting with</h2>
             <p>
-              These terms govern your use of kvrn.com and any purchase you make from KVRN,
+              These terms govern your use of kvrn.shop and any purchase you make from KVRN,
               operated by [KVRN Ltd], registered in England and Wales (Company No. [XXXXXXXX]).
               By placing an order, you agree to these terms.
             </p>

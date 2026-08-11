@@ -12,12 +12,13 @@ keep_vars = true
 #   npx wrangler secret put TWILIO_PHONE_NUMBER
 #   npx wrangler secret put ADMIN_SECRET
 #   npx wrangler secret put EMAIL_FROM
+#   npx wrangler secret put CRON_SECRET            # required for /api/internal/transactional-email-retry
 #   npx wrangler secret put SUPPORT_EMAIL
 #   npx wrangler secret put ORDERS_EMAIL
 #   npx wrangler secret put RETURNS_EMAIL
 
 name       = "kvrn"
-main       = ".open-next/worker.js"
+main       = "cloudflare-cron-wrapper.js"   # wraps .open-next/worker.js; adds cron handler
 account_id = "5c2f1f1df8ff752572878665e985280b"
 
 compatibility_date  = "2024-12-18"
@@ -28,10 +29,17 @@ compatibility_flags = ["nodejs_compat"]
 directory = ".open-next/assets"
 binding   = "ASSETS"
 
+# ── Cron Triggers — transactional email retry ──────────────────────────────────
+# Fires scheduled() in cloudflare-cron-wrapper.js every 5 minutes.
+# Enable cron in Cloudflare dashboard after first deployment of V51.4.
+# Set CRON_SECRET via: npx wrangler secret put CRON_SECRET
+[triggers]
+crons = ["*/5 * * * *"]
+
 # ── Public environment variables ───────────────────────────────────────────────
 # Secrets must be set via `wrangler secret put` — never hardcode here
 [vars]
-NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
+NEXT_PUBLIC_SITE_URL = "https://kvrn.shop"
 NODE_ENV             = "production"
 
 # ── Production ────────────────────────────────────────────────────────────────
@@ -39,7 +47,7 @@ NODE_ENV             = "production"
 name = "kvrn"
 
 [env.production.vars]
-NEXT_PUBLIC_SITE_URL = "https://kvrn.com"
+NEXT_PUBLIC_SITE_URL = "https://kvrn.shop"
 NODE_ENV             = "production"
 
 # ── Preview / staging ─────────────────────────────────────────────────────────

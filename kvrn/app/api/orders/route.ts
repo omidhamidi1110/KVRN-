@@ -1,61 +1,65 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/admin-auth'
+import { sql } from '@/lib/db'
+import {
+  createAdminOrderService,
+  VALID_PAYMENT_STATUSES,
+  VALID_FULFILLMENT_STATUSES,
+} from '@/lib/admin-orders'
 
-// ─── GET /api/orders ───────────────────────────────────────────────────────────
-// Returns all orders for the admin dashboard.
-// Protected by middleware — only accessible with admin cookie.
+export const dynamic = 'force-dynamic'
+
+const MAX_LIMIT     = 100
+const DEFAULT_LIMIT = 50
+
 export async function GET(req: NextRequest) {
-  const url    = new URL(req.url)
-  const status = url.searchParams.get('status')   // filter by status
-  const limit  = parseInt(url.searchParams.get('limit') ?? '50')
-  const offset = parseInt(url.searchParams.get('offset') ?? '0')
+  // Auth before any DB access
+  const { identity, error } = await requireAdmin(req)
+  if (error) return error
+
+  const p = req.nextUrl.searchParams
+
+  // Validate limit
+  const limitRaw = p.get('limit')
+  const limit    = limitRaw === null ? DEFAULT_LIMIT : parseInt(limitRaw, 10)
+  if (!Number.isInteger(limit) || limit < 1 || isNaN(limit)) {
+    return NextResponse.json({ error: 'Invalid limit.' }, { status: 400 })
+  }
+  const clampedLimit = Math.min(limit, MAX_LIMIT)
+
+  // Validate offset
+  const offsetRaw = p.get('offset')
+  const offset    = offsetRaw === null ? 0 : parseInt(offsetRaw, 10)
+  if (!Number.isInteger(offset) || offset < 0 || isNaN(offset)) {
+    return NextResponse.json({ error: 'Invalid offset.' }, { status: 400 })
+  }
+
+  // Validate statuses
+  const paymentStatus     = p.get('paymentStatus')     ?? undefined
+  const fulfillmentStatus = p.get('fulfillmentStatus') ?? undefined
+  if (paymentStatus && !(VALID_PAYMENT_STATUSES as readonly string[]).includes(paymentStatus)) {
+    return NextResponse.json({ error: `Invalid paymentStatus.` }, { status: 400 })
+  }
+  if (fulfillmentStatus && !(VALID_FULFILLMENT_STATUSES as readonly string[]).includes(fulfillmentStatus)) {
+    return NextResponse.json({ error: `Invalid fulfillmentStatus.` }, { status: 400 })
+  }
+
+  const search = p.get('search')?.trim().slice(0, 200) || undefined
 
   try {
-    // TODO: Connect Neon DB
-    // import { db } from '@/lib/db'
-    //
-    // let query = `
-    //   SELECT
-    //     o.id, o.stripe_payment_intent, o.customer_email, o.customer_name,
-    //     o.shipping_address, o.line_items, o.shipping_method,
-    //     o.subtotal_pence, o.shipping_cost_pence, o.tax_pence, o.total_pence,
-    //     o.status, o.tracking_number, o.carrier,
-    //     o.created_at, o.fulfilled_at, o.shipped_at, o.delivered_at
-    //   FROM orders o
-    // `
-    // const params: unknown[] = []
-    //
-    // if (status) {
-    //   query += ` WHERE o.status = $${params.length + 1}`
-    //   params.push(status)
-    // }
-    //
-    // query += ` ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
-    // params.push(limit, offset)
-    //
-    // const orders = await db.query(query, params)
-    // return NextResponse.json({ success: true, data: orders })
-
-    // ─── MVP: Return mock orders ───────────────────────────────────────────
-    const mockOrders = [
-      {
-        id:              'ord_001',
-        customerEmail:   'james@example.com',
-        customerName:    'James Taylor',
-        totalPence:      42000,
-        status:          'unfulfilled',
-        lineItems:       [{ name: 'KVRN Heavyweight Hoodie', color: 'Stone', size: 'L', quantity: 1, price: 23000 }],
-        shippingAddress: { firstName: 'James', lastName: 'Taylor', address1: '14 Station Road', city: 'London', postcode: 'E1 6PF', country: 'GB' },
-        createdAt:       new Date().toISOString(),
-      },
-    ]
+    const svc    = createAdminOrderService(sql)
+    const params = { paymentStatus, fulfillmentStatus, search, limit: clampedLimit, offset }
+    const [data, total] = await Promise.all([
+      svc.listOrders(params),
+      svc.countOrders({ paymentStatus, fulfillmentStatus, search }),
+    ])
 
     return NextResponse.json({
       success: true,
-      data:    mockOrders,
-      meta:    { total: mockOrders.length, limit, offset },
+      data,
+      meta: { total, limit: clampedLimit, offset },
     })
-  } catch (err) {
-    console.error('[orders] GET error:', err)
-    return NextResponse.json({ success: false, error: 'Failed to fetch orders.' }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Failed to fetch orders.' }, { status: 500 })
   }
 }

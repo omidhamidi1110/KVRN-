@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { products } from '@/data/products'
 
-const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://kvrn.com'
+const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://kvrn.shop'
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const productPages: MetadataRoute.Sitemap = products.filter(p => !p.hidden).map(({ slug }) => ({

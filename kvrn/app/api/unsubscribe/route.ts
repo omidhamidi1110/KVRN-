@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   <div class="wrap">
     <h1>Unsubscribed.</h1>
     <p>You've been removed from our ${type === 'sms' ? 'SMS' : 'email'} list. You won't hear from us again.</p>
-    <p style="margin-top: 24px;"><a href="https://kvrn.com">Return to kvrn.com</a></p>
+    <p style="margin-top: 24px;"><a href="https://kvrn.shop">Return to kvrn.shop</a></p>
   </div>
 </body>
 </html>`,

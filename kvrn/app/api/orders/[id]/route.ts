@@ -1,78 +1,141 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/admin-auth'
+import { sql } from '@/lib/db'
+import { createAdminOrderService, UUID_RE } from '@/lib/admin-orders'
+import { getEmailProvider } from '@/lib/resend-adapter'
+import { processPendingTransactionalEmails } from '@/lib/transactional-email'
 
-// ─── GET /api/orders/[id] ──────────────────────────────────────────────────────
-// Next 15: params must be awaited as a Promise
-export async function GET(
-  _req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export const dynamic = 'force-dynamic'
+
+type Context = { params: Promise<{ id: string }> }
+
+const CARRIER_MAX  = 50
+const TRACKING_MAX = 100
+
+export async function GET(req: NextRequest, context: Context) {
+  const { error } = await requireAdmin(req)
+  if (error) return error
+
   const { id } = await context.params
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: 'Invalid order ID.' }, { status: 400 })
+  }
 
   try {
-    // TODO: Connect Neon DB
-    // import { db } from '@/lib/db'
-    // const [order] = await db.query('SELECT * FROM orders WHERE id = $1', [id])
-    // if (!order) return NextResponse.json({ success: false, error: 'Order not found.' }, { status: 404 })
-    // return NextResponse.json({ success: true, data: order })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        id,
-        status:        'unfulfilled',
-        customerEmail: 'james@example.com',
-        customerName:  'James Taylor',
-        totalPence:    42000,
-        lineItems:     [{ name: 'KVRN Heavyweight Hoodie', color: 'Stone', size: 'L', quantity: 1, price: 23000 }],
-        createdAt:     new Date().toISOString(),
-        message:       'Connect Neon DB to return real order data.',
-      },
-    })
-  } catch (err) {
-    console.error('[orders/id] GET error:', err)
-    return NextResponse.json({ success: false, error: 'Failed to fetch order.' }, { status: 500 })
+    const svc   = createAdminOrderService(sql)
+    const order = await svc.getOrderDetail(id)
+    if (!order) return NextResponse.json({ error: 'Order not found.' }, { status: 404 })
+    return NextResponse.json({ success: true, data: order })
+  } catch {
+    return NextResponse.json({ error: 'Failed to fetch order.' }, { status: 500 })
   }
 }
 
-// ─── PATCH /api/orders/[id] ────────────────────────────────────────────────────
-// Next 15: params must be awaited as a Promise
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, context: Context) {
+  const { error } = await requireAdmin(req)
+  if (error) return error
+
   const { id } = await context.params
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: 'Invalid order ID.' }, { status: 400 })
+  }
 
-  try {
-    const body = await req.json()
-    const allowedFields = ['status', 'tracking_number', 'carrier', 'fulfilled_at', 'shipped_at']
+  let body: any
+  try { body = await req.json() } catch {
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
+  }
 
-    const updates = Object.fromEntries(
-      Object.entries(body).filter(([key]) => allowedFields.includes(key))
-    )
+  const requestedStatus = body?.fulfillmentStatus
 
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ success: false, error: 'No valid fields to update.' }, { status: 400 })
+  // ── Branch 1: unfulfilled → processing ────────────────────────────────────
+  if (requestedStatus === 'processing') {
+    const extraKeys = Object.keys(body).filter(k => k !== 'fulfillmentStatus')
+    if (extraKeys.length > 0) {
+      return NextResponse.json(
+        { error: `Unsupported fields for processing transition: ${extraKeys.join(', ')}.` },
+        { status: 400 }
+      )
     }
 
-    // TODO: Connect Neon DB
-    // import { db } from '@/lib/db'
-    // const setClauses = Object.keys(updates).map((key, i) => `${key} = $${i + 2}`)
-    // const query = `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1 RETURNING *`
-    // const [updated] = await db.query(query, [id, ...Object.values(updates)])
-    //
-    // if (updates.status === 'shipped' && updates.tracking_number) {
-    //   // Send shipping confirmation email
-    // }
-    //
-    // return NextResponse.json({ success: true, data: updated })
-
-    console.log(`[orders/id] PATCH ${id}:`, updates)
-    return NextResponse.json({
-      success: true,
-      data: { id, ...updates, message: 'Connect Neon DB to persist.' },
-    })
-  } catch (err) {
-    console.error('[orders/id] PATCH error:', err)
-    return NextResponse.json({ success: false, error: 'Failed to update order.' }, { status: 500 })
+    try {
+      const svc    = createAdminOrderService(sql)
+      const result = await svc.transitionToProcessing(id)
+      if (result === 'not_found')       return NextResponse.json({ error: 'Order not found.' }, { status: 404 })
+      if (result === 'conflict')        return NextResponse.json({ error: 'Cannot move to processing from current status.' }, { status: 409 })
+      const order = await svc.getOrderDetail(id)
+      return NextResponse.json({ success: true, data: order })
+    } catch {
+      return NextResponse.json({ error: 'Failed to update order.' }, { status: 500 })
+    }
   }
+
+  // ── Branch 2: processing → shipped ────────────────────────────────────────
+  if (requestedStatus === 'shipped') {
+    const extraKeys = Object.keys(body).filter(
+      k => !['fulfillmentStatus', 'carrier', 'trackingNumber'].includes(k)
+    )
+    if (extraKeys.length > 0) {
+      return NextResponse.json(
+        { error: `Unsupported fields: ${extraKeys.join(', ')}.` },
+        { status: 400 }
+      )
+    }
+
+    // Validate carrier
+    const carrierRaw = body.carrier
+    if (carrierRaw === null || carrierRaw === undefined || typeof carrierRaw !== 'string') {
+      return NextResponse.json({ error: 'carrier is required.' }, { status: 400 })
+    }
+    const carrier = carrierRaw.trim()
+    if (!carrier) return NextResponse.json({ error: 'carrier must not be empty.' }, { status: 400 })
+    if (carrier.length > CARRIER_MAX) {
+      return NextResponse.json({ error: `carrier must be ${CARRIER_MAX} characters or fewer.` }, { status: 400 })
+    }
+
+    // Validate trackingNumber
+    const trackingRaw = body.trackingNumber
+    if (trackingRaw === null || trackingRaw === undefined || typeof trackingRaw !== 'string') {
+      return NextResponse.json({ error: 'trackingNumber is required.' }, { status: 400 })
+    }
+    const trackingNumber = trackingRaw.trim()
+    if (!trackingNumber) return NextResponse.json({ error: 'trackingNumber must not be empty.' }, { status: 400 })
+    if (trackingNumber.length > TRACKING_MAX) {
+      return NextResponse.json({ error: `trackingNumber must be ${TRACKING_MAX} characters or fewer.` }, { status: 400 })
+    }
+
+    try {
+      const svc    = createAdminOrderService(sql)
+      const result = await svc.markOrderShipped(id, carrier, trackingNumber)
+
+      if (result.outcome === 'not_found') {
+        return NextResponse.json({ error: 'Order not found.' }, { status: 404 })
+      }
+      if (result.outcome === 'invalid_transition') {
+        return NextResponse.json(
+          { error: 'Order cannot be marked shipped from its current status.' },
+          { status: 409 }
+        )
+      }
+      // 'shipped' or 'already_shipped' — both are success; attempt email (non-fatal)
+      if (result.outcome === 'shipped') {
+        try {
+          const provider = getEmailProvider()
+          await processPendingTransactionalEmails({ sql, provider, limit: 1 })
+        } catch (emailErr: any) {
+          console.error('[orders/id PATCH] Shipping email failed (non-fatal):', emailErr?.message?.slice(0, 100))
+        }
+      }
+
+      const order = await svc.getOrderDetail(id)
+      return NextResponse.json({ success: true, data: order })
+    } catch {
+      return NextResponse.json({ error: 'Failed to mark order shipped.' }, { status: 500 })
+    }
+  }
+
+  // ── Unknown transition ─────────────────────────────────────────────────────
+  return NextResponse.json(
+    { error: 'Only fulfillmentStatus "processing" or "shipped" (with carrier and trackingNumber) are supported.' },
+    { status: 400 }
+  )
 }
