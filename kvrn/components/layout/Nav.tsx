@@ -19,6 +19,7 @@ export function Nav() {
   const { openPreferences }       = useCookiePrefs()
   const { t }                     = useI18n()
   const pathname                  = usePathname()
+  const isAdmin                   = pathname === '/admin' || pathname.startsWith('/admin/')
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
@@ -168,6 +169,8 @@ export function Nav() {
     { label: t.shippingReturns, href: '/support/shipping-returns' },
     { label: t.contact,         href: '/contact' },
   ]
+
+  if (isAdmin) return null
 
   return (
     <>

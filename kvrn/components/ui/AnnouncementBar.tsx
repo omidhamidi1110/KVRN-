@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 // Announcement bar — always visible/sticky, does NOT hide on scroll
 const MESSAGES = [
@@ -13,6 +14,9 @@ const INTERVAL = 6000
 const FADE_MS  = 500
 
 export function AnnouncementBar() {
+  const pathname = usePathname()
+  const isAdmin  = pathname === '/admin' || pathname.startsWith('/admin/')
+
   const [idx,     setIdx]     = useState(0)
   const [fading,  setFading]  = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -30,6 +34,8 @@ export function AnnouncementBar() {
     }, INTERVAL)
     return () => clearInterval(timer)
   }, [mounted])
+
+  if (isAdmin) return null
 
   if (!mounted) return (
     <div className="fixed top-0 left-0 right-0 z-[250] h-[36px] bg-[#0E0E0E]" aria-hidden="true" />

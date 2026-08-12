@@ -23,6 +23,7 @@ const STATUS_LABELS: Record<string, { label: string; description: string }> = {
   pending:        { label: 'Order received',     description: 'Payment confirmed. Preparing for dispatch.' },
   paid:           { label: 'Order confirmed',    description: 'Payment confirmed. Preparing for dispatch.' },
   unfulfilled:    { label: 'Preparing',          description: 'Your order is being prepared.' },
+  processing:     { label: 'Processing',         description: 'Your order is being prepared.' },
   fulfilled:      { label: 'Ready to ship',      description: 'Packed and ready for collection by the carrier.' },
   shipped:        { label: 'Shipped',            description: 'On its way to you.' },
   delivered:      { label: 'Delivered',          description: 'Your order has been delivered.' },
@@ -43,35 +44,36 @@ export default function TrackOrderPage() {
     e.preventDefault()
     setInputErr('')
 
-    if (!orderId.trim() && !email.trim()) {
-      setInputErr('Enter your order number or email address.')
+    if (!orderId.trim() || !email.trim()) {
+      setInputErr('Enter both your order number and email address.')
       return
     }
 
     setState('loading')
 
     try {
-      const params = new URLSearchParams()
-      if (orderId.trim()) params.set('id',    orderId.trim().replace('#', ''))
-      if (email.trim())   params.set('email', email.trim())
-
-      const res  = await fetch(`/api/orders?${params}`)
+      const res = await fetch('/api/order-tracking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderNumber: orderId.trim(),
+          email: email.trim(),
+        }),
+      })
       const data = await res.json()
 
-      if (!data.success || !data.data?.length) {
+      if (!res.ok || !data.success || !data.data) {
         setState('not-found')
         return
       }
 
-      const order = data.data[0]
+      const order = data.data
       setResult({
-        id:               order.id,
-        status:           order.status ?? 'pending',
+        id:               order.orderNumber,
+        status:           order.status ?? 'unfulfilled',
         trackingNumber:   order.trackingNumber ?? null,
         carrier:          order.carrier ?? null,
-        trackingUrl:      order.trackingNumber
-          ? `https://track.royalmail.com/tracking/your-item#${order.trackingNumber}`
-          : null,
+        trackingUrl:      null,
         createdAt:        order.createdAt,
         lineItems:        order.lineItems ?? [],
       })
@@ -95,12 +97,12 @@ export default function TrackOrderPage() {
         <form onSubmit={handleSearch} className="space-y-4" noValidate>
           <div>
             <label htmlFor="order-id" className="label-11 block mb-2">
-              Order number <span className="text-kvrn-subtle normal-case tracking-normal">(optional)</span>
+              Order number
             </label>
             <input
               id="order-id"
               type="text"
-              placeholder="#1042"
+              placeholder="KVRN-001001"
               value={orderId}
               onChange={e => { setOrderId(e.target.value); setInputErr('') }}
               className="kvrn-input"
@@ -109,7 +111,7 @@ export default function TrackOrderPage() {
 
           <div>
             <label htmlFor="track-email" className="label-11 block mb-2">
-              Email address <span className="text-kvrn-subtle normal-case tracking-normal">(optional)</span>
+              Email address
             </label>
             <input
               id="track-email"
@@ -206,12 +208,6 @@ export default function TrackOrderPage() {
           </div>
         )}
 
-        {/* Dev notice */}
-        <div className="mt-12 border border-kvrn-border bg-kvrn-bg-raised p-4 text-[12px] text-kvrn-muted leading-relaxed">
-          <strong className="font-light text-kvrn-text">Dev note:</strong> Order lookup requires Neon DB connected.
-          Connect <code className="bg-kvrn-bg px-1">DATABASE_URL</code> and uncomment the DB queries
-          in <code className="bg-kvrn-bg px-1">/api/orders/route.ts</code>.
-        </div>
       </div>
     </div>
   )

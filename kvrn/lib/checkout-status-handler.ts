@@ -3,7 +3,7 @@
 // Imported by the route and by tests — never duplicated.
 
 import { type NextRequest, NextResponse } from 'next/server'
-import { isValidTestCheckoutSessionId } from './checkout-status'
+import { isValidCheckoutSessionId } from './checkout-status'
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
@@ -28,7 +28,7 @@ export function createStatusGetHandler(deps: StatusRouteDeps) {
     }
 
     // Invalid format → 400 (validates full value, never truncates)
-    if (!isValidTestCheckoutSessionId(sessionId)) {
+    if (!isValidCheckoutSessionId(sessionId)) {
       return NextResponse.json(
         { error: 'Invalid session_id.' },
         { status: 400, headers: NO_STORE }

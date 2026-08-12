@@ -6,7 +6,7 @@
  */
 
 import { aggregateAndValidate, createReservationService, parseDbErr } from '../reservations'
-import { isValidTestCheckoutSessionId } from '../checkout-status'
+import { isValidCheckoutSessionId } from '../checkout-status'
 import { isValidStripeTestSecretKey, isValidWebhookSecret } from '../stripe-client'
 import { getSiteOrigin } from '../site-origin'
 import { requiredStringField, optionalStringField, FIELD_MAX } from '../checkout-validation'
@@ -71,11 +71,11 @@ describe('parseDbErr', () => {
   test('falls back DB_ERROR for non-KVRN', () => expect(parseDbErr('random error').code).toBe('DB_ERROR'))
 })
 
-describe('isValidTestCheckoutSessionId', () => {
-  test('accepts cs_test_ ID', () => expect(isValidTestCheckoutSessionId('cs_test_' + 'a'.repeat(20))).toBe(true))
-  test('rejects cs_live_', () => expect(isValidTestCheckoutSessionId('cs_live_' + 'a'.repeat(20))).toBe(false))
-  test('rejects too short', () => expect(isValidTestCheckoutSessionId('cs_test_abc')).toBe(false))
-  test('rejects null', () => expect(isValidTestCheckoutSessionId(null)).toBe(false))
+describe('isValidCheckoutSessionId', () => {
+  test('accepts cs_test_ ID', () => expect(isValidCheckoutSessionId('cs_test_' + 'a'.repeat(20))).toBe(true))
+  test('accepts cs_live_', () => expect(isValidCheckoutSessionId('cs_live_' + 'a'.repeat(20))).toBe(true))
+  test('rejects too short', () => expect(isValidCheckoutSessionId('cs_test_abc')).toBe(false))
+  test('rejects null', () => expect(isValidCheckoutSessionId(null)).toBe(false))
 })
 
 describe('isValidStripeTestSecretKey', () => {
@@ -1032,10 +1032,10 @@ describe('createStatusGetHandler — real production handler', () => {
     expect(response.status).toBe(400)
   })
 
-  test('cs_live_ session → 400 (test mode only)', async () => {
+  test('valid unknown cs_live_ session → 404', async () => {
     const handler  = createStatusGetHandler(makeStatusDeps([]))
     const response = await handler(makeStatusRequest('cs_live_' + 'a'.repeat(20)) as any)
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
   })
 
   test('valid unknown session → 404', async () => {

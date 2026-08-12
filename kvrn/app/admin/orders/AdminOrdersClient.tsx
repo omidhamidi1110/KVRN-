@@ -200,154 +200,373 @@ export function AdminOrdersClient() {
   const currentPage = Math.floor(offset / LIMIT) + 1
 
   return (
-    <div style={{ minHeight:'100vh', background:'#F9F8F6', paddingTop:'calc(36px + 56px)' }}>
-      <div style={{ maxWidth:1400, margin:'0 auto', padding:'32px 24px' }}>
+    <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-7 lg:px-10 lg:py-10">
 
-        {/* Header */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
-          <h1 style={{ fontSize:20, fontWeight:500, color:'#1A1A1A', letterSpacing:'0.04em', textTransform:'uppercase' }}>
+      {/* Page header */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-black/35">
+            Commerce
+          </p>
+          <h1 className="text-[30px] font-medium tracking-[-0.035em] text-[#171717] sm:text-[34px]">
             Orders
           </h1>
-          <span style={{ fontSize:12, color:'#9B9B9B' }}>
-            {meta.total} total
-          </span>
+          <p className="mt-2 text-[13px] text-black/45">
+            Search, review, fulfill, and ship customer orders.
+          </p>
         </div>
 
-        {/* Filters */}
-        <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:20 }}>
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key==='Enter' && fetchOrders(0)}
-            placeholder="Order #, customer name, or email"
-            style={{ flex:'1 1 260px', padding:'8px 12px', fontSize:13, border:'1px solid #D1CCBF', background:'#fff', outline:'none' }}
-          />
-          <select value={payFilter} onChange={e => setPayFilter(e.target.value)}
-            style={selStyle}>
-            <option value="">All payment statuses</option>
-            {['pending','paid','failed','refunded'].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={fulFilter} onChange={e => setFulFilter(e.target.value)}
-            style={selStyle}>
-            <option value="">All fulfillment statuses</option>
-            {['unfulfilled','processing','shipped','delivered','cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button onClick={() => fetchOrders(0)} style={btnOutline}>Search</button>
-          <button onClick={() => { setSearch(''); setPayFilter(''); setFulFilter(''); }} style={btnOutline}>Clear</button>
+        <div className="rounded-full border border-black/[0.07] bg-white px-3.5 py-1.5 text-[11px] font-medium text-black/40 shadow-sm">
+          {meta.total} total
         </div>
+      </div>
 
-        {error && (
-          <div style={{ padding:'10px 14px', background:'#FEF2F2', border:'1px solid #FECACA', color:'#B91C1C', fontSize:13, marginBottom:16 }}>
-            {error}
+      {/* Filters */}
+      <div className="mb-5 rounded-xl border border-black/[0.07] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+        <div className="flex flex-col gap-2.5 lg:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <svg
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-black/25"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="m16 16 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && fetchOrders(0)}
+              placeholder="Order #, customer name, or email"
+              className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] pl-10 pr-3 text-[12px] text-[#171717] outline-none transition placeholder:text-black/25 focus:border-black/25 focus:bg-white"
+            />
           </div>
-        )}
 
-        <div style={{ display:'flex', gap:24, alignItems:'flex-start', flexWrap:'wrap' }}>
+          <select
+            value={payFilter}
+            onChange={e => setPayFilter(e.target.value)}
+            className="h-10 rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] text-black/60 outline-none transition focus:border-black/25 focus:bg-white"
+          >
+            <option value="">All payments</option>
+            {['pending','paid','failed','refunded'].map(v => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
 
-          {/* Orders table */}
-          <div style={{ flex:'1 1 600px', minWidth:0, overflowX:'auto' }}>
-            {loading ? (
-              <p style={{ color:'#9B9B9B', fontSize:13 }}>Loading...</p>
-            ) : orders.length === 0 ? (
-              <p style={{ color:'#9B9B9B', fontSize:13 }}>No orders found.</p>
-            ) : (
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+          <select
+            value={fulFilter}
+            onChange={e => setFulFilter(e.target.value)}
+            className="h-10 rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] text-black/60 outline-none transition focus:border-black/25 focus:bg-white"
+          >
+            <option value="">All fulfillment</option>
+            {['unfulfilled','processing','shipped','delivered','cancelled'].map(v => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => fetchOrders(0)}
+            className="h-10 rounded-lg bg-[#111111] px-5 text-[11px] font-medium tracking-[0.04em] text-white transition hover:bg-black/80"
+          >
+            Search
+          </button>
+
+          <button
+            onClick={() => {
+              setSearch('')
+              setPayFilter('')
+              setFulFilter('')
+            }}
+            className="h-10 rounded-lg border border-black/[0.09] bg-white px-4 text-[11px] font-medium text-black/45 transition hover:border-black/20 hover:text-black"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-col items-start gap-4 2xl:flex-row">
+
+        {/* Orders list */}
+        <section className="w-full min-w-0 flex-1 overflow-hidden rounded-xl border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+          <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/30">
+                Order ledger
+              </p>
+              <p className="mt-1 text-[12px] text-black/40">
+                {loading ? 'Updating…' : `${meta.total} order${meta.total === 1 ? '' : 's'}`}
+              </p>
+            </div>
+
+            <button
+              onClick={() => fetchOrders(offset)}
+              disabled={loading}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-black/[0.07] text-black/35 transition hover:border-black/15 hover:text-black disabled:opacity-40"
+              aria-label="Refresh orders"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                className={loading ? 'animate-spin' : ''}
+                aria-hidden="true"
+              >
+                <path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"
+                  stroke="currentColor" strokeWidth="1.5"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="px-6 py-14 text-center text-[12px] text-black/35">
+              Loading orders…
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="px-6 py-14 text-center">
+              <p className="text-[13px] font-medium text-black/55">No orders found</p>
+              <p className="mt-1 text-[11px] text-black/30">
+                Try changing your search or filters.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] border-collapse text-left">
                 <thead>
-                  <tr style={{ borderBottom:'2px solid #E8E5E0' }}>
+                  <tr className="border-b border-black/[0.06] bg-[#FAFAF9]">
                     {['Order','Date','Customer','Items','Total','Payment','Fulfillment','Shipping',''].map(h => (
-                      <th key={h} style={thStyle}>{h}</th>
+                      <th
+                        key={h}
+                        className="whitespace-nowrap px-4 py-3 text-[9px] font-medium uppercase tracking-[0.12em] text-black/30"
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
+
                 <tbody>
                   {orders.map(o => (
-                    <tr key={o.id}
+                    <tr
+                      key={o.id}
                       onClick={() => openDetail(o.id)}
-                      style={{ borderBottom:'1px solid #F1EEE8', cursor:'pointer' }}
-                      onMouseEnter={e => (e.currentTarget.style.background='#F9F8F6')}
-                      onMouseLeave={e => (e.currentTarget.style.background='')}>
-                      <td style={tdStyle}><code style={{ fontSize:11 }}>{o.orderNumber}</code></td>
-                      <td style={tdStyle}>{new Date(o.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})}</td>
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight:500 }}>{o.customerName ?? '—'}</div>
-                        <div style={{ color:'#9B9B9B', fontSize:11 }}>{o.customerEmail ?? ''}</div>
+                      className={[
+                        'cursor-pointer border-b border-black/[0.05] transition last:border-0 hover:bg-black/[0.018]',
+                        detail?.id === o.id ? 'bg-black/[0.025]' : '',
+                      ].join(' ')}
+                    >
+                      <td className="whitespace-nowrap px-4 py-4">
+                        <span className="font-mono text-[11px] font-medium text-black/70">
+                          {o.orderNumber}
+                        </span>
                       </td>
-                      <td style={{ ...tdStyle, textAlign:'center' }}>{o.quantityCount}</td>
-                      <td style={tdStyle}>{formatCheckoutPrice(o.totalCents)}</td>
-                      <td style={tdStyle}><Badge text={o.paymentStatus} colour={PAYMENT_COLOURS[o.paymentStatus] ?? '#6B7280'} /></td>
-                      <td style={tdStyle}><Badge text={o.fulfillmentStatus} colour={FULFILL_COLOURS[o.fulfillmentStatus] ?? '#6B7280'} /></td>
-                      <td style={tdStyle}>{o.shippingMethod ?? '—'}</td>
-                      <td style={tdStyle}>
-                        <span style={{ fontSize:11, color:'#2563EB', textDecoration:'underline' }}>View</span>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-[11px] text-black/40">
+                        {new Date(o.createdAt).toLocaleDateString('en-US', {
+                          month:'short',
+                          day:'numeric',
+                          year:'2-digit',
+                        })}
+                      </td>
+
+                      <td className="max-w-[220px] px-4 py-4">
+                        <p className="truncate text-[12px] font-medium text-[#171717]">
+                          {o.customerName ?? '—'}
+                        </p>
+                        <p className="mt-0.5 truncate text-[10px] text-black/30">
+                          {o.customerEmail ?? ''}
+                        </p>
+                      </td>
+
+                      <td className="px-4 py-4 text-center text-[12px] text-black/55">
+                        {o.quantityCount}
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-[12px] font-medium">
+                        {formatCheckoutPrice(o.totalCents)}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <Badge
+                          text={o.paymentStatus}
+                          colour={PAYMENT_COLOURS[o.paymentStatus] ?? '#6B7280'}
+                        />
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <Badge
+                          text={o.fulfillmentStatus}
+                          colour={FULFILL_COLOURS[o.fulfillmentStatus] ?? '#6B7280'}
+                        />
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-[11px] text-black/40">
+                        {o.shippingMethod ?? '—'}
+                      </td>
+
+                      <td className="px-4 py-4 text-right">
+                        <span className="text-[11px] font-medium text-black/35">
+                          View →
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            )}
+            </div>
+          )}
 
-            {/* Pagination */}
-            {meta.total > LIMIT && (
-              <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:16 }}>
-                <button onClick={() => fetchOrders(Math.max(0, offset-LIMIT))}
-                  disabled={offset===0} style={btnOutline}>← Prev</button>
-                <span style={{ fontSize:12, color:'#6b7280' }}>
-                  Page {currentPage} of {totalPages} ({meta.total} orders)
-                </span>
-                <button onClick={() => fetchOrders(offset+LIMIT)}
-                  disabled={offset+LIMIT>=meta.total} style={btnOutline}>Next →</button>
+          {meta.total > LIMIT && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.06] px-5 py-4">
+              <p className="text-[10px] text-black/30">
+                Page {currentPage} of {totalPages} · {meta.total} orders
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchOrders(Math.max(0, offset - LIMIT))}
+                  disabled={offset === 0}
+                  className="h-8 rounded-lg border border-black/[0.09] bg-white px-3 text-[10px] font-medium text-black/45 transition hover:border-black/20 hover:text-black disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ← Previous
+                </button>
+
+                <button
+                  onClick={() => fetchOrders(offset + LIMIT)}
+                  disabled={offset + LIMIT >= meta.total}
+                  className="h-8 rounded-lg border border-black/[0.09] bg-white px-3 text-[10px] font-medium text-black/45 transition hover:border-black/20 hover:text-black disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  Next →
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </section>
 
-          {/* Detail panel */}
-          {(detailLoading || detail) && (
-            <div style={{ flex:'0 1 380px', minWidth:280, background:'#fff', border:'1px solid #E8E5E0', padding:'20px' }}>
-              {detailLoading ? (
-                <p style={{ color:'#9B9B9B', fontSize:13 }}>Loading order...</p>
-              ) : detail ? (
-                <>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
-                    <h2 style={{ fontSize:14, fontWeight:600, color:'#1A1A1A' }}>{detail.orderNumber}</h2>
-                    <button onClick={() => { setDetail(null); setTxMsg('') }}
-                      style={{ background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#9B9B9B' }}>✕</button>
+        {/* Order detail */}
+        {(detailLoading || detail) && (
+          <aside className="w-full flex-shrink-0 overflow-hidden rounded-xl border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] 2xl:sticky 2xl:top-6 2xl:w-[390px]">
+            {detailLoading ? (
+              <div className="px-6 py-14 text-center text-[12px] text-black/35">
+                Loading order…
+              </div>
+            ) : detail ? (
+              <>
+                <div className="flex items-start justify-between border-b border-black/[0.06] px-5 py-4">
+                  <div>
+                    <p className="text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                      Order detail
+                    </p>
+                    <h2 className="mt-1.5 font-mono text-[13px] font-medium">
+                      {detail.orderNumber}
+                    </h2>
                   </div>
 
-                  <Row label="Payment"><Badge text={detail.paymentStatus} colour={PAYMENT_COLOURS[detail.paymentStatus] ?? '#6B7280'} /></Row>
-                  <Row label="Fulfillment"><Badge text={detail.fulfillmentStatus} colour={FULFILL_COLOURS[detail.fulfillmentStatus] ?? '#6B7280'} /></Row>
-                  {detail.paidAt && <Row label="Paid">{new Date(detail.paidAt).toLocaleString()}</Row>}
-                  <Row label="Created">{new Date(detail.createdAt).toLocaleString()}</Row>
+                  <button
+                    onClick={() => {
+                      setDetail(null)
+                      setTxMsg('')
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-black/30 transition hover:bg-black/[0.04] hover:text-black"
+                    aria-label="Close order details"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                      <path d="M3 3l12 12M15 3 3 15"
+                        stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="max-h-[calc(100vh-120px)] overflow-y-auto px-5 py-5">
+                  <div className="flex flex-wrap gap-2 pb-4">
+                    <Badge
+                      text={detail.paymentStatus}
+                      colour={PAYMENT_COLOURS[detail.paymentStatus] ?? '#6B7280'}
+                    />
+                    <Badge
+                      text={detail.fulfillmentStatus}
+                      colour={FULFILL_COLOURS[detail.fulfillmentStatus] ?? '#6B7280'}
+                    />
+                  </div>
+
+                  <div className="rounded-lg bg-[#F8F8F6] p-4">
+                    {detail.paidAt && (
+                      <Row label="Paid">{new Date(detail.paidAt).toLocaleString()}</Row>
+                    )}
+                    <Row label="Created">{new Date(detail.createdAt).toLocaleString()}</Row>
+                  </div>
 
                   <Divider />
-                  <Row label="Customer">{detail.customerName ?? '—'}</Row>
+
+                  <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                    Customer
+                  </p>
+                  <Row label="Name">{detail.customerName ?? '—'}</Row>
                   <Row label="Email">{detail.customerEmail ?? '—'}</Row>
                   {detail.customerPhone && <Row label="Phone">{detail.customerPhone}</Row>}
                   <Row label="Address">{formatAddr(detail.shippingAddress)}</Row>
                   {detail.shippingMethod && <Row label="Shipping">{detail.shippingMethod}</Row>}
 
                   <Divider />
-                  {detail.items.map(item => (
-                    <div key={item.id} style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'4px 0', color:'#1A1A1A' }}>
-                      <span style={{ flex:1 }}>
-                        {item.productName} — {item.color} / {item.size}
-                        {item.quantity > 1 && ` × ${item.quantity}`}
-                      </span>
-                      <span style={{ flexShrink:0, marginLeft:8 }}>{formatCheckoutPrice(item.lineTotalCents)}</span>
-                    </div>
-                  ))}
+
+                  <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                    Items
+                  </p>
+
+                  <div className="space-y-2">
+                    {detail.items.map(item => (
+                      <div
+                        key={item.id}
+                        className="flex justify-between gap-3 rounded-lg bg-[#F8F8F6] px-3.5 py-3 text-[11px]"
+                      >
+                        <span className="min-w-0 flex-1 text-black/65">
+                          {item.productName}
+                          <span className="block mt-0.5 text-[10px] text-black/30">
+                            {item.color} / {item.size}
+                            {item.quantity > 1 && ` × ${item.quantity}`}
+                          </span>
+                        </span>
+                        <span className="flex-shrink-0 font-medium">
+                          {formatCheckoutPrice(item.lineTotalCents)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
 
                   <Divider />
+
+                  <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                    Payment summary
+                  </p>
                   <Row label="Subtotal">{formatCheckoutPrice(detail.subtotalCents)}</Row>
                   <Row label="Shipping">{formatCheckoutPrice(detail.shippingCents)}</Row>
-                  {detail.taxCents > 0 && <Row label="Tax">{formatCheckoutPrice(detail.taxCents)}</Row>}
-                  {detail.discountCents > 0 && <Row label="Discount">−{formatCheckoutPrice(detail.discountCents)}</Row>}
+                  {detail.taxCents > 0 && (
+                    <Row label="Tax">{formatCheckoutPrice(detail.taxCents)}</Row>
+                  )}
+                  {detail.discountCents > 0 && (
+                    <Row label="Discount">−{formatCheckoutPrice(detail.discountCents)}</Row>
+                  )}
                   <Row label="Total" bold>{formatCheckoutPrice(detail.totalCents)}</Row>
 
                   {detail.fulfillmentStatus === 'unfulfilled' && (
                     <>
                       <Divider />
-                      <button onClick={markProcessing} disabled={transitioning}
-                        style={{ ...btnPrimary, width:'100%', marginTop:4 }}>
-                        {transitioning ? 'Updating...' : 'Mark processing'}
+                      <button
+                        onClick={markProcessing}
+                        disabled={transitioning}
+                        className="h-11 w-full rounded-lg bg-[#111111] text-[11px] font-medium tracking-[0.04em] text-white transition hover:bg-black/80 disabled:opacity-50"
+                      >
+                        {transitioning ? 'Updating…' : 'Mark processing'}
                       </button>
                     </>
                   )}
@@ -355,20 +574,35 @@ export function AdminOrdersClient() {
                   {detail.fulfillmentStatus === 'processing' && (
                     <>
                       <Divider />
-                      <p style={{ fontSize:11, fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', color:'#1A1A1A', marginBottom:8 }}>Mark shipped</p>
-                      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                        <select value={carrier} onChange={e => setCarrier(e.target.value)}
-                          style={{ ...selStyle, fontSize:12 }}>
+                      <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                        Shipment
+                      </p>
+
+                      <div className="space-y-2">
+                        <select
+                          value={carrier}
+                          onChange={e => setCarrier(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none focus:border-black/25"
+                        >
                           <option value="">Carrier *</option>
-                          {['USPS','UPS','FedEx','DHL','Other'].map(c => <option key={c} value={c}>{c}</option>)}
+                          {['USPS','UPS','FedEx','DHL','Other'].map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
                         </select>
-                        <input value={tracking} onChange={e => setTracking(e.target.value)}
+
+                        <input
+                          value={tracking}
+                          onChange={e => setTracking(e.target.value)}
                           placeholder="Tracking number *"
-                          style={{ padding:'8px 10px', fontSize:12, border:'1px solid #D1CCBF', background:'#fff', outline:'none' }}
+                          className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none placeholder:text-black/25 focus:border-black/25"
                         />
-                        <button onClick={markShipped} disabled={transitioning}
-                          style={{ ...btnPrimary, width:'100%' }}>
-                          {transitioning ? 'Saving...' : 'Confirm shipment'}
+
+                        <button
+                          onClick={markShipped}
+                          disabled={transitioning}
+                          className="h-11 w-full rounded-lg bg-[#111111] text-[11px] font-medium tracking-[0.04em] text-white transition hover:bg-black/80 disabled:opacity-50"
+                        >
+                          {transitioning ? 'Saving…' : 'Confirm shipment'}
                         </button>
                       </div>
                     </>
@@ -377,25 +611,34 @@ export function AdminOrdersClient() {
                   {detail.shipment && (
                     <>
                       <Divider />
+                      <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                        Tracking
+                      </p>
                       <Row label="Carrier">{detail.shipment.carrier ?? '—'}</Row>
                       <Row label="Tracking">{detail.shipment.trackingNumber ?? '—'}</Row>
                       {detail.shipment.shippedAt && (
-                        <Row label="Shipped">{new Date(detail.shipment.shippedAt).toLocaleString()}</Row>
+                        <Row label="Shipped">
+                          {new Date(detail.shipment.shippedAt).toLocaleString()}
+                        </Row>
                       )}
                     </>
                   )}
 
                   {txMsg && (
-                    <p style={{ marginTop:10, fontSize:12,
-                      color: txMsg.includes('processing') ? '#059669' : '#B91C1C' }}>
+                    <div className={[
+                      'mt-4 rounded-lg border px-3 py-2.5 text-[11px]',
+                      txMsg.includes('processing')
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-red-200 bg-red-50 text-red-700',
+                    ].join(' ')}>
                       {txMsg}
-                    </p>
+                    </div>
                   )}
-                </>
-              ) : null}
-            </div>
-          )}
-        </div>
+                </div>
+              </>
+            ) : null}
+          </aside>
+        )}
       </div>
     </div>
   )
