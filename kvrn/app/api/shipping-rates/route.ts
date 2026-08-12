@@ -44,46 +44,51 @@ export async function POST(req: NextRequest) {
         const shippoRates = await getShippoRates({ city, state, zip, country }, items, shippingDb, apiToken)
 
         if (shippoRates) {
-          // Express: use real Shippo rate if available, else static (never fabricated)
-          const expressOpt  = shippoRates.express
-          const expressRate = expressOpt
-            ? {
-                id:       'express',
-                label:    `${expressOpt.label} — ${expressOpt.estimate}`,
-                cents:    expressOpt.cents,
-                minDays:  expressOpt.minDays,
-                maxDays:  expressOpt.maxDays,
-                provider: expressOpt.provider,
-                default:  false,
-                source:   'shippo',
-              }
-            : {
-                id:       'express',
-                label:    US_SHIPPING_OPTIONS['express'].label + ' — ' + US_SHIPPING_OPTIONS['express'].estimate,
-                cents:    calculateShippingCents('express'),
-                minDays:  US_SHIPPING_OPTIONS['express'].minDays,
-                maxDays:  US_SHIPPING_OPTIONS['express'].maxDays,
-                provider: 'Carrier',
-                default:  false,
-                source:   'static',
-              }
+          const standardRate = {
+            id:       'standard',
+            label:    `${shippoRates.standard.label} — ${shippoRates.standard.estimate}`,
+            cents:    shippoRates.standard.cents,
+            minDays:  shippoRates.standard.minDays,
+            maxDays:  shippoRates.standard.maxDays,
+            provider: shippoRates.standard.provider,
+            default:  true,
+            source:   'shippo',
+          }
 
-          const rates = [
-            {
-              id:       'standard',
-              label:    `${shippoRates.standard.label} — ${shippoRates.standard.estimate}`,
-              cents:    shippoRates.standard.cents,
-              minDays:  shippoRates.standard.minDays,
-              maxDays:  shippoRates.standard.maxDays,
-              provider: shippoRates.standard.provider,
-              default:  true,
+          // Express: real Shippo rate when available.
+          // US only: static fallback when Shippo returns none.
+          // Non-US: never insert US domestic static rates — omit express entirely.
+          const expressOpt = shippoRates.express
+          const rates: typeof standardRate[] = [standardRate]
+
+          if (expressOpt) {
+            rates.push({
+              id:       'express',
+              label:    `${expressOpt.label} — ${expressOpt.estimate}`,
+              cents:    expressOpt.cents,
+              minDays:  expressOpt.minDays,
+              maxDays:  expressOpt.maxDays,
+              provider: expressOpt.provider,
+              default:  false,
               source:   'shippo',
-            },
-            expressRate,
-          ]
+            })
+          } else if (isUS) {
+            // US only: insert trusted static express when Shippo has none
+            rates.push({
+              id:       'express',
+              label:    US_SHIPPING_OPTIONS['express'].label + ' — ' + US_SHIPPING_OPTIONS['express'].estimate,
+              cents:    calculateShippingCents('express'),
+              minDays:  US_SHIPPING_OPTIONS['express'].minDays,
+              maxDays:  US_SHIPPING_OPTIONS['express'].maxDays,
+              provider: 'Carrier',
+              default:  false,
+              source:   'static',
+            })
+          }
+          // Non-US with no Shippo express: rates has only [standard] — correct
 
           // Apply free-shipping rule with server-authoritative subtotal.
-          // subtotalCents=null means unknown SKU(s) → do not apply rule (safe default).
+          // subtotalCents=null → unknown SKU(s), do not apply rule (safe default).
           const qualifiedRates = subtotalCents !== null
             ? applyFreeShippingToRates(rates, country, subtotalCents)
             : rates

@@ -1,11 +1,12 @@
 // lib/shippo.ts — Shippo shipping rate integration for KVRN
 // Server-only. Never import in client components.
+// Supports both US domestic and international destinations.
 // Requires SHIPPO_API_TOKEN (Cloudflare Worker secret).
 // Requires SHIPPO_FROM_* env vars for ship-from address.
 // Falls back gracefully to null on any error.
 //
 // LABEL PURCHASING NOTE:
-// This module sends city/state/zip for rate estimation.
+// This module sends city/state/zip for rate estimation (state optional for international).
 // When label purchasing is added in Admin, it must use the complete customer
 // shipping address (street1, street2, city, state, zip, country, name) from
 // the orders table — partial addresses cannot generate valid shipping labels.
@@ -153,67 +154,132 @@ export interface ShippoRate {
 
 export interface ShippoRates {
   standard: ShippoRate
-  // null means Shippo returned no real express service for this shipment.
-  // Callers must fall back to static express rate — never fabricate a carrier or price.
+  // null means Shippo returned no real express service for this destination.
+  // US callers may insert a static fallback; non-US callers must omit express entirely.
   express:  ShippoRate | null
 }
 
-function pickRates(rates: any[]): { standard: ShippoRate | null; express: ShippoRate | null } {
+// Substring keywords that identify international express/expedited services.
+// Checked against servicelevel.token and servicelevel.name (case-insensitive).
+const INTL_EXPRESS_KEYWORDS = [
+  'priority', 'express', 'xpress', 'expedited', 'worldwide', 'saver', 'air',
+] as const
+
+function hasExpressKeyword(rate: any): boolean {
+  const token = (rate.servicelevel?.token ?? '').toLowerCase()
+  const name  = (rate.servicelevel?.name  ?? '').toLowerCase()
+  return INTL_EXPRESS_KEYWORDS.some(kw => token.includes(kw) || name.includes(kw))
+}
+
+/**
+ * Shared helper: convert a raw Shippo rate object to a typed ShippoRate.
+ */
+function toShippoRate(r: any, method: 'standard' | 'express'): ShippoRate {
+  const cents       = Math.round(parseFloat(r.amount) * 100)
+  const estDays     = r.estimated_days ?? (method === 'standard' ? 7 : 3)
+  const minDays     = Math.max(estDays - 1, 1)
+  const maxDays     = estDays + 1
+  const provider    = r.provider ?? 'Carrier'
+  const serviceName = r.servicelevel?.name ??
+    (method === 'standard' ? 'Standard Shipping' : 'Express Shipping')
+  const estimate    = `${minDays}–${maxDays} business days`
+  return {
+    method,
+    cents,
+    label:        `${provider} ${serviceName}`,
+    estimate,
+    minDays,
+    maxDays,
+    stripeLabel:  `${provider} ${serviceName} (${estimate})`,
+    provider,
+    serviceToken: r.servicelevel?.token ?? '',
+  }
+}
+
+/**
+ * Select standard and express rates from a list of raw Shippo rate objects.
+ * Country-aware: US uses domestic token sets; international uses cheapest/faster logic.
+ *
+ * Exported for unit testing — not part of the public API surface.
+ *
+ * US domestic:
+ *   Standard — prefers known ground tokens, else cheapest.
+ *   Express  — prefers known express tokens, else null (caller may use static fallback).
+ *
+ * International:
+ *   Standard — cheapest valid Shippo rate (no domestic token preference).
+ *   Express  — cheapest real Shippo rate that is strictly faster by estimated_days;
+ *             falls back to cheapest rate with an express keyword if no faster-by-days
+ *             option exists; null if nothing qualifies. Never fabricated.
+ */
+export function pickRatesForDestination(
+  rates:   any[],
+  country: string
+): { standard: ShippoRate | null; express: ShippoRate | null } {
   const valid = rates
     .filter((r: any) => r.amount && r.currency?.toLowerCase() === 'usd' && !r.hidden)
     .sort((a: any, b: any) => parseFloat(a.amount) - parseFloat(b.amount))
 
   if (valid.length === 0) return { standard: null, express: null }
 
+  const isInternational = country.toUpperCase() !== 'US'
+
+  if (isInternational) {
+    // ── International: cheapest is standard; real-faster-or-keyword rate is express ──
+    const standardRaw = valid[0]
+    const stdDays     = standardRaw.estimated_days as number | null | undefined
+    const others      = valid.filter((r: any) => r.object_id !== standardRaw.object_id)
+
+    let expressRaw: any = null
+
+    // Priority 1: a real Shippo rate with strictly fewer estimated_days than standard
+    if (stdDays != null) {
+      expressRaw = others.find(
+        (r: any) => r.estimated_days != null && r.estimated_days < stdDays
+      ) ?? null  // others already sorted cheapest-first → first match = cheapest faster
+    }
+
+    // Priority 2: a rate with an express/priority keyword (no fabrication)
+    if (!expressRaw) {
+      expressRaw = others.find(hasExpressKeyword) ?? null
+    }
+
+    return {
+      standard: toShippoRate(standardRaw, 'standard'),
+      express:  expressRaw ? toShippoRate(expressRaw, 'express') : null,
+    }
+  }
+
+  // ── US domestic: existing token-based logic ────────────────────────────────
   const standardRaw =
     valid.find((r: any) => STANDARD_TOKENS.has(r.servicelevel?.token?.toLowerCase())) ??
     valid[0]
 
-  // Only return a real Shippo express rate — never synthesise one
+  // Only return a real Shippo express rate — never synthesise one.
+  // null → US callers may insert the trusted static express fallback.
   const expressRaw =
     valid.find((r: any) =>
       EXPRESS_TOKENS.has(r.servicelevel?.token?.toLowerCase()) &&
-      r.object_id !== standardRaw?.object_id
-    ) ?? null  // null = no real express available; callers use static fallback
-
-  const toRate = (r: any, method: 'standard' | 'express'): ShippoRate => {
-    const cents       = Math.round(parseFloat(r.amount) * 100)
-    const estDays     = r.estimated_days ?? (method === 'standard' ? 7 : 3)
-    const minDays     = Math.max(estDays - 1, 1)
-    const maxDays     = estDays + 1
-    const provider    = r.provider ?? 'Carrier'
-    const serviceName = r.servicelevel?.name ?? (method === 'standard' ? 'Standard Shipping' : 'Express Shipping')
-    const estimate    = `${minDays}–${maxDays} business days`
-
-    return {
-      method,
-      cents,
-      label:        `${provider} ${serviceName}`,
-      estimate,
-      minDays,
-      maxDays,
-      stripeLabel:  `${provider} ${serviceName} (${estimate})`,
-      provider,
-      serviceToken: r.servicelevel?.token ?? '',
-    }
-  }
+      r.object_id !== standardRaw.object_id
+    ) ?? null
 
   return {
-    standard: toRate(standardRaw, 'standard'),
-    express:  expressRaw ? toRate(expressRaw, 'express') : null,
+    standard: toShippoRate(standardRaw, 'standard'),
+    express:  expressRaw ? toShippoRate(expressRaw, 'express') : null,
   }
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
- * Fetch real shipping rates from Shippo for a US shipment.
+ * Fetch real shipping rates from Shippo for domestic or international shipments.
  *
- * Returns `{ standard, express }` where express may be null if Shippo returned
- * no real express carrier — callers must use static express fallback in that case.
- * Returns null on any network/API error — callers fall back to static rates entirely.
+ * Returns `{ standard, express }` where express may be null when Shippo has no
+ * real faster service for the destination. US callers may use the static express
+ * fallback; non-US callers must NOT substitute US domestic static rates.
+ * Returns null on any network/API error — callers fall back accordingly.
  *
- * For rate estimation, city/state/zip is sufficient.
+ * For rate estimation, city/zip/country is sufficient; state is optional.
  * Full street address is required when purchasing labels — see LABEL PURCHASING NOTE.
  */
 export async function getShippoRates(
@@ -346,7 +412,9 @@ export async function getShippoRates(
     return null
   }
 
-  const { standard, express } = pickRates(data?.rates ?? [])
+  const { standard, express } = pickRatesForDestination(
+    data?.rates ?? [], toAddress.country
+  )
   if (!standard) {
     console.error(
       `[shippo] No usable standard rate returned; rates=${Array.isArray(data?.rates) ? data.rates.length : 0}`
@@ -354,5 +422,5 @@ export async function getShippoRates(
     return null
   }
 
-  return { standard, express }  // express may be null — callers use static fallback
+  return { standard, express }
 }
