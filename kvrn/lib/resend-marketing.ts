@@ -77,11 +77,11 @@ export async function syncSubscribeToResend(opts: {
   firstName:  string | null
   lastName:   string | null
 }): Promise<ResendSyncResult> {
-  const apiKey    = process.env.RESEND_API_KEY              ?? ''
+  const apiKey    = process.env.RESEND_MARKETING_API_KEY    ?? ''
   const segmentId = process.env.RESEND_MARKETING_SEGMENT_ID ?? ''
   const topicId   = process.env.RESEND_MARKETING_TOPIC_ID   ?? ''
 
-  if (!apiKey)    return { ok: false, error: 'RESEND_API_KEY not configured.' }
+  if (!apiKey)    return { ok: false, error: 'RESEND_MARKETING_API_KEY not configured.' }
   if (!segmentId) return { ok: false, error: 'RESEND_MARKETING_SEGMENT_ID not configured.' }
 
   // ── Step 1: Create global Contact (idempotent by email) ───────────────────
@@ -168,12 +168,12 @@ export async function syncSubscribeToResend(opts: {
 export async function syncUnsubscribeFromResend(opts: {
   contactId: string | null
 }): Promise<ResendSyncResult> {
-  const apiKey    = process.env.RESEND_API_KEY              ?? ''
+  const apiKey    = process.env.RESEND_MARKETING_API_KEY    ?? ''
   const segmentId = process.env.RESEND_MARKETING_SEGMENT_ID ?? ''
   const topicId   = process.env.RESEND_MARKETING_TOPIC_ID   ?? ''
   const contactId = opts.contactId
 
-  if (!apiKey)    return { ok: false, error: 'RESEND_API_KEY not configured.' }
+  if (!apiKey)    return { ok: false, error: 'RESEND_MARKETING_API_KEY not configured.' }
   if (!segmentId) return { ok: false, error: 'RESEND_MARKETING_SEGMENT_ID not configured.' }
   if (!contactId) {
     // No stored contact ID — nothing to sync (consent was never synced to Resend)
