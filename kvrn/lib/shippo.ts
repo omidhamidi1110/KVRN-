@@ -290,8 +290,10 @@ export async function getShippoRates(
 
   if (!res.ok) {
     let detail = ''
+    let structure = ''
     try {
       const errBody: any = await res.json()
+      // Safe detail extraction — known scalar error fields only
       const safeDetail =
         errBody?.detail ??
         errBody?.message ??
@@ -302,13 +304,21 @@ export async function getShippoRates(
         typeof safeDetail === 'string'
           ? safeDetail
           : JSON.stringify(safeDetail)
+
+      // If no detail found, log only key structure (never values)
+      if (!detail && errBody && typeof errBody === 'object') {
+        const topKeys = Object.keys(errBody)
+        const nested = topKeys
+          .filter(k => errBody[k] !== null && typeof errBody[k] === 'object' && !Array.isArray(errBody[k]))
+          .map(k => `${k}:[${Object.keys(errBody[k]).join(',')}]`)
+          .join('|')
+        structure = `keys=${topKeys.join(',')}` + (nested ? `; nested=${nested}` : '')
+      }
     } catch {
       detail = ''
     }
-    console.error(
-      `[shippo] API returned ${res.status}` +
-      (detail ? `; detail=${detail.slice(0, 300)}` : '')
-    )
+    const suffix = detail ? `; detail=${detail.slice(0, 300)}` : (structure ? `; ${structure.slice(0, 300)}` : '')
+    console.error(`[shippo] API returned ${res.status}${suffix}`)
     return null
   }
 
