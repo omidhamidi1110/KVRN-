@@ -305,14 +305,29 @@ export async function getShippoRates(
           ? safeDetail
           : JSON.stringify(safeDetail)
 
-      // If no detail found, log only key structure (never values)
+      // If no detail found, recursively summarise KEY/INDEX structure only — never values
       if (!detail && errBody && typeof errBody === 'object') {
-        const topKeys = Object.keys(errBody)
-        const nested = topKeys
-          .filter(k => errBody[k] !== null && typeof errBody[k] === 'object' && !Array.isArray(errBody[k]))
-          .map(k => `${k}:[${Object.keys(errBody[k]).join(',')}]`)
-          .join('|')
-        structure = `keys=${topKeys.join(',')}` + (nested ? `; nested=${nested}` : '')
+        // Recursively build a key-structure string; depth-limited to 4 levels
+        const summarise = (node: any, depth: number): string => {
+          if (depth > 4) return '...'
+          if (Array.isArray(node)) {
+            return '[' + node.map((el, i) =>
+              el !== null && typeof el === 'object'
+                ? `${i}:{${summarise(el, depth + 1)}}`
+                : String(i)
+            ).join(',') + ']'
+          }
+          if (node !== null && typeof node === 'object') {
+            return Object.keys(node).map(k => {
+              const v = node[k]
+              return (v !== null && typeof v === 'object')
+                ? `${k}:{${summarise(v, depth + 1)}}`
+                : k
+            }).join(',')
+          }
+          return ''
+        }
+        structure = `structure=${summarise(errBody, 0)}`
       }
     } catch {
       detail = ''
