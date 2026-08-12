@@ -136,12 +136,20 @@ export interface FinalizePaidOrderResult {
 }
 
 export interface CheckoutDetails {
-  customerEmail:   string
-  customerName:    string
-  customerPhone:   string | null
-  shippingAddress: Record<string, string>
-  shippingMethod:  'standard' | 'express'
-  shippingCents:   number
+  customerEmail:              string
+  customerName:               string
+  customerPhone:              string | null
+  shippingAddress:            Record<string, string>
+  shippingMethod:             'standard' | 'express'
+  // Shipping snapshot: before discount, reduction, and final charged amount
+  shippingBeforeDiscountCents: number
+  shippingDiscountCents:       number
+  shippingFinalCents:          number
+  // Merchandise/order discount only (never shipping code)
+  discountId?:                string | null
+  discountCode?:              string | null
+  discountType?:              string | null
+  discountCents?:             number
 }
 
 export function createReservationService(sql: NeonQueryFunction<false, false>): ReservationService {
@@ -259,7 +267,9 @@ export function createReservationService(sql: NeonQueryFunction<false, false>): 
     },
 
     async saveReservationCheckoutDetails(reservationId, details) {
-      const { customerEmail, customerName, customerPhone, shippingAddress, shippingMethod, shippingCents } = details
+      const { customerEmail, customerName, customerPhone, shippingAddress, shippingMethod,
+              shippingBeforeDiscountCents, shippingDiscountCents, shippingFinalCents,
+              discountId, discountCode, discountType, discountCents } = details
       const rows = await sql`
         SELECT save_reservation_checkout_details(
           ${reservationId}::uuid,
@@ -268,7 +278,13 @@ export function createReservationService(sql: NeonQueryFunction<false, false>): 
           ${customerPhone ?? null},
           ${JSON.stringify(shippingAddress)}::jsonb,
           ${shippingMethod},
-          ${shippingCents}::integer
+          ${shippingBeforeDiscountCents ?? 0}::integer,
+          ${shippingDiscountCents ?? 0}::integer,
+          ${shippingFinalCents ?? 0}::integer,
+          ${discountId ?? null}::uuid,
+          ${discountCode ?? null},
+          ${discountType ?? null},
+          ${discountCents ?? 0}::integer
         ) AS result
       `
       return Boolean((rows[0] as any).result)

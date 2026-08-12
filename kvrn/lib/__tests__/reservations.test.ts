@@ -383,7 +383,7 @@ describeDB50('Integration V50 — shipping snapshot and paid order finalization'
         customerPhone:   '+15550001234',
         shippingAddress: testAddress,
         shippingMethod:  'standard',
-        shippingCents:   1999,
+        shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       expect(saved).toBe(true)
 
@@ -409,7 +409,7 @@ describeDB50('Integration V50 — shipping snapshot and paid order finalization'
       await testSql`UPDATE reservations SET status='completed' WHERE id=${r.reservationId}`
       const saved = await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail: 'x@y.com', customerName: 'X', customerPhone: null,
-        shippingAddress: testAddress, shippingMethod: 'standard', shippingCents: 1999,
+        shippingAddress: testAddress, shippingMethod: 'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       expect(saved).toBe(false)
     } finally { await teardown50(ids) }
@@ -526,7 +526,7 @@ describe('createCheckoutPostHandler — real production handler', () => {
       expect.objectContaining({
         customerEmail:  'test@example.com',
         shippingMethod: 'standard',
-        shippingCents:  1999,
+        shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
     )
   })
@@ -621,7 +621,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'std@t.com', customerName:'Std', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({
@@ -652,7 +652,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'exp@t.com', customerName:'Exp', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'express', shippingCents:2999,
+        shippingAddress:ta, shippingMethod:'express', shippingBeforeDiscountCents: 2999, shippingDiscountCents: 0, shippingFinalCents: 2999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({
@@ -686,7 +686,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
       const saved = await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'snap@test.com', customerName:'Snap Shot',
         customerPhone:'+15550004444', shippingAddress:snapAddr,
-        shippingMethod:'standard', shippingCents:1999,
+        shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       expect(saved).toBe(true)
       const [res] = await testSql`SELECT customer_email,customer_name,customer_phone,shipping_address,shipping_method,shipping_cents FROM reservations WHERE id=${r.reservationId}`
@@ -744,7 +744,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
       const [pvBefore] = await testSql`SELECT stock_on_hand,reserved_quantity FROM product_variants WHERE id=${f.vid}`
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'wt@t.com', customerName:'WT', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       // Expected 9999 (8000+1999), sending 8000 — must fail
@@ -783,7 +783,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'rp@t.com', customerName:'RP', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'express', shippingCents:2999,
+        shippingAddress:ta, shippingMethod:'express', shippingBeforeDiscountCents: 2999, shippingDiscountCents: 0, shippingFinalCents: 2999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const opts = {
@@ -829,7 +829,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
         customerPhone:   null,   // explicit opt-out — must not be replaced
         shippingAddress: ta,
         shippingMethod:  'standard',
-        shippingCents:   1999,
+        shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       expect(saved).toBe(true)
 
@@ -1196,7 +1196,7 @@ const SAMPLE_ORDER: OrderConfirmationData = {
     lineTotalCents: 8000,
   }],
   subtotalCents:   8000,
-  shippingCents:   1999,
+  shippingCents: 1999,
   totalCents:      9999,
   shippingMethod:  'standard',
   shippingAddress: {
@@ -1389,7 +1389,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'em51@test.com', customerName:'EM Test', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({
@@ -1419,7 +1419,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'replay@test.com', customerName:'Replay', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const opts = {
@@ -1448,7 +1448,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'wrongamt@test.com', customerName:'WA', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       await expect(svc.finalizePaidOrder({
@@ -1502,7 +1502,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'sent@test.com', customerName:'Sent Test', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({
@@ -1548,7 +1548,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'fail@test.com', customerName:'Fail Test', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({
@@ -1588,7 +1588,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       ids.rids.push(r.reservationId)
       await svc.saveReservationCheckoutDetails(r.reservationId, {
         customerEmail:'alreadysent@test.com', customerName:'Already', customerPhone:null,
-        shippingAddress:ta, shippingMethod:'standard', shippingCents:1999,
+        shippingAddress:ta, shippingMethod:'standard', shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
       })
       await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs} WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({

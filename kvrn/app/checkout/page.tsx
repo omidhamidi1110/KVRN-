@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
 import { Button } from '@/components/ui/Button'
@@ -44,6 +44,12 @@ export default function CheckoutPage() {
     city: '', state: '', postalCode: '', country: 'US',
   })
   const [shippingMethod,   setShippingMethod]   = useState<ShippingMethod>('standard')
+  const [discountInput,    setDiscountInput]    = useState('')
+  const [discountApplied,  setDiscountApplied]  = useState<{
+    code: string; error: string | null; discountCents?: number;
+    shippingAdjustmentCents?: number; displayAmount?: string; type?: string;
+  }>({ code: '', error: null })
+  const [discountLoading,  setDiscountLoading]  = useState(false)
   const [contactErrors,    setContactErrors]    = useState<Record<string, string>>({})
   const [addressErrors,    setAddressErrors]    = useState<Record<string, string>>({})
 
@@ -139,7 +145,10 @@ export default function CheckoutPage() {
 
   const activeOpt     = currentShippingOpts.find(o => o.id === shippingMethod) ?? currentShippingOpts[0]
   const shippingCents = activeOpt?.cents ?? (isUS ? calculateShipping('US', shippingMethod) : null)
-  const totalCents    = subtotalPence + (shippingCents ?? 0)
+  const appliedDiscountCents = discountApplied.code ? (discountApplied.discountCents ?? 0) : 0
+  const appliedShippingAdj   = discountApplied.code ? (discountApplied.shippingAdjustmentCents ?? 0) : 0
+  const effectiveShipping    = shippingCents !== null ? Math.max(0, shippingCents - appliedShippingAdj) : null
+  const totalCents    = subtotalPence + (effectiveShipping ?? 0) - appliedDiscountCents
 
   // Checkout may proceed when: US (static fallback available), or non-US with real live rates
   const canProceed = isUS || (liveRates !== null && liveRates.length > 0)
@@ -204,6 +213,7 @@ export default function CheckoutPage() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...(discountApplied.code ? { discountCode: discountApplied.code } : {}),
           items:          items.map(i => ({ sku: i.sku, quantity: i.quantity })),
           email:          contact.email.trim(),
           phone:          contact.smsOptIn ? (contact.phone.trim() || undefined) : undefined,
@@ -242,6 +252,57 @@ export default function CheckoutPage() {
       setCreatingSession(false)
     }
   }, [items, contact, address, shippingMethod, canProceed])
+
+  const handleApplyDiscount = async () => {
+    const code = discountInput.trim().toUpperCase()
+    if (!code) return
+    setDiscountLoading(true)
+    try {
+      const cartItems = items.map((i: any) => ({ sku: i.sku ?? i.variantSku, quantity: i.quantity }))
+      const res = await fetch('/api/discounts/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, country: address.country || 'US', items: cartItems, shippingMethod }),
+      })
+      const data = await res.json()
+      if (!data.valid) {
+        setDiscountApplied({ code: '', error: data.error ?? 'Invalid code.' })
+      } else {
+        setDiscountApplied({ code: data.code, error: null,
+          discountCents: data.discountCents, shippingAdjustmentCents: data.shippingAdjustmentCents,
+          displayAmount: data.displayAmount, type: data.type })
+      }
+    } catch {
+      setDiscountApplied({ code: '', error: 'Network error. Please try again.' })
+    } finally {
+      setDiscountLoading(false)
+    }
+  }
+
+  const handleRemoveDiscount = () => {
+    setDiscountApplied({ code: '', error: null })
+    setDiscountInput('')
+  }
+
+  // Invalidate discount preview when shipping method changes (shipping discounts depend on cost)
+  const prevMethodRef = useRef(shippingMethod)
+  useEffect(() => {
+    if (prevMethodRef.current !== shippingMethod && discountApplied.code) {
+      // Revalidate: shipping discounts depend on the selected method's cost
+      handleApplyDiscount()
+    }
+    prevMethodRef.current = shippingMethod
+  }, [shippingMethod])
+
+  // Invalidate discount preview when country or cart changes
+  // (US $150 eligibility may change)
+  const prevCountryRef = useRef(address.country)
+  useEffect(() => {
+    if (prevCountryRef.current !== address.country && discountApplied.code) {
+      handleRemoveDiscount()
+    }
+    prevCountryRef.current = address.country
+  }, [address.country])
 
   if (!isClient) return null
 
@@ -578,6 +639,57 @@ export default function CheckoutPage() {
                   <span>{formatCheckoutPrice(shippingCents)}</span>
                 )}
               </div>
+
+              {/* ── Discount Code & Summary ──────────────────────────────── */}
+              {!discountApplied.code ? (
+                <div style={{ display:'flex', gap:8 }}>
+                  <input
+                    type="text"
+                    value={discountInput}
+                    onChange={e => setDiscountInput(e.target.value.toUpperCase())}
+                    onKeyDown={e => { if (e.key === 'Enter') handleApplyDiscount() }}
+                    placeholder="DISCOUNT CODE"
+                    style={{ flex:1, padding:'10px 12px', fontSize:12, border:'1px solid #E8E5E0',
+                             background:'#fff', outline:'none', letterSpacing:'0.06em',
+                             textTransform:'uppercase', fontFamily: '-apple-system, Helvetica Neue, Arial, sans-serif' }}
+                  />
+                  <button
+                    onClick={handleApplyDiscount}
+                    disabled={discountLoading || !discountInput.trim()}
+                    style={{ padding:'10px 14px', background:'#1A1A1A', color:'#fff', border:'none',
+                             cursor:'pointer', fontSize:11, fontWeight:500, letterSpacing:'0.08em',
+                             textTransform:'uppercase', opacity:(discountLoading || !discountInput.trim()) ? 0.4 : 1 }}
+                  >
+                    APPLY
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13,
+                              background:'#F1EEE8', padding:'10px 12px' }}>
+                  <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', letterSpacing:'0.04em', color:'#1A1A1A' }}>
+                    {discountApplied.code}
+                    {discountApplied.error && (
+                      <span style={{ color:'#B91C1C', display:'block', fontSize:11, marginTop:2 }}>
+                        {discountApplied.error}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={handleRemoveDiscount}
+                    style={{ background:'none', border:'none', cursor:'pointer', color:'#6b7280',
+                             fontSize:11, letterSpacing:'0.04em', textDecoration:'underline' }}
+                  >
+                    REMOVE
+                  </button>
+                </div>
+              )}
+
+              {discountApplied.code && discountApplied.displayAmount && (
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#059669' }}>
+                  <span>Discount ({discountApplied.code})</span>
+                  <span>{discountApplied.displayAmount}</span>
+                </div>
+              )}
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:500,
                             borderTop:'1px solid #E8E5E0', paddingTop:12, marginTop:4 }}>
                 <span>Total</span>

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail, waitlistConfirmationHTML } from '@/lib/email'
 import { normaliseEmail, upsertSubscriber, updateSyncStatus, ALLOWED_CONSENT_SOURCES } from '@/lib/marketing-subscribers'
+import { normalizePhoneE164 } from '@/lib/phone'
+import { upsertSmsSubscriber } from '@/lib/sms-subscribers'
 import { syncSubscribeToResend } from '@/lib/resend-marketing'
 
 export async function POST(req: NextRequest) {
@@ -45,6 +47,21 @@ export async function POST(req: NextRequest) {
       } catch (syncErr: any) {
         console.error('[waitlist] Resend sync failed (non-fatal):', syncErr?.message?.slice(0, 80))
         try { await updateSyncStatus(subscriberId, 'failed', null, 'Sync exception') } catch {}
+      }
+    }
+
+    // ── Store SMS consent (independent from email) ─────────────────────
+    // Only store if explicit smsConsent provided AND phone is valid.
+    // SMS consent does not depend on email consent and vice versa.
+    if (smsConsent && phone) {
+      const phoneE164 = normalizePhoneE164(String(phone))
+      if (phoneE164) {
+        try {
+          await upsertSmsSubscriber({ phoneE164, consentSource: 'waitlist' })
+        } catch (smsErr: any) {
+          // Non-fatal — SMS consent failure does not block email signup
+          console.error('[waitlist] SMS DB error (non-fatal):', smsErr?.message?.slice(0, 80))
+        }
       }
     }
 

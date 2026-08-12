@@ -193,3 +193,26 @@ export async function serverTrackPurchase(params: {
     console.error('[analytics] Measurement Protocol failed:', err)
   }
 }
+
+// ─── SMS POPUP ANALYTICS ──────────────────────────────────────────────────────
+// Call these from the SmsPopup component. Never pass phone numbers as properties.
+
+export type SmsAnalyticsEvent =
+  | 'sms_offer_view'     // popup becomes visible
+  | 'sms_offer_accept'   // user interacts positively (clicks any CTA)
+  | 'sms_offer_decline'  // user clicks X or NO THANKS
+  | 'sms_manual_submit'  // user submits manual phone field
+  | 'sms_signup_success' // server returns 200
+  | 'sms_signup_error'   // server returns error or network failure
+  | 'sms_deeplink_open'  // user taps mobile SMS:// CTA
+  | 'sms_offer_reopen'   // user clicks persistent $10 OFF tab
+
+export function trackSmsEvent(event: SmsAnalyticsEvent): void {
+  try {
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', event, { event_category: 'sms_popup' })
+    }
+  } catch {
+    // Never throw — analytics must never break the UI
+  }
+}

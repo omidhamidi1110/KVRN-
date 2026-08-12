@@ -13,6 +13,8 @@ import { COUNTRY_CODES } from './countries'
 import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
 import { getShippoRates, type ShippoRate, type ShippoRates } from './shippo'
 import { applyFreeShippingToSingleRate } from './free-shipping'
+import { validateDiscount, applyDiscountPriority, normalizeDiscountCode, claimDiscount, releaseDiscountClaim, getOrCreateStripeCouponForTerms } from './discounts'
+import { qualifiesForFreeShipping } from './free-shipping'
 import { getProductShippingData } from './inventory'
 import type {
   ReservationService,
@@ -257,6 +259,99 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       shippingCents, otherCents, shippingMethod, country, subtotalCents
     )
 
+    // Discount code from request body (validated server-side, never trusted from client)
+    const rawDiscountCode = typeof body.discountCode === 'string' ? body.discountCode.trim() : null
+
+    // ── Discount validation — server-authoritative ────────────────────────────
+    // Discount priority: shipping (incl. auto free-shipping) > merchandise.
+    // Never stack. Free shipping winning blocks all merchandise/order discounts.
+    let appliedDiscount: import('./discounts').AppliedDiscount | null = null
+    let discountBlockedReason: string | null = null
+
+    let _appliedValidation: Awaited<ReturnType<typeof validateDiscount>> | null = null
+    if (rawDiscountCode) {
+      const validation = await validateDiscount(rawDiscountCode, { subtotalCents, country })
+      _appliedValidation = validation
+      if (!validation.valid) {
+        return NextResponse.json({ error: validation.error }, { status: 400 })
+      }
+
+      // Priority uses shippingCents BEFORE any discount (for shipping code calculation)
+      const priorityResult = applyDiscountPriority({
+        discount:      validation.discount,
+        subtotalCents,
+        country,
+        shippingCents, // base shipping cost
+      })
+      if (priorityResult.blockedReason) {
+        return NextResponse.json({ error: priorityResult.blockedReason }, { status: 400 })
+      }
+      appliedDiscount = priorityResult.applied
+
+      if (appliedDiscount) {
+        // For merchandise discounts: get or create Stripe coupon (cached in DB)
+        if (appliedDiscount.type !== 'shipping') {
+          try {
+            // Use shared coupon keyed by terms (not per-code)
+            const couponId = await getOrCreateStripeCouponForTerms({
+              type: appliedDiscount.type,
+              amountCents: _appliedValidation?.valid ? _appliedValidation.discount.amountCents : null,
+              percentageBps: _appliedValidation?.valid ? _appliedValidation.discount.percentageBps : null,
+            })
+            appliedDiscount.stripeCouponId = couponId
+          } catch (err: any) {
+            console.error('[checkout] Stripe coupon error:', err?.message?.slice(0, 60))
+          }
+        }
+
+        // Claim discount slot BEFORE Stripe session creation (race prevention for single-use codes)
+        // KVRN10 (unlimited) doesn't need exclusive claim, but SMS codes do
+        if (validation.discount.singleUse || validation.discount.maxRedemptions !== null) {
+          const sessionExpiresAt = new Date(Date.now() + 31 * 60 * 1000 + 60_000)
+          const claimResult = await claimDiscount({
+            discountId:    appliedDiscount.discountId,
+            reservationId: reservation.reservationId,
+            expiresAt:     sessionExpiresAt,
+          })
+          if (claimResult === 'conflict') {
+            return NextResponse.json(
+              { error: 'Only one discount can be applied per order.' },
+              { status: 409 }
+            )
+          }
+          if (claimResult === 'exhausted') {
+            return NextResponse.json(
+              { error: 'That code has already been used or is held by another active checkout.' },
+              { status: 409 }
+            )
+          }
+          // 'claimed', 'idempotent', or 'unlimited' — all proceed
+        }
+
+        // ── Fail closed: non-shipping discount requires a Stripe coupon ───────────
+        // If coupon resolution failed, the Neon snapshot would diverge from Stripe:
+        // Neon expects discount; Stripe charges full price → finalize_paid_order
+        // amount invariant would reject the payment after the customer has already paid.
+        if (appliedDiscount.type !== 'shipping' && !appliedDiscount.stripeCouponId) {
+          console.error('[checkout] Stripe coupon unavailable for merchandise discount; aborting checkout')
+          // Release claim (no-op for unlimited codes; real release for limited ones)
+          try { await releaseDiscountClaim(reservation.reservationId) } catch {}
+          // Release the inventory reservation so items are not locked indefinitely
+          try { await deps.failReservation(reservation.reservationId, 'stripe_coupon_unavailable') } catch {}
+          return NextResponse.json(
+            { error: 'Could not apply the discount code at this time. Please try again.' },
+            { status: 503 }
+          )
+        }
+      }
+    }
+
+    // Apply shipping discount to shippingCents if applicable
+    let adjustedShippingCents = shippingCents
+    if (appliedDiscount?.type === 'shipping') {
+      adjustedShippingCents = Math.max(0, shippingCents - appliedDiscount.shippingAdjustmentCents)
+    }
+
     // ── Step 2: Save snapshot ─────────────────────────────────────────────────
     const shippingAddress = {
       firstName, lastName, line1, line2: line2 ?? '', city, state, postalCode, country,
@@ -269,7 +364,17 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         customerPhone:   phone,
         shippingAddress,
         shippingMethod,
-        shippingCents,
+        // Full shipping snapshot: before, discount, final
+        shippingBeforeDiscountCents: shippingCents,
+        shippingDiscountCents:       appliedDiscount?.shippingAdjustmentCents ?? 0,
+        shippingFinalCents:          adjustedShippingCents,
+        // Attribution: stored for ALL discount types (id/code/type)
+        // discountCents: merchandise/order only — stays 0 for shipping codes
+        // Shipping value is only in shipping_before/discount/final fields
+        discountId:      appliedDiscount?.discountId ?? null,
+        discountCode:    appliedDiscount?.code ?? null,
+        discountType:    appliedDiscount?.type ?? null,
+        discountCents:   appliedDiscount?.type !== 'shipping' ? (appliedDiscount?.amountCents ?? 0) : 0,
       })
     } catch (err: any) {
       console.error('Failed to save checkout details:', err.message)
@@ -277,6 +382,10 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
 
     if (!saved) {
       console.error(`CRITICAL: snapshot failed for reservation ${reservation.reservationId}`)
+      // Release discount claim before failing reservation (Blocker 4)
+      try { await releaseDiscountClaim(reservation.reservationId) } catch (e: any) {
+        console.error('CRITICAL: claim release failed after snapshot error:', e?.message?.slice(0, 60))
+      }
       try {
         const rel = await deps.failReservation(reservation.reservationId, 'save_checkout_details_failed')
         if (rel !== 'released') {
@@ -299,7 +408,8 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           mode:           'payment',
           currency:       'usd',
           customer_email: email,
-          line_items: reservation.items.map((item: any) => ({
+          line_items: [
+            ...reservation.items.map((item: any) => ({
             price_data: {
               currency:    'usd',
               unit_amount: item.unitPriceCents,
@@ -310,10 +420,11 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
             },
             quantity: item.quantity,
           })),
+          ],
           shipping_options: [{
             shipping_rate_data: {
               type: 'fixed_amount',
-              fixed_amount: { amount: shippingCents, currency: 'usd' },
+              fixed_amount: { amount: adjustedShippingCents, currency: 'usd' },
               display_name: shippingOpt.stripeLabel,
               delivery_estimate: {
                 minimum: { unit: 'business_day', value: shippingOpt.minDays },
@@ -337,15 +448,38 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
             },
             },
           },
-          metadata:    { reservation_id: reservation.reservationId, shipping_method: shippingMethod },
+          // Note: customer-facing discount codes are NOT in Stripe metadata.
+          // Authoritative attribution is in Neon reservation/order/redemption tables.
+          metadata: {
+            reservation_id: reservation.reservationId,
+            shipping_method: shippingMethod,
+            ...(appliedDiscount ? {
+              kvrn_discount_definition: appliedDiscount.type === 'fixed_amount'
+                ? `fixed_usd_${appliedDiscount.amountCents}`
+                : appliedDiscount.type === 'percentage'
+                ? `pct_${_appliedValidation?.valid ? _appliedValidation.discount.percentageBps : 0}`
+                : `shipping_${appliedDiscount.shippingAdjustmentCents}`,
+              kvrn_discount_type: appliedDiscount.type,
+            } : {}),
+          },
+          // Stripe coupon for merchandise discounts; shipping discounts applied to shippingCents directly
+          ...(appliedDiscount?.type !== 'shipping' && appliedDiscount?.stripeCouponId
+            ? { discounts: [{ coupon: appliedDiscount.stripeCouponId }] }
+            : {}),
+          // allow_promotion_codes: omitted — KVRN is the only discount entry point
           success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url:  `${origin}/checkout`,
+          // allow_promotion_codes: false (omitted) — KVRN validates discounts server-side
           expires_at:  Math.floor(Date.now() / 1000) + 31 * 60,
         },
         { idempotencyKey: `session-${reservation.reservationId}` }
       )
     } catch (err: any) {
       console.error('Stripe session creation failed:', err.message)
+      // Release discount claim if session creation fails
+      if (appliedDiscount && (_appliedValidation?.valid ? _appliedValidation.discount.singleUse || _appliedValidation.discount.maxRedemptions !== null : false)) {
+        try { await releaseDiscountClaim(reservation.reservationId) } catch {}
+      }
       try {
         const rel = await deps.failReservation(reservation.reservationId, 'stripe_session_creation_failed')
         if (rel !== 'released') {
@@ -359,6 +493,8 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
 
     if (!isValidHttpsUrl(session.url)) {
       console.error(`CRITICAL: Stripe returned null session.url for ${session.id}`)
+      // Release discount claim before expiring (Blocker 5)
+      try { await releaseDiscountClaim(reservation.reservationId) } catch {}
       try {
         await stripe.checkout.sessions.expire(session.id)
         const rel = await deps.failReservation(reservation.reservationId, 'null_session_url')
@@ -388,6 +524,8 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
 
     if (!attached) {
       console.error(`CRITICAL: Failed to attach ${session.id} to reservation ${reservation.reservationId}`)
+      // Release discount claim before expiring (Blocker 6)
+      try { await releaseDiscountClaim(reservation.reservationId) } catch {}
       let stripeExpired = false
       try { await stripe.checkout.sessions.expire(session.id); stripeExpired = true }
       catch (e: any) { console.error('CRITICAL: Could not expire Stripe session:', e.message) }

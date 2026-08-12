@@ -12,6 +12,7 @@ import { CookieBanner }     from '@/components/ui/CookieConsent'
 import { AnnouncementBar }  from '@/components/ui/AnnouncementBar'
 import { Nav }              from '@/components/layout/Nav'
 import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
+import { ConditionalSmsPopup } from '@/components/sms/ConditionalSmsPopup'
 import { CartDrawer }       from '@/components/cart/CartDrawer'
 import './globals.css'
 
@@ -98,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <AnnouncementBar />
                 <Nav />
                 <CartDrawer />
+        <ConditionalSmsPopup />
                 <WishlistDrawer />
                 <main id="main-content">{children}</main>
                 <ConditionalFooter />

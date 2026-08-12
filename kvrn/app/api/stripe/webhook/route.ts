@@ -7,6 +7,7 @@ import {
 } from '@/lib/reservations'
 import { sql } from '@/lib/db'
 import { processPendingTransactionalEmails } from '@/lib/transactional-email'
+import { releaseDiscountClaim } from '@/lib/discounts'
 import { getEmailProvider } from '@/lib/resend-adapter'
 
 export const dynamic = 'force-dynamic'
@@ -52,10 +53,12 @@ export async function POST(req: NextRequest) {
 
       case 'checkout.session.async_payment_failed':
         await releaseReservationForEvent(session.id, event.id, event.type, 'async_payment_failed')
+        await releaseDiscountClaimForSession(session)
         break
 
       case 'checkout.session.expired':
         await releaseReservationForEvent(session.id, event.id, event.type, 'session_expired')
+        await releaseDiscountClaimForSession(session)
         break
 
       default:
@@ -109,5 +112,16 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
       // Log without PII — order remains paid regardless
       console.error('[WEBHOOK] Email send failed (non-fatal):', emailErr?.message?.slice(0, 100))
     }
+  }
+}
+
+async function releaseDiscountClaimForSession(session: any) {
+  // Read reservation_id from session metadata, release any active discount claim
+  const reservationId = session.metadata?.reservation_id
+  if (!reservationId) return
+  try {
+    await releaseDiscountClaim(reservationId)
+  } catch (err: any) {
+    console.error('[WEBHOOK] releaseDiscountClaim error (non-fatal):', err?.message?.slice(0, 60))
   }
 }
