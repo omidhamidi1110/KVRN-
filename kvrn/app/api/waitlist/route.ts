@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail, waitlistConfirmationHTML } from '@/lib/email'
+import { normaliseEmail, upsertSubscriber, updateSyncStatus, ALLOWED_CONSENT_SOURCES } from '@/lib/marketing-subscribers'
+import { syncSubscribeToResend } from '@/lib/resend-marketing'
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,76 +10,58 @@ export async function POST(req: NextRequest) {
       email,
       phone,
       smsConsent = false,
-      dropId  = 'drop_001',
-      source  = 'unknown',
+      dropId     = 'drop_001',
+      source     = 'waitlist',
     } = body
 
-    // ── Validate ───────────────────────────────────────────────────────────
+    // ── Validate ──────────────────────────────────────────────────────────
     if (!email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ success: false, error: 'A valid email address is required.' }, { status: 400 })
     }
 
-    // ── Neon DB upsert ─────────────────────────────────────────────────────
-    // Uncomment once @neondatabase/serverless is installed and DATABASE_URL is set:
-    //
-    // import { neon } from '@neondatabase/serverless'
-    // const db = neon(process.env.DATABASE_URL!)
-    //
-    // await db`
-    //   INSERT INTO customers (
-    //     id, email, phone,
-    //     email_consent, email_consent_at, email_consent_source,
-    //     sms_consent,   sms_consent_at,   sms_consent_source,
-    //     segment, acquisition_source, created_at
-    //   )
-    //   VALUES (
-    //     gen_random_uuid()::text,
-    //     ${email.trim().toLowerCase()},
-    //     ${phone?.trim() || null},
-    //     true,  NOW(), ${source},
-    //     ${smsConsent}, ${smsConsent ? 'NOW()' : null}, ${smsConsent ? source : null},
-    //     'B', ${source}, NOW()
-    //   )
-    //   ON CONFLICT (email) DO UPDATE
-    //     SET updated_at          = NOW(),
-    //         email_consent       = true,
-    //         email_consent_at    = COALESCE(customers.email_consent_at, NOW()),
-    //         sms_consent         = EXCLUDED.sms_consent,
-    //         sms_consent_at      = CASE WHEN EXCLUDED.sms_consent THEN COALESCE(customers.sms_consent_at, NOW()) ELSE customers.sms_consent_at END,
-    //         phone               = COALESCE(EXCLUDED.phone, customers.phone)
-    // `
-    //
-    // // Add to drop waitlist
-    // await db`
-    //   INSERT INTO drop_waitlist (id, customer_id, drop_id, created_at)
-    //   SELECT gen_random_uuid()::text, id, ${dropId}, NOW()
-    //   FROM customers WHERE email = ${email.trim().toLowerCase()}
-    //   ON CONFLICT DO NOTHING
-    // `
+    const normEmail    = normaliseEmail(email)
+    const consentSource = ALLOWED_CONSENT_SOURCES.has(source) ? source : 'waitlist'
 
-    // ── Confirmation email ─────────────────────────────────────────────────
-    await sendEmail({
-      to:      email.trim(),
-      subject: "You're on the list.",
-      html:    waitlistConfirmationHTML({ email: email.trim(), dropId }),
-    })
+    // ── Store marketing consent in Neon (source of truth) ─────────────────
+    // If Neon fails, the explicit email marketing consent cannot be stored.
+    // Return a failure — do not silently report success without stored consent.
+    let subscriberId: string
+    try {
+      const result = await upsertSubscriber({ email: normEmail, consentSource })
+      subscriberId = result.id
+    } catch (dbErr: any) {
+      console.error('[waitlist] DB error (consent not stored):', dbErr?.message?.slice(0, 80))
+      return NextResponse.json(
+        { success: false, error: 'Subscription could not be saved. Please try again.' },
+        { status: 500 }
+      )
+    }
 
-    // ── SMS confirmation (opt-in only) ─────────────────────────────────────
-    // Uncomment once twilio is installed:
-    //
-    // if (smsConsent && phone?.trim()) {
-    //   const twilio = require('twilio')(
-    //     process.env.TWILIO_ACCOUNT_SID,
-    //     process.env.TWILIO_AUTH_TOKEN
-    //   )
-    //   await twilio.messages.create({
-    //     body: `You're on the KVRN list. First to know about Drop 002. Reply STOP to unsubscribe.`,
-    //     from: process.env.TWILIO_PHONE_NUMBER,
-    //     to:   phone.trim(),
-    //   })
-    // }
+    // ── Sync to Resend (best-effort) ──────────────────────────────────────
+    if (subscriberId) {
+      try {
+        const sync = await syncSubscribeToResend({ email: normEmail, firstName: null, lastName: null })
+        await updateSyncStatus(subscriberId, sync.ok ? 'synced' : 'failed', sync.contactId, sync.ok ? null : sync.error)
+      } catch (syncErr: any) {
+        console.error('[waitlist] Resend sync failed (non-fatal):', syncErr?.message?.slice(0, 80))
+        try { await updateSyncStatus(subscriberId, 'failed', null, 'Sync exception') } catch {}
+      }
+    }
 
-    console.log(`[waitlist] ${email} | drop: ${dropId} | source: ${source} | sms: ${smsConsent}`)
+    // ── Confirmation email (stub — kept for backward compat) ─────────────
+    // In production, Resend Broadcasts handle promotional emails.
+    // This stub call is a no-op (sendEmail is not yet wired for marketing).
+    try {
+      await sendEmail({
+        to:      email.trim(),
+        subject: "You're on the list.",
+        html:    waitlistConfirmationHTML({ email: email.trim(), dropId }),
+      })
+    } catch {
+      // Non-fatal stub
+    }
+
+    console.log(`[waitlist] ${normEmail} | drop: ${dropId} | source: ${consentSource} | sms: ${smsConsent}`)
 
     return NextResponse.json({ success: true })
   } catch (err) {

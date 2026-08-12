@@ -59,20 +59,41 @@ export default {
       },
     })
 
+    // ── 1. Transactional email retry ─────────────────────────────────────────
     try {
       const res = await openNextWorker.fetch(req, env, ctx)
-
       if (!res.ok) {
         console.error(`[cron] Email retry handler returned HTTP ${res.status}`)
-        return
+      } else {
+        const data = await res.json().catch(() => ({}))
+        const { processed = 0, sent = 0, failed = 0 } = data
+        console.log(`[cron] Email retry: processed=${processed} sent=${sent} failed=${failed}`)
       }
-
-      const data = await res.json().catch(() => ({}))
-      const { processed = 0, sent = 0, failed = 0 } = data
-      console.log(`[cron] Email retry: processed=${processed} sent=${sent} failed=${failed}`)
     } catch (err) {
-      // Log only the error message — no PII
       console.error('[cron] Email retry failed:', err?.message || String(err))
+    }
+
+    // ── 2. Marketing contact sync ─────────────────────────────────────────────
+    // Logically separate from transactional email retry.
+    // Uses the same openNextWorker.fetch pattern to avoid public self-fetch (522).
+    try {
+      const syncReq = new Request('https://cron-internal/api/internal/marketing-sync', {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${cronSecret}`,
+          'Content-Type':  'application/json',
+        },
+      })
+      const syncRes = await openNextWorker.fetch(syncReq, env, ctx)
+      if (!syncRes.ok) {
+        console.error(`[cron] Marketing sync returned HTTP ${syncRes.status}`)
+      } else {
+        const data = await syncRes.json().catch(() => ({}))
+        const { processed = 0, synced = 0, failed = 0 } = data
+        if (processed > 0) console.log(`[cron] Marketing sync: processed=${processed} synced=${synced} failed=${failed}`)
+      }
+    } catch (err) {
+      console.error('[cron] Marketing sync failed:', err?.message || String(err))
     }
   },
 }

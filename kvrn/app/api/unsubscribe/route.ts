@@ -1,40 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { normaliseEmail, unsubscribeByEmail, updateSyncStatus, getPendingSyncs } from '@/lib/marketing-subscribers'
+import { syncUnsubscribeFromResend } from '@/lib/resend-marketing'
+import { sql } from '@/lib/db'
+
+async function processUnsubscribe(rawEmail: string): Promise<void> {
+  const email = normaliseEmail(rawEmail)
+
+  // Mark unsubscribed in Neon (source of truth)
+  const wasSubscribed = await unsubscribeByEmail(email)
+
+  // Sync to Resend (best-effort)
+  if (wasSubscribed) {
+    try {
+      // Get the contact ID for this subscriber
+      const rows = await sql`
+        SELECT id, resend_contact_id AS "resendContactId"
+        FROM marketing_subscribers WHERE email = ${email} LIMIT 1
+      `
+      const row = (rows as any[])[0]
+      if (row) {
+        const sync = await syncUnsubscribeFromResend({ contactId: row.resendContactId })
+        await updateSyncStatus(row.id, sync.ok ? 'synced' : 'failed', null, sync.ok ? null : sync.error)
+      }
+    } catch (syncErr: any) {
+      console.error('[unsubscribe] Resend sync failed (non-fatal):', syncErr?.message?.slice(0, 80))
+    }
+  }
+}
 
 // ─── GET /api/unsubscribe ─────────────────────────────────────────────────────
-// Handles one-click unsubscribe from email List-Unsubscribe header
-// and direct unsubscribe links.
-// GDPR/PECR compliance: must process immediately.
+// One-click unsubscribe from email List-Unsubscribe header and direct links.
+// GDPR/PECR: processes immediately; marketing only — transactional emails unaffected.
 export async function GET(req: NextRequest) {
-  const url    = new URL(req.url)
-  const email  = url.searchParams.get('email')
-  const token  = url.searchParams.get('token')  // optional signed token
-  const type   = url.searchParams.get('type') ?? 'email'  // 'email' | 'sms'
+  const url   = new URL(req.url)
+  const email = url.searchParams.get('email')
 
-  if (!email) {
-    return new NextResponse('Missing email parameter.', { status: 400 })
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return new NextResponse('Missing or invalid email parameter.', { status: 400 })
   }
 
   try {
-    // TODO: Connect Neon DB
-    // import { db } from '@/lib/db'
-    //
-    // if (type === 'sms') {
-    //   await db.query(
-    //     `UPDATE customers SET sms_unsubscribed = true, sms_unsubscribed_at = NOW() WHERE email = $1`,
-    //     [email]
-    //   )
-    // } else {
-    //   await db.query(
-    //     `UPDATE customers SET email_unsubscribed = true, email_unsubscribed_at = NOW() WHERE email = $1`,
-    //     [email]
-    //   )
-    // }
+    await processUnsubscribe(email)
+    console.log(`[unsubscribe] GET: ${normaliseEmail(email)}`)
+  } catch (err) {
+    console.error('[unsubscribe] GET error:', err)
+    // Still show confirmation to user — do not reveal DB errors
+  }
 
-    console.log(`[unsubscribe] ${email} unsubscribed from ${type}`)
-
-    // Return a clean HTML confirmation page
-    return new NextResponse(
-      `<!DOCTYPE html>
+  return new NextResponse(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -51,43 +65,29 @@ export async function GET(req: NextRequest) {
 <body>
   <div class="wrap">
     <h1>Unsubscribed.</h1>
-    <p>You've been removed from our ${type === 'sms' ? 'SMS' : 'email'} list. You won't hear from us again.</p>
+    <p>You've been removed from our email list. You won't receive marketing emails from KVRN.</p>
+    <p style="font-size:12px;color:#9B9B9B;margin-top:8px;">Order confirmations and shipping updates are transactional and are not affected.</p>
     <p style="margin-top: 24px;"><a href="https://kvrn.shop">Return to kvrn.shop</a></p>
   </div>
 </body>
 </html>`,
-      {
-        status:  200,
-        headers: { 'Content-Type': 'text/html' },
-      }
-    )
-  } catch (err) {
-    console.error('[unsubscribe] Error:', err)
-    return new NextResponse('An error occurred. Please email support@kvrn.shop to unsubscribe.', {
-      status: 500,
-    })
-  }
+    { status: 200, headers: { 'Content-Type': 'text/html' } }
+  )
 }
 
 // ─── POST /api/unsubscribe ────────────────────────────────────────────────────
-// Handles List-Unsubscribe-Post header (one-click RFC 8058)
-// Email clients send a POST request to this URL when user clicks
-// "Unsubscribe" in the email client interface.
+// RFC 8058 List-Unsubscribe-Post one-click handler.
 export async function POST(req: NextRequest) {
   try {
     const url   = new URL(req.url)
     const email = url.searchParams.get('email')
 
-    if (!email) {
-      return NextResponse.json({ error: 'Missing email.' }, { status: 400 })
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: 'Missing or invalid email.' }, { status: 400 })
     }
 
-    // Same as GET handler but for POST (RFC 8058 compliance)
-    console.log(`[unsubscribe] POST one-click unsubscribe: ${email}`)
-
-    // TODO: Same DB update as GET handler above
-    // await db.query(`UPDATE customers SET email_unsubscribed = true ...`, [email])
-
+    await processUnsubscribe(email)
+    console.log(`[unsubscribe] POST: ${normaliseEmail(email)}`)
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (err) {
     console.error('[unsubscribe] POST error:', err)
