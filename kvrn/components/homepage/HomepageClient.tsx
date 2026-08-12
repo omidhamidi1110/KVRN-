@@ -419,6 +419,12 @@ function HomepageFooter() {
                 <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor"><path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/></svg>
               </a>
             </div>
+            <Link
+              href="/admin"
+              className="inline-flex items-center justify-center rounded-full border border-[#D8D5D0] px-3 py-1.5 text-[9px] tracking-[0.12em] uppercase text-[#7C7C7C] hover:border-[#1A1A1A] hover:text-[#1A1A1A] transition-colors"
+            >
+              Admin Login
+            </Link>
           </div>
           <div>
             <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Shop</p>
