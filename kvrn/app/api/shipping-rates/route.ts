@@ -33,7 +33,9 @@ export async function POST(req: NextRequest) {
 
     // Attempt live Shippo rates when address is usable
     const apiToken   = process.env.SHIPPO_API_TOKEN ?? ''
-    const hasAddress = city && state && zip && country === 'US'
+    // city + zip + country required; state/province optional (international addresses may omit it)
+    const hasAddress = city && zip && country
+    const isUS       = country === 'US'
     const hasItems   = items.length > 0
 
     if (hasAddress && hasItems && apiToken) {
@@ -93,7 +95,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Static fallback ────────────────────────────────────────────────────────
+    // ── Fallback ──────────────────────────────────────────────────────────────
+    // US: return trusted static rates (with free-shipping rule applied).
+    // Non-US: do NOT present US domestic static rates as international prices.
+    if (!isUS) {
+      return NextResponse.json({
+        success: true,
+        data:    { rates: [], source: 'international_unavailable' },
+      })
+    }
+
     const staticMethods: ShippingMethod[] = ['standard', 'express']
     const staticRates = staticMethods.map(method => ({
       id:       method,
