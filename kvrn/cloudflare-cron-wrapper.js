@@ -10,15 +10,21 @@
  * handler. Cloudflare Cron Triggers require a `scheduled` export on the default
  * worker export. This wrapper adds it without modifying the OpenNext build output.
  *
- * This file is referenced by wrangler.toml `main`. It is NOT compiled by Next.js
- * or TypeScript — wrangler bundles it at deploy time after `npm run build` has
- * generated `.open-next/worker.js`.
- *
  * DEPLOYMENT ORDER:
  *   1. npm run build              # generates .open-next/worker.js
  *   2. wrangler deploy            # bundles this wrapper + .open-next/worker.js
  *
- * The cron handler self-calls the internal authenticated HTTP route.
+ * FIX: CRON 522 SELF-FETCH ELIMINATED
+ * Previous versions called fetch(SITE_URL + '/api/internal/transactional-email-retry'),
+ * which caused HTTP 522 because a Cloudflare Worker cannot reliably make outbound HTTP
+ * requests back to its own hostname — the request is routed through Cloudflare's edge
+ * network and can time out.
+ *
+ * The fix: call openNextWorker.fetch(syntheticRequest, env, ctx) directly.
+ * This invokes the Next.js API route handler within the same Worker process,
+ * with no external network round-trip. The CRON_SECRET authentication is still
+ * enforced by the route handler, so there is no reduction in security.
+ *
  * CRON_SECRET must be set as a Cloudflare Worker secret (never in this file).
  */
 
@@ -31,33 +37,33 @@ export default {
 
   /**
    * Cloudflare Cron Trigger handler — fires every 5 minutes.
-   * Calls /api/internal/transactional-email-retry with CRON_SECRET auth.
+   * Directly invokes the retry handler via openNextWorker.fetch (no external HTTP call).
    * Never logs PII. Failures are logged safely and do not affect order state.
    */
   async scheduled(event, env, ctx) {
-    const siteUrl    = (env.SITE_URL || env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
     const cronSecret = env.CRON_SECRET
 
-    if (!siteUrl) {
-      console.error('[cron] SITE_URL is not configured — skipping email retry batch')
-      return
-    }
     if (!cronSecret) {
       console.error('[cron] CRON_SECRET is not configured — skipping email retry batch')
       return
     }
 
+    // Synthesise an internal Request to the retry route.
+    // Using openNextWorker.fetch avoids the 522 self-HTTP issue: the request is
+    // handled entirely within this Worker process, with no outbound network call.
+    const req = new Request('https://cron-internal/api/internal/transactional-email-retry', {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${cronSecret}`,
+        'Content-Type':  'application/json',
+      },
+    })
+
     try {
-      const res = await fetch(`${siteUrl}/api/internal/transactional-email-retry`, {
-        method:  'POST',
-        headers: {
-          'Authorization': `Bearer ${cronSecret}`,
-          'Content-Type':  'application/json',
-        },
-      })
+      const res = await openNextWorker.fetch(req, env, ctx)
 
       if (!res.ok) {
-        console.error(`[cron] Email retry route returned HTTP ${res.status}`)
+        console.error(`[cron] Email retry handler returned HTTP ${res.status}`)
         return
       }
 
@@ -66,7 +72,7 @@ export default {
       console.log(`[cron] Email retry: processed=${processed} sent=${sent} failed=${failed}`)
     } catch (err) {
       // Log only the error message — no PII
-      console.error('[cron] Email retry fetch failed:', err?.message || String(err))
+      console.error('[cron] Email retry failed:', err?.message || String(err))
     }
   },
 }

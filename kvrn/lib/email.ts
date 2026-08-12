@@ -123,8 +123,11 @@ export function orderConfirmationHTML(data: OrderConfirmationData, siteOrigin?: 
 
     <hr style="${S.rule}">
 
-    <p style="${S.p}">Questions? Reply to this email or contact
-      <a href="mailto:support@kvrn.shop" style="color:#1A1A1A;">support@kvrn.shop</a>.</p>
+    <p style="${S.p}">
+      <a href="${origin}/support/track" style="color:#1A1A1A;">Track your order</a>
+      &nbsp;&middot;&nbsp;
+      Questions? <a href="mailto:support@kvrn.shop" style="color:#1A1A1A;">support@kvrn.shop</a>
+    </p>
 
     <p style="${S.footer}">
       &copy; KVRN &middot; <a href="${origin}" style="color:#9B9B9B;">kvrn.shop</a>
@@ -135,7 +138,7 @@ export function orderConfirmationHTML(data: OrderConfirmationData, siteOrigin?: 
 }
 
 export function orderConfirmationSubject(orderNumber: string): string {
-  return `Order ${orderNumber} confirmed`
+  return `KVRN — Order ${orderNumber} confirmed`
 }
 
 // ── Active: shipping confirmation (V51.3) ────────────────────────────────────
@@ -192,7 +195,11 @@ export function shippingConfirmationHTML(data: ShippingConfirmationData, siteOri
 
     <hr style="${S.rule}">
 
-    <p style="${S.p}">Questions? Contact <a href="mailto:support@kvrn.shop" style="color:#1A1A1A;">support@kvrn.shop</a>.</p>
+    <p style="${S.p}">
+      <a href="${origin}/support/track" style="color:#1A1A1A;">Track your order</a>
+      &nbsp;&middot;&nbsp;
+      Questions? <a href="mailto:support@kvrn.shop" style="color:#1A1A1A;">support@kvrn.shop</a>
+    </p>
 
     <p style="${S.footer}">
       &copy; KVRN &middot; <a href="${origin}" style="color:#9B9B9B;">kvrn.shop</a>
@@ -203,7 +210,7 @@ export function shippingConfirmationHTML(data: ShippingConfirmationData, siteOri
 }
 
 export function shippingConfirmationSubject(orderNumber: string): string {
-  return `Order ${orderNumber} shipped`
+  return `KVRN — Order ${orderNumber} has shipped`
 }
 
 // ── Inactive templates (future phases) ────────────────────────────────────────

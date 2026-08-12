@@ -1254,7 +1254,7 @@ describe('orderConfirmationHTML template', () => {
     expect(html2).not.toContain('kvrn.com')
   })
   test('correct subject line', () => {
-    expect(orderConfirmationSubject('KVRN-001001')).toBe('Order KVRN-001001 confirmed')
+    expect(orderConfirmationSubject('KVRN-001001')).toBe('KVRN — Order KVRN-001001 confirmed')
   })
   test('contains "Order confirmed."', () => {
     expect(html).toContain('Order confirmed.')
@@ -1974,7 +1974,7 @@ describe('shippingConfirmationHTML template', () => {
   beforeAll(() => { html = shippingConfirmationHTML(SAMPLE_SHIP, 'https://kvrn.shop') })
 
   test('correct subject line', () => {
-    expect(shippingConfirmationSubject('KVRN-001002')).toBe('Order KVRN-001002 shipped')
+    expect(shippingConfirmationSubject('KVRN-001002')).toBe('KVRN — Order KVRN-001002 has shipped')
   })
   test('contains order number', () => {
     expect(html).toContain('KVRN-001002')

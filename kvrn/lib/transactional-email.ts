@@ -13,8 +13,13 @@ import {
 import type { EmailProvider }    from './resend-adapter'
 import { getSiteOrigin }         from './site-origin'
 
-const FROM_ADDRESS   = process.env.TRANSACTIONAL_EMAIL_FROM    ?? 'KVRN <orders@send.kvrn.shop>'
-const REPLY_TO       = process.env.TRANSACTIONAL_EMAIL_REPLY_TO ?? 'support@kvrn.shop'
+// FROM_ADDRESS: TRANSACTIONAL_EMAIL_FROM overrides; otherwise built from RESEND_FROM_NAME / RESEND_FROM_EMAIL
+function buildFromAddress(): string {
+  const name  = process.env.RESEND_FROM_NAME  ?? 'KVRN'
+  const email = process.env.RESEND_FROM_EMAIL ?? 'orders@send.kvrn.shop'
+  return process.env.TRANSACTIONAL_EMAIL_FROM ?? `${name} <${email}>`
+}
+const REPLY_TO = process.env.TRANSACTIONAL_EMAIL_REPLY_TO ?? 'support@kvrn.shop'
 const MAX_ATTEMPTS           = 5
 const STALE_SENDING_MINUTES  = 15   // rows stuck in 'sending' longer than this become retryable
 
@@ -205,7 +210,7 @@ export async function processOneEmail(opts: ProcessEmailOpts): Promise<
   }
 
   const result = await provider.send({
-    from:           FROM_ADDRESS,
+    from:           buildFromAddress(),
     replyTo:        REPLY_TO,
     to:             row.recipient_email,
     subject,
@@ -221,6 +226,7 @@ export async function processOneEmail(opts: ProcessEmailOpts): Promise<
           last_error=NULL, next_attempt_at=NULL, updated_at=NOW()
       WHERE id=${row.id}
     `
+    console.log(`[transactional-email] sent ${row.email_type}`)
     return { outcome: 'sent' }
   }
 
@@ -236,6 +242,7 @@ export async function processOneEmail(opts: ProcessEmailOpts): Promise<
         updated_at=NOW()
     WHERE id=${row.id}
   `
+  console.error(`[transactional-email] retry failed ${row.email_type} attempt=${newAttemptCount}`)
   return { outcome: 'failed', error: safeError(result.message) }
 }
 
