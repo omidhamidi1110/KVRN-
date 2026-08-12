@@ -283,7 +283,7 @@ export default function AdminInventoryClient() {
                               Inactive
                             </span>
                           ) : isSoldOut ? (
-                            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.06em] text-red-700">
+                            <span className="inline-flex whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.06em] text-red-700">
                               Sold out
                             </span>
                           ) : (
