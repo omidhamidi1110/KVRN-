@@ -269,18 +269,209 @@ export function pickRatesForDestination(
   }
 }
 
+// ── Helpers for international multi-parcel aggregation ───────────────────────
+
+/**
+ * Determine the aggregate label, provider, and service token for a set of
+ * per-parcel rates of the same method (standard or express).
+ *
+ * Same service across all parcels → use the specific carrier/service label.
+ * Same provider, different services → "{Provider} International {Method}".
+ * Mixed providers → "International {Method}".
+ */
+function aggregateLabel(
+  rates:  ShippoRate[],
+  method: 'standard' | 'express'
+): { label: string; provider: string; serviceToken: string } {
+  const uniqueTokens    = [...new Set(rates.map(r => r.serviceToken).filter(Boolean))]
+  const uniqueProviders = [...new Set(rates.map(r => r.provider))]
+  const methodWord      = method === 'express' ? 'Express' : 'Standard'
+
+  if (uniqueTokens.length === 1) {
+    // All parcels use the same service — show the real carrier label
+    return { label: rates[0].label, provider: rates[0].provider, serviceToken: uniqueTokens[0] }
+  }
+  if (uniqueProviders.length === 1) {
+    const p = uniqueProviders[0]
+    return { label: `${p} International ${methodWord}`, provider: p, serviceToken: '' }
+  }
+  return { label: `International ${methodWord}`, provider: 'Multiple Carriers', serviceToken: '' }
+}
+
+/**
+ * Aggregate per-parcel Shippo results into a single order-level ShippoRates object.
+ * Called only for international multi-parcel orders (non-US, parcels.length > 1).
+ * Exported for unit testing.
+ *
+ * Standard total  = sum of each parcel's standard cents.
+ * Express total   = sum of each parcel's express cents — ONLY when every parcel has real express.
+ * Delivery window = conservative (slowest parcel drives min/max days).
+ */
+export function aggregateInternationalParcels(
+  parcelRates: Array<{ standard: ShippoRate; express: ShippoRate | null }>
+): ShippoRates {
+  if (parcelRates.length === 1) {
+    return {
+      standard: parcelRates[0].standard,
+      express:  parcelRates[0].express,
+    }
+  }
+
+  // ── Standard ──────────────────────────────────────────────────────────────
+  const stds       = parcelRates.map(r => r.standard)
+  const stdAgg     = aggregateLabel(stds, 'standard')
+  const stdMinDays = Math.max(...stds.map(r => r.minDays))  // conservative = slowest
+  const stdMaxDays = Math.max(...stds.map(r => r.maxDays))
+  const stdEstimate = `${stdMinDays}–${stdMaxDays} business days`
+
+  const standard: ShippoRate = {
+    method:       'standard',
+    cents:        stds.reduce((sum, r) => sum + r.cents, 0),
+    label:        stdAgg.label,
+    estimate:     stdEstimate,
+    minDays:      stdMinDays,
+    maxDays:      stdMaxDays,
+    stripeLabel:  `${stdAgg.label} (${stdEstimate})`,
+    provider:     stdAgg.provider,
+    serviceToken: stdAgg.serviceToken,
+  }
+
+  // ── Express — only when every parcel has a real faster Shippo rate ─────────
+  const allHaveExpress = parcelRates.every(r => r.express !== null)
+  let express: ShippoRate | null = null
+
+  if (allHaveExpress) {
+    const exps       = parcelRates.map(r => r.express!)
+    const expAgg     = aggregateLabel(exps, 'express')
+    const expMinDays = Math.max(...exps.map(r => r.minDays))
+    const expMaxDays = Math.max(...exps.map(r => r.maxDays))
+    const expEstimate = `${expMinDays}–${expMaxDays} business days`
+
+    express = {
+      method:       'express',
+      cents:        exps.reduce((sum, r) => sum + r.cents, 0),
+      label:        expAgg.label,
+      estimate:     expEstimate,
+      minDays:      expMinDays,
+      maxDays:      expMaxDays,
+      stripeLabel:  `${expAgg.label} (${expEstimate})`,
+      provider:     expAgg.provider,
+      serviceToken: expAgg.serviceToken,
+    }
+  }
+
+  return { standard, express }
+}
+
+// ── Shared HTTP helper ────────────────────────────────────────────────────────
+
+/**
+ * Make one POST to the Shippo /shipments/ endpoint.
+ * Handles all network errors, non-2xx responses, and safe diagnostics.
+ * Returns the raw rates array on success, or null on any failure.
+ */
+async function callShippoApi(payload: object, apiToken: string): Promise<any[] | null> {
+  let res: Response
+  try {
+    res = await fetch(`${SHIPPO_API}/shipments/`, {
+      method:  'POST',
+      headers: {
+        'Authorization': `ShippoToken ${apiToken}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (err: any) {
+    console.error('[shippo] Network error:', err?.message?.slice(0, 80))
+    return null
+  }
+
+  if (!res.ok) {
+    let detail = ''
+    let structure = ''
+    try {
+      const errBody: any = await res.json()
+      const safeDetail =
+        errBody?.detail ??
+        errBody?.message ??
+        errBody?.error ??
+        errBody?.messages ??
+        ''
+      detail =
+        typeof safeDetail === 'string'
+          ? safeDetail
+          : JSON.stringify(safeDetail)
+
+      if (!detail && errBody && typeof errBody === 'object') {
+        const summarise = (node: any, depth: number): string => {
+          if (depth > 4) return '...'
+          if (Array.isArray(node)) {
+            return '[' + node.map((el, i) =>
+              el !== null && typeof el === 'object'
+                ? `${i}:{${summarise(el, depth + 1)}}`
+                : String(i)
+            ).join(',') + ']'
+          }
+          if (node !== null && typeof node === 'object') {
+            return Object.keys(node).map(k => {
+              const v = node[k]
+              return (v !== null && typeof v === 'object')
+                ? `${k}:{${summarise(v, depth + 1)}}`
+                : k
+            }).join(',')
+          }
+          return ''
+        }
+        structure = `structure=${summarise(errBody, 0)}`
+      }
+    } catch {
+      detail = ''
+    }
+    const suffix = detail
+      ? `; detail=${detail.slice(0, 300)}`
+      : (structure ? `; ${structure.slice(0, 300)}` : '')
+    console.error(`[shippo] API returned ${res.status}${suffix}`)
+    return null
+  }
+
+  let data: any
+  try {
+    data = await res.json()
+  } catch {
+    console.error('[shippo] Could not parse Shippo response JSON')
+    return null
+  }
+
+  return data?.rates ?? []
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
  * Fetch real shipping rates from Shippo for domestic or international shipments.
  *
- * Returns `{ standard, express }` where express may be null when Shippo has no
- * real faster service for the destination. US callers may use the static express
- * fallback; non-US callers must NOT substitute US domestic static rates.
- * Returns null on any network/API error — callers fall back accordingly.
+ * US domestic — always one multi-piece Shippo request (unchanged):
+ *   standard from STANDARD_TOKENS, express from EXPRESS_TOKENS or null.
+ *
+ * International, one parcel — one Shippo request:
+ *   cheapest rate = standard; real faster/keyword rate = express or null.
+ *
+ * International, multiple parcels — one Shippo request PER parcel:
+ *   USPS does not support multi-piece international shipments.
+ *   Rates are aggregated: total cents = sum; delivery = slowest parcel; express
+ *   only when every parcel has a real faster Shippo rate.
+ *
+ * Returns null on any network/API error or if no standard rate can be obtained.
+ * Non-US callers must NOT substitute US domestic static rates when null is returned.
  *
  * For rate estimation, city/zip/country is sufficient; state is optional.
- * Full street address is required when purchasing labels — see LABEL PURCHASING NOTE.
+ *
+ * LABEL PURCHASING / CUSTOMS NOTE:
+ * When international label purchasing is implemented, each physical international
+ * parcel requires its own Shippo label purchase, customs declaration (HS codes,
+ * item descriptions, values), and separate tracking number. The multi-parcel
+ * split done here for rate quoting maps 1:1 to the label purchasing workflow.
+ * Full street address is required for labels (see LABEL PURCHASING NOTE above).
  */
 export async function getShippoRates(
   toAddress:  { city: string; state: string; zip: string; country: string },
@@ -308,116 +499,87 @@ export async function getShippoRates(
     return null
   }
 
-  const payload = {
-    address_from: {
-      name:    process.env.SHIPPO_FROM_NAME    ?? 'KVRN',
-      street1: fromStreet1,
-      ...(process.env.SHIPPO_FROM_STREET2?.trim()
-        ? { street2: process.env.SHIPPO_FROM_STREET2.trim() }
-        : {}),
-      city:    fromCity,
-      state:   fromState,
-      zip:     fromZip,
-      country: process.env.SHIPPO_FROM_COUNTRY ?? 'US',
-      phone:   process.env.SHIPPO_FROM_PHONE   ?? '',
-      email:   process.env.SHIPPO_FROM_EMAIL   ?? '',
-    },
-    address_to: {
-      name:    'Customer',
-      city:    toAddress.city,
-      state:   toAddress.state,
-      zip:     toAddress.zip,
-      country: toAddress.country ?? 'US',
-    },
-    parcels: parcels.map(p => ({
-      length:        String(p.lengthIn),
-      width:         String(p.widthIn),
-      height:        String(p.heightIn),
-      distance_unit: 'in',
-      weight:        String(p.weightOz),
-      mass_unit:     'oz',
-    })),
-    async: false,
+  const fromAddress = {
+    name:    process.env.SHIPPO_FROM_NAME    ?? 'KVRN',
+    street1: fromStreet1,
+    ...(process.env.SHIPPO_FROM_STREET2?.trim()
+      ? { street2: process.env.SHIPPO_FROM_STREET2.trim() }
+      : {}),
+    city:    fromCity,
+    state:   fromState,
+    zip:     fromZip,
+    country: process.env.SHIPPO_FROM_COUNTRY ?? 'US',
+    phone:   process.env.SHIPPO_FROM_PHONE   ?? '',
+    email:   process.env.SHIPPO_FROM_EMAIL   ?? '',
   }
 
-  let res: Response
-  try {
-    res = await fetch(`${SHIPPO_API}/shipments/`, {
-      method:  'POST',
-      headers: {
-        'Authorization': `ShippoToken ${apiToken}`,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-  } catch (err: any) {
-    console.error('[shippo] Network error:', err?.message?.slice(0, 80))
-    return null
+  const addressTo = {
+    name:    'Customer',
+    city:    toAddress.city,
+    state:   toAddress.state,
+    zip:     toAddress.zip,
+    country: toAddress.country ?? 'US',
   }
 
-  if (!res.ok) {
-    let detail = ''
-    let structure = ''
-    try {
-      const errBody: any = await res.json()
-      // Safe detail extraction — known scalar error fields only
-      const safeDetail =
-        errBody?.detail ??
-        errBody?.message ??
-        errBody?.error ??
-        errBody?.messages ??
-        ''
-      detail =
-        typeof safeDetail === 'string'
-          ? safeDetail
-          : JSON.stringify(safeDetail)
+  const isInternational = toAddress.country.toUpperCase() !== 'US'
 
-      // If no detail found, recursively summarise KEY/INDEX structure only — never values
-      if (!detail && errBody && typeof errBody === 'object') {
-        // Recursively build a key-structure string; depth-limited to 4 levels
-        const summarise = (node: any, depth: number): string => {
-          if (depth > 4) return '...'
-          if (Array.isArray(node)) {
-            return '[' + node.map((el, i) =>
-              el !== null && typeof el === 'object'
-                ? `${i}:{${summarise(el, depth + 1)}}`
-                : String(i)
-            ).join(',') + ']'
-          }
-          if (node !== null && typeof node === 'object') {
-            return Object.keys(node).map(k => {
-              const v = node[k]
-              return (v !== null && typeof v === 'object')
-                ? `${k}:{${summarise(v, depth + 1)}}`
-                : k
-            }).join(',')
-          }
-          return ''
-        }
-        structure = `structure=${summarise(errBody, 0)}`
+  const toShippoParcel = (p: ParcelSpec) => ({
+    length:        String(p.lengthIn),
+    width:         String(p.widthIn),
+    height:        String(p.heightIn),
+    distance_unit: 'in',
+    weight:        String(p.weightOz),
+    mass_unit:     'oz',
+  })
+
+  // ── International multi-parcel: one Shippo request per parcel ─────────────
+  // USPS does not support multi-piece international shipments.
+  // US multi-parcel continues to use a single multi-piece request (unchanged).
+  if (isInternational && parcels.length > 1) {
+    console.log(`[shippo] International split quote: ${parcels.length} parcels, ${parcels.length} separate requests`)
+    const parcelResults: Array<{ standard: ShippoRate; express: ShippoRate | null }> = []
+
+    for (let i = 0; i < parcels.length; i++) {
+      const payload = {
+        address_from: fromAddress,
+        address_to:   addressTo,
+        parcels:      [toShippoParcel(parcels[i])],
+        async:        false,
       }
-    } catch {
-      detail = ''
+
+      const rates = await callShippoApi(payload, apiToken)
+      if (!rates) return null   // HTTP/network failure → whole order unavailable
+
+      const { standard, express } = pickRatesForDestination(rates, toAddress.country)
+      if (!standard) {
+        console.error(
+          `[shippo] No standard rate for international parcel ${i + 1}/${parcels.length}; ` +
+          `rates=${rates.length}`
+        )
+        return null   // can't quote partial shipment
+      }
+
+      parcelResults.push({ standard, express })
     }
-    const suffix = detail ? `; detail=${detail.slice(0, 300)}` : (structure ? `; ${structure.slice(0, 300)}` : '')
-    console.error(`[shippo] API returned ${res.status}${suffix}`)
-    return null
+
+    return aggregateInternationalParcels(parcelResults)
   }
 
-  let data: any
-  try {
-    data = await res.json()
-  } catch {
-    console.error('[shippo] Could not parse Shippo response JSON')
-    return null
+  // ── Single Shippo request (US all parcels, or international 1 parcel) ─────
+  const payload = {
+    address_from: fromAddress,
+    address_to:   addressTo,
+    parcels:      parcels.map(toShippoParcel),
+    async:        false,
   }
 
-  const { standard, express } = pickRatesForDestination(
-    data?.rates ?? [], toAddress.country
-  )
+  const rates = await callShippoApi(payload, apiToken)
+  if (!rates) return null
+
+  const { standard, express } = pickRatesForDestination(rates, toAddress.country)
   if (!standard) {
     console.error(
-      `[shippo] No usable standard rate returned; rates=${Array.isArray(data?.rates) ? data.rates.length : 0}`
+      `[shippo] No usable standard rate returned; rates=${rates.length}`
     )
     return null
   }
