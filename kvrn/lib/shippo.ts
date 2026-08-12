@@ -289,7 +289,26 @@ export async function getShippoRates(
   }
 
   if (!res.ok) {
-    console.error(`[shippo] API returned ${res.status}`)
+    let detail = ''
+    try {
+      const errBody: any = await res.json()
+      const safeDetail =
+        errBody?.detail ??
+        errBody?.message ??
+        errBody?.error ??
+        errBody?.messages ??
+        ''
+      detail =
+        typeof safeDetail === 'string'
+          ? safeDetail
+          : JSON.stringify(safeDetail)
+    } catch {
+      detail = ''
+    }
+    console.error(
+      `[shippo] API returned ${res.status}` +
+      (detail ? `; detail=${detail.slice(0, 300)}` : '')
+    )
     return null
   }
 
