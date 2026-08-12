@@ -226,11 +226,20 @@ export async function getShippoRates(
   const fromState   = process.env.SHIPPO_FROM_STATE
   const fromZip     = process.env.SHIPPO_FROM_ZIP
 
-  if (!fromStreet1 || !fromCity || !fromState || !fromZip) return null
-  if (!apiToken) return null
+  if (!fromStreet1 || !fromCity || !fromState || !fromZip) {
+    console.error('[shippo] Missing required SHIPPO_FROM_* configuration')
+    return null
+  }
+  if (!apiToken) {
+    console.error('[shippo] Missing SHIPPO_API_TOKEN')
+    return null
+  }
 
   const parcels = buildParcels(items, shippingDb)
-  if (parcels.length === 0) return null
+  if (parcels.length === 0) {
+    console.error('[shippo] No parcels built from cart items')
+    return null
+  }
 
   const payload = {
     address_from: {
@@ -285,10 +294,20 @@ export async function getShippoRates(
   }
 
   let data: any
-  try { data = await res.json() } catch { return null }
+  try {
+    data = await res.json()
+  } catch {
+    console.error('[shippo] Could not parse Shippo response JSON')
+    return null
+  }
 
   const { standard, express } = pickRates(data?.rates ?? [])
-  if (!standard) return null
+  if (!standard) {
+    console.error(
+      `[shippo] No usable standard rate returned; rates=${Array.isArray(data?.rates) ? data.rates.length : 0}`
+    )
+    return null
+  }
 
   return { standard, express }  // express may be null — callers use static fallback
 }
