@@ -9,6 +9,7 @@ import {
   FIELD_MAX,
 } from './checkout-validation'
 import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
+import { COUNTRY_CODES } from './countries'
 import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
 import { getShippoRates, type ShippoRate, type ShippoRates } from './shippo'
 import { applyFreeShippingToSingleRate } from './free-shipping'
@@ -78,40 +79,63 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     // ── Shipping address ─────────────────────────────────────────────────────
     const addr = body.shippingAddress ?? {}
 
-    const firstNameR = requiredStringField(addr.firstName,               FIELD_MAX.name,    'First name')
-    const lastNameR  = requiredStringField(addr.lastName,                FIELD_MAX.name,    'Last name')
-    const line1R     = requiredStringField(addr.line1,                   FIELD_MAX.address, 'Address')
-    const line2R     = optionalStringField(addr.line2,                   FIELD_MAX.address, 'Apartment/unit')
-    const cityR      = requiredStringField(addr.city,                    FIELD_MAX.city,    'City')
-    const stateR     = requiredStringField(addr.state,                   FIELD_MAX.state,   'State')
-    const postalR    = requiredStringField(addr.postalCode ?? addr.zip,  FIELD_MAX.zip,     'ZIP code')
-    const countryR   = requiredStringField(addr.country,                 FIELD_MAX.country, 'Country')
+    // ── Country (validated first — affects subsequent field rules) ──────────────
+    const countryR = requiredStringField(addr.country, FIELD_MAX.country, 'Country')
+    if (!countryR.ok) return NextResponse.json({ error: countryR.error }, { status: 400 })
+    const country = countryR.value.toUpperCase()
+    if (!COUNTRY_CODES.has(country)) {
+      return NextResponse.json({ error: 'Unsupported shipping destination.' }, { status: 400 })
+    }
+    const isUS = country === 'US'
 
-    const addrResults = [firstNameR, lastNameR, line1R, line2R, cityR, stateR, postalR, countryR]
-    for (const r of addrResults) {
+    // ── Name / address lines / city (country-independent) ────────────────────
+    const firstNameR = requiredStringField(addr.firstName,  FIELD_MAX.name,    'First name')
+    const lastNameR  = requiredStringField(addr.lastName,   FIELD_MAX.name,    'Last name')
+    const line1R     = requiredStringField(addr.line1,      FIELD_MAX.address, 'Address')
+    const line2R     = optionalStringField(addr.line2,      FIELD_MAX.address, 'Apartment/unit')
+    const cityR      = requiredStringField(addr.city,       FIELD_MAX.city,    'City')
+    for (const r of [firstNameR, lastNameR, line1R, line2R, cityR]) {
       if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })
     }
-
-    // TypeScript narrows (all ok=true here)
-    if (!firstNameR.ok||!lastNameR.ok||!line1R.ok||!line2R.ok||
-        !cityR.ok||!stateR.ok||!postalR.ok||!countryR.ok) {
+    if (!firstNameR.ok||!lastNameR.ok||!line1R.ok||!line2R.ok||!cityR.ok) {
       return NextResponse.json({ error: 'Invalid address.' }, { status: 400 })
     }
+    const firstName = firstNameR.value
+    const lastName  = lastNameR.value
+    const line1     = line1R.value
+    const line2     = line2R.value || null
+    const city      = cityR.value
 
-    const firstName  = firstNameR.value
-    const lastName   = lastNameR.value
-    const line1      = line1R.value
-    const line2      = line2R.value || null
-    const city       = cityR.value
-    const state      = stateR.value.toUpperCase()
+    // ── State / province (required for US; optional for international) ─────────
+    let state = ''
+    if (isUS) {
+      const stateR = requiredStringField(addr.state, FIELD_MAX.state, 'State')
+      if (!stateR.ok) return NextResponse.json({ error: stateR.error }, { status: 400 })
+      state = stateR.value.toUpperCase()
+      if (!isValidUSState(state)) {
+        return NextResponse.json({ error: 'A valid US state is required.' }, { status: 400 })
+      }
+    } else {
+      const stateR = optionalStringField(addr.state, FIELD_MAX.state, 'State / Province / Region')
+      if (!stateR.ok) return NextResponse.json({ error: stateR.error }, { status: 400 })
+      state = stateR.value ? stateR.value.toUpperCase() : ''
+    }
+
+    // ── Postal code (US ZIP format vs generic international) ─────────────────
+    const postalLabel = isUS ? 'ZIP code' : 'Postal code'
+    const postalR     = requiredStringField(addr.postalCode ?? addr.zip, FIELD_MAX.zip, postalLabel)
+    if (!postalR.ok) return NextResponse.json({ error: postalR.error }, { status: 400 })
     const postalCode = postalR.value
-    const country    = countryR.value.toUpperCase()   // Fix 4: no silent fallback
-
-    const fieldErrors: string[] = []
-    if (!isValidUSState(state))    fieldErrors.push('A valid US state is required.')
-    if (!isValidUSZip(postalCode)) fieldErrors.push('A valid US ZIP code is required.')
-    if (country !== 'US')          fieldErrors.push('Only US shipping is supported at this time.')
-    if (fieldErrors.length) return NextResponse.json({ error: fieldErrors[0] }, { status: 400 })
+    if (isUS) {
+      if (!isValidUSZip(postalCode)) {
+        return NextResponse.json({ error: 'A valid US ZIP code is required.' }, { status: 400 })
+      }
+    } else {
+      // International: require safe characters + reasonable length (no country-specific regex)
+      if (!/^[A-Za-z0-9][A-Za-z0-9 \-]{1,14}$/.test(postalCode)) {
+        return NextResponse.json({ error: 'Enter a valid postal code.' }, { status: 400 })
+      }
+    }
 
     // ── Shipping method ───────────────────────────────────────────────────────
     const methodR = requiredStringField(body.shippingMethod, FIELD_MAX.method, 'Shipping method')
@@ -121,41 +145,87 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 })
     }
 
-    // ── Get authoritative shipping cost — Shippo, fall back to static ────────
-    // Server re-fetches Shippo to be authoritative; never trusts browser-sent price.
+    // ── Get authoritative shipping cost ────────────────────────────────────────
+    // Server re-fetches Shippo; never trusts browser-sent price.
+    // US: Shippo preferred, US static rates permitted as fallback.
+    // Non-US: real Shippo rate REQUIRED — static US rates never used internationally.
     const apiToken = process.env.SHIPPO_API_TOKEN ?? ''
-    let shippingCents = calculateShippingCents(shippingMethod)  // static fallback
-    let shippingOpt   = US_SHIPPING_OPTIONS[shippingMethod]
-    let liveRate: ShippoRate | null = null
-    let shippoRatesResult: ShippoRates | null = null  // hoisted for free-shipping comparison
+    let shippingCents: number
+    let shippingOpt   = US_SHIPPING_OPTIONS[shippingMethod]  // typed base; may be overridden
+    let shippoRatesResult: ShippoRates | null = null
 
-    if (apiToken) {
+    if (isUS) {
+      // US: start with static fallback, try Shippo
+      shippingCents = calculateShippingCents(shippingMethod)
+      if (apiToken) {
+        try {
+          const shippingDb = await getProductShippingData().catch(() => [])
+          shippoRatesResult = await getShippoRates(
+            { city, state, zip: postalCode, country },
+            (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
+            shippingDb,
+            apiToken
+          )
+          if (shippoRatesResult) {
+            const liveRate: ShippoRate | null = shippoRatesResult[shippingMethod] ?? null
+            if (liveRate) {
+              shippingCents = liveRate.cents
+              shippingOpt   = {
+                ...US_SHIPPING_OPTIONS[shippingMethod],
+                cents:       liveRate.cents,
+                stripeLabel: liveRate.stripeLabel,
+                minDays:     liveRate.minDays,
+                maxDays:     liveRate.maxDays,
+              }
+            }
+          }
+        } catch (shippoErr: any) {
+          console.error('[checkout/session] Shippo error (US static fallback):', shippoErr?.message?.slice(0, 80))
+        }
+      }
+    } else {
+      // Non-US: Shippo REQUIRED — no static fallback, no US price permitted
+      if (!apiToken) {
+        return NextResponse.json(
+          { error: 'Shipping is currently unavailable to this destination.' },
+          { status: 503 }
+        )
+      }
       try {
-        const shippingDb = await getProductShippingData().catch(() => [])
+        const shippingDb  = await getProductShippingData().catch(() => [])
         shippoRatesResult = await getShippoRates(
           { city, state, zip: postalCode, country },
           (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
           shippingDb,
           apiToken
         )
-        if (shippoRatesResult) {
-          // express may be null from Shippo — fall back to static express, never fabricate
-          liveRate = shippoRatesResult[shippingMethod] ?? null
-          if (liveRate) {
-            shippingCents = liveRate.cents
-            // Build a shippingOpt-compatible object for Stripe display name/estimate
-            shippingOpt = {
-              ...US_SHIPPING_OPTIONS[shippingMethod],
-              cents:       liveRate.cents,
-              stripeLabel: liveRate.stripeLabel,
-              minDays:     liveRate.minDays,
-              maxDays:     liveRate.maxDays,
-            }
-            // liveRate is null for this method → shippingCents/shippingOpt keep static values
-          }
-        }
       } catch (shippoErr: any) {
-        console.error('[checkout/session] Shippo error (using static fallback):', shippoErr?.message?.slice(0, 80))
+        console.error('[checkout/session] Shippo error (international):', shippoErr?.message?.slice(0, 80))
+      }
+
+      if (!shippoRatesResult) {
+        return NextResponse.json(
+          { error: 'Shipping is currently unavailable to this destination.' },
+          { status: 503 }
+        )
+      }
+
+      const intlRate: ShippoRate | null = shippoRatesResult[shippingMethod] ?? null
+      if (!intlRate) {
+        // Selected method (e.g. express) not available for this destination
+        return NextResponse.json(
+          { error: 'The selected shipping method is not available to this destination. Please select Standard shipping or try again.' },
+          { status: 400 }
+        )
+      }
+
+      shippingCents = intlRate.cents
+      shippingOpt   = {
+        ...US_SHIPPING_OPTIONS[shippingMethod],
+        cents:       intlRate.cents,
+        stripeLabel: intlRate.stripeLabel,
+        minDays:     intlRate.minDays,
+        maxDays:     intlRate.maxDays,
       }
     }
 
@@ -257,7 +327,14 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
             shipping: {
               name:    fullName,
               phone:   phone ?? undefined,
-              address: { line1, line2: line2 ?? undefined, city, state, postal_code: postalCode, country: 'US' },
+              address: {
+              line1,
+              line2: line2 ?? undefined,
+              city,
+              ...(state ? { state } : {}),
+              postal_code: postalCode,
+              country,    // validated 2-letter ISO code
+            },
             },
           },
           metadata:    { reservation_id: reservation.reservationId, shipping_method: shippingMethod },

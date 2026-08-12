@@ -7,60 +7,84 @@ import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/data/products'
 import { formatCheckoutPrice } from '@/lib/format-money'
 import { calculateShipping, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
+import { COUNTRIES } from '@/lib/countries'
 import { cn } from '@/lib/utils'
 
 type Step = 'contact' | 'shipping'
 
 interface ContactData {
-  email:     string
-  smsOptIn:  boolean
-  phone:     string
+  email:    string
+  smsOptIn: boolean
+  phone:    string
 }
 
 interface AddressData {
-  firstName: string
-  lastName:  string
-  line1:     string
-  line2:     string
-  city:      string
-  state:     string
+  firstName:  string
+  lastName:   string
+  line1:      string
+  line2:      string
+  city:       string
+  state:      string
   postalCode: string
+  country:    string   // 2-letter ISO code
 }
 
 // ─── Main checkout page ───────────────────────────────────────────────────────
 export default function CheckoutPage() {
   const { items, subtotalPence } = useCart()
 
-  const [isClient,       setIsClient]       = useState(false)
-  const [step,           setStep]           = useState<Step>('contact')
-  const [paymentError,   setPaymentError]   = useState('')
-  const [creatingSession, setCreatingSession] = useState(false)
+  const [isClient,         setIsClient]         = useState(false)
+  const [step,             setStep]             = useState<Step>('contact')
+  const [paymentError,     setPaymentError]     = useState('')
+  const [creatingSession,  setCreatingSession]  = useState(false)
 
   const [contact, setContact] = useState<ContactData>({ email: '', smsOptIn: false, phone: '' })
   const [address, setAddress] = useState<AddressData>({
-    firstName: '', lastName: '', line1: '', line2: '', city: '', state: '', postalCode: '',
+    firstName: '', lastName: '', line1: '', line2: '',
+    city: '', state: '', postalCode: '', country: 'US',
   })
-  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('standard')
-  const [contactErrors,  setContactErrors]  = useState<Record<string, string>>({})
-  const [addressErrors,  setAddressErrors]  = useState<Record<string, string>>({})
-  // Live Shippo rates — fetched when address zip+state are filled in
-  const [liveRates,      setLiveRates]      = useState<Array<{
+  const [shippingMethod,   setShippingMethod]   = useState<ShippingMethod>('standard')
+  const [contactErrors,    setContactErrors]    = useState<Record<string, string>>({})
+  const [addressErrors,    setAddressErrors]    = useState<Record<string, string>>({})
+
+  // Live Shippo rates from /api/shipping-rates
+  const [liveRates,             setLiveRates]             = useState<Array<{
     id: string; label: string; cents: number; minDays: number; maxDays: number; default: boolean
   }> | null>(null)
-  const [fetchingRates,  setFetchingRates]  = useState(false)
+  const [fetchingRates,         setFetchingRates]         = useState(false)
+  const [internationalUnavail,  setInternationalUnavail]  = useState(false)
 
   useEffect(() => { setIsClient(true) }, [])
 
-  // Fetch live Shippo rates when zip + state are entered (debounced 800ms)
+  const isUS = address.country === 'US'
+
+  // Clear stale rates immediately when country changes
   useEffect(() => {
-    const zip   = address.postalCode.trim()
-    const state = address.state.trim()
-    const city  = address.city.trim()
-    // Need at least zip + state to get rates
-    if (!zip || zip.length < 5 || !state || state.length < 2) {
-      setLiveRates(null)
-      return
-    }
+    setLiveRates(null)
+    setInternationalUnavail(false)
+    setShippingMethod('standard')
+    // Also clear state/postal when switching country to avoid validation carryover
+  }, [address.country])
+
+  // Fetch live Shippo rates (debounced 800ms)
+  useEffect(() => {
+    const zip     = address.postalCode.trim()
+    const state   = address.state.trim()
+    const city    = address.city.trim()
+    const country = address.country
+
+    // Clear while waiting for fresh data
+    setLiveRates(null)
+    setInternationalUnavail(false)
+
+    // Gate: minimum address needed to get rates
+    const countryIsUS = country === 'US'
+    const hasEnough   = countryIsUS
+      ? (zip.length >= 5 && state.length >= 2 && city.length >= 1)
+      : (zip.length >= 2 && city.length >= 1)
+
+    if (!hasEnough || !items.length) return
+
     const timer = setTimeout(async () => {
       setFetchingRates(true)
       try {
@@ -68,42 +92,65 @@ export default function CheckoutPage() {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            city, state, zip, country: 'US',
+            city, state, zip, country,
             items: items.map(i => ({ sku: i.sku, quantity: i.quantity })),
           }),
         })
         if (res.ok) {
           const data = await res.json()
-          if (data?.data?.rates?.length) {
-            setLiveRates(data.data.rates)
-            // Keep current selection if it exists in new rates, else reset to default
-            const ids = (data.data.rates as any[]).map((r: any) => r.id)
+          const rates = data?.data?.rates
+          if (rates?.length) {
+            setLiveRates(rates)
+            // Keep current method if available, else auto-select default
+            const ids = (rates as any[]).map((r: any) => r.id)
             if (!ids.includes(shippingMethod)) {
-              const defaultRate = (data.data.rates as any[]).find((r: any) => r.default)
-              if (defaultRate) setShippingMethod(defaultRate.id as ShippingMethod)
+              const def = (rates as any[]).find((r: any) => r.default)
+              if (def) setShippingMethod(def.id as ShippingMethod)
             }
+          } else if (!countryIsUS) {
+            setInternationalUnavail(true)
           }
+        } else if (!countryIsUS) {
+          setInternationalUnavail(true)
         }
       } catch {
-        // Network error — keep static rates (no UI disruption)
+        if (!countryIsUS) setInternationalUnavail(true)
       } finally {
         setFetchingRates(false)
       }
     }, 800)
-    return () => clearTimeout(timer)
-  }, [address.postalCode, address.state, address.city, items])
 
-  // Use live rate if available; fall back to static
+    return () => clearTimeout(timer)
+  }, [address.postalCode, address.state, address.city, address.country, items])
+
+  // ── Computed shipping display ─────────────────────────────────────────────
+
+  const US_STATIC_OPTS = Object.values(US_SHIPPING_OPTIONS).map(o => ({
+    id: o.method, label: o.label, cents: o.cents,
+    minDays: o.minDays, maxDays: o.maxDays, default: o.method === 'standard'
+  }))
+
+  // Non-US: only real Shippo rates or empty. US: live rates or static fallback.
   const currentShippingOpts = liveRates
     ? liveRates
-    : Object.values(US_SHIPPING_OPTIONS).map(o => ({
-        id: o.method, label: o.label, cents: o.cents,
-        minDays: o.minDays, maxDays: o.maxDays, default: o.method === 'standard'
-      }))
+    : isUS
+      ? US_STATIC_OPTS
+      : []
 
   const activeOpt     = currentShippingOpts.find(o => o.id === shippingMethod) ?? currentShippingOpts[0]
-  const shippingCents = activeOpt?.cents ?? calculateShipping('US', shippingMethod)
-  const totalCents    = subtotalPence + shippingCents
+  const shippingCents = activeOpt?.cents ?? (isUS ? calculateShipping('US', shippingMethod) : null)
+  const totalCents    = subtotalPence + (shippingCents ?? 0)
+
+  // Checkout may proceed when: US (static fallback available), or non-US with real live rates
+  const canProceed = isUS || (liveRates !== null && liveRates.length > 0)
+
+  // ── US state validation set ───────────────────────────────────────────────
+  const US_STATES = new Set([
+    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+    'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+    'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+    'VA','WA','WV','WI','WY','DC','PR','VI','GU','AS','MP',
+  ])
 
   // ── Validate contact ──────────────────────────────────────────────────────
   const validateContact = () => {
@@ -115,21 +162,26 @@ export default function CheckoutPage() {
   }
 
   // ── Validate address ──────────────────────────────────────────────────────
-  const US_STATES = new Set([
-    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
-    'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-    'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
-    'VA','WA','WV','WI','WY','DC','PR','VI','GU','AS','MP',
-  ])
   const validateAddress = () => {
     const errs: Record<string, string> = {}
     if (!address.firstName.trim()) errs.firstName = 'First name is required.'
     if (!address.lastName.trim())  errs.lastName  = 'Last name is required.'
     if (!address.line1.trim())     errs.line1     = 'Address is required.'
     if (!address.city.trim())      errs.city      = 'City is required.'
-    const state = address.state.trim().toUpperCase()
-    if (!state || !US_STATES.has(state)) errs.state = 'Enter a valid US state code (e.g. CA).'
-    if (!/^\d{5}(-\d{4})?$/.test(address.postalCode.trim())) errs.postalCode = 'Enter a valid ZIP code.'
+
+    if (isUS) {
+      const st = address.state.trim().toUpperCase()
+      if (!st || !US_STATES.has(st)) errs.state = 'Enter a valid US state code (e.g. CA).'
+      if (!/^\d{5}(-\d{4})?$/.test(address.postalCode.trim())) errs.postalCode = 'Enter a valid ZIP code.'
+    } else {
+      // International: postal required, state optional
+      if (!address.postalCode.trim()) errs.postalCode = 'Postal code is required.'
+    }
+
+    if (!canProceed) {
+      errs.shipping = 'Shipping rates are not available for this destination.'
+    }
+
     setAddressErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -162,21 +214,18 @@ export default function CheckoutPage() {
             line1:      address.line1.trim(),
             line2:      address.line2.trim() || undefined,
             city:       address.city.trim(),
-            state:      address.state.trim().toUpperCase(),
+            state:      address.state.trim().toUpperCase() || undefined,
             postalCode: address.postalCode.trim(),
-            country:    'US',
+            country:    address.country,    // actual country code — never hardcoded
           },
         }),
       })
       const data = await res.json()
       if (!res.ok) {
-        // For stock errors, build a customer-friendly message using cart display names
         if (data.code === 'OUT_OF_STOCK' || data.code === 'INSUFFICIENT_STOCK') {
           const cartItem = data.sku ? items.find(i => i.sku === data.sku) : null
           if (cartItem) {
-            setPaymentError(
-              `${cartItem.productName} — ${cartItem.colorName} / ${cartItem.size} is sold out.`
-            )
+            setPaymentError(`${cartItem.productName} — ${cartItem.colorName} / ${cartItem.size} is sold out.`)
           } else {
             setPaymentError('An item in your bag is sold out.')
           }
@@ -192,7 +241,7 @@ export default function CheckoutPage() {
     } finally {
       setCreatingSession(false)
     }
-  }, [items, contact, address, shippingMethod])
+  }, [items, contact, address, shippingMethod, canProceed])
 
   if (!isClient) return null
 
@@ -212,10 +261,9 @@ export default function CheckoutPage() {
     <div style={{ minHeight:'100vh', background:'#F9F8F6', paddingTop:'calc(36px + 56px)' }}>
       <div style={{ maxWidth:1100, margin:'0 auto', padding:'40px 24px', display:'flex', gap:48, flexWrap:'wrap', alignItems:'start' }}>
 
-        {/* ── Left: Form ──────────────────────────────────────────────── */}
+        {/* ── Left: Form ──────────────────────────────────────────── */}
         <div style={{ flex:'1 1 400px', minWidth:0 }}>
 
-          {/* Header */}
           <h1 style={{ fontSize:22, fontWeight:400, letterSpacing:'0.06em', textTransform:'uppercase',
                        color:'#1A1A1A', marginBottom:32 }}>
             Checkout
@@ -244,7 +292,7 @@ export default function CheckoutPage() {
             ))}
           </div>
 
-          {/* ── Contact ── */}
+          {/* ── Contact step ── */}
           {step === 'contact' && (
             <section>
               <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
@@ -257,7 +305,6 @@ export default function CheckoutPage() {
                   <input
                     type="email" autoComplete="email" value={contact.email}
                     onChange={e => setContact(c => ({ ...c, email: e.target.value }))}
-                    style={contact.email ? inputStyle : inputStyle}
                     className="checkout-input"
                     placeholder="you@example.com"
                   />
@@ -289,7 +336,7 @@ export default function CheckoutPage() {
             </section>
           )}
 
-          {/* ── Shipping ── */}
+          {/* ── Shipping step ── */}
           {step === 'shipping' && (
             <section>
               {/* Contact summary */}
@@ -309,12 +356,25 @@ export default function CheckoutPage() {
               </h2>
 
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                {/* Country (locked to US) */}
+
+                {/* Country selector */}
                 <div>
-                  <label style={labelStyle}>Country</label>
-                  <div style={{ ...inputStyle, background:'#F1EEE8', color:'#9B9B9B', display:'flex', alignItems:'center' }}>
-                    United States
-                  </div>
+                  <label style={labelStyle}>Country *</label>
+                  <select
+                    value={address.country}
+                    onChange={e => setAddress(a => ({
+                      ...a,
+                      country:    e.target.value,
+                      state:      '',   // clear on country change
+                      postalCode: '',
+                    }))}
+                    style={{ ...inputStyle, cursor:'pointer' }}
+                    autoComplete="country"
+                  >
+                    {COUNTRIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
@@ -359,57 +419,90 @@ export default function CheckoutPage() {
 
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                   <div>
-                    <label style={labelStyle}>State *</label>
-                    <input value={address.state} autoComplete="address-level1"
+                    {/* Label and maxLength differ by country */}
+                    <label style={labelStyle}>
+                      {isUS ? 'State *' : 'State / Province / Region'}
+                    </label>
+                    <input
+                      value={address.state}
+                      autoComplete="address-level1"
                       onChange={e => setAddress(a => ({ ...a, state: e.target.value }))}
-                      className="checkout-input" placeholder="CA" maxLength={2} />
+                      className="checkout-input"
+                      placeholder={isUS ? 'CA' : ''}
+                      maxLength={isUS ? 2 : 80}
+                    />
                     {addressErrors.state && <p style={errStyle}>{addressErrors.state}</p>}
                   </div>
                   <div>
-                    <label style={labelStyle}>ZIP code *</label>
-                    <input value={address.postalCode} autoComplete="postal-code"
+                    <label style={labelStyle}>
+                      {isUS ? 'ZIP code *' : 'Postal code *'}
+                    </label>
+                    <input
+                      value={address.postalCode}
+                      autoComplete="postal-code"
                       onChange={e => setAddress(a => ({ ...a, postalCode: e.target.value }))}
-                      className="checkout-input" placeholder="90210" />
+                      className="checkout-input"
+                      placeholder={isUS ? '90210' : ''}
+                    />
                     {addressErrors.postalCode && <p style={errStyle}>{addressErrors.postalCode}</p>}
                   </div>
                 </div>
               </div>
 
-              {/* Shipping method */}
+              {/* ── Shipping method ── */}
               <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
                            color:'#1A1A1A', marginTop:32, marginBottom:16 }}>
                 Shipping method
               </h2>
+
               {fetchingRates && (
                 <p style={{ fontSize:11, color:'#9B9B9B', marginBottom:8, letterSpacing:'0.04em' }}>
                   Calculating shipping rates…
                 </p>
               )}
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {currentShippingOpts.map(opt => (
-                  <label key={opt.id}
-                    style={{
-                      display:'flex', alignItems:'center', justifyContent:'space-between',
-                      padding:'14px 16px', border:`1.5px solid ${shippingMethod === opt.id ? '#1A1A1A' : '#E8E5E0'}`,
-                      cursor:'pointer', background:'#fff',
-                    }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <input type="radio" name="shipping" value={opt.id}
-                        checked={shippingMethod === opt.id}
-                        onChange={() => setShippingMethod(opt.id as ShippingMethod)} />
-                      <span>
-                        <span style={{ fontSize:13, fontWeight:500 }}>{opt.label}</span>
-                        {opt.minDays > 0 && (
-                          <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>
-                            {opt.minDays}–{opt.maxDays} business days
-                          </span>
-                        )}
+
+              {/* International: no live rates yet and we tried */}
+              {!isUS && !fetchingRates && internationalUnavail && (
+                <div style={{ padding:'12px 16px', background:'#FEF2F2',
+                              border:'1px solid #FECACA', color:'#B91C1C', fontSize:13, marginBottom:16 }}>
+                  Shipping is currently unavailable to this destination.
+                </div>
+              )}
+
+              {currentShippingOpts.length > 0 && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {currentShippingOpts.map(opt => (
+                    <label key={opt.id}
+                      style={{
+                        display:'flex', alignItems:'center', justifyContent:'space-between',
+                        padding:'14px 16px',
+                        border:`1.5px solid ${shippingMethod === opt.id ? '#1A1A1A' : '#E8E5E0'}`,
+                        cursor:'pointer', background:'#fff',
+                      }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                        <input type="radio" name="shipping" value={opt.id}
+                          checked={shippingMethod === opt.id}
+                          onChange={() => setShippingMethod(opt.id as ShippingMethod)} />
+                        <span>
+                          <span style={{ fontSize:13, fontWeight:500 }}>{opt.label}</span>
+                          {opt.minDays > 0 && (
+                            <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>
+                              {opt.minDays}–{opt.maxDays} business days
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize:13,
+                        fontWeight: opt.cents === 0 ? 500 : 400,
+                        color: opt.cents === 0 ? '#059669' : 'inherit',
+                      }}>
+                        {opt.cents === 0 ? 'FREE' : formatCheckoutPrice(opt.cents)}
                       </span>
-                    </div>
-                    <span style={{ fontSize:13, fontWeight: opt.cents === 0 ? 500 : 400, color: opt.cents === 0 ? '#059669' : 'inherit' }}>{opt.cents === 0 ? 'FREE' : formatCheckoutPrice(opt.cents)}</span>
-                  </label>
-                ))}
-              </div>
+                    </label>
+                  ))}
+                </div>
+              )}
 
               {paymentError && (
                 <div style={{ marginTop:16, padding:'12px 16px', background:'#FEF2F2',
@@ -417,9 +510,16 @@ export default function CheckoutPage() {
                   {paymentError}
                 </div>
               )}
+              {addressErrors.shipping && (
+                <div style={{ marginTop:8, fontSize:11, color:'#B91C1C' }}>
+                  {addressErrors.shipping}
+                </div>
+              )}
 
               <Button variant="primary" size="lg" fullWidth loading={creatingSession}
-                style={{ marginTop:28 }} onClick={handleCheckout}>
+                disabled={!canProceed || creatingSession}
+                style={{ marginTop:28, opacity: canProceed ? 1 : 0.5 }}
+                onClick={handleCheckout}>
                 Continue to secure payment
               </Button>
 
@@ -439,7 +539,6 @@ export default function CheckoutPage() {
               Order summary
             </h2>
 
-            {/* Items */}
             <div style={{ display:'flex', flexDirection:'column', gap:16, marginBottom:24 }}>
               {items.map(item => (
                 <div key={item.cartItemId} style={{ display:'flex', gap:12, alignItems:'center' }}>
@@ -470,12 +569,23 @@ export default function CheckoutPage() {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
                 <span style={{ color:'#6b7280' }}>Shipping</span>
-                <span style={{ color: shippingCents === 0 ? '#059669' : 'inherit', fontWeight: shippingCents === 0 ? 500 : 400 }}>{shippingCents === 0 ? 'FREE' : formatCheckoutPrice(shippingCents)}</span>
+                {shippingCents === null ? (
+                  // Non-US, no live rate yet — don't show a fake US price
+                  <span style={{ color:'#9B9B9B' }}>Calculated at checkout</span>
+                ) : shippingCents === 0 ? (
+                  <span style={{ color:'#059669', fontWeight:500 }}>FREE</span>
+                ) : (
+                  <span>{formatCheckoutPrice(shippingCents)}</span>
+                )}
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:500,
                             borderTop:'1px solid #E8E5E0', paddingTop:12, marginTop:4 }}>
                 <span>Total</span>
-                <span>{formatCheckoutPrice(totalCents)}</span>
+                {shippingCents === null ? (
+                  <span style={{ color:'#9B9B9B' }}>—</span>
+                ) : (
+                  <span>{formatCheckoutPrice(totalCents)}</span>
+                )}
               </div>
             </div>
           </div>

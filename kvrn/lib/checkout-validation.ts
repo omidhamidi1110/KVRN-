@@ -10,7 +10,7 @@ export const FIELD_MAX = {
   zip:       10,
   method:    10,
   country:    2,
-  state:      2,
+  state:     80,  // security max; US 2-char constraint enforced separately by isValidUSState()
 } as const
 
 export type FieldResult =
