@@ -19,7 +19,7 @@ export function Footer() {
       <div className="container-kvrn">
 
         {/* ── Main columns ─────────────────────────────────────────── */}
-        <div className="py-10 md:py-12 grid grid-cols-3 md:grid-cols-4 gap-6 md:gap-8">
+        <div className="py-10 md:py-12 grid grid-cols-3 md:grid-cols-4 gap-6 md:gap-8 text-center">
 
           {/* Brand block — desktop only */}
           <div className="hidden md:block space-y-3">
@@ -28,7 +28,7 @@ export function Footer() {
               <p className="text-[12px] font-light text-[#6B6B6B]">Quiet garments.</p>
               <p className="text-[12px] font-light text-[#6B6B6B]">Built with intention.</p>
             </div>
-            <div className="flex gap-4 pt-1">
+            <div className="flex justify-center gap-4 pt-1">
               <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
                 aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
                 <InstagramIcon />
@@ -75,7 +75,7 @@ export function Footer() {
               ))}
             </ul>
             {/* Social icons — mobile only (desktop shows in brand block) */}
-            <div className="flex md:hidden gap-4 mt-5">
+            <div className="flex md:hidden justify-center gap-4 mt-5">
               <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
                 aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
                 <InstagramIcon />
