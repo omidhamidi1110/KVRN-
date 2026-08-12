@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
+import { applyFreeShippingToRates } from '@/lib/free-shipping'
 import { getShippoRates } from '@/lib/shippo'
-import { getProductShippingData } from '@/lib/inventory'
+import { getProductShippingData, getSubtotalCentsForItems } from '@/lib/inventory'
 
 // ─── POST /api/shipping-rates ──────────────────────────────────────────────────
 // Returns available shipping options and costs.
-// Accepts: { city, state, zip, country, items } — calls Shippo for real rates.
+// Accepts: { city, state, zip, country, items }
+// Items contain only sku + quantity — prices are resolved server-side from Neon.
+// Client-provided subtotals are NOT accepted or trusted.
 // Falls back to flat rates if Shippo unavailable.
 // Server-side only: SHIPPO_API_TOKEN never reaches the client.
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -16,10 +21,18 @@ export async function POST(req: NextRequest) {
     const state   = body.state   ?? ''
     const zip     = body.zip     ?? ''
     const country = (body.country ?? 'US').toUpperCase()
-    const items: Array<{ sku: string; quantity: number }> = Array.isArray(body.items) ? body.items : []
+    const items: Array<{ sku: string; quantity: number }> =
+      Array.isArray(body.items) ? body.items : []
+
+    // ── Server-authoritative subtotal ─────────────────────────────────────────
+    // Prices resolved from Neon products table — never trusted from client.
+    // Returns null if any SKU is unknown/inactive; treat as "do not apply rule."
+    const subtotalCents = items.length > 0
+      ? await getSubtotalCentsForItems(items).catch(() => null)
+      : 0
 
     // Attempt live Shippo rates when address is usable
-    const apiToken = process.env.SHIPPO_API_TOKEN ?? ''
+    const apiToken   = process.env.SHIPPO_API_TOKEN ?? ''
     const hasAddress = city && state && zip && country === 'US'
     const hasItems   = items.length > 0
 
@@ -29,9 +42,8 @@ export async function POST(req: NextRequest) {
         const shippoRates = await getShippoRates({ city, state, zip, country }, items, shippingDb, apiToken)
 
         if (shippoRates) {
-          // Build rates array — express uses real Shippo rate if available,
-          // otherwise falls back to static (never fabricated).
-          const expressOpt = shippoRates.express
+          // Express: use real Shippo rate if available, else static (never fabricated)
+          const expressOpt  = shippoRates.express
           const expressRate = expressOpt
             ? {
                 id:       'express',
@@ -44,7 +56,6 @@ export async function POST(req: NextRequest) {
                 source:   'shippo',
               }
             : {
-                // Shippo returned no real express carrier — use trusted static rate
                 id:       'express',
                 label:    US_SHIPPING_OPTIONS['express'].label + ' — ' + US_SHIPPING_OPTIONS['express'].estimate,
                 cents:    calculateShippingCents('express'),
@@ -68,7 +79,13 @@ export async function POST(req: NextRequest) {
             },
             expressRate,
           ]
-          return NextResponse.json({ success: true, data: { rates, source: 'shippo' } })
+
+          // Apply free-shipping rule with server-authoritative subtotal.
+          // subtotalCents=null means unknown SKU(s) → do not apply rule (safe default).
+          const qualifiedRates = subtotalCents !== null
+            ? applyFreeShippingToRates(rates, country, subtotalCents)
+            : rates
+          return NextResponse.json({ success: true, data: { rates: qualifiedRates, source: 'shippo' } })
         }
       } catch (shippoErr: any) {
         console.error('[shipping-rates] Shippo error:', shippoErr?.message?.slice(0, 80))
@@ -77,8 +94,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Static fallback ────────────────────────────────────────────────────────
-    const rates: ShippingMethod[] = ['standard', 'express']
-    const staticRates = rates.map(method => ({
+    const staticMethods: ShippingMethod[] = ['standard', 'express']
+    const staticRates = staticMethods.map(method => ({
       id:       method,
       label:    US_SHIPPING_OPTIONS[method].label + ' — ' + US_SHIPPING_OPTIONS[method].estimate,
       cents:    calculateShippingCents(method),
@@ -89,7 +106,10 @@ export async function POST(req: NextRequest) {
       source:   'static',
     }))
 
-    return NextResponse.json({ success: true, data: { rates: staticRates, source: 'static' } })
+    const qualifiedStaticRates = subtotalCents !== null
+      ? applyFreeShippingToRates(staticRates, country, subtotalCents)
+      : staticRates
+    return NextResponse.json({ success: true, data: { rates: qualifiedStaticRates, source: 'static' } })
 
   } catch (err: any) {
     console.error('[shipping-rates] Error:', err?.message)

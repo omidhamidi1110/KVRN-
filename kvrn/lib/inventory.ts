@@ -213,3 +213,55 @@ export async function getProductShippingData(): Promise<ProductShippingData[]> {
     heightIn:         Number(r.heightIn),
   }))
 }
+
+// ── Authoritative subtotal calculation for free-shipping rule ─────────────────
+
+/**
+ * Compute the authoritative merchandise subtotal (in cents) for a list of
+ * SKU + quantity pairs by querying product prices directly from Neon.
+ *
+ * This is the server-side source of truth for the /api/shipping-rates display
+ * route. It uses the same products.price_cents column as validateLineItem(),
+ * so the pricing source is identical to what checkout uses.
+ *
+ * Returns null if any SKU is not found, inactive, or has no price configured.
+ * Callers should treat null as "subtotal unknown — do not apply free shipping."
+ */
+export async function getSubtotalCentsForItems(
+  items: Array<{ sku: string; quantity: number }>
+): Promise<number | null> {
+  if (items.length === 0) return 0
+
+  // Deduplicate SKUs for the DB query, validate quantities are positive integers
+  const validItems = items.filter(
+    i => typeof i.sku === 'string' && i.sku.length > 0 &&
+         Number.isInteger(i.quantity) && i.quantity > 0
+  )
+  if (validItems.length === 0) return null
+
+  const skus = [...new Set(validItems.map(i => i.sku))]
+
+  const rows = await sql`
+    SELECT pv.sku, p.price_cents
+    FROM product_variants pv
+    JOIN products p ON p.id = pv.product_id
+    WHERE pv.sku = ANY(${skus}::text[])
+      AND pv.active     = true
+      AND p.active      = true
+      AND p.price_cents > 0
+  `
+
+  const priceMap: Record<string, number> = {}
+  for (const row of rows as any[]) {
+    priceMap[row.sku] = Number(row.price_cents)
+  }
+
+  let subtotal = 0
+  for (const item of validItems) {
+    const price = priceMap[item.sku]
+    if (!price) return null  // unknown/inactive SKU — cannot compute authoritative subtotal
+    subtotal += price * item.quantity
+  }
+
+  return subtotal
+}

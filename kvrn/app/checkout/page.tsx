@@ -406,7 +406,7 @@ export default function CheckoutPage() {
                         )}
                       </span>
                     </div>
-                    <span style={{ fontSize:13 }}>{formatCheckoutPrice(opt.cents)}</span>
+                    <span style={{ fontSize:13, fontWeight: opt.cents === 0 ? 500 : 400, color: opt.cents === 0 ? '#059669' : 'inherit' }}>{opt.cents === 0 ? 'FREE' : formatCheckoutPrice(opt.cents)}</span>
                   </label>
                 ))}
               </div>
@@ -470,7 +470,7 @@ export default function CheckoutPage() {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
                 <span style={{ color:'#6b7280' }}>Shipping</span>
-                <span>{formatCheckoutPrice(shippingCents)}</span>
+                <span style={{ color: shippingCents === 0 ? '#059669' : 'inherit', fontWeight: shippingCents === 0 ? 500 : 400 }}>{shippingCents === 0 ? 'FREE' : formatCheckoutPrice(shippingCents)}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:500,
                             borderTop:'1px solid #E8E5E0', paddingTop:12, marginTop:4 }}>

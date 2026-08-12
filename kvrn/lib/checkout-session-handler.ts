@@ -10,7 +10,8 @@ import {
 } from './checkout-validation'
 import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
 import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
-import { getShippoRates, type ShippoRate } from './shippo'
+import { getShippoRates, type ShippoRate, type ShippoRates } from './shippo'
+import { applyFreeShippingToSingleRate } from './free-shipping'
 import { getProductShippingData } from './inventory'
 import type {
   ReservationService,
@@ -126,19 +127,20 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     let shippingCents = calculateShippingCents(shippingMethod)  // static fallback
     let shippingOpt   = US_SHIPPING_OPTIONS[shippingMethod]
     let liveRate: ShippoRate | null = null
+    let shippoRatesResult: ShippoRates | null = null  // hoisted for free-shipping comparison
 
     if (apiToken) {
       try {
-        const shippingDb  = await getProductShippingData().catch(() => [])
-        const shippoRates = await getShippoRates(
+        const shippingDb = await getProductShippingData().catch(() => [])
+        shippoRatesResult = await getShippoRates(
           { city, state, zip: postalCode, country },
           (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
           shippingDb,
           apiToken
         )
-        if (shippoRates) {
+        if (shippoRatesResult) {
           // express may be null from Shippo — fall back to static express, never fabricate
-          liveRate = shippoRates[shippingMethod] ?? null
+          liveRate = shippoRatesResult[shippingMethod] ?? null
           if (liveRate) {
             shippingCents = liveRate.cents
             // Build a shippingOpt-compatible object for Stripe display name/estimate
@@ -171,6 +173,19 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         { status: reservation.code === 'DB_ERROR' ? 503 : 400 }
       )
     }
+
+    // ── Free-shipping rule — server-authoritative ─────────────────────────────
+    // Subtotal computed from reservation items (never trusted from client).
+    // Determines whether the cheapest chosen method should cost $0.
+    const subtotalCents = (reservation.items as any[]).reduce(
+      (sum: number, item: any) => sum + (item.unitPriceCents * item.quantity), 0
+    )
+    const otherMethod = shippingMethod === 'standard' ? 'express' : 'standard'
+    const otherCents  = (shippoRatesResult?.[otherMethod]?.cents) ??
+                        calculateShippingCents(otherMethod)
+    shippingCents = applyFreeShippingToSingleRate(
+      shippingCents, otherCents, shippingMethod, country, subtotalCents
+    )
 
     // ── Step 2: Save snapshot ─────────────────────────────────────────────────
     const shippingAddress = {
