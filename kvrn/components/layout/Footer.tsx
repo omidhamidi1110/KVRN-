@@ -38,12 +38,6 @@ export function Footer() {
                 <TikTokIcon />
               </a>
             </div>
-            <Link
-              href="/admin"
-              className="inline-flex items-center justify-center rounded-full border border-[#D8D5D0] px-3 py-1.5 text-[9px] tracking-[0.12em] uppercase text-[#7C7C7C] hover:border-[#1A1A1A] hover:text-[#1A1A1A] transition-colors"
-            >
-              Admin Login
-            </Link>
           </div>
 
           {/* Shop */}
@@ -91,12 +85,6 @@ export function Footer() {
                 <TikTokIcon />
               </a>
             </div>
-            <Link
-              href="/admin"
-              className="mt-3 inline-flex md:hidden items-center justify-center rounded-full border border-[#D8D5D0] px-3 py-1.5 text-[9px] tracking-[0.12em] uppercase text-[#7C7C7C] hover:border-[#1A1A1A] hover:text-[#1A1A1A] transition-colors"
-            >
-              Admin Login
-            </Link>
           </div>
         </div>
 
