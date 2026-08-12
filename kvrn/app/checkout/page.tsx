@@ -43,10 +43,66 @@ export default function CheckoutPage() {
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>('standard')
   const [contactErrors,  setContactErrors]  = useState<Record<string, string>>({})
   const [addressErrors,  setAddressErrors]  = useState<Record<string, string>>({})
+  // Live Shippo rates — fetched when address zip+state are filled in
+  const [liveRates,      setLiveRates]      = useState<Array<{
+    id: string; label: string; cents: number; minDays: number; maxDays: number; default: boolean
+  }> | null>(null)
+  const [fetchingRates,  setFetchingRates]  = useState(false)
 
   useEffect(() => { setIsClient(true) }, [])
 
-  const shippingCents = calculateShipping('US', shippingMethod)
+  // Fetch live Shippo rates when zip + state are entered (debounced 800ms)
+  useEffect(() => {
+    const zip   = address.postalCode.trim()
+    const state = address.state.trim()
+    const city  = address.city.trim()
+    // Need at least zip + state to get rates
+    if (!zip || zip.length < 5 || !state || state.length < 2) {
+      setLiveRates(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setFetchingRates(true)
+      try {
+        const res = await fetch('/api/shipping-rates', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            city, state, zip, country: 'US',
+            items: items.map(i => ({ sku: i.sku, quantity: i.quantity })),
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data?.data?.rates?.length) {
+            setLiveRates(data.data.rates)
+            // Keep current selection if it exists in new rates, else reset to default
+            const ids = (data.data.rates as any[]).map((r: any) => r.id)
+            if (!ids.includes(shippingMethod)) {
+              const defaultRate = (data.data.rates as any[]).find((r: any) => r.default)
+              if (defaultRate) setShippingMethod(defaultRate.id as ShippingMethod)
+            }
+          }
+        }
+      } catch {
+        // Network error — keep static rates (no UI disruption)
+      } finally {
+        setFetchingRates(false)
+      }
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [address.postalCode, address.state, address.city, items])
+
+  // Use live rate if available; fall back to static
+  const currentShippingOpts = liveRates
+    ? liveRates
+    : Object.values(US_SHIPPING_OPTIONS).map(o => ({
+        id: o.method, label: o.label, cents: o.cents,
+        minDays: o.minDays, maxDays: o.maxDays, default: o.method === 'standard'
+      }))
+
+  const activeOpt     = currentShippingOpts.find(o => o.id === shippingMethod) ?? currentShippingOpts[0]
+  const shippingCents = activeOpt?.cents ?? calculateShipping('US', shippingMethod)
   const totalCents    = subtotalPence + shippingCents
 
   // ── Validate contact ──────────────────────────────────────────────────────
@@ -324,21 +380,30 @@ export default function CheckoutPage() {
                            color:'#1A1A1A', marginTop:32, marginBottom:16 }}>
                 Shipping method
               </h2>
+              {fetchingRates && (
+                <p style={{ fontSize:11, color:'#9B9B9B', marginBottom:8, letterSpacing:'0.04em' }}>
+                  Calculating shipping rates…
+                </p>
+              )}
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {(Object.values(US_SHIPPING_OPTIONS) as typeof US_SHIPPING_OPTIONS['standard'][]).map(opt => (
-                  <label key={opt.method}
+                {currentShippingOpts.map(opt => (
+                  <label key={opt.id}
                     style={{
                       display:'flex', alignItems:'center', justifyContent:'space-between',
-                      padding:'14px 16px', border:`1.5px solid ${shippingMethod === opt.method ? '#1A1A1A' : '#E8E5E0'}`,
+                      padding:'14px 16px', border:`1.5px solid ${shippingMethod === opt.id ? '#1A1A1A' : '#E8E5E0'}`,
                       cursor:'pointer', background:'#fff',
                     }}>
                     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                      <input type="radio" name="shipping" value={opt.method}
-                        checked={shippingMethod === opt.method}
-                        onChange={() => setShippingMethod(opt.method as ShippingMethod)} />
+                      <input type="radio" name="shipping" value={opt.id}
+                        checked={shippingMethod === opt.id}
+                        onChange={() => setShippingMethod(opt.id as ShippingMethod)} />
                       <span>
                         <span style={{ fontSize:13, fontWeight:500 }}>{opt.label}</span>
-                        <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>{opt.estimate}</span>
+                        {opt.minDays > 0 && (
+                          <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>
+                            {opt.minDays}–{opt.maxDays} business days
+                          </span>
+                        )}
                       </span>
                     </div>
                     <span style={{ fontSize:13 }}>{formatCheckoutPrice(opt.cents)}</span>

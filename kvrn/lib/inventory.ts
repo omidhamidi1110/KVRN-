@@ -174,3 +174,42 @@ export async function getRecentMovements(variantId: string, limit = 20) {
     ORDER BY created_at DESC LIMIT ${limit}
   `
 }
+
+// ── Shipping data for Shippo rate calculations ────────────────────────────────
+
+export interface ProductShippingData {
+  productCode:     string  // e.g. 'PKHH', 'PKHSP'
+  garmentWeightLb: number  // garment weight only — packaging weight added separately per parcel
+  lengthIn:        number  // parcel length in inches (mailer dimension)
+  widthIn:         number  // parcel width in inches (mailer dimension)
+  heightIn:        number  // packed height estimate — configurable via DB, update when measured
+}
+
+/**
+ * Fetch authoritative packed shipping dimensions from the products table.
+ * Returns only products that have all four shipping fields populated.
+ * Server-side only — used by Shippo rate calculation.
+ */
+export async function getProductShippingData(): Promise<ProductShippingData[]> {
+  const rows = await sql`
+    SELECT
+      product_code         AS "productCode",
+      shipping_weight_lb   AS "shippingWeightLb",
+      package_length_in    AS "lengthIn",
+      package_width_in     AS "widthIn",
+      package_height_in    AS "heightIn"
+    FROM products
+    WHERE shipping_weight_lb IS NOT NULL
+      AND package_length_in  IS NOT NULL
+      AND package_width_in   IS NOT NULL
+      AND package_height_in  IS NOT NULL
+    ORDER BY product_code
+  `
+  return (rows as any[]).map(r => ({
+    productCode:      r.productCode,
+    garmentWeightLb:  Number(r.shippingWeightLb),
+    lengthIn:         Number(r.lengthIn),
+    widthIn:          Number(r.widthIn),
+    heightIn:         Number(r.heightIn),
+  }))
+}

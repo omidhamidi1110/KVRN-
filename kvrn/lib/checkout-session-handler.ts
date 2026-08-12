@@ -10,6 +10,8 @@ import {
 } from './checkout-validation'
 import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
 import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
+import { getShippoRates, type ShippoRate } from './shippo'
+import { getProductShippingData } from './inventory'
 import type {
   ReservationService,
   LineItemInput,
@@ -118,9 +120,44 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 })
     }
 
-    const shippingCents = calculateShippingCents(shippingMethod)
-    const shippingOpt   = US_SHIPPING_OPTIONS[shippingMethod]
-    const fullName      = `${firstName} ${lastName}`.trim()
+    // ── Get authoritative shipping cost — Shippo, fall back to static ────────
+    // Server re-fetches Shippo to be authoritative; never trusts browser-sent price.
+    const apiToken = process.env.SHIPPO_API_TOKEN ?? ''
+    let shippingCents = calculateShippingCents(shippingMethod)  // static fallback
+    let shippingOpt   = US_SHIPPING_OPTIONS[shippingMethod]
+    let liveRate: ShippoRate | null = null
+
+    if (apiToken) {
+      try {
+        const shippingDb  = await getProductShippingData().catch(() => [])
+        const shippoRates = await getShippoRates(
+          { city, state, zip: postalCode, country },
+          (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
+          shippingDb,
+          apiToken
+        )
+        if (shippoRates) {
+          // express may be null from Shippo — fall back to static express, never fabricate
+          liveRate = shippoRates[shippingMethod] ?? null
+          if (liveRate) {
+            shippingCents = liveRate.cents
+            // Build a shippingOpt-compatible object for Stripe display name/estimate
+            shippingOpt = {
+              ...US_SHIPPING_OPTIONS[shippingMethod],
+              cents:       liveRate.cents,
+              stripeLabel: liveRate.stripeLabel,
+              minDays:     liveRate.minDays,
+              maxDays:     liveRate.maxDays,
+            }
+            // liveRate is null for this method → shippingCents/shippingOpt keep static values
+          }
+        }
+      } catch (shippoErr: any) {
+        console.error('[checkout/session] Shippo error (using static fallback):', shippoErr?.message?.slice(0, 80))
+      }
+    }
+
+    const fullName = `${firstName} ${lastName}`.trim()
 
     // ── Release expired reservations ──────────────────────────────────────────
     try { await deps.releaseExpiredReservations() }
