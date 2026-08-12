@@ -67,7 +67,7 @@ const FALLBACKS: Record<string, Omit<ProductShippingData, 'productCode'>> = {
 // ── Parcel building ───────────────────────────────────────────────────────────
 
 interface ParcelSpec {
-  weightLb: number
+  weightOz: number
   lengthIn: number
   widthIn:  number
   heightIn: number
@@ -100,11 +100,11 @@ function buildParcels(
     const data = code ? (dbByCode[code] ?? FALLBACKS[code]) : null
     const pkg  = getPackageForProduct(code ?? '')
 
-    const garmentWeightLb = data?.garmentWeightLb ?? 2.4
-    const pkgWeightLb     = pkg.weightOz / 16
-    const baseHeightIn    = data?.heightIn         ?? 3
-    const lengthIn        = data?.lengthIn          ?? 17
-    const widthIn         = data?.widthIn           ?? 14
+    const garmentWeightOz = (data?.garmentWeightLb ?? 2.4) * 16  // convert lb→oz for Shippo
+    const pkgWeightOz     = pkg.weightOz                          // already in oz
+    const baseHeightIn    = data?.heightIn                  ?? 3
+    const lengthIn        = data?.lengthIn                  ?? 17
+    const widthIn         = data?.widthIn                   ?? 14
 
     // Batch quantity into ceil(quantity / maxGarments) parcels.
     // Each parcel holds min(maxGarments, remaining) units.
@@ -115,7 +115,8 @@ function buildParcels(
 
       parcels.push({
         // One mailer per parcel regardless of unit count inside
-        weightLb: Math.round((garmentWeightLb * units + pkgWeightLb) * 100000) / 100000,
+        // Weight in oz: avoids lb decimal precision issues (Shippo max 4 decimal digits)
+        weightOz: Math.round((garmentWeightOz * units + pkgWeightOz) * 10) / 10,
         lengthIn,
         widthIn,
         heightIn: baseHeightIn * units,  // stacked height
@@ -267,8 +268,8 @@ export async function getShippoRates(
       width:         String(p.widthIn),
       height:        String(p.heightIn),
       distance_unit: 'in',
-      weight:        String(p.weightLb),
-      mass_unit:     'lb',
+      weight:        String(p.weightOz),
+      mass_unit:     'oz',
     })),
     async: false,
   }
