@@ -6,7 +6,7 @@ import { useCart } from '@/context/CartContext'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/data/products'
 import { formatCheckoutPrice } from '@/lib/format-money'
-import { calculateShipping, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
+import { type ShippingMethod } from '@/lib/stripe'
 import { qualifiesForFreeShipping, FREE_SHIPPING_THRESHOLD_CENTS } from '@/lib/free-shipping'
 import { COUNTRIES } from '@/lib/countries'
 import { cn } from '@/lib/utils'
@@ -66,6 +66,18 @@ export default function CheckoutPage() {
 
   const isUS = address.country === 'US'
 
+  // Minimum destination data required before requesting live Shippo rates.
+  const shippingAddressReady = isUS
+    ? (
+        address.postalCode.trim().length >= 5 &&
+        address.state.trim().length >= 2 &&
+        address.city.trim().length >= 1
+      )
+    : (
+        address.postalCode.trim().length >= 2 &&
+        address.city.trim().length >= 1
+      )
+
   // Clear stale rates immediately when country changes
   useEffect(() => {
     setLiveRates(null)
@@ -86,12 +98,10 @@ export default function CheckoutPage() {
     setInternationalUnavail(false)
 
     // Gate: minimum address needed to get rates
+    // Gate: minimum address needed to get rates
     const countryIsUS = country === 'US'
-    const hasEnough   = countryIsUS
-      ? (zip.length >= 5 && state.length >= 2 && city.length >= 1)
-      : (zip.length >= 2 && city.length >= 1)
 
-    if (!hasEnough || !items.length) return
+    if (!shippingAddressReady || !items.length) return
 
     const timer = setTimeout(async () => {
       setFetchingRates(true)
@@ -129,31 +139,22 @@ export default function CheckoutPage() {
     }, 800)
 
     return () => clearTimeout(timer)
-  }, [address.postalCode, address.state, address.city, address.country, items])
+  }, [address.postalCode, address.state, address.city, address.country, items, shippingAddressReady])
 
   // ── Computed shipping display ─────────────────────────────────────────────
 
-  const US_STATIC_OPTS = Object.values(US_SHIPPING_OPTIONS).map(o => ({
-    id: o.method, label: o.label, cents: o.cents,
-    minDays: o.minDays, maxDays: o.maxDays, default: o.method === 'standard'
-  }))
-
-  // Non-US: only real Shippo rates or empty. US: live rates or static fallback.
-  const currentShippingOpts = liveRates
-    ? liveRates
-    : isUS
-      ? US_STATIC_OPTS
-      : []
+  // Customer-facing shipping rates come from live Shippo only.
+  const currentShippingOpts = liveRates ?? []
 
   const activeOpt     = currentShippingOpts.find(o => o.id === shippingMethod) ?? currentShippingOpts[0]
-  const shippingCents = activeOpt?.cents ?? (isUS ? calculateShipping('US', shippingMethod) : null)
+  const shippingCents = activeOpt?.cents ?? null
   const appliedDiscountCents = discountApplied.code ? (discountApplied.discountCents ?? 0) : 0
   const appliedShippingAdj   = discountApplied.code ? (discountApplied.shippingAdjustmentCents ?? 0) : 0
   const effectiveShipping    = shippingCents !== null ? Math.max(0, shippingCents - appliedShippingAdj) : null
   const totalCents    = subtotalPence + (effectiveShipping ?? 0) - appliedDiscountCents
 
-  // Checkout may proceed when: US (static fallback available), or non-US with real live rates
-  const canProceed = isUS || (liveRates !== null && liveRates.length > 0)
+  // Checkout proceeds only after Shippo returns a real selectable rate.
+  const canProceed = liveRates !== null && liveRates.length > 0
   // Client-side eligibility check for DISPLAY only; server is authoritative
   const freeShippingEligible = qualifiesForFreeShipping(address.country || 'US', subtotalPence)
 
@@ -578,11 +579,30 @@ export default function CheckoutPage() {
                 Shipping method
               </h2>
 
-              {fetchingRates && (
-                <p style={{ fontSize:11, color:'#9B9B9B', marginBottom:8, letterSpacing:'0.04em' }}>
-                  Calculating shipping rates…
-                </p>
-              )}
+                {!shippingAddressReady && (
+                  <div style={{
+                    padding:'14px 16px',
+                    background:'#F5F3EF',
+                    border:'1px solid #E8E5E0',
+                    color:'#7C7770',
+                    fontSize:12,
+                    lineHeight:1.5,
+                    marginBottom:16,
+                  }}>
+                    Enter your shipping address to see available rates.
+                  </div>
+                )}
+
+                {shippingAddressReady && fetchingRates && (
+                  <p style={{
+                    fontSize:11,
+                    color:'#9B9B9B',
+                    marginBottom:16,
+                    letterSpacing:'0.04em'
+                  }}>
+                    Calculating shipping rates…
+                  </p>
+                )}
 
               {/* International: no live rates yet and we tried */}
               {!isUS && !fetchingRates && internationalUnavail && (
@@ -693,8 +713,7 @@ export default function CheckoutPage() {
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
                 <span style={{ color:'#6b7280' }}>Shipping</span>
                 {shippingCents === null ? (
-                  // Non-US, no live rate yet — don't show a fake US price
-                  <span style={{ color:'#9B9B9B' }}>Calculated at checkout</span>
+                  <span style={{ color:'#9B9B9B' }}>Calculated after address</span>
                 ) : shippingCents === 0 ? (
                   <span style={{ color:'#059669', fontWeight:500 }}>FREE</span>
                 ) : (
