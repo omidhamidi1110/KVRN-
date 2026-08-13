@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/data/products'
 import { formatCheckoutPrice } from '@/lib/format-money'
 import { calculateShipping, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
+import { qualifiesForFreeShipping, FREE_SHIPPING_THRESHOLD_CENTS } from '@/lib/free-shipping'
 import { COUNTRIES } from '@/lib/countries'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,7 @@ export default function CheckoutPage() {
   })
   const [shippingMethod,   setShippingMethod]   = useState<ShippingMethod>('standard')
   const [discountInput,    setDiscountInput]    = useState('')
+  const [smsOfferCode,     setSmsOfferCode]     = useState<string|null>(null)
   const [discountApplied,  setDiscountApplied]  = useState<{
     code: string; error: string | null; discountCents?: number;
     shippingAdjustmentCents?: number; displayAmount?: string; type?: string;
@@ -152,6 +154,8 @@ export default function CheckoutPage() {
 
   // Checkout may proceed when: US (static fallback available), or non-US with real live rates
   const canProceed = isUS || (liveRates !== null && liveRates.length > 0)
+  // Client-side eligibility check for DISPLAY only; server is authoritative
+  const freeShippingEligible = qualifiesForFreeShipping(address.country || 'US', subtotalPence)
 
   // ── US state validation set ───────────────────────────────────────────────
   const US_STATES = new Set([
@@ -253,8 +257,8 @@ export default function CheckoutPage() {
     }
   }, [items, contact, address, shippingMethod, canProceed])
 
-  const handleApplyDiscount = async () => {
-    const code = discountInput.trim().toUpperCase()
+  const handleApplyDiscount = async (overrideCode?: string) => {
+    const code = (overrideCode ?? discountInput).trim().toUpperCase()
     if (!code) return
     setDiscountLoading(true)
     try {
@@ -266,6 +270,17 @@ export default function CheckoutPage() {
       })
       const data = await res.json()
       if (!data.valid) {
+        // Clear stale localStorage code on permanent server-authoritative invalidity
+        // Uses machine-readable reason field (preferred over string matching)
+        const permanentReasons = new Set(['invalid','expired','already_redeemed'])
+        const isPerm = res.status === 400 && (
+          permanentReasons.has(data.reason) ||
+          isPermanentDiscountError(data.error ?? '')  // fallback for older response format
+        )
+        if (isPerm) {
+          try { localStorage.removeItem('kvrn_sms_discount_code') } catch {}
+          setSmsOfferCode(null)
+        }
         setDiscountApplied({ code: '', error: data.error ?? 'Invalid code.' })
       } else {
         setDiscountApplied({ code: data.code, error: null,
@@ -283,6 +298,53 @@ export default function CheckoutPage() {
     setDiscountApplied({ code: '', error: null })
     setDiscountInput('')
   }
+
+  // Permanent discount errors: clear stale localStorage code
+  function isPermanentDiscountError(error: string): boolean {
+    return [
+      "That code isn't valid",
+      'That code has already been used',
+      'That code has expired',
+      "isn't valid for your shipping",
+    ].some(p => error.includes(p))
+  }
+
+  // Read stored SMS discount code + deeplink flag from localStorage
+  useEffect(() => {
+    try {
+      const storedCode = localStorage.getItem('kvrn_sms_discount_code')
+      if (storedCode && storedCode.startsWith('KVRN-')) setSmsOfferCode(storedCode)
+      // Try to resolve a browser claim token (set by popup before Messages was opened)
+      const claimRaw = localStorage.getItem('kvrn_sms_claim_token')
+      if (claimRaw && !storedCode) {
+        try {
+          const claimData = JSON.parse(claimRaw)
+          if (claimData.token && new Date(claimData.expiresAt) > new Date()) {
+            fetch('/api/sms/claim/resolve', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: claimData.token }),
+            })
+              .then(r => r.json())
+              .then(d => {
+                if (d.success && d.discountCode) {
+                  setSmsOfferCode(d.discountCode)
+                  try { localStorage.setItem('kvrn_sms_discount_code', d.discountCode) } catch {}
+                }
+                // Remove claim token regardless (confirmed/consumed or expired)
+                const permanent = ['confirmed','already_consumed','expired','invalid','no_offer']
+                if (d.success || permanent.includes(d.reason)) {
+                  try { localStorage.removeItem('kvrn_sms_claim_token') } catch {}
+                }
+              })
+              .catch(() => {})  // retain token on network failure for retry
+          } else {
+            // Token expired client-side — clean up
+            try { localStorage.removeItem('kvrn_sms_claim_token') } catch {}
+          }
+        } catch {}
+      }
+    } catch {}
+  }, [])
 
   // Invalidate discount preview when shipping method changes (shipping discounts depend on cost)
   const prevMethodRef = useRef(shippingMethod)
@@ -640,6 +702,61 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+
+              {/* ── AVAILABLE OFFERS ───────────────────────────────────── */}
+              {(freeShippingEligible || (smsOfferCode && !discountApplied.code)) && (
+                <div style={{ marginBottom:16 }}>
+                  <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:9, letterSpacing:'0.12em',
+                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
+                    Available Offers
+                  </p>
+
+                  {/* Free shipping — auto-detected, not a code */}
+                  {freeShippingEligible && (
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                      padding:'10px 14px', background:'#F5FBF5', border:'1px solid #C8E6C8',
+                      marginBottom:8 }}>
+                      <div>
+                        <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, fontWeight:500,
+                          letterSpacing:'0.06em', textTransform:'uppercase', color:'#1A4A1A', margin:0 }}>
+                          Free Shipping
+                        </p>
+                        <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, color:'#4A7A4A', margin:'2px 0 0' }}>
+                          Orders ${(FREE_SHIPPING_THRESHOLD_CENTS / 100).toFixed(0)}+ · Applied automatically
+                        </p>
+                      </div>
+                      <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:10, fontWeight:600, letterSpacing:'0.10em',
+                        textTransform:'uppercase', color:'#1A4A1A' }}>APPLIED</span>
+                    </div>
+                  )}
+
+                  {/* SMS signup discount — only surfaced if code exists, not yet applied */}
+                  {smsOfferCode && !discountApplied.code && (
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                      padding:'10px 14px', background:'#F9F8F6', border:'1px solid #E8E5E0' }}>
+                      <div>
+                        <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, fontWeight:500,
+                          letterSpacing:'0.06em', textTransform:'uppercase', color:'#1A1A1A', margin:0 }}>
+                          SMS Welcome — $10 Off
+                        </p>
+                        <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, color:'#6B6B6B', margin:'2px 0 0' }}>
+                          Your signup offer · {smsOfferCode}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { setDiscountInput(smsOfferCode); void handleApplyDiscount(smsOfferCode) }}
+                        disabled={discountLoading}
+                        style={{ background:'#1A1A1A', color:'#fff', border:'none', cursor:'pointer',
+                          fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:10, fontWeight:500, letterSpacing:'0.10em',
+                          textTransform:'uppercase', padding:'7px 14px',
+                          opacity: discountLoading ? 0.5 : 1 }}>
+                        APPLY
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── Discount Code & Summary ──────────────────────────────── */}
               {!discountApplied.code ? (
                 <div style={{ display:'flex', gap:8 }}>
@@ -654,7 +771,7 @@ export default function CheckoutPage() {
                              textTransform:'uppercase', fontFamily: '-apple-system, Helvetica Neue, Arial, sans-serif' }}
                   />
                   <button
-                    onClick={handleApplyDiscount}
+                    onClick={() => void handleApplyDiscount()}
                     disabled={discountLoading || !discountInput.trim()}
                     style={{ padding:'10px 14px', background:'#1A1A1A', color:'#fff', border:'none',
                              cursor:'pointer', fontSize:11, fontWeight:500, letterSpacing:'0.08em',

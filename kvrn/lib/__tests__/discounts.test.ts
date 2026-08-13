@@ -443,17 +443,14 @@ describe('localStorage expiration', () => {
 // ── Mobile deep-link UX (item 6) ────────────────────────────────────────────
 
 describe('mobile deep-link UX', () => {
-  test('handleDeeplinkTap does NOT set KEY_SUBSCRIBED_AT', () => {
+  test('onDeeplink does NOT set KEY_SUBSCRIBED', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    // Find handleDeeplinkTap function and verify it only sets KEY_DEEPLINK_AT
-    const fnIdx  = src.indexOf('handleDeeplinkTap')
+    const fnIdx  = src.indexOf('onDeeplink = useCallback')
     const fnBody = src.slice(fnIdx, fnIdx + 400)
-    expect(fnBody).toContain('KEY_DEEPLINK_AT')
-    // KEY_SUBSCRIBED_AT appears in a comment only ('Do NOT set KEY_SUBSCRIBED_AT')
-    // The function body should not SET it (no localStorage.setItem(KEY_SUBSCRIBED_AT))
-    const setsSubscribed = fnBody.includes("setItem(KEY_SUBSCRIBED_AT")
+    expect(fnBody).toContain('KEY_DEEPLINK')
+    const setsSubscribed = fnBody.includes('setItem(KEY_SUBSCRIBED')
     expect(setsSubscribed).toBe(false)
   })
 
@@ -461,7 +458,7 @@ describe('mobile deep-link UX', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    const fnIdx = src.indexOf('handleDeeplinkTap = useCallback')
+    const fnIdx = src.indexOf('onDeeplink = useCallback')
     const fnBody = src.slice(fnIdx, fnIdx + 500)
     expect(fnBody).toContain('setVisible(false)')
     expect(fnBody).toContain('setShowTab(true)')
@@ -583,12 +580,13 @@ describe('popup accessibility', () => {
 // ── No unused state (item 13) ────────────────────────────────────────────────
 
 describe('no dead UI state', () => {
-  test('showManual state removed from SmsPopup', () => {
+  test('mobile has manual entry toggle (showManual as a UI toggle state)', () => {
+    // V59 redesign: showManual is now a valid mobile secondary-option toggle
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).not.toContain('showManual')
-    expect(src).not.toContain('setShowManual')
+    expect(src).toContain('showManual')
+    expect(src).toContain('setShowManual')
   })
 })
 

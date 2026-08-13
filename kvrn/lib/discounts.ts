@@ -46,7 +46,7 @@ export interface Discount {
 
 export type DiscountValidationResult =
   | { valid: true;  discount: Discount }
-  | { valid: false; error:    string }
+  | { valid: false; error: string; reason?: string }
 
 export interface AppliedDiscount {
   code:               string
@@ -126,30 +126,30 @@ export async function validateDiscount(
   const rows = await sql`SELECT * FROM discounts WHERE code = ${code} LIMIT 1`
   const r    = (rows as any[])[0]
 
-  if (!r) return { valid: false, error: "That code isn't valid." }
+  if (!r) return { valid: false, error: "That code isn't valid.", reason: 'invalid' }
   const d = rowToDiscount(r)
 
-  if (!d.active)    return { valid: false, error: "That code isn't valid." }
-  if (d.startsAt  && new Date(d.startsAt)  > now) return { valid: false, error: "That code isn't valid yet." }
-  if (d.expiresAt && new Date(d.expiresAt) < now) return { valid: false, error: 'That code has expired.' }
+  if (!d.active)    return { valid: false, error: "That code isn't valid.", reason: 'invalid' }
+  if (d.startsAt  && new Date(d.startsAt)  > now) return { valid: false, error: "That code isn't valid yet.", reason: 'invalid' }
+  if (d.expiresAt && new Date(d.expiresAt) < now) return { valid: false, error: 'That code has expired.', reason: 'expired' }
 
   // Check redemption capacity (before claims — preview only)
   const effectiveMax = d.maxRedemptions ?? (d.singleUse ? 1 : null)
   if (effectiveMax !== null && d.redemptionCount >= effectiveMax) {
-    return { valid: false, error: 'That code has already been used.' }
+    return { valid: false, error: 'That code has already been used.', reason: 'already_redeemed' }
   }
 
   if (d.minimumSubtotalCents !== null && opts.subtotalCents < d.minimumSubtotalCents) {
     const min = (d.minimumSubtotalCents / 100).toFixed(2)
-    return { valid: false, error: `This code requires a minimum subtotal of $${min}.` }
+    return { valid: false, error: `This code requires a minimum subtotal of $${min}.`, reason: 'minimum_subtotal' }
   }
 
   const country = opts.country.toUpperCase()
   if (d.allowedCountryCodes?.length && !d.allowedCountryCodes.includes(country)) {
-    return { valid: false, error: "That code isn't valid for your shipping destination." }
+    return { valid: false, error: "That code isn't valid for your shipping destination.", reason: 'shipping_restricted' }
   }
   if (d.excludedCountryCodes?.length && d.excludedCountryCodes.includes(country)) {
-    return { valid: false, error: "That code isn't valid for your shipping destination." }
+    return { valid: false, error: "That code isn't valid for your shipping destination.", reason: 'shipping_restricted' }
   }
 
   return { valid: true, discount: d }

@@ -10,6 +10,7 @@ import { validateTwilioSignature, parseFormBody, getWebhookUrl } from '@/lib/twi
 import { normalizePhoneE164 } from '@/lib/phone'
 import { unsubscribeSmsPhone, resubscribeSmsPhone, upsertSmsSubscriber } from '@/lib/sms-subscribers'
 import { upsertSmsDiscountCode, isSmsOfferActive } from '@/lib/discounts'
+import { confirmSmsSignupClaim } from '@/lib/sms-signup-claims'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,8 +38,13 @@ export async function POST(req: NextRequest) {
     return new NextResponse('Forbidden', { status: 403 })
   }
 
-  const rawFrom = params.From ?? ''
-  const body    = (params.Body ?? '').trim().toUpperCase().split(/\s+/)[0]  // first word
+  const rawFrom   = params.From ?? ''
+  const bodyRaw   = (params.Body ?? '').trim()
+  const body      = bodyRaw.toUpperCase().split(/\s+/)[0]  // first word for keyword detection
+  // Extract claim token if present: TK-{base64url} anywhere in the body
+  // Browser embeds this when customer taps TEXT US before Messages opens
+  const tkMatch        = bodyRaw.match(/TK-([A-Za-z0-9_-]{20,40})/)
+  const claimTokenRaw  = tkMatch ? tkMatch[1] : null
 
   const phoneE164 = normalizePhoneE164(rawFrom)
   if (!phoneE164) {
@@ -81,6 +87,21 @@ export async function POST(req: NextRequest) {
         }
       }
       console.log('[twilio/incoming] START/JOIN received — local subscribe recorded')
+
+      // Confirm browser claim if a token was sent with the JOIN message
+      // SECURITY: This is the ONLY path that can bind token → subscriber
+      // Token must have been placed in the SMS by the browser before sending
+      // The phone owner is authenticated by Twilio's inbound From (already verified above)
+      // MUST AWAIT: Cloudflare Workers exits after the response; .then() chains can be dropped
+      if (claimTokenRaw && smsSubscriberId) {
+        try {
+          const confirmed = await confirmSmsSignupClaim({ rawToken: claimTokenRaw, subscriberId: smsSubscriberId })
+          if (confirmed) console.log('[twilio/incoming] claim confirmed for subscriber')
+        } catch (err: any) {
+          // Non-fatal: ordinary JOIN subscription already succeeded above
+          console.error('[twilio/incoming] claim confirm error (non-fatal):', err?.message?.slice(0, 60))
+        }
+      }
 
     } else if (HELP_KEYWORDS.has(body)) {  // HELP keywords — no consent change
       // HELP: do not alter consent state; Twilio handles reply

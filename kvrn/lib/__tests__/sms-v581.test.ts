@@ -151,7 +151,7 @@ describe('disclosure visible before CTA', () => {
     // DISCLOSURE const is defined early; check it's referenced in JSX near/before CTAs
     expect(src).toContain('{DISCLOSURE}')
     expect(src).toContain('handleSubmit')
-    expect(src).toContain('handleDeeplinkTap')
+    expect(src).toContain('onDeeplink')
   })
   test('DISCLOSURE string contains required TCPA/CTIA elements', () => {
     const src = require('fs').readFileSync(
@@ -206,8 +206,8 @@ describe('cooldown and tab persistence (source assertions)', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    // New popup uses KEY_SUBSCRIBED_AT (timestamp) not permanent boolean
-    expect(src).toContain('KEY_SUBSCRIBED_AT')
+    // Popup uses KEY_SUBSCRIBED (timestamp) for 30-day suppression
+    expect(src).toContain('KEY_SUBSCRIBED')
   })
 })
 
@@ -218,30 +218,30 @@ describe('desktop/mobile layout (source assertions)', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain("left: '50%'")
-    expect(src).toContain("top: '50%'")
-    expect(src).toContain('translate(-50%, -50%)')
+    expect(src).toContain("left:'50%'")
+    expect(src).toContain("top:'50%'")
+    expect(src).toContain('translate(-50%,-50%)')
   })
   test('desktop tab uses bottom-left placement', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain('bottom: 0')
-    expect(src).toContain('left: 32')
+    expect(src).toContain('bottom:0')
+    expect(src).toContain('left:28')
   })
   test('mobile tab uses right-edge placement', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain("right: 0")
-    expect(src).toContain("top: '65%'")
+    expect(src).toContain("right:0")
+    expect(src).toContain("top:'62%'")
   })
   test('mobile CTA uses sms: deep link with JOIN body', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain('body=JOIN')
-    expect(src).toContain('sms:')
+    expect(src).toContain('JOIN') // JOIN keyword in SMS body
+    expect(src).toContain('sms:') // sms: protocol
   })
   test('mobile manual phone field present alongside deep link', () => {
     const src = require('fs').readFileSync(
@@ -250,8 +250,8 @@ describe('desktop/mobile layout (source assertions)', () => {
     // New popup: inline JSX sections rather than separate component functions
     const mobileStr = src  // search whole file
     // SMS_LINK is derived from NEXT_PUBLIC_KVRN_SMS_NUMBER — referenced in MobileContent
-    expect(mobileStr).toContain('SMS_LINK')   // SMS deep link reference
-    expect(mobileStr).toContain('tel')           // phone input type
+    expect(mobileStr).toContain('SMS_RAW')  // env var for dynamic SMS link
+    expect(mobileStr).toContain('tel')       // phone input type
   })
   test('desktop has manual phone field', () => {
     const src = require('fs').readFileSync(

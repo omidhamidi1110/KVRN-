@@ -74,11 +74,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (priorityResult.blockedReason) {
-    return NextResponse.json({ valid: false, error: priorityResult.blockedReason })
+    return NextResponse.json({ valid: false, error: priorityResult.blockedReason, reason: 'blocked' })
   }
 
   if (!priorityResult.applied) {
-    return NextResponse.json({ valid: false, error: "That code isn't valid for this order." })
+    return NextResponse.json({ valid: false, error: "That code isn't valid for this order.", reason: 'invalid' })
   }
 
   const a = priorityResult.applied
