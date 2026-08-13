@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const SMS_RAW = process.env.NEXT_PUBLIC_KVRN_SMS_NUMBER ?? null
+const SMS_RAW = process.env.NEXT_PUBLIC_KVRN_SMS_NUMBER || '+16572149996'
 // SMS deep link: RFC-standard ?body= works on modern iOS + Android
 // SMS link is built dynamically with an embedded claim token (pre-fetched when popup opens)
 // If token fetch fails, fallback body is used — customer still subscribes
@@ -23,10 +23,10 @@ const SUBSCRIBED_SUPP  = 30 * 24 * 60 * 60 * 1000
 const DISCLOSURE = 'By signing up, you agree to receive recurring automated marketing text messages from KVRN. Consent is not a condition of purchase. Msg & data rates may apply. Msg frequency varies. Reply STOP to unsubscribe, HELP for help.'
 
 // ── Design tokens (dark editorial) ────────────────────────────────────────────
-const BG    = '#0F0F0F'
-const FG    = '#F2EFE9'
-const MUTED = '#606060'
-const DIM   = '#3A3A3A'
+const BG    = '#1B1A18'
+const FG    = '#F4F0E8'
+const MUTED = '#B7B1A7'
+const DIM   = '#45413B'
 const SERIF = "Georgia, 'Times New Roman', serif"
 const SANS  = '-apple-system, Helvetica Neue, Arial, sans-serif'
 
@@ -57,6 +57,7 @@ export function SmsPopup() {
   const [claimToken, setClaimToken] = useState<string | null>(null)
   const [showTab,    setShowTab]    = useState(false)
   const [mobile,     setMobile]     = useState(false)
+  const [stickyAtcOffset, setStickyAtcOffset] = useState(0)
   const [showManual, setShowManual] = useState(false)  // mobile manual-entry toggle
   const [phone,      setPhone]      = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -80,7 +81,7 @@ export function SmsPopup() {
   const EYEBROW  = 'PRIVATE ACCESS'
   const HEAD1    = hasOffer ? '$10 OFF'        : 'EARLY ACCESS'
   const HEAD2    = hasOffer ? 'YOUR FIRST ORDER' : 'KVRN RELEASES'
-  const CTA_MOB  = hasOffer ? `TEXT US → ${SMS_NUMBER_DISPLAY ?? 'JOIN'}` : `TEXT US → ${SMS_NUMBER_DISPLAY ?? 'JOIN'}`
+  const CTA_MOB  = hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'
   const CTA_DESK = hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'
 
   // Mount timer
@@ -91,6 +92,40 @@ export function SmsPopup() {
     setMobile(isMobile())
     const id = setTimeout(() => { setVisible(true); setShowTab(true); track('sms_popup_shown') }, 5000)
     return () => clearTimeout(id)
+  }, [])
+
+  // Keep mobile offer pill above the PDP sticky purchase bar.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const syncStickyAtc = () => {
+      const el = document.getElementById('kvrn-sticky-atc')
+
+      if (!el || el.getAttribute('data-visible') !== 'true') {
+        setStickyAtcOffset(0)
+        return
+      }
+
+      setStickyAtcOffset(Math.ceil(el.getBoundingClientRect().height))
+    }
+
+    syncStickyAtc()
+
+    const observer = new MutationObserver(syncStickyAtc)
+
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-visible'],
+    })
+
+    window.addEventListener('resize', syncStickyAtc)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', syncStickyAtc)
+    }
   }, [])
 
   // Pre-fetch claim token when popup becomes visible (mobile only)
@@ -176,48 +211,48 @@ export function SmsPopup() {
     try { await navigator.clipboard.writeText(successCode); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch {}
   }, [successCode])
 
-  // ── Tab ───────────────────────────────────────────────────────────────────
+  // ── Reopen control ─────────────────────────────────────────────────────────
   if (showTab && !visible) {
     const open = () => { setVisible(true); track('sms_tab_opened') }
-    if (mobile) {
-      return (
-        <button onClick={open} aria-label="Open KVRN private access offer"
-          style={{
-            position:'fixed', right:0, top:'62%', transform:'translateY(-50%)',
-            zIndex:9997, width:36, height:80,
-            background:'rgba(15,15,15,0.88)', backdropFilter:'blur(6px)',
-            WebkitBackdropFilter:'blur(6px)',
-            border:'1px solid rgba(255,255,255,0.10)', borderRight:'none',
-            borderRadius:'4px 0 0 4px',
-            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-            gap:3, padding:0, cursor:'pointer',
-          }}>
-          <span style={{ fontSize:9, color:FG, fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', lineHeight:1.1 }}>
-            {hasOffer ? '$10' : 'JOIN'}
-          </span>
-          {hasOffer && <span style={{ width:16, height:'1px', background:DIM }} />}
-          {hasOffer && (
-            <span style={{ fontSize:9, color:MUTED, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase', lineHeight:1.1 }}>
-              OFF
-            </span>
-          )}
-        </button>
-      )
-    }
+
     return (
-      <button onClick={open} aria-label="Open KVRN private access offer"
+      <button
+        onClick={open}
+        aria-label="Open KVRN private access offer"
         style={{
-          position:'fixed', bottom:0, left:28, zIndex:9997,
-          background:'rgba(15,15,15,0.92)', backdropFilter:'blur(8px)',
-          WebkitBackdropFilter:'blur(8px)',
-          border:'1px solid rgba(255,255,255,0.10)', borderBottom:'none',
-          borderRadius:'4px 4px 0 0',
-          padding:'10px 18px',
-          fontFamily:SANS, fontSize:10, fontWeight:500,
-          letterSpacing:'0.12em', textTransform:'uppercase', color:FG,
-          cursor:'pointer', display:'flex', alignItems:'center', gap:8,
-        }}>
-        PRIVATE ACCESS <span style={{ opacity:0.45 }}>+</span>
+          position:'fixed',
+          left: mobile ? 16 : 24,
+          bottom: mobile ? 18 + stickyAtcOffset : 22,
+          transition:'bottom 300ms ease',
+          zIndex:9997,
+          background:'rgba(27,26,24,0.94)',
+          backdropFilter:'blur(12px)',
+          WebkitBackdropFilter:'blur(12px)',
+          border:'1px solid rgba(244,240,232,0.22)',
+          borderRadius:999,
+          padding: mobile ? '11px 15px' : '11px 17px',
+          boxShadow:'0 8px 30px rgba(0,0,0,0.28)',
+          fontFamily:SANS,
+          fontSize:9,
+          fontWeight:600,
+          letterSpacing:'0.14em',
+          textTransform:'uppercase',
+          color:FG,
+          cursor:'pointer',
+          display:'flex',
+          alignItems:'center',
+          gap:9,
+          whiteSpace:'nowrap',
+        }}
+      >
+        <span>{hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'}</span>
+        <span style={{
+          fontSize:14,
+          lineHeight:1,
+          color:'#D7D1C7',
+          fontWeight:300,
+          transform:'translateY(-1px)'
+        }}>+</span>
       </button>
     )
   }
@@ -229,7 +264,7 @@ export function SmsPopup() {
   if (successCode !== null) {
     return (
       <>
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)', backdropFilter:'blur(2px)', WebkitBackdropFilter:'blur(2px)', zIndex:9998 }} onClick={dismiss} aria-hidden="true" />
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.58)', backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(2px)', zIndex:9998 }} onClick={dismiss} aria-hidden="true" />
         <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Signup confirmed"
           style={{ position:'fixed', zIndex:9999, left:'50%', top:'50%', transform:'translate(-50%,-50%)',
             width:`min(420px, calc(100vw - 32px))`, background:BG, padding:'44px 40px 36px', outline:'none' }}
@@ -311,11 +346,11 @@ export function SmsPopup() {
   )
 
   const Disc = (
-    <p style={{ fontFamily:SANS, fontSize:10, color:'#3E3E3E', lineHeight:1.6, margin:'16px 0 0' }}>
+    <p style={{ fontFamily:SANS, fontSize:10, color:'#8F897F', lineHeight:1.65, margin:'16px 0 0' }}>
       {DISCLOSURE}{' '}
-      <a href="/legal/terms" style={{ color:'#4A4A4A', textDecoration:'underline' }}>Terms</a>
+      <a href="/legal/terms" style={{ color:'#A9A298', textDecoration:'underline' }}>Terms</a>
       {' · '}
-      <a href="/legal/privacy" style={{ color:'#4A4A4A', textDecoration:'underline' }}>Privacy</a>
+      <a href="/legal/privacy" style={{ color:'#A9A298', textDecoration:'underline' }}>Privacy</a>
     </p>
   )
 
@@ -339,7 +374,7 @@ export function SmsPopup() {
           border:'none', cursor:'pointer', fontFamily:SANS, fontSize:11, fontWeight:500,
           letterSpacing:'0.12em', textTransform:'uppercase', opacity:submitting ? 0.5 : 1 }}
         aria-busy={submitting}>
-        {submitting ? 'SIGNING UP…' : CTA_DESK}
+        {submitting ? 'SIGNING UP…' : (mobile ? 'SIGN UP & GET $10 OFF' : CTA_DESK)}
       </button>
     </div>
   )
@@ -392,7 +427,7 @@ export function SmsPopup() {
           <a
             href={`sms:${SMS_RAW}?body=${encodeURIComponent(
               claimToken
-                ? `JOIN KVRN TK-${claimToken}${SMS_CONSENT_TEXT}`
+                ? `JOIN KVRN${SMS_CONSENT_TEXT} Ref: TK-${claimToken}`
                 : `JOIN KVRN${SMS_CONSENT_TEXT}`
             )}`}
             onClick={onDeeplink}
@@ -405,21 +440,83 @@ export function SmsPopup() {
           </a>
         ) : null}
 
-        {/* Secondary: manual entry toggle */}
+        {/* Secondary: manual entry drawer */}
         {!showManual ? (
-          <button onClick={() => setShowManual(true)}
-            style={{ display:'block', width:'100%', padding:'12px 0', background:'none',
-              border:'1px solid #2A2A2A', color:MUTED, cursor:'pointer',
-              fontFamily:SANS, fontSize:10, fontWeight:400, letterSpacing:'0.10em',
-              textTransform:'uppercase' }}>
-            Enter your number instead
+          <button
+            onClick={() => setShowManual(true)}
+            style={{
+              display:'flex',
+              width:'100%',
+              padding:'14px 2px',
+              background:'none',
+              border:'none',
+              borderBottom:'1px solid #4A4640',
+              color:'#C7C1B7',
+              cursor:'pointer',
+              fontFamily:SANS,
+              fontSize:10,
+              fontWeight:500,
+              letterSpacing:'0.09em',
+              textTransform:'uppercase',
+              alignItems:'center',
+              justifyContent:'space-between',
+            }}
+          >
+            <span>Enter your number manually</span>
+            <span
+              aria-hidden="true"
+              style={{
+                fontSize:16,
+                lineHeight:1,
+                color:'#8F897F',
+                fontWeight:300,
+              }}
+            >
+              +
+            </span>
           </button>
         ) : (
-          <div style={{ marginTop:4 }}>
+          <div style={{ marginTop:14, paddingTop:2 }}>
+            <div
+              style={{
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'space-between',
+                marginBottom:12,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily:SANS,
+                  fontSize:9,
+                  letterSpacing:'0.12em',
+                  textTransform:'uppercase',
+                  color:MUTED,
+                }}
+              >
+                Sign up with your number
+              </span>
+
+              <button
+                onClick={() => setShowManual(false)}
+                aria-label="Close manual phone entry"
+                style={{
+                  background:'none',
+                  border:'none',
+                  color:MUTED,
+                  cursor:'pointer',
+                  fontSize:18,
+                  lineHeight:1,
+                  padding:'0 0 2px 8px',
+                }}
+              >
+                −
+              </button>
+            </div>
+
             {PhoneForm}
           </div>
         )}
-
         {NoThanks}
       </div>
     </>

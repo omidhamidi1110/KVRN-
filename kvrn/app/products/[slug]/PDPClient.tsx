@@ -564,7 +564,7 @@ function MobileHeroInfo({ product, color, setColor, size, setSize,
       </button>
       {/* Scroll cue */}
       {/* Explore cue — bright and legible, not faded */}
-      <div className="flex items-center gap-2" aria-hidden="true">
+      <div className="flex w-full items-center justify-center gap-2" aria-hidden="true">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
           <path d="M6 2.5v5M3.5 6l2.5 2.5L8.5 6" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
         </svg>
@@ -1539,10 +1539,14 @@ function BundleCard({ product, img, selectedSize, onSize }: {
 // ─── Sticky ATC ───────────────────────────────────────────────────────────────
 function StickyATC({ product, color, size, cta, ctaLabel, soldOut, onAdd, t, visible }: any) {
   return (
-    <div className={cn('fixed bottom-0 left-0 right-0 z-[200] overflow-hidden lg:hidden',
-      'bg-white border-t border-[#E8E5E0] transition-transform duration-300',
-      visible ? 'translate-y-0 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]' : 'translate-y-full')}
-      aria-hidden={!visible}>
+      <div
+        id="kvrn-sticky-atc"
+        data-visible={visible ? 'true' : 'false'}
+        className={cn('fixed bottom-0 left-0 right-0 z-[200] overflow-hidden lg:hidden',
+          'bg-white border-t border-[#E8E5E0] transition-transform duration-300',
+          visible ? 'translate-y-0 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]' : 'translate-y-full')}
+        aria-hidden={!visible}
+      >
       <div className="max-w-[520px] mx-auto px-6 lg:px-0 py-3 flex items-center gap-4">
         <div className="flex-1 min-w-0 flex items-center gap-3">
           <span className="w-4 h-4 rounded-full flex-shrink-0 border border-[#E8E5E0]"
