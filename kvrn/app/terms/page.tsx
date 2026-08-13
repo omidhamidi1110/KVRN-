@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: false },
 }
 
-const LAST_UPDATED = '1 January 2025'
+const LAST_UPDATED = '12 August 2026'
 
 export default function TermsPage() {
   return (
@@ -34,8 +34,8 @@ export default function TermsPage() {
             <h2 className="text-[15px] font-light text-kvrn-text mb-3">Who you are contracting with</h2>
             <p>
               These terms govern your use of kvrn.shop and any purchase you make from KVRN,
-              operated by [KVRN Ltd], registered in England and Wales (Company No. [XXXXXXXX]).
-              By placing an order, you agree to these terms.
+              operated by Omid Hamidi as a sole proprietor in the United States.
+              By using the site or placing an order, you agree to these terms.
             </p>
           </section>
 
@@ -138,6 +138,39 @@ export default function TermsPage() {
               These terms are governed by the laws of England and Wales. Any disputes will be
               subject to the exclusive jurisdiction of the courts of England and Wales.
             </p>
+          </section>
+
+          <div className="rule" />
+
+          <section>
+            <h2 className="text-[15px] font-light text-kvrn-text mb-3">SMS marketing program</h2>
+            <div className="space-y-3">
+              <p>
+                By affirmatively opting in to the KVRN SMS program, you agree
+                to receive recurring automated marketing text messages about
+                KVRN product launches, drops, restocks, early access, and
+                promotional offers at the mobile number you provide.
+              </p>
+              <p>
+                Message frequency varies. Msg &amp; data rates may apply.
+                Consent to receive marketing text messages is not a condition
+                of purchasing goods or services from KVRN.
+              </p>
+              <p>
+                Reply STOP at any time to cancel. Reply HELP for help or contact{' '}
+                <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                  support@kvrn.shop
+                </a>.
+              </p>
+              <p>
+                Mobile carriers are not responsible for delayed or undelivered
+                messages. See our{' '}
+                <Link href="/privacy" className="text-kvrn-text underline underline-offset-2">
+                  Privacy Policy
+                </Link>{' '}
+                for information about how we handle mobile information.
+              </p>
+            </div>
           </section>
 
           <div className="rule" />

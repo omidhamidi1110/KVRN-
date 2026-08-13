@@ -20,7 +20,7 @@ const KEY_CODE         = 'kvrn_sms_discount_code'   // surfaced in checkout
 const COOLDOWN_MS      = 7  * 24 * 60 * 60 * 1000
 const SUBSCRIBED_SUPP  = 30 * 24 * 60 * 60 * 1000
 
-const DISCLOSURE = 'By signing up, you agree to receive recurring automated marketing text messages from KVRN. Consent is not a condition of purchase. Msg & data rates may apply. Msg frequency varies. Reply STOP to unsubscribe, HELP for help.'
+const DISCLOSURE = 'By signing up, you agree to receive recurring automated marketing text messages about KVRN product launches, drops, restocks, early access, and promotional offers. Message frequency varies. Msg & data rates may apply. Reply STOP to cancel, HELP for help. Consent is not a condition of purchase.'
 
 // ── Design tokens (dark editorial) ────────────────────────────────────────────
 const BG    = '#1B1A18'
@@ -60,6 +60,7 @@ export function SmsPopup() {
   const [stickyAtcOffset, setStickyAtcOffset] = useState(0)
   const [showManual, setShowManual] = useState(false)  // mobile manual-entry toggle
   const [phone,      setPhone]      = useState('')
+  const [smsConsent, setSmsConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error,      setError]      = useState('')
   const [successCode,setSuccessCode]= useState<string|null>(null)
@@ -188,6 +189,7 @@ export function SmsPopup() {
 
   const handleSubmit = useCallback(async () => {
     if (!phone.trim()) { setError('Enter your mobile number.'); return }
+    if (!smsConsent) { setError('Please confirm SMS consent to continue.'); return }
     setSubmitting(true); setError('')
     try {
       const res  = await fetch('/api/sms/subscribe', {
@@ -204,7 +206,7 @@ export function SmsPopup() {
       track('sms_manual_subscribed')
     } catch { setError('Network error. Please try again.') }
     finally { setSubmitting(false) }
-  }, [phone])
+  }, [phone, smsConsent])
 
   const handleCopy = useCallback(async () => {
     if (!successCode) return
@@ -348,9 +350,9 @@ export function SmsPopup() {
   const Disc = (
     <p style={{ fontFamily:SANS, fontSize:10, color:'#8F897F', lineHeight:1.65, margin:'16px 0 0' }}>
       {DISCLOSURE}{' '}
-      <a href="/legal/terms" style={{ color:'#A9A298', textDecoration:'underline' }}>Terms</a>
+      <a href="/terms" style={{ color:'#A9A298', textDecoration:'underline' }}>Terms</a>
       {' · '}
-      <a href="/legal/privacy" style={{ color:'#A9A298', textDecoration:'underline' }}>Privacy</a>
+      <a href="/privacy" style={{ color:'#A9A298', textDecoration:'underline' }}>Privacy</a>
     </p>
   )
 
@@ -368,11 +370,60 @@ export function SmsPopup() {
           border:'1px solid #2A2A2A', color:FG, fontFamily:SANS, fontSize:14,
           outline:'none', boxSizing:'border-box', marginBottom:10 }}
         disabled={submitting} aria-required="true" />
+
+        <label
+          htmlFor="sms-consent"
+          style={{
+            display:'flex',
+            alignItems:'flex-start',
+            gap:10,
+            margin:'6px 0 14px',
+            cursor:'pointer',
+          }}
+        >
+          <input
+            id="sms-consent"
+            type="checkbox"
+            checked={smsConsent}
+            onChange={e => {
+              setSmsConsent(e.target.checked)
+              if (e.target.checked) setError('')
+            }}
+            disabled={submitting}
+            style={{
+              width:16,
+              height:16,
+              margin:'2px 0 0',
+              flexShrink:0,
+              accentColor:FG,
+            }}
+          />
+          <span style={{
+            fontFamily:SANS,
+            fontSize:10,
+            lineHeight:1.6,
+            color:'#B7B1A7',
+          }}>
+            I agree to receive recurring automated marketing text messages about
+            KVRN product launches, drops, restocks, early access, and promotional
+            offers. Message frequency varies. Msg &amp; data rates may apply.
+            Reply STOP to cancel, HELP for help. Consent is not a condition of purchase.{' '}
+            <a href="/terms" onClick={e => e.stopPropagation()}
+              style={{ color:'#D3CDC3', textDecoration:'underline' }}>
+              Terms
+            </a>
+            {' · '}
+            <a href="/privacy" onClick={e => e.stopPropagation()}
+              style={{ color:'#D3CDC3', textDecoration:'underline' }}>
+              Privacy
+            </a>
+          </span>
+        </label>
       {error && <p style={{ fontFamily:SANS, fontSize:11, color:'#C0392B', marginBottom:8 }} role="alert">{error}</p>}
-      <button onClick={handleSubmit} disabled={submitting}
+      <button onClick={handleSubmit} disabled={submitting || !smsConsent}
         style={{ width:'100%', padding:'13px 0', background:FG, color:BG,
           border:'none', cursor:'pointer', fontFamily:SANS, fontSize:11, fontWeight:500,
-          letterSpacing:'0.12em', textTransform:'uppercase', opacity:submitting ? 0.5 : 1 }}
+          letterSpacing:'0.12em', textTransform:'uppercase', opacity:(submitting || !smsConsent) ? 0.45 : 1 }}
         aria-busy={submitting}>
         {submitting ? 'SIGNING UP…' : (mobile ? 'SIGN UP & GET $10 OFF' : CTA_DESK)}
       </button>

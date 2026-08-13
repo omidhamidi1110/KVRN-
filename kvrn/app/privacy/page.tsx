@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   robots:      { index: true, follow: false },
 }
 
-const LAST_UPDATED = '1 January 2025'
+const LAST_UPDATED = '12 August 2026'
 
 export default function PrivacyPage() {
   return (
@@ -34,9 +34,9 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-[15px] font-light text-kvrn-text mb-3">Who we are</h2>
             <p>
-              KVRN is operated by [KVRN Ltd], a company registered in England and Wales
-              (Company No. [XXXXXXXX]). Our registered address is [address].
-              We are the data controller for the personal information we collect about you.
+              KVRN is operated by Omid Hamidi as a sole proprietor in the United States.
+              We are responsible for the personal information we collect through kvrn.shop
+              and the KVRN SMS program.
             </p>
             <p className="mt-3">
               For questions about this policy, contact us at{' '}
@@ -114,6 +114,31 @@ export default function PrivacyPage() {
                 </li>
               ))}
             </ul>
+          </section>
+
+          <div className="rule" />
+
+          <section>
+            <h2 className="text-[15px] font-light text-kvrn-text mb-3">SMS and mobile information</h2>
+            <div className="space-y-3">
+              <p>
+                If you opt in to the KVRN SMS program, we may use your mobile number
+                and SMS consent information to send recurring automated marketing text
+                messages about product launches, drops, restocks, early access, and
+                promotional offers.
+              </p>
+              <p>
+                Message frequency varies. Msg &amp; data rates may apply. Reply STOP
+                to cancel or HELP for help. Consent to receive marketing text messages
+                is not a condition of purchase.
+              </p>
+              <p>
+                We do not sell or share mobile phone numbers, SMS opt-in data, or SMS
+                consent information with third parties or affiliates for their marketing
+                or promotional purposes. Mobile information may be provided to service
+                providers only as necessary to operate and deliver the KVRN SMS program.
+              </p>
+            </div>
           </section>
 
           <div className="rule" />

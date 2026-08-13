@@ -24,6 +24,12 @@ account_id = "5c2f1f1df8ff752572878665e985280b"
 compatibility_date  = "2024-12-18"
 compatibility_flags = ["nodejs_compat"]
 
+
+# ── Production custom domain ───────────────────────────────────────────────────
+[[routes]]
+pattern = "kvrn.shop"
+custom_domain = true
+
 # ── Static assets ─────────────────────────────────────────────────────────────
 [assets]
 directory = ".open-next/assets"
@@ -40,10 +46,12 @@ crons = ["*/5 * * * *"]
 # Secrets must be set via `wrangler secret put` — never hardcode here
 [vars]
 NEXT_PUBLIC_SITE_URL              = "https://kvrn.shop"
+SITE_URL                          = "https://kvrn.shop"
 NEXT_PUBLIC_KVRN_SMS_NUMBER       = "+16572149996"
 SMS_SIGNUP_DISCOUNT_AMOUNT_CENTS  = "1000"
 TWILIO_A2P_APPROVED               = "false"
 TWILIO_MARKETING_SEND_ENABLED     = "false"
+ENABLE_STRIPE_TEST_CHECKOUT       = "false"
 NODE_ENV                          = "production"
 
 # ── Production ────────────────────────────────────────────────────────────────
@@ -52,10 +60,12 @@ name = "kvrn"
 
 [env.production.vars]
 NEXT_PUBLIC_SITE_URL              = "https://kvrn.shop"
+SITE_URL                          = "https://kvrn.shop"
 NEXT_PUBLIC_KVRN_SMS_NUMBER       = "+16572149996"
 SMS_SIGNUP_DISCOUNT_AMOUNT_CENTS  = "1000"
 TWILIO_A2P_APPROVED               = "false"
 TWILIO_MARKETING_SEND_ENABLED     = "false"
+ENABLE_STRIPE_TEST_CHECKOUT       = "false"
 NODE_ENV                          = "production"
 
 # ── Preview / staging ─────────────────────────────────────────────────────────
