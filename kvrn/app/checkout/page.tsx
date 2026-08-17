@@ -56,6 +56,7 @@ export default function CheckoutPage() {
   const [addressErrors,    setAddressErrors]    = useState<Record<string, string>>({})
 
   // Live Shippo rates from /api/shipping-rates
+  const [shippingUnavail,        setShippingUnavail]        = useState(false)
   const [liveRates,             setLiveRates]             = useState<Array<{
     id: string; label: string; cents: number; minDays: number; maxDays: number; default: boolean
   }> | null>(null)
@@ -96,8 +97,8 @@ export default function CheckoutPage() {
     // Clear while waiting for fresh data
     setLiveRates(null)
     setInternationalUnavail(false)
+    setShippingUnavail(false)
 
-    // Gate: minimum address needed to get rates
     // Gate: minimum address needed to get rates
     const countryIsUS = country === 'US'
 
@@ -117,22 +118,31 @@ export default function CheckoutPage() {
         if (res.ok) {
           const data = await res.json()
           const rates = data?.data?.rates
+          const unavailable = data?.data?.unavailable === true
           if (rates?.length) {
             setLiveRates(rates)
+            setShippingUnavail(false)
             // Keep current method if available, else auto-select default
             const ids = (rates as any[]).map((r: any) => r.id)
             if (!ids.includes(shippingMethod)) {
               const def = (rates as any[]).find((r: any) => r.default)
               if (def) setShippingMethod(def.id as ShippingMethod)
             }
+          } else if (unavailable) {
+            // Shippo temporarily unavailable — tell customer, keep payment disabled
+            setShippingUnavail(true)
           } else if (!countryIsUS) {
             setInternationalUnavail(true)
           }
         } else if (!countryIsUS) {
           setInternationalUnavail(true)
+        } else {
+          // Non-4xx server error for US — treat as temporarily unavailable
+          setShippingUnavail(true)
         }
       } catch {
         if (!countryIsUS) setInternationalUnavail(true)
+        else setShippingUnavail(true)
       } finally {
         setFetchingRates(false)
       }
@@ -154,7 +164,7 @@ export default function CheckoutPage() {
   const totalCents    = subtotalPence + (effectiveShipping ?? 0) - appliedDiscountCents
 
   // Checkout proceeds only after Shippo returns a real selectable rate.
-  const canProceed = liveRates !== null && liveRates.length > 0
+  const canProceed = liveRates !== null && liveRates.length > 0 && !shippingUnavail
   // Client-side eligibility check for DISPLAY only; server is authoritative
   const freeShippingEligible = qualifiesForFreeShipping(address.country || 'US', subtotalPence)
 
@@ -609,6 +619,14 @@ export default function CheckoutPage() {
                 <div style={{ padding:'12px 16px', background:'#FEF2F2',
                               border:'1px solid #FECACA', color:'#B91C1C', fontSize:13, marginBottom:16 }}>
                   Shipping is currently unavailable to this destination.
+                </div>
+              )}
+
+              {/* US: Shippo temporarily unavailable — no fake rates shown */}
+              {isUS && !fetchingRates && shippingUnavail && (
+                <div style={{ padding:'12px 16px', background:'#FFF7ED',
+                              border:'1px solid #FED7AA', color:'#92400E', fontSize:13, marginBottom:16 }}>
+                  Shipping rates are temporarily unavailable. Please try again in a moment.
                 </div>
               )}
 

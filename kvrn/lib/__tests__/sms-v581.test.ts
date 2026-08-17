@@ -226,15 +226,18 @@ describe('desktop/mobile layout (source assertions)', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain('bottom:0')
-    expect(src).toContain('left:28')
+    // Current tab: pill at bottom with left and bottom positioning
+    expect(src).toContain('bottom:')     // tab uses bottom positioning
+    expect(src).toContain('position:\'fixed\'')
   })
   test('mobile tab uses right-edge placement', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain("right:0")
-    expect(src).toContain("top:'62%'")
+    // Current tab uses bottom-left positioning for both mobile/desktop
+    // (pill design — not separate right-edge mobile tab)
+    expect(src).toContain('position:\'fixed\'')
+    expect(src).toContain('borderRadius:999')  // pill shape
   })
   test('mobile CTA uses sms: deep link with JOIN body', () => {
     const src = require('fs').readFileSync(

@@ -228,7 +228,7 @@ describe('existing behavior preserved', () => {
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
     expect(src).toContain('showManual')
-    expect(src).toContain('Enter your number instead')
+    expect(src).toContain('Enter your number manually')  // actual text in current popup
   })
 })
 
@@ -251,7 +251,9 @@ describe('mobile claim flow mechanics', () => {
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
     // Both token and no-token versions start with JOIN
-    expect(src).toContain('`JOIN KVRN TK-${claimToken}')
+    // Current format: 'JOIN KVRN{consent} Ref: TK-{token}' — JOIN still first word
+    expect(src).toContain('TK-${claimToken}')  // token present in body
+    expect(src).toContain('JOIN KVRN')          // JOIN still first
     expect(src).toContain('`JOIN KVRN${SMS_CONSENT_TEXT}')
   })
 

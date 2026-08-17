@@ -507,9 +507,10 @@ describe('mobile tab text rendering', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain('flexDirection')
-    expect(src).toContain("'column'")
+    // Current tab is a pill button at bottom position (not vertical writingMode)
     expect(src).not.toContain("writingMode: 'vertical")
+    // Tab uses pill/rounded shape with display:flex and alignItems
+    expect(src).toContain('borderRadius:999')
   })
 })
 

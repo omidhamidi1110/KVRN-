@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from '@/lib/stripe'
+// calculateShippingCents / US_SHIPPING_OPTIONS no longer used — static fallback removed
 import { applyFreeShippingToRates } from '@/lib/free-shipping'
 import { getShippoRates } from '@/lib/shippo'
 import { getProductShippingData, getSubtotalCentsForItems } from '@/lib/inventory'
@@ -9,7 +9,7 @@ import { getProductShippingData, getSubtotalCentsForItems } from '@/lib/inventor
 // Accepts: { city, state, zip, country, items }
 // Items contain only sku + quantity — prices are resolved server-side from Neon.
 // Client-provided subtotals are NOT accepted or trusted.
-// Falls back to flat rates if Shippo unavailable.
+// Returns unavailable:true if Shippo fails — no static fallback.
 // Server-side only: SHIPPO_API_TOKEN never reaches the client.
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +43,12 @@ export async function POST(req: NextRequest) {
         const shippingDb  = await getProductShippingData().catch(() => [])
         const shippoRates = await getShippoRates({ city, state, zip, country }, items, shippingDb, apiToken)
 
-        if (shippoRates) {
+        if (!shippoRates) {
+          // Shippo returned null without throwing — treat as unavailable
+          return NextResponse.json({ success: true, data: { rates: [], unavailable: true } })
+        }
+
+        {
           const standardRate = {
             id:       'standard',
             label:    `${shippoRates.standard.label} — ${shippoRates.standard.estimate}`,
@@ -72,20 +77,8 @@ export async function POST(req: NextRequest) {
               default:  false,
               source:   'shippo',
             })
-          } else if (isUS) {
-            // US only: insert trusted static express when Shippo has none
-            rates.push({
-              id:       'express',
-              label:    US_SHIPPING_OPTIONS['express'].label + ' — ' + US_SHIPPING_OPTIONS['express'].estimate,
-              cents:    calculateShippingCents('express'),
-              minDays:  US_SHIPPING_OPTIONS['express'].minDays,
-              maxDays:  US_SHIPPING_OPTIONS['express'].maxDays,
-              provider: 'Carrier',
-              default:  false,
-              source:   'static',
-            })
           }
-          // Non-US with no Shippo express: rates has only [standard] — correct
+          // If Shippo returns no express rate, omit it — no static fallback
 
           // Apply free-shipping rule with server-authoritative subtotal.
           // subtotalCents=null → unknown SKU(s), do not apply rule (safe default).
@@ -95,14 +88,13 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: true, data: { rates: qualifiedRates, source: 'shippo' } })
         }
       } catch (shippoErr: any) {
-        console.error('[shipping-rates] Shippo error:', shippoErr?.message?.slice(0, 80))
-        // Fall through to static rates
+        console.error('[shipping-rates] Shippo unavailable:', shippoErr?.message?.slice(0, 80))
+        // Fail closed: no static fallback. Customer sees unavailable state.
+        return NextResponse.json({ success: true, data: { rates: [], unavailable: true } })
       }
     }
 
-    // ── Fallback ──────────────────────────────────────────────────────────────
-    // US: return trusted static rates (with free-shipping rule applied).
-    // Non-US: do NOT present US domestic static rates as international prices.
+    // Distinguish: genuine provider failure vs incomplete address
     if (!isUS) {
       return NextResponse.json({
         success: true,
@@ -110,22 +102,13 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const staticMethods: ShippingMethod[] = ['standard', 'express']
-    const staticRates = staticMethods.map(method => ({
-      id:       method,
-      label:    US_SHIPPING_OPTIONS[method].label + ' — ' + US_SHIPPING_OPTIONS[method].estimate,
-      cents:    calculateShippingCents(method),
-      minDays:  US_SHIPPING_OPTIONS[method].minDays,
-      maxDays:  US_SHIPPING_OPTIONS[method].maxDays,
-      provider: 'Carrier',
-      default:  method === 'standard',
-      source:   'static',
-    }))
+    if (hasAddress && hasItems && !apiToken) {
+      // Complete address + no Shippo token = provider unavailable (not address missing)
+      return NextResponse.json({ success: true, data: { rates: [], unavailable: true } })
+    }
 
-    const qualifiedStaticRates = subtotalCents !== null
-      ? applyFreeShippingToRates(staticRates, country, subtotalCents)
-      : staticRates
-    return NextResponse.json({ success: true, data: { rates: qualifiedStaticRates, source: 'static' } })
+    // US with incomplete address — address still being entered; not a Shippo outage
+    return NextResponse.json({ success: true, data: { rates: [], unavailable: false } })
 
   } catch (err: any) {
     console.error('[shipping-rates] Error:', err?.message)

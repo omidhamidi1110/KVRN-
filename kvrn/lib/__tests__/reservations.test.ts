@@ -12,6 +12,39 @@ import { getSiteOrigin } from '../site-origin'
 import { requiredStringField, optionalStringField, FIELD_MAX } from '../checkout-validation'
 import { createCheckoutPostHandler, type CheckoutRouteDeps } from '../checkout-session-handler'
 
+jest.mock('../shippo', () => ({
+  getShippoRates: jest.fn(),
+}))
+jest.mock('../inventory', () => ({
+  getProductShippingData: jest.fn().mockResolvedValue([]),
+  getSubtotalCentsForItems: jest.fn().mockResolvedValue(8000),
+}))
+
+const { getShippoRates: mockGetShippoRates } = require('../shippo') as { getShippoRates: jest.Mock }
+
+// Standard live rate used in handler tests (deliberately != static 1999)
+const MOCK_LIVE_STANDARD_CENTS = 1249
+const MOCK_SHIPPO_RATES = {
+  standard: {
+    cents: MOCK_LIVE_STANDARD_CENTS, label: 'USPS Priority', stripeLabel: 'USPS Priority',
+    estimate: '2-3 days', minDays: 2, maxDays: 3, provider: 'USPS',
+  },
+  express: {
+    cents: 2399, label: 'UPS Overnight', stripeLabel: 'UPS Overnight',
+    estimate: '1 day', minDays: 1, maxDays: 1, provider: 'UPS',
+  },
+}
+
+beforeEach(() => {
+  process.env.SHIPPO_API_TOKEN = 'test_shippo_token'
+  mockGetShippoRates.mockResolvedValue(MOCK_SHIPPO_RATES)
+})
+afterEach(() => {
+  delete process.env.SHIPPO_API_TOKEN
+  jest.clearAllMocks()
+})
+
+
 describe('aggregateAndValidate', () => {
   test('rejects null', () => expect(Array.isArray(aggregateAndValidate(null as any))).toBe(false))
   test('rejects empty array', () => {
@@ -383,7 +416,7 @@ describeDB50('Integration V50 — shipping snapshot and paid order finalization'
         customerPhone:   '+15550001234',
         shippingAddress: testAddress,
         shippingMethod:  'standard',
-        shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
+        shippingBeforeDiscountCents: MOCK_LIVE_STANDARD_CENTS, shippingDiscountCents: 0, shippingFinalCents: MOCK_LIVE_STANDARD_CENTS,
       })
       expect(saved).toBe(true)
 
@@ -526,7 +559,7 @@ describe('createCheckoutPostHandler — real production handler', () => {
       expect.objectContaining({
         customerEmail:  'test@example.com',
         shippingMethod: 'standard',
-        shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
+        shippingBeforeDiscountCents: MOCK_LIVE_STANDARD_CENTS, shippingDiscountCents: 0, shippingFinalCents: MOCK_LIVE_STANDARD_CENTS,
       })
     )
   })
@@ -829,7 +862,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
         customerPhone:   null,   // explicit opt-out — must not be replaced
         shippingAddress: ta,
         shippingMethod:  'standard',
-        shippingBeforeDiscountCents: 1999, shippingDiscountCents: 0, shippingFinalCents: 1999,
+        shippingBeforeDiscountCents: MOCK_LIVE_STANDARD_CENTS, shippingDiscountCents: 0, shippingFinalCents: MOCK_LIVE_STANDARD_CENTS,
       })
       expect(saved).toBe(true)
 

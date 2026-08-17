@@ -10,7 +10,9 @@ import {
 } from './checkout-validation'
 import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
 import { COUNTRY_CODES } from './countries'
-import { calculateShippingCents, US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
+import { US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
+// calculateShippingCents intentionally not imported — static cents must never
+// become authoritative US payment shipping price
 import { getShippoRates, type ShippoRate, type ShippoRates } from './shippo'
 import { applyFreeShippingToSingleRate } from './free-shipping'
 import { validateDiscount, applyDiscountPriority, normalizeDiscountCode, claimDiscount, releaseDiscountClaim, getOrCreateStripeCouponForTerms } from './discounts'
@@ -149,42 +151,64 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
 
     // ── Get authoritative shipping cost ────────────────────────────────────────
     // Server re-fetches Shippo; never trusts browser-sent price.
-    // US: Shippo preferred, US static rates permitted as fallback.
+    // US: live Shippo REQUIRED — no static fallback (fail closed).
     // Non-US: real Shippo rate REQUIRED — static US rates never used internationally.
     const apiToken = process.env.SHIPPO_API_TOKEN ?? ''
     let shippingCents: number
     let shippingOpt   = US_SHIPPING_OPTIONS[shippingMethod]  // typed base; may be overridden
     let shippoRatesResult: ShippoRates | null = null
 
+    const SHIPPING_UNAVAILABLE_503 = NextResponse.json(
+      { error: 'Shipping rates are temporarily unavailable. Please try again in a moment.' },
+      { status: 503 }
+    )
+
     if (isUS) {
-      // US: start with static fallback, try Shippo
-      shippingCents = calculateShippingCents(shippingMethod)
-      if (apiToken) {
-        try {
-          const shippingDb = await getProductShippingData().catch(() => [])
-          shippoRatesResult = await getShippoRates(
-            { city, state, zip: postalCode, country },
-            (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
-            shippingDb,
-            apiToken
-          )
-          if (shippoRatesResult) {
-            const liveRate: ShippoRate | null = shippoRatesResult[shippingMethod] ?? null
-            if (liveRate) {
-              shippingCents = liveRate.cents
-              shippingOpt   = {
-                ...US_SHIPPING_OPTIONS[shippingMethod],
-                cents:       liveRate.cents,
-                stripeLabel: liveRate.stripeLabel,
-                minDays:     liveRate.minDays,
-                maxDays:     liveRate.maxDays,
-              }
-            }
-          }
-        } catch (shippoErr: any) {
-          console.error('[checkout/session] Shippo error (US static fallback):', shippoErr?.message?.slice(0, 80))
-        }
+      // US: live Shippo rate REQUIRED for every path.
+      // No static fallback. shippingCents is only assigned from a confirmed live rate.
+
+      // Guard 1: Shippo token must be present
+      if (!apiToken) {
+        console.error('[checkout/session] SHIPPO_API_TOKEN missing — fail closed')
+        return SHIPPING_UNAVAILABLE_503
       }
+
+      try {
+        const shippingDb = await getProductShippingData().catch(() => [])
+        shippoRatesResult = await getShippoRates(
+          { city, state, zip: postalCode, country },
+          (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
+          shippingDb,
+          apiToken
+        )
+      } catch (shippoErr: any) {
+        console.error('[checkout/session] Shippo threw (fail closed):', shippoErr?.message?.slice(0, 80))
+        return SHIPPING_UNAVAILABLE_503
+      }
+
+      // Guard 2: Shippo must return a result
+      if (!shippoRatesResult) {
+        console.error('[checkout/session] Shippo returned null — fail closed')
+        return SHIPPING_UNAVAILABLE_503
+      }
+
+      // Guard 3: selected method must have a live rate
+      const liveRate: ShippoRate | null = shippoRatesResult[shippingMethod] ?? null
+      if (!liveRate) {
+        console.error('[checkout/session] No live rate for', shippingMethod, '— fail closed')
+        return SHIPPING_UNAVAILABLE_503
+      }
+
+      // All guards passed — live rate is authoritative
+      shippingCents = liveRate.cents
+      shippingOpt   = {
+        ...US_SHIPPING_OPTIONS[shippingMethod],
+        cents:       liveRate.cents,
+        stripeLabel: liveRate.stripeLabel,
+        minDays:     liveRate.minDays,
+        maxDays:     liveRate.maxDays,
+      }
+
     } else {
       // Non-US: Shippo REQUIRED — no static fallback, no US price permitted
       if (!apiToken) {
@@ -253,8 +277,10 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       (sum: number, item: any) => sum + (item.unitPriceCents * item.quantity), 0
     )
     const otherMethod = shippingMethod === 'standard' ? 'express' : 'standard'
-    const otherCents  = (shippoRatesResult?.[otherMethod]?.cents) ??
-                        calculateShippingCents(otherMethod)
+    // Use live rate for the alternate method; if it has no live rate,
+    // Infinity ensures the selected (only available) method is always cheapest.
+    // Never fall back to static cents for the free-shipping comparison.
+    const otherCents  = shippoRatesResult?.[otherMethod]?.cents ?? Infinity
     shippingCents = applyFreeShippingToSingleRate(
       shippingCents, otherCents, shippingMethod, country, subtotalCents
     )
