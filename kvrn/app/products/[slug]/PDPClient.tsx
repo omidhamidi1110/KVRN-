@@ -29,7 +29,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
   const [sticky,  setSticky]  = useState(false)
 
   // Live Neon inventory — keyed by size label
-  type AvailMap = Record<string, { sku: string; available: number; active: boolean }>
+  type AvailMap = Record<string, { sku: string; available: number; active: boolean; availableQty: number }>
   const [availability,        setAvailability]        = useState<AvailMap | null>(null)
   const [inventoryError,      setInventoryError]      = useState(false)
   const [inventoryLoading,    setInventoryLoading]    = useState(true)
@@ -44,7 +44,8 @@ export function PDPClient({ product, relatedProduct }: Props) {
     const map: AvailMap = {}
     for (const v of variants ?? []) {
       const isAvailable = v.in_stock === true
-      map[v.size] = { sku: v.sku, available: isAvailable ? 1 : 0, active: v.active !== false }
+      const qty = typeof v.available_qty === 'number' ? v.available_qty : (isAvailable ? 1 : 0)
+      map[v.size] = { sku: v.sku, available: isAvailable ? qty : 0, active: v.active !== false, availableQty: qty }
     }
     return map
   }
@@ -166,6 +167,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
       color: color.value, colorName: color.name, colorHex: color.hex, size: chosen,
       sku: itemSku,
       price: product.price, quantity: 1,
+      availableQuantity: availability?.[chosen]?.availableQty ?? undefined,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     setCta('done')
     setTimeout(() => { setCta('idle'); openCart() }, 700)
@@ -204,12 +206,14 @@ export function PDPClient({ product, relatedProduct }: Props) {
     addItem({ productId: product.id, productName: product.name, slug: product.slug,
       color: color.value, colorName: color.name, colorHex: color.hex, size: productSize as any,
       sku: productSku, price: product.price, quantity: 1,
+      availableQuantity: productAvail.availableQty ?? undefined,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     addItem({ productId: relatedProduct.id, productName: relatedProduct.name,
       slug: relatedProduct.slug,
       color: relatedProduct.colors[0].value, colorName: relatedProduct.colors[0].name,
       colorHex: relatedProduct.colors[0].hex, size: relatedSize as any,
       sku: relatedSku, price: relatedProduct.price, quantity: 1,
+      availableQuantity: relatedAvail.availableQty ?? undefined,
       image: relatedProduct.colors[0].images.find(i => i.type === 'front')?.src ?? '' })
     openCart()
   }, [color, product, relatedProduct, addItem, openCart,

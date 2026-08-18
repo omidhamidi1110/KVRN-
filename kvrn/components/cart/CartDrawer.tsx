@@ -98,26 +98,45 @@ export function CartDrawer() {
                     </div>
 
                     <div className="flex items-center gap-4 mt-3">
-                      {/* Qty */}
-                      <div className="flex items-center border border-kvrn-border" role="group" aria-label="Quantity">
-                        {[
-                          { label: '−', delta: -1 },
-                          { label: '+', delta: +1 },
-                        ].map((btn, i) => (
-                          <button
-                            key={i}
-                            onClick={() => updateQuantity(item.cartItemId, item.quantity + btn.delta)}
-                            aria-label={`${btn.delta > 0 ? 'Increase' : 'Decrease'} quantity`}
-                            className="w-8 h-8 flex items-center justify-center text-[14px] text-kvrn-muted hover:text-kvrn-text transition-colors"
-                          >
-                            {btn.label}
-                          </button>
-                        )).flatMap((el, i, arr) =>
-                          i < arr.length - 1
-                            ? [el, <span key={`sep-${i}`} className="w-8 h-8 flex items-center justify-center text-[13px] font-light">{item.quantity}</span>]
-                            : [el]
-                        )}
-                      </div>
+                      {/* Qty — cap + at availableQuantity */}
+                      {(() => {
+                        const cap = item.availableQuantity ?? Infinity
+                        const atCap = item.quantity >= cap
+                        return (
+                          <>
+                            <div className="flex items-center border border-kvrn-border" role="group" aria-label="Quantity">
+                              {[
+                                { label: '−', delta: -1, disabled: false },
+                                { label: '+', delta: +1, disabled: atCap },
+                              ].map((btn, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => !btn.disabled && updateQuantity(item.cartItemId, item.quantity + btn.delta)}
+                                  aria-label={`${btn.delta > 0 ? 'Increase' : 'Decrease'} quantity`}
+                                  aria-disabled={btn.disabled}
+                                  className={`w-8 h-8 flex items-center justify-center text-[14px] transition-colors ${
+                                    btn.disabled
+                                      ? 'text-kvrn-border cursor-default'
+                                      : 'text-kvrn-muted hover:text-kvrn-text cursor-pointer'
+                                  }`}
+                                >
+                                  {btn.label}
+                                </button>
+                              )).flatMap((el, i, arr) =>
+                                i < arr.length - 1
+                                  ? [el, <span key={`sep-${i}`} className="w-8 h-8 flex items-center justify-center text-[13px] font-light">{item.quantity}</span>]
+                                  : [el]
+                              )}
+                            </div>
+                            {typeof cap === 'number' && cap <= 3 && cap > 0 && (
+                              <span style={{ fontFamily: '-apple-system, Helvetica Neue, Arial, sans-serif',
+                                fontSize: 10, letterSpacing: '0.06em', color: cap === 1 ? '#B91C1C' : '#92400E' }}>
+                                {cap === 1 ? 'Only 1 left' : `Only ${cap} left`}
+                              </span>
+                            )}
+                          </>
+                        )
+                      })()}
                       <button
                         onClick={() => removeItem(item.cartItemId)}
                         className="text-[11px] text-kvrn-subtle hover:text-kvrn-text transition-colors tracking-wide"

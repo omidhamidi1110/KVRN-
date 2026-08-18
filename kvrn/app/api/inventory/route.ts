@@ -24,23 +24,26 @@ export async function GET(req: NextRequest) {
         pv.size_sort,
         pv.color_code,
         pv.active,
-        -- Return boolean only — exact counts are admin-only
-        (pv.stock_on_hand - pv.reserved_quantity > 0 AND pv.active = true) AS in_stock
+        (pv.stock_on_hand - pv.reserved_quantity > 0 AND pv.active = true) AS in_stock,
+        -- Actual non-negative available quantity
+        -- Used for cart caps; low-stock display handled in UI (e.g. show label when ≤ 3)
+        GREATEST(0, pv.stock_on_hand - pv.reserved_quantity) AS available_qty
       FROM product_variants pv
       JOIN products p ON p.id = pv.product_id
       WHERE p.slug = ${neonSlug} AND p.active = true
       ORDER BY pv.size_sort ASC
     `
 
-    // Strip any quantity fields — public response is boolean only
+    // Return boolean in_stock + capped available_qty for cart UX
+    // Exact stock_on_hand and reserved_quantity remain admin-only
     const variants = (rows as any[]).map(v => ({
-      sku:        v.sku        as string,
-      size:       v.size       as string,
-      size_sort:  v.size_sort  as number,
-      color_code: v.color_code as string,
-      active:     Boolean(v.active),
-      in_stock:   Boolean(v.in_stock),
-      // Deliberately omit: stock_on_hand, reserved_quantity, available_quantity
+      sku:           v.sku        as string,
+      size:          v.size       as string,
+      size_sort:     v.size_sort  as number,
+      color_code:    v.color_code as string,
+      active:        Boolean(v.active),
+      in_stock:      Boolean(v.in_stock),
+      available_qty: Number(v.available_qty),  // actual available count (stock_on_hand - reserved)
     }))
 
     return NextResponse.json({ variants }, {

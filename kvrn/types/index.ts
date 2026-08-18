@@ -84,6 +84,7 @@ export interface CartItem {
   sku?: string           // Permanent Drop 001 SKU e.g. KVRN-D001-PKHH-BLK-M
   price: number          // In pence
   quantity: number
+  availableQuantity?: number  // Capped available stock (for cart + UI)
   image: string          // Front image src for cart display
 }
 

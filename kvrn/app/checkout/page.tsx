@@ -52,6 +52,7 @@ export default function CheckoutPage() {
     shippingAdjustmentCents?: number; displayAmount?: string; type?: string;
   }>({ code: '', error: null })
   const [discountLoading,  setDiscountLoading]  = useState(false)
+  const [discountInputError, setDiscountInputError] = useState<string|null>(null)
   const [contactErrors,    setContactErrors]    = useState<Record<string, string>>({})
   const [addressErrors,    setAddressErrors]    = useState<Record<string, string>>({})
 
@@ -282,24 +283,27 @@ export default function CheckoutPage() {
       const data = await res.json()
       if (!data.valid) {
         // Clear stale localStorage code on permanent server-authoritative invalidity
-        // Uses machine-readable reason field (preferred over string matching)
         const permanentReasons = new Set(['invalid','expired','already_redeemed'])
         const isPerm = res.status === 400 && (
           permanentReasons.has(data.reason) ||
-          isPermanentDiscountError(data.error ?? '')  // fallback for older response format
+          isPermanentDiscountError(data.error ?? '')
         )
         if (isPerm) {
           try { localStorage.removeItem('kvrn_sms_discount_code') } catch {}
           setSmsOfferCode(null)
         }
-        setDiscountApplied({ code: '', error: data.error ?? 'Invalid code.' })
+        // Do NOT clear an existing valid applied code just because a new one failed
+        // Show error under the input; keep applied code in place
+        const errorMsg = data.error ?? 'That code isn\'t valid.'
+        setDiscountInputError(errorMsg)
       } else {
+        setDiscountInputError(null)
         setDiscountApplied({ code: data.code, error: null,
           discountCents: data.discountCents, shippingAdjustmentCents: data.shippingAdjustmentCents,
           displayAmount: data.displayAmount, type: data.type })
       }
     } catch {
-      setDiscountApplied({ code: '', error: 'Network error. Please try again.' })
+      setDiscountInputError('Network error. Please try again.')
     } finally {
       setDiscountLoading(false)
     }
@@ -308,6 +312,7 @@ export default function CheckoutPage() {
   const handleRemoveDiscount = () => {
     setDiscountApplied({ code: '', error: null })
     setDiscountInput('')
+    setDiscountInputError(null)
   }
 
   // Permanent discount errors: clear stale localStorage code
@@ -795,46 +800,87 @@ export default function CheckoutPage() {
               )}
 
               {/* ── Discount Code & Summary ──────────────────────────────── */}
+              {/* Input — shown when no code applied OR when a code is applied (for stacking attempts) */}
               {!discountApplied.code ? (
-                <div style={{ display:'flex', gap:8 }}>
-                  <input
-                    type="text"
-                    value={discountInput}
-                    onChange={e => setDiscountInput(e.target.value.toUpperCase())}
-                    onKeyDown={e => { if (e.key === 'Enter') handleApplyDiscount() }}
-                    placeholder="DISCOUNT CODE"
-                    style={{ flex:1, padding:'10px 12px', fontSize:12, border:'1px solid #E8E5E0',
-                             background:'#fff', outline:'none', letterSpacing:'0.06em',
-                             textTransform:'uppercase', fontFamily: '-apple-system, Helvetica Neue, Arial, sans-serif' }}
-                  />
-                  <button
-                    onClick={() => void handleApplyDiscount()}
-                    disabled={discountLoading || !discountInput.trim()}
-                    style={{ padding:'10px 14px', background:'#1A1A1A', color:'#fff', border:'none',
-                             cursor:'pointer', fontSize:11, fontWeight:500, letterSpacing:'0.08em',
-                             textTransform:'uppercase', opacity:(discountLoading || !discountInput.trim()) ? 0.4 : 1 }}
-                  >
-                    APPLY
-                  </button>
+                <div>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input
+                      type="text"
+                      value={discountInput}
+                      onChange={e => { setDiscountInput(e.target.value.toUpperCase()); setDiscountInputError(null) }}
+                      onKeyDown={e => { if (e.key === 'Enter') handleApplyDiscount() }}
+                      placeholder="DISCOUNT CODE"
+                      style={{ flex:1, padding:'10px 12px', fontSize:12,
+                               border: discountInputError ? '1px solid #FCA5A5' : '1px solid #E8E5E0',
+                               background:'#fff', outline:'none', letterSpacing:'0.06em',
+                               textTransform:'uppercase', fontFamily: '-apple-system, Helvetica Neue, Arial, sans-serif' }}
+                      aria-invalid={!!discountInputError}
+                      aria-describedby={discountInputError ? 'discount-error' : undefined}
+                    />
+                    <button
+                      onClick={() => void handleApplyDiscount()}
+                      disabled={discountLoading || !discountInput.trim()}
+                      style={{ padding:'10px 14px', background:'#1A1A1A', color:'#fff', border:'none',
+                               cursor:'pointer', fontSize:11, fontWeight:500, letterSpacing:'0.08em',
+                               textTransform:'uppercase', opacity:(discountLoading || !discountInput.trim()) ? 0.4 : 1 }}
+                      aria-busy={discountLoading}
+                    >
+                      {discountLoading ? '…' : 'APPLY'}
+                    </button>
+                  </div>
+                  {discountInputError && (
+                    <p id="discount-error" role="alert"
+                      style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
+                               fontSize:11, color:'#B91C1C', marginTop:6, letterSpacing:'0.02em' }}>
+                      {discountInputError}
+                    </p>
+                  )}
                 </div>
               ) : (
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13,
-                              background:'#F1EEE8', padding:'10px 12px' }}>
-                  <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', letterSpacing:'0.04em', color:'#1A1A1A' }}>
-                    {discountApplied.code}
-                    {discountApplied.error && (
-                      <span style={{ color:'#B91C1C', display:'block', fontSize:11, marginTop:2 }}>
-                        {discountApplied.error}
+                <div>
+                  {/* Applied code banner */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
+                                background:'#F1EEE8', padding:'10px 12px', marginBottom: discountInputError ? 6 : 0 }}>
+                    <div>
+                      <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
+                                     fontSize:12, fontWeight:500, letterSpacing:'0.06em',
+                                     textTransform:'uppercase', color:'#1A1A1A' }}>
+                        {discountApplied.code}
                       </span>
-                    )}
-                  </span>
-                  <button
-                    onClick={handleRemoveDiscount}
-                    style={{ background:'none', border:'none', cursor:'pointer', color:'#6b7280',
-                             fontSize:11, letterSpacing:'0.04em', textDecoration:'underline' }}
-                  >
-                    REMOVE
-                  </button>
+                      {discountApplied.displayAmount && (
+                        <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
+                                       fontSize:11, color:'#059669', marginLeft:8 }}>
+                          {discountApplied.displayAmount}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <button
+                        onClick={handleRemoveDiscount}
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'#6b7280',
+                                 fontSize:11, letterSpacing:'0.04em', textDecoration:'underline',
+                                 fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
+                                 display:'block' }}
+                      >
+                        REMOVE
+                      </button>
+                      <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
+                                     fontSize:10, color:'#9B9B9B', letterSpacing:'0.04em',
+                                     display:'block', marginTop:2 }}>
+                        One per order
+                      </span>
+                    </div>
+                  </div>
+                  {/* Stacking / second-code error shown when a code is already applied */}
+                  {discountInputError && (
+                    <p role="alert"
+                      style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
+                               fontSize:11, color:'#92400E', background:'#FFFBEB',
+                               border:'1px solid #FDE68A', padding:'8px 12px',
+                               letterSpacing:'0.02em' }}>
+                      {discountInputError}
+                    </p>
+                  )}
                 </div>
               )}
 
