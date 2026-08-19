@@ -89,30 +89,41 @@ describe('applyDiscountPriority', () => {
     expect(result.blockedReason).toBeNull()
   })
 
-  // Item 15: US subtotal $150 + KVRN10 → free shipping wins, KVRN10 blocked
-  test('US subtotal $15000 cents + KVRN10 → free shipping wins', () => {
+  // Item 15: automatic free shipping may stack with one merchandise promo
+  test('US subtotal $15000 cents + KVRN10 → automatic free shipping stacks with merchandise discount', () => {
     const discount = makeDiscount({ type: 'fixed_amount', amountCents: 1000 })
     const result = applyDiscountPriority({
       discount,
       subtotalCents: 15000,
       country: 'US',
-      shippingCents: 0,    // free shipping already applied
+      shippingCents: 0,
     })
-    expect(result.applied).toBeNull()
-    expect(result.blockedReason).toContain('free shipping')
+    expect(result.applied).not.toBeNull()
+    expect(result.applied?.amountCents).toBe(1000)
+    expect(result.applied?.shippingAdjustmentCents).toBe(0)
+    expect(result.blockedReason).toBeNull()
   })
 
-  // Item 16: US subtotal $160 + SMS code → free shipping wins, SMS blocked
-  test('US subtotal $160 + SMS code → free shipping wins', () => {
-    const smsCode = makeDiscount({ code: 'KVRN-A7K4P9', singleUse: true, subscriberId: 'sub-001' })
+  // Item 16: SMS merchandise promo also stacks with automatic free shipping
+  test('US subtotal $160 + SMS code → automatic free shipping stacks with merchandise discount', () => {
+    const smsCode = makeDiscount({
+      code: 'KVRN-A7K4P9',
+      type: 'fixed_amount',
+      amountCents: 1000,
+      singleUse: true,
+      subscriberId: 'sub-001',
+    })
     const result = applyDiscountPriority({
       discount: smsCode,
       subtotalCents: 16000,
       country: 'US',
       shippingCents: 0,
     })
-    expect(result.applied).toBeNull()
-    expect(result.blockedReason).toContain('free shipping')
+    expect(result.applied).not.toBeNull()
+    expect(result.applied?.code).toBe('KVRN-A7K4P9')
+    expect(result.applied?.amountCents).toBe(1000)
+    expect(result.applied?.shippingAdjustmentCents).toBe(0)
+    expect(result.blockedReason).toBeNull()
   })
 
   // Item 17: non-US $160 + KVRN10 → allowed (no US free-shipping rule)

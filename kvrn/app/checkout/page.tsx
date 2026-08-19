@@ -278,7 +278,13 @@ export default function CheckoutPage() {
       const res = await fetch('/api/discounts/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, country: address.country || 'US', items: cartItems, shippingMethod }),
+        body: JSON.stringify({
+          code,
+          country: address.country || 'US',
+          items: cartItems,
+          shippingMethod,
+          shippingCents,
+        }),
       })
       const data = await res.json()
       if (!data.valid) {
@@ -867,7 +873,7 @@ export default function CheckoutPage() {
                       <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
                                      fontSize:10, color:'#9B9B9B', letterSpacing:'0.04em',
                                      display:'block', marginTop:2 }}>
-                        One per order
+                        One promo code per order · Automatic offers may still apply
                       </span>
                     </div>
                   </div>

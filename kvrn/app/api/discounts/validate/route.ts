@@ -5,7 +5,6 @@
 // Never trusts client-supplied discount amounts.
 import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
-import { calculateShippingCents, type ShippingMethod } from '@/lib/stripe'
 import { validateDiscount, applyDiscountPriority, normalizeDiscountCode } from '@/lib/discounts'
 import { qualifiesForFreeShipping } from '@/lib/free-shipping'
 
@@ -21,10 +20,18 @@ export async function POST(req: NextRequest) {
   const country       = typeof body.country === 'string' ? body.country.toUpperCase() : 'US'
   const cartItems     = Array.isArray(body.items) ? body.items : []
   const rawMethod     = body.shippingMethod
-  // Authoritative shipping cost for US; non-US uses 0 (Shippo rates not deterministic at preview time)
-  const authShipping  = country === 'US' && ['standard','express'].includes(rawMethod)
-    ? calculateShippingCents(rawMethod as ShippingMethod)
-    : 0
+  const rawShippingCents = body.shippingCents
+
+  // PREVIEW ONLY. Final checkout/session independently re-fetches Shippo
+  // and remains authoritative for the actual shipping charge.
+  const previewShippingCents =
+    country === 'US' &&
+    ['standard','express'].includes(rawMethod) &&
+    Number.isInteger(rawShippingCents) &&
+    rawShippingCents >= 0 &&
+    rawShippingCents <= 100000
+      ? rawShippingCents
+      : 0
 
   if (!rawCode || typeof rawCode !== 'string') {
     return NextResponse.json({ valid: false, error: "Enter a discount code." })
@@ -37,10 +44,20 @@ export async function POST(req: NextRequest) {
       for (const item of cartItems) {
         if (typeof item.sku !== 'string' || !Number.isInteger(item.quantity) || item.quantity < 1) continue
         const rows = await sql`
-          SELECT price_cents FROM product_variants WHERE sku = ${item.sku} LIMIT 1
+          SELECT p.price_cents
+          FROM product_variants pv
+          JOIN products p ON p.id = pv.product_id
+          WHERE pv.sku = ${item.sku}
+          LIMIT 1
         `
         const price = (rows as any[])[0]?.price_cents
-        if (price) subtotalCents += Number(price) * item.quantity
+        if (price === undefined || price === null) {
+          return NextResponse.json(
+            { valid: false, error: 'An item in your cart is no longer available.', reason: 'invalid_cart' },
+            { status: 400 }
+          )
+        }
+        subtotalCents += Number(price) * item.quantity
       }
     }
   } catch (err: any) {
@@ -48,7 +65,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ valid: false, error: 'Could not validate code at this time.' }, { status: 500 })
   }
 
-  // Check US free-shipping eligibility (blocks merchandise codes)
+  // Automatic US free shipping is a store benefit and may stack with one merchandise promo.
   const freeShippingEligible = qualifiesForFreeShipping(country, subtotalCents)
 
   // Validate discount code
@@ -62,16 +79,8 @@ export async function POST(req: NextRequest) {
     discount:      validation.discount,
     subtotalCents,
     country,
-    shippingCents: authShipping,  // authoritative US shipping; 0 for non-US preview
+    shippingCents: previewShippingCents,  // preview only; checkout/session revalidates Shippo
   })
-
-  // Override: if free shipping eligible and NOT a shipping discount → block
-  if (freeShippingEligible && validation.discount.type !== 'shipping') {
-    return NextResponse.json({
-      valid: false,
-      error: 'This order already qualifies for free shipping. Discounts cannot be combined.',
-    })
-  }
 
   if (priorityResult.blockedReason) {
     return NextResponse.json({ valid: false, error: priorityResult.blockedReason, reason: 'blocked' })
@@ -82,7 +91,7 @@ export async function POST(req: NextRequest) {
   }
 
   const a = priorityResult.applied
-  const effectiveShipping = Math.max(0, authShipping - a.shippingAdjustmentCents)
+  const effectiveShipping = Math.max(0, previewShippingCents - a.shippingAdjustmentCents)
   return NextResponse.json({
     valid:               true,
     code:                normalizeDiscountCode(rawCode),
@@ -91,7 +100,7 @@ export async function POST(req: NextRequest) {
     shippingAdjustmentCents: a.shippingAdjustmentCents,
     effectiveShippingCents:  effectiveShipping,
     displayAmount:       a.type === 'shipping'
-      ? (a.shippingAdjustmentCents >= authShipping ? 'Free shipping'
+      ? (a.shippingAdjustmentCents >= previewShippingCents ? 'Free shipping'
          : `-$${(a.shippingAdjustmentCents/100).toFixed(2)} off shipping`)
       : `-$${(a.amountCents/100).toFixed(2)}`,
   })

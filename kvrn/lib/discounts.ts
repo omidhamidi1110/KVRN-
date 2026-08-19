@@ -157,9 +157,10 @@ export async function validateDiscount(
 
 // ── Discount priority enforcement ─────────────────────────────────────────────
 //
-// KVRN RULE: US $150+ free shipping blocks ALL merchandise/order discounts,
-// even if the customer selects Express. Eligibility is based on country + subtotal,
-// NOT on whether shippingCents === 0. This prevents bypass via Express selection.
+// KVRN RULE:
+// Automatic US $150+ free shipping is a store benefit and MAY stack with
+// one merchandise/order promo code. A redundant manual SHIPPING promo remains
+// blocked when automatic free shipping already applies.
 
 export function applyDiscountPriority(opts: {
   discount:       Discount | null
@@ -171,8 +172,8 @@ export function applyDiscountPriority(opts: {
 
   if (!discount) return { applied: null, blockedReason: null }
 
-  // US $150+ eligibility blocks all order/merchandise discounts
-  // (even if customer picks Express — the automatic benefit still takes priority)
+  // Automatic US free-shipping eligibility is independent of the customer's
+  // single merchandise promo-code slot.
   const freeShippingEligible = qualifiesForFreeShipping(country, subtotalCents)
 
   // Shipping discount codes — highest manual priority
@@ -198,13 +199,9 @@ export function applyDiscountPriority(opts: {
     }
   }
 
-  // Merchandise/order discounts — blocked by US free-shipping eligibility
-  if (freeShippingEligible) {
-    return {
-      applied: null,
-      blockedReason: 'This order already qualifies for free shipping. Discounts cannot be combined.',
-    }
-  }
+  // Merchandise/order discounts MAY stack with automatic US $150+ free shipping.
+  // Automatic free shipping is a store benefit, not a promo-code slot.
+  // Shipping discount codes above remain redundant when auto free shipping applies.
 
   // Compute merchandise discount amount
   let amountCents: number
