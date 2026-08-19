@@ -9,6 +9,9 @@ import { sql } from '@/lib/db'
 import { processPendingTransactionalEmails } from '@/lib/transactional-email'
 import { releaseDiscountClaim } from '@/lib/discounts'
 import { getEmailProvider } from '@/lib/resend-adapter'
+import { recordOrderRefund, normalizeRefundStatus } from '@/lib/refunds'
+import { reconcileStripeFeeForOrder } from '@/lib/stripe-fees'
+import { getStripe } from '@/lib/stripe-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,6 +64,22 @@ export async function POST(req: NextRequest) {
         await releaseDiscountClaimForSession(session)
         break
 
+      // ── Refunds ────────────────────────────────────────────────────────────
+      // charge.refunded fires for the charge as a whole; refund.* fire per refund
+      // object. All three routes converge on the same idempotent SQL function, so
+      // overlapping deliveries of the same refund cannot double-count.
+      case 'charge.refunded': {
+        await handleChargeRefunded(session)
+        break
+      }
+
+      case 'refund.created':
+      case 'refund.updated':
+      case 'charge.refund.updated': {
+        await handleRefundObject(session)
+        break
+      }
+
       default:
         return NextResponse.json({ received: true, handled: false })
     }
@@ -112,6 +131,12 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
       // Log without PII — order remains paid regardless
       console.error('[WEBHOOK] Email send failed (non-fatal):', emailErr?.message?.slice(0, 100))
     }
+
+    // Opportunistic Stripe fee capture. Usually not settled yet, in which case the
+    // five-minute cron reconciles it later. Never allowed to affect the paid order.
+    if (result.orderId) {
+      await tryEnrichStripeFee(result.orderId)
+    }
   }
 }
 
@@ -123,5 +148,91 @@ async function releaseDiscountClaimForSession(session: any) {
     await releaseDiscountClaim(reservationId)
   } catch (err: any) {
     console.error('[WEBHOOK] releaseDiscountClaim error (non-fatal):', err?.message?.slice(0, 60))
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REFUND HANDLERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * charge.refunded — the charge object carries a `refunds` list. Each entry is
+ * recorded individually so partial refunds are preserved as separate rows rather
+ * than being collapsed into one running total.
+ */
+async function handleChargeRefunded(charge: any) {
+  const paymentIntentId = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent
+    : charge.payment_intent?.id
+  if (!paymentIntentId) return
+
+  const refunds: any[] = charge.refunds?.data ?? []
+  if (refunds.length === 0) return
+
+  for (const refund of refunds) {
+    try {
+      await recordOrderRefund(sql, {
+        stripeRefundId:   refund.id,
+        paymentIntentId,
+        chargeId:         charge.id ?? null,
+        amountCents:      Number(refund.amount ?? 0),
+        currency:         refund.currency ?? 'usd',
+        status:           normalizeRefundStatus(refund.status),
+        reason:           refund.reason ?? null,
+        // Stripe reports a returned processing fee only sometimes.
+        // Absent => NULL => "unknown", never assumed to be zero.
+        feeRefundedCents: null,
+        refundedAt:       refund.created
+          ? new Date(refund.created * 1000).toISOString()
+          : null,
+      })
+    } catch (err: any) {
+      console.error('[WEBHOOK] refund record failed:', err?.message?.slice(0, 100))
+    }
+  }
+}
+
+/** refund.created / refund.updated — a single refund object. */
+async function handleRefundObject(refund: any) {
+  const paymentIntentId = typeof refund.payment_intent === 'string'
+    ? refund.payment_intent
+    : refund.payment_intent?.id
+  if (!paymentIntentId || !refund.id) return
+
+  try {
+    await recordOrderRefund(sql, {
+      stripeRefundId:   refund.id,
+      paymentIntentId,
+      chargeId:         typeof refund.charge === 'string' ? refund.charge : refund.charge?.id ?? null,
+      amountCents:      Number(refund.amount ?? 0),
+      currency:         refund.currency ?? 'usd',
+      status:           normalizeRefundStatus(refund.status),
+      reason:           refund.reason ?? null,
+      feeRefundedCents: null,
+      refundedAt:       refund.created
+        ? new Date(refund.created * 1000).toISOString()
+        : null,
+    })
+  } catch (err: any) {
+    console.error('[WEBHOOK] refund record failed:', err?.message?.slice(0, 100))
+  }
+}
+
+/**
+ * Opportunistic Stripe fee capture immediately after an order is created.
+ *
+ * NON-FATAL BY DESIGN. The fee is usually not settled this early, in which case
+ * this is a no-op and the five-minute cron picks it up later. A failure here must
+ * never affect a successful paid order, so every error is swallowed after logging.
+ */
+async function tryEnrichStripeFee(orderId: string) {
+  try {
+    const stripe = getStripe()
+    const result = await reconcileStripeFeeForOrder({ sql, stripe, orderId })
+    if (result.outcome === 'enriched') {
+      console.log('[WEBHOOK] Stripe fee reconciled at order creation')
+    }
+  } catch (err: any) {
+    console.error('[WEBHOOK] Fee enrichment skipped (non-fatal):', err?.message?.slice(0, 80))
   }
 }

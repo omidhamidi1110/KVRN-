@@ -70,6 +70,74 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Financials',
+    items: [
+      {
+        label: 'Overview',
+        href: '/admin/financials',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 3v18h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="m7 14 3.5-4 3 3L20 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Shipping',
+        href: '/admin/financials/shipping',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 7h11v10H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="M14 10h4l3 3v4h-7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+            <circle cx="7" cy="18" r="1.6" stroke="currentColor" strokeWidth="1.5"/>
+            <circle cx="17" cy="18" r="1.6" stroke="currentColor" strokeWidth="1.5"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Product Costs',
+        href: '/admin/financials/costs',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3v18M8 7.5h6a2.5 2.5 0 0 1 0 5h-4a2.5 2.5 0 0 0 0 5h6"
+                  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Advertising',
+        href: '/admin/financials/advertising',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 10v4h4l6 4V6l-6 4H3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="M17 9a4 4 0 0 1 0 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Infrastructure',
+        href: '/admin/financials/infrastructure',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="3" y="14" width="18" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M7 7h.01M7 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Expenses',
+        href: '/admin/financials/expenses',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M3 10h18M7 15h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
     label: 'Marketing',
     items: [
       {

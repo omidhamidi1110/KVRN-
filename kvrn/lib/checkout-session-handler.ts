@@ -281,16 +281,27 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     // Infinity ensures the selected (only available) method is always cheapest.
     // Never fall back to static cents for the free-shipping comparison.
     const otherCents  = shippoRatesResult?.[otherMethod]?.cents ?? Infinity
+
+    // FINANCIAL SNAPSHOT: capture the live carrier quote BEFORE the automatic
+    // free-shipping benefit is applied. applyFreeShippingToSingleRate overwrites
+    // shippingCents with 0 when the order qualifies, which would otherwise destroy
+    // all record of what the benefit gave away. Phase B reports the cost of free
+    // shipping from this value.
+    const quotedShippingCents = shippingCents
+
     shippingCents = applyFreeShippingToSingleRate(
       shippingCents, otherCents, shippingMethod, country, subtotalCents
     )
+
+    // Amount waived by the AUTOMATIC benefit (distinct from a manual promo code).
+    const autoFreeShippingDiscountCents = Math.max(0, quotedShippingCents - shippingCents)
 
     // Discount code from request body (validated server-side, never trusted from client)
     const rawDiscountCode = typeof body.discountCode === 'string' ? body.discountCode.trim() : null
 
     // ── Discount validation — server-authoritative ────────────────────────────
-    // Discount priority: shipping (incl. auto free-shipping) > merchandise.
-    // Never stack. Free shipping winning blocks all merchandise/order discounts.
+    // Discount priority: automatic free shipping may coexist with one merchandise promo.
+    // Manual shipping promo codes remain redundant when automatic free shipping applies.
     let appliedDiscount: import('./discounts').AppliedDiscount | null = null
     let discountBlockedReason: string | null = null
 
@@ -394,6 +405,9 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         shippingBeforeDiscountCents: shippingCents,
         shippingDiscountCents:       appliedDiscount?.shippingAdjustmentCents ?? 0,
         shippingFinalCents:          adjustedShippingCents,
+        // Phase B shipping economics: live quote + automatic benefit waiver
+        shippingQuotedCents:            quotedShippingCents,
+        shippingAutoFreeDiscountCents:  autoFreeShippingDiscountCents,
         // Attribution: stored for ALL discount types (id/code/type)
         // discountCents: merchandise/order only — stays 0 for shipping codes
         // Shipping value is only in shipping_before/discount/final fields

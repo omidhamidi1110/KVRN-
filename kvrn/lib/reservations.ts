@@ -145,6 +145,10 @@ export interface CheckoutDetails {
   shippingBeforeDiscountCents: number
   shippingDiscountCents:       number
   shippingFinalCents:          number
+  /** Live carrier quote before ANY reduction. Null when unavailable. */
+  shippingQuotedCents?:           number | null
+  /** Amount waived by the automatic US free-shipping benefit. */
+  shippingAutoFreeDiscountCents?: number
   // Merchandise/order discount only (never shipping code)
   discountId?:                string | null
   discountCode?:              string | null
@@ -269,6 +273,7 @@ export function createReservationService(sql: NeonQueryFunction<false, false>): 
     async saveReservationCheckoutDetails(reservationId, details) {
       const { customerEmail, customerName, customerPhone, shippingAddress, shippingMethod,
               shippingBeforeDiscountCents, shippingDiscountCents, shippingFinalCents,
+              shippingQuotedCents, shippingAutoFreeDiscountCents,
               discountId, discountCode, discountType, discountCents } = details
       const rows = await sql`
         SELECT save_reservation_checkout_details(
@@ -284,7 +289,9 @@ export function createReservationService(sql: NeonQueryFunction<false, false>): 
           ${discountId ?? null}::uuid,
           ${discountCode ?? null},
           ${discountType ?? null},
-          ${discountCents ?? 0}::integer
+          ${discountCents ?? 0}::integer,
+          ${shippingQuotedCents ?? null}::integer,
+          ${shippingAutoFreeDiscountCents ?? 0}::integer
         ) AS result
       `
       return Boolean((rows[0] as any).result)

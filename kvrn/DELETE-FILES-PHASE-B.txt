@@ -1,0 +1,24 @@
+# KVRN Phase B — files to DELETE when applying this patch
+#
+# A ZIP overlay can add and replace files but cannot express a deletion. These two
+# routes belonged to the old single-table operating_expenses model, which migration
+# 016 replaced with expense_definitions / expense_transactions /
+# provider_usage_snapshots.
+#
+# They import a service that no longer exists. If they survive the patch, Next.js
+# will register /api/admin/expenses against removed code and the build will fail.
+#
+# Run from the repository root:
+#
+#   rm -f app/api/admin/expenses/route.ts
+#   rm -f "app/api/admin/expenses/[id]/route.ts"
+#   rmdir "app/api/admin/expenses/[id]" 2>/dev/null || true
+#
+# Replacements (already included in this patch):
+#   app/api/admin/expenses/definitions/route.ts
+#   app/api/admin/expenses/definitions/[id]/route.ts
+#   app/api/admin/expenses/transactions/route.ts
+#   app/api/admin/expenses/transactions/[id]/route.ts
+
+app/api/admin/expenses/route.ts
+app/api/admin/expenses/[id]/route.ts

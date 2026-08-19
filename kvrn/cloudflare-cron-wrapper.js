@@ -95,5 +95,30 @@ export default {
     } catch (err) {
       console.error('[cron] Marketing sync failed:', err?.message || String(err))
     }
+
+    // ── 3. Stripe fee reconciliation ─────────────────────────────────────────
+    // Captures the ACTUAL processing fee for paid orders once Stripe settles the
+    // charge. Fees are never estimated. Failures here never affect order state.
+    try {
+      const feeReq = new Request('https://cron-internal/api/internal/stripe-fee-reconcile', {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${cronSecret}`,
+          'Content-Type':  'application/json',
+        },
+      })
+      const feeRes = await openNextWorker.fetch(feeReq, env, ctx)
+      if (!feeRes.ok) {
+        console.error(`[cron] Stripe fee reconcile returned HTTP ${feeRes.status}`)
+      } else {
+        const data = await feeRes.json().catch(() => ({}))
+        const { processed = 0, enriched = 0, notSettled = 0, failed = 0 } = data
+        if (processed > 0) {
+          console.log(`[cron] Stripe fees: processed=${processed} enriched=${enriched} notSettled=${notSettled} failed=${failed}`)
+        }
+      }
+    } catch (err) {
+      console.error('[cron] Stripe fee reconcile failed:', err?.message || String(err))
+    }
   },
 }
