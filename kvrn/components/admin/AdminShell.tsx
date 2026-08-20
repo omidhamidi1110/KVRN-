@@ -156,13 +156,37 @@ const navGroups: NavGroup[] = [
 // Flat list for mobile nav (preserves existing mobile pattern)
 const navItems: NavItem[] = navGroups.flatMap(g => g.items)
 
-function isActive(pathname: string, href: string) {
-  if (href === '/admin') return pathname === '/admin'
-  return pathname === href || pathname.startsWith(`${href}/`)
+/**
+ * Resolve which single nav href is active for the current path.
+ *
+ * MOST-SPECIFIC MATCH WINS. A plain prefix test is not enough: /admin/financials
+ * is a prefix of /admin/financials/costs, so Overview and Product Costs would both
+ * highlight. Exact-match-only is also wrong, because it would un-highlight Orders
+ * while viewing /admin/orders/<id>.
+ *
+ * Taking the longest matching href satisfies both:
+ *   /admin/financials/costs -> Product Costs only (longest match)
+ *   /admin/orders/<id>      -> Orders            (only match)
+ *   /admin                  -> Overview          (exact, see below)
+ *
+ * /admin is special-cased to exact match because it prefixes every admin route.
+ */
+function resolveActiveHref(pathname: string, hrefs: string[]): string | null {
+  let best: string | null = null
+  for (const href of hrefs) {
+    const matches = href === '/admin'
+      ? pathname === '/admin'
+      : pathname === href || pathname.startsWith(`${href}/`)
+    if (!matches) continue
+    if (best === null || href.length > best.length) best = href
+  }
+  return best
 }
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  // Resolved once so desktop and mobile navigation can never disagree.
+  const activeHref = resolveActiveHref(pathname, navItems.map(i => i.href))
 
   return (
     <div className="min-h-screen bg-[#F5F5F3] text-[#171717]">
@@ -187,7 +211,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 </p>
                 <div className="space-y-0.5">
                   {group.items.map(item => {
-                    const active = isActive(pathname, item.href)
+                    const active = item.href === activeHref
                     return (
                       <Link
                         key={item.href}
@@ -257,7 +281,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
         <nav className="flex overflow-x-auto border-t border-white/[0.07] px-3" aria-label="Admin mobile navigation">
           {navItems.map(item => {
-            const active = isActive(pathname, item.href)
+            const active = item.href === activeHref
             return (
               <Link
                 key={item.href}

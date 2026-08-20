@@ -588,24 +588,34 @@ describe('realised expense reporting reads transactions only', () => {
   const FIN = fs.readFileSync(path.join(__dirname, '../financials.ts'), 'utf8')
 
   test('actual operating expenses are sourced from expense_transactions', () => {
-    const fn = FIN.slice(FIN.indexOf('async getRecognizedOperatingExpensesCents'),
-                         FIN.indexOf('async getForecastOperatingExpensesCents'))
-    expect(fn).toContain('FROM expense_transactions')
-    // An expectation is not a bill — definitions must never enter this figure.
-    expect(fn).not.toContain('expense_definitions')
-    expect(fn).not.toContain('provider_usage_snapshots')
+    // The query moved into the shared fetchExpenseRows helper so the period path
+    // and the per-bucket chart path read identical rows. The invariant is
+    // unchanged: only real transactions, never definitions or usage forecasts.
+    const fetchFn = FIN.slice(FIN.indexOf('async function fetchExpenseRows'),
+                              FIN.indexOf('async function fetchAdSpendRows'))
+    expect(fetchFn).toContain('FROM expense_transactions')
+    expect(fetchFn).not.toContain('expense_definitions')
+    expect(fetchFn).not.toContain('provider_usage_snapshots')
   })
 
   test('only settled transactions count toward realised expense', () => {
-    const fn = FIN.slice(FIN.indexOf('async getRecognizedOperatingExpensesCents'),
-                         FIN.indexOf('async getForecastOperatingExpensesCents'))
-    expect(fn).toContain('paid_at IS NOT NULL')
+    // Enforced twice: the fetch filters unpaid rows, and the recognition
+    // primitive skips any row without a paid date.
+    const fetchFn = FIN.slice(FIN.indexOf('async function fetchExpenseRows'),
+                              FIN.indexOf('async function fetchAdSpendRows'))
+    expect(fetchFn).toContain('paid_at IS NOT NULL')
+
+    const calc = fs.readFileSync(path.join(__dirname, '../financial-calculator.ts'), 'utf8')
+    const prim = calc.slice(calc.indexOf('export function recognizeExpenseRowsExact'))
+    expect(prim).toContain('if (!r.paidAt) continue')
   })
 
   test('development expense is split out from operating expense', () => {
-    const fn = FIN.slice(FIN.indexOf('async getRecognizedOperatingExpensesCents'),
-                         FIN.indexOf('async getForecastOperatingExpensesCents'))
-    expect(fn).toContain("r.category === 'development'")
+    // The split now lives in the canonical primitive, shared by the period
+    // totals and the chart buckets, so both classify identically.
+    const calc = fs.readFileSync(path.join(__dirname, '../financial-calculator.ts'), 'utf8')
+    const prim = calc.slice(calc.indexOf('export function recognizeExpenseRowsExact'))
+    expect(prim).toContain("r.category === 'development'")
   })
 
   test('forecasts are read from usage snapshots and kept apart', () => {

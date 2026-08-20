@@ -23,6 +23,21 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   FONT, BORDER, money, moneyOrUnknown, RangePicker, SectionTitle, buildQuery,
 } from '@/components/admin/FinancialUI'
+import { PROVIDER_PORTALS } from '@/lib/provider-portals'
+import { LineChart, type LineSeries } from '@/components/admin/charts/LineChart'
+
+type UsageSeries = {
+  granularity: string
+  labels: string[]
+  series: {
+    usageValue: Array<number | null>
+    estimatedAccruedCents: Array<number | null>
+    spendCents: number[]
+  }
+  metricUnit: string | null
+  includedAllowance: number | null
+  availableMetrics: Array<{ provider: string; metricName: string; metricUnit: string }>
+}
 
 type Definition = {
   id: string; name: string; category: string; cadence: string
@@ -61,6 +76,8 @@ type Totals = {
   usageMetricCount: number
 }
 
+const INPUT_STYLE = { fontFamily: FONT, fontSize: 12, padding: '8px 10px', border: BORDER, background: '#fff', width: '100%', boxSizing: 'border-box' as const }
+
 function ThresholdPill({ status }: { status: string | null }) {
   if (!status) return <span style={{ color: '#9B9B9B' }}>—</span>
   const map: Record<string, { bg: string; bd: string; fg: string }> = {
@@ -85,19 +102,90 @@ export function InfrastructureClient() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [err, setErr]       = useState<string | null>(null)
+  const [usageTs, setUsageTs] = useState<UsageSeries | null>(null)
+  // Usage (a meter reading in provider units) and spend (money) are never drawn
+  // on one axis. The operator picks which to view.
+  const [chartMode, setChartMode] = useState<'usage' | 'spend'>('spend')
+  const [chartProvider, setChartProvider] = useState('')
+  const [chartMetric, setChartMetric] = useState('')
+  const [showUsageForm, setShowUsageForm] = useState(false)
+  const [savingUsage, setSavingUsage]     = useState(false)
+  const [usageForm, setUsageForm] = useState({
+    provider: '', metricName: '', metricUnit: '',
+    usageValue: '', includedAllowance: '',
+    estimatedAccruedCents: '', projectedMonthEndCents: '',
+    thresholdStatus: '', billingPeriodStart: '', billingPeriodEnd: '',
+  })
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null)
     try {
-      const res  = await fetch(`/api/admin/financials/infrastructure${buildQuery(range, custom)}`)
+      const q = buildQuery(range, custom)
+      const params = new URLSearchParams()
+      if (chartProvider) params.set('provider', chartProvider)
+      if (chartMetric)   params.set('metric', chartMetric)
+      const extra = params.toString() ? `&${params}` : ''
+
+      const [res, tsRes] = await Promise.all([
+        fetch(`/api/admin/financials/infrastructure${q}`),
+        fetch(`/api/admin/financials/infrastructure/timeseries${q}${extra}`),
+      ])
       const json = await res.json()
       if (!res.ok) { setErr(json.error ?? 'Could not load infrastructure costs.'); return }
       setData(json)
+      // A chart failure must not blank the cost tables below it.
+      if (tsRes.ok) setUsageTs(await tsRes.json()); else setUsageTs(null)
     } catch { setErr('Network error.') }
     finally { setLoading(false) }
-  }, [range, custom])
+  }, [range, custom, chartProvider, chartMetric])
 
   useEffect(() => { void load() }, [load])
+
+  /**
+   * Record a manual usage reading.
+   *
+   * Until Batch 4 wires provider APIs, this is how usage and forecast figures
+   * enter the system. Everything saved here is stored as source='manual' and
+   * remains a FORECAST — estimated/projected amounts are never treated as a bill
+   * and never reduce realised profit.
+   */
+  async function saveUsage() {
+    if (!usageForm.provider.trim() || !usageForm.metricName.trim() || !usageForm.metricUnit.trim()) {
+      setErr('Provider, metric name and unit are required.'); return
+    }
+    const toCents = (v: string) => {
+      if (!v.trim()) return null
+      const n = Math.round(parseFloat(v) * 100)
+      return Number.isFinite(n) ? n : null
+    }
+    const toNum = (v: string) => (v.trim() === '' ? null : Number(v))
+
+    setSavingUsage(true); setErr(null)
+    try {
+      const res = await fetch('/api/admin/provider-usage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider:   usageForm.provider.trim(),
+          metricName: usageForm.metricName.trim(),
+          metricUnit: usageForm.metricUnit.trim(),
+          usageValue:             toNum(usageForm.usageValue),
+          includedAllowance:      toNum(usageForm.includedAllowance),
+          estimatedAccruedCents:  toCents(usageForm.estimatedAccruedCents),
+          projectedMonthEndCents: toCents(usageForm.projectedMonthEndCents),
+          thresholdStatus:    usageForm.thresholdStatus || null,
+          billingPeriodStart: usageForm.billingPeriodStart || null,
+          billingPeriodEnd:   usageForm.billingPeriodEnd || null,
+          source: 'manual',
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setErr(json.error ?? 'Could not save usage reading.'); return }
+      setUsageForm({ ...usageForm, usageValue: '', estimatedAccruedCents: '', projectedMonthEndCents: '' })
+      setShowUsageForm(false)
+      await load()
+    } catch { setErr('Network error.') }
+    finally { setSavingUsage(false) }
+  }
 
   const toggle = (p: string) => setExpanded(prev => {
     const next = new Set(prev)
@@ -176,6 +264,167 @@ export function InfrastructureClient() {
             spreads a charge across the period it covers. A $40 annual renewal paid this month
             appears as $40 here and about $3.33 in a one-month P&amp;L. Both are correct.
           </div>
+
+
+          {/* ── Usage / spend over time ───────────────────────────────────── */}
+          <SectionTitle note="Separate from the Financial Overview chart: this answers how much has been used and how close a plan limit is, not what it did to profit.">
+            Usage and spend over time
+          </SectionTitle>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center',
+                        flexWrap: 'wrap', marginBottom: 10 }}>
+            {(['spend', 'usage'] as const).map(m => (
+              <button key={m} onClick={() => setChartMode(m)}
+                style={{ fontFamily: FONT, fontSize: 11, padding: '6px 12px', cursor: 'pointer',
+                         border: chartMode === m ? '1px solid #1A1A1A' : BORDER,
+                         background: chartMode === m ? '#1A1A1A' : '#fff',
+                         color: chartMode === m ? '#fff' : '#1A1A1A' }}>
+                {m === 'spend' ? 'Spend (billed)' : 'Usage'}
+              </button>
+            ))}
+            <span style={{ width: 1, height: 20, background: '#E8E5E0' }} />
+            <select value={chartProvider} onChange={e => { setChartProvider(e.target.value); setChartMetric('') }}
+              style={{ fontFamily: FONT, fontSize: 11, padding: '6px 10px', border: BORDER, background: '#fff' }}>
+              <option value="">All providers</option>
+              {[...new Set((usageTs?.availableMetrics ?? []).map(m => m.provider))]
+                .map(pv => <option key={pv} value={pv}>{pv}</option>)}
+            </select>
+            {chartMode === 'usage' && chartProvider && (
+              <select value={chartMetric} onChange={e => setChartMetric(e.target.value)}
+                style={{ fontFamily: FONT, fontSize: 11, padding: '6px 10px', border: BORDER, background: '#fff' }}>
+                <option value="">All metrics</option>
+                {(usageTs?.availableMetrics ?? [])
+                  .filter(m => m.provider === chartProvider)
+                  .map(m => <option key={m.metricName} value={m.metricName}>
+                    {m.metricName} ({m.metricUnit})
+                  </option>)}
+              </select>
+            )}
+          </div>
+
+          {chartMode === 'usage' && !chartMetric && chartProvider === '' && (
+            <p style={{ fontFamily: FONT, fontSize: 11, color: '#92400E', background: '#FFFBEB',
+                        border: '1px solid #FDE68A', padding: '8px 12px', marginBottom: 10 }}>
+              Usage units differ between providers (CU-hours, GB, messages, emails).
+              Select a provider and metric to view a single comparable unit.
+            </p>
+          )}
+
+          <div style={{ marginBottom: 26 }}>
+            <LineChart
+              labels={usageTs?.labels ?? []}
+              formatCents={money}
+              series={
+                chartMode === 'spend'
+                  ? [{
+                      key: 'spend', label: 'Billed spend', color: '#1A1A1A', unit: 'cents',
+                      values: usageTs?.series.spendCents ?? [],
+                    } as LineSeries]
+                  : [{
+                      key: 'usage',
+                      label: chartMetric || 'Usage',
+                      color: '#0F766E',
+                      unit: 'count',
+                      unitLabel: usageTs?.metricUnit ?? undefined,
+                      values: usageTs?.series.usageValue ?? [],
+                    } as LineSeries]
+              }
+              emptyMessage={
+                chartMode === 'spend'
+                  ? 'No billed provider transactions in this period.'
+                  : 'No usage readings recorded. Use "Record usage reading" below.'
+              }
+            />
+            {chartMode === 'usage' && usageTs?.includedAllowance != null && (
+              <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', marginTop: 6 }}>
+                Included allowance for the latest reading:{' '}
+                <strong>{usageTs.includedAllowance.toLocaleString()}
+                {usageTs.metricUnit ? ` ${usageTs.metricUnit}` : ''}</strong>
+              </p>
+            )}
+            {chartMode === 'spend' && (
+              <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', marginTop: 6 }}>
+                Billed spend only — real invoices from expense transactions.
+                Estimated and projected figures are forecasts and are excluded here.
+              </p>
+            )}
+          </div>
+
+          {/* Manual usage entry — the only ingestion path until Batch 4 */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+            <button onClick={() => setShowUsageForm(v => !v)}
+              style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
+                       textTransform: 'uppercase', padding: '9px 16px',
+                       background: '#1A1A1A', color: '#fff', border: 'none', cursor: 'pointer' }}>
+              {showUsageForm ? 'Cancel' : 'Record usage reading'}
+            </button>
+            <span style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B' }}>
+              Manual readings are stored as forecasts and never count as billed cost.
+            </span>
+          </div>
+
+          {showUsageForm && (
+            <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12 }}>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Provider *
+                  <input list="kvrn-providers" value={usageForm.provider}
+                    onChange={e => setUsageForm({ ...usageForm, provider: e.target.value })}
+                    placeholder="Neon" style={INPUT_STYLE} />
+                  <datalist id="kvrn-providers">
+                    {PROVIDER_PORTALS.map(p2 => <option key={p2.provider} value={p2.provider} />)}
+                  </datalist>
+                </label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Metric name *
+                  <input value={usageForm.metricName}
+                    onChange={e => setUsageForm({ ...usageForm, metricName: e.target.value })}
+                    placeholder="compute" style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Unit *
+                  <input value={usageForm.metricUnit}
+                    onChange={e => setUsageForm({ ...usageForm, metricUnit: e.target.value })}
+                    placeholder="CU-hours" style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Used
+                  <input type="number" step="any" value={usageForm.usageValue}
+                    onChange={e => setUsageForm({ ...usageForm, usageValue: e.target.value })}
+                    style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Included allowance
+                  <input type="number" step="any" value={usageForm.includedAllowance}
+                    onChange={e => setUsageForm({ ...usageForm, includedAllowance: e.target.value })}
+                    style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Estimated accrued $
+                  <input type="number" step="0.01" min="0" value={usageForm.estimatedAccruedCents}
+                    onChange={e => setUsageForm({ ...usageForm, estimatedAccruedCents: e.target.value })}
+                    style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Projected month-end $
+                  <input type="number" step="0.01" min="0" value={usageForm.projectedMonthEndCents}
+                    onChange={e => setUsageForm({ ...usageForm, projectedMonthEndCents: e.target.value })}
+                    style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Status
+                  <select value={usageForm.thresholdStatus}
+                    onChange={e => setUsageForm({ ...usageForm, thresholdStatus: e.target.value })}
+                    style={INPUT_STYLE}>
+                    <option value="">—</option>
+                    <option value="ok">ok</option>
+                    <option value="warning">warning</option>
+                    <option value="critical">critical</option>
+                  </select></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Billing period start
+                  <input type="date" value={usageForm.billingPeriodStart}
+                    onChange={e => setUsageForm({ ...usageForm, billingPeriodStart: e.target.value })}
+                    style={INPUT_STYLE} /></label>
+                <label style={{ fontFamily: FONT, fontSize: 11 }}>Billing period end
+                  <input type="date" value={usageForm.billingPeriodEnd}
+                    onChange={e => setUsageForm({ ...usageForm, billingPeriodEnd: e.target.value })}
+                    style={INPUT_STYLE} /></label>
+              </div>
+              <button onClick={() => void saveUsage()} disabled={savingUsage}
+                style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
+                         textTransform: 'uppercase', padding: '9px 16px', marginTop: 14,
+                         background: '#1A1A1A', color: '#fff', border: 'none',
+                         cursor: 'pointer', opacity: savingUsage ? 0.45 : 1 }}>
+                {savingUsage ? 'Saving…' : 'Save reading'}
+              </button>
+            </div>
+          )}
 
           <SectionTitle note="Every obligation and every billable metric is represented. Select a provider to expand its detail.">
             By provider
@@ -314,6 +563,30 @@ export function InfrastructureClient() {
             Monthly equivalents are planning arithmetic for comparing obligations. The actual
             charge stays a single transaction on its real cadence — no monthly rows are fabricated.
           </p>
+
+          {/* Provider portals — navigation shortcuts, no credentials involved */}
+          <div style={{ marginTop: 30 }}>
+            <SectionTitle note="Open the provider's own dashboard to verify a figure or retrieve an invoice. These are links only — no credentials are stored or transmitted by KVRN.">
+              Provider portals
+            </SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 10 }}>
+              {PROVIDER_PORTALS.map(p2 => (
+                <a key={p2.provider} href={p2.url}
+                   target="_blank" rel="noopener noreferrer"
+                   style={{ border: BORDER, background: '#fff', padding: '12px 14px',
+                            textDecoration: 'none', display: 'block' }}>
+                  <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500,
+                                 color: '#1A1A1A', display: 'block' }}>
+                    {p2.label} ↗
+                  </span>
+                  <span style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B',
+                                 display: 'block', marginTop: 3 }}>
+                    {p2.purpose}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
         </>
       )}
     </div>

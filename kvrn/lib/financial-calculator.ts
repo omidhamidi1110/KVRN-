@@ -380,8 +380,22 @@ export interface PeriodEconomics {
   realizedOperatingProfitAfterAdsCents:  number
   realizedProfitAfterDevelopmentCents:   number
 
-  contributionMarginPct:    number | null
+  contributionMarginPct:      number | null
   realizedOperatingMarginPct: number | null
+
+  // ── Derived operating metrics ────────────────────────────────────────────
+  // All ratios are expressed against netRevenueCents so every percentage below
+  // shares one denominator and they can be compared to each other directly.
+  // Each is null when the denominator is zero rather than silently reported as 0%.
+  totalOperatingCostCents:  number
+  averageOrderValueCents:   number | null
+  profitPerOrderCents:      number | null
+  cogsPctOfRevenue:         number | null
+  shippingCostPctOfRevenue: number | null
+  stripeFeePctOfRevenue:    number | null
+  advertisingPctOfRevenue:  number | null
+  operatingExpensePctOfRevenue: number | null
+  refundRatePct:            number | null
 
   /** True when any cost component is missing on any order in the window. */
   isPartial: boolean
@@ -469,8 +483,18 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
   const realizedProfitAfterDevelopmentCents =
     realizedOperatingProfitAfterAdsCents - input.recognizedDevelopmentExpensesCents
 
+  // Total of every cost that reduced realised profit this period.
+  // Mirrors the profit chain exactly so cost + profit == revenue.
+  const totalOperatingCostCents =
+    cogsCents + shippingCostCents + stripeFeeCents +
+    input.recognizedOperatingExpensesCents +
+    input.recognizedDevelopmentExpensesCents +
+    input.advertisingSpendCents
+
+  const orderCount = o.length
+
   return {
-    orderCount: o.length,
+    orderCount,
 
     grossMerchandiseCents,
     merchandiseDiscountCents,
@@ -511,6 +535,24 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
     contributionMarginPct:      pct(contributionProfitCents, netRevenueCents),
     realizedOperatingMarginPct: pct(realizedOperatingProfitAfterAdsCents, netRevenueCents),
 
+    totalOperatingCostCents,
+    // AOV uses gross customer revenue (merchandise + shipping, tax excluded)
+    // because that is what the customer actually transacted before refunds.
+    averageOrderValueCents: orderCount === 0
+      ? null : Math.round(grossCustomerRevenueCents / orderCount),
+    profitPerOrderCents: orderCount === 0
+      ? null : Math.round(contributionProfitCents / orderCount),
+    cogsPctOfRevenue:             pct(cogsCents, netRevenueCents),
+    shippingCostPctOfRevenue:     pct(shippingCostCents, netRevenueCents),
+    stripeFeePctOfRevenue:        pct(stripeFeeCents, netRevenueCents),
+    advertisingPctOfRevenue:      pct(input.advertisingSpendCents, netRevenueCents),
+    operatingExpensePctOfRevenue: pct(
+      input.recognizedOperatingExpensesCents + input.recognizedDevelopmentExpensesCents,
+      netRevenueCents),
+    // Refunds measured against gross customer revenue (pre-refund), which is the
+    // amount that was actually available to be refunded.
+    refundRatePct:                pct(refundCents, grossCustomerRevenueCents),
+
     isPartial:
       ordersMissingCogs > 0 ||
       ordersMissingShippingCost > 0 ||
@@ -530,3 +572,198 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
 // never arrive. Realised operating expense is read exclusively from
 // expense_transactions — see getActualOperatingExpensesCents in lib/financials.ts,
 // which pro-rates a transaction's own service period across the reporting window.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAX SCENARIO — PLANNING ONLY
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// THIS IS NOT A TAX CALCULATION. It multiplies a period's pre-income-tax profit
+// by a hypothetical rate the user types in, so the owner can sanity-check what
+// they might want to set aside.
+//
+// It is a PURE FUNCTION BY DESIGN. It takes numbers and returns numbers. It has
+// no database access, writes no expense_transaction, and cannot alter any
+// financial record. Official KVRN profit stays pre-income-tax and tax-neutral:
+// nothing here is ever subtracted from a reported profit figure.
+//
+// It does NOT determine actual tax liability. Real liability depends on entity
+// type, jurisdiction, deductions, credits and carry-forwards that KVRN does not
+// model. Treat the output as a planning estimate only.
+//
+// Sales tax is a completely separate concept and is never involved here — it is
+// collected on behalf of an authority and is excluded from profit upstream.
+
+export interface TaxScenarioInput {
+  /** Pre-income-tax profit for the selected reporting period, in cents. */
+  preTaxProfitCents: number
+  /** Hypothetical rate the user entered, as a percentage (e.g. 25 for 25%). */
+  hypotheticalRatePct: number
+}
+
+export interface TaxScenarioResult {
+  preTaxProfitCents:     number
+  hypotheticalRatePct:   number
+  estimatedTaxCents:     number
+  afterTaxProfitCents:   number
+  /** True when profit is <= 0, so no tax is estimated on a loss. */
+  isLoss:                boolean
+  /** Always true. Callers must surface this; it is never an actual liability. */
+  isHypothetical:        true
+}
+
+export const TAX_RATE_MIN_PCT = 0
+export const TAX_RATE_MAX_PCT = 100
+
+/** Clamp a user-entered rate to a sane range; non-numeric input becomes 0. */
+export function normalizeTaxRatePct(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n)) return 0
+  return Math.min(TAX_RATE_MAX_PCT, Math.max(TAX_RATE_MIN_PCT, n))
+}
+
+/**
+ * estimatedTax       = max(0, preTaxProfit) x rate
+ * afterTaxProfit     = preTaxProfit - estimatedTax
+ *
+ * A loss produces zero estimated tax rather than a negative "refund", because
+ * loss relief is jurisdiction-specific and KVRN does not model it.
+ */
+export function computeTaxScenario(input: TaxScenarioInput): TaxScenarioResult {
+  const rate    = normalizeTaxRatePct(input.hypotheticalRatePct)
+  const profit  = Math.round(input.preTaxProfitCents)
+  const isLoss  = profit <= 0
+
+  const estimatedTaxCents = isLoss ? 0 : Math.round(profit * (rate / 100))
+
+  return {
+    preTaxProfitCents:   profit,
+    hypotheticalRatePct: rate,
+    estimatedTaxCents,
+    afterTaxProfitCents: profit - estimatedTaxCents,
+    isLoss,
+    isHypothetical:      true,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPENSE / AD-SPEND RECOGNITION PRIMITIVES
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// These are the CANONICAL recognition rules. Both the whole-period figures and
+// the per-bucket chart figures call these same functions, so a cost can never be
+// recognised one way on a card and a different way on a chart.
+//
+// They return UNROUNDED cents on purpose. Rounding at every bucket then summing
+// drifts from rounding once over the whole period; callers therefore round the
+// period total once and apportion it across buckets with largest-remainder,
+// which is both timing-faithful and cent-exact.
+
+const DAY_MS = 86400000
+
+/** Parse a yyyy-mm-dd date as UTC midnight. NaN for anything malformed. */
+function utcDay(d: string | null | undefined): number {
+  if (!d) return NaN
+  return Date.parse(String(d).slice(0, 10) + 'T00:00:00Z')
+}
+
+/**
+ * Inclusive day-count overlap between two closed date ranges.
+ * Returns 0 when they do not overlap.
+ */
+function overlapDaysInclusive(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
+  const start = Math.max(aStart, bStart)
+  const end   = Math.min(aEnd, bEnd)
+  if (end < start) return 0
+  return Math.floor((end - start) / DAY_MS) + 1
+}
+
+export interface ExpenseTxnRow {
+  amountCents: number
+  category:    string
+  /** yyyy-mm-dd; the date money actually left. */
+  paidAt:      string | null
+  /** yyyy-mm-dd service period, when the charge covers a span. */
+  periodStart: string | null
+  periodEnd:   string | null
+}
+
+/**
+ * RECOGNITION RULE (unchanged from the original period implementation):
+ *
+ *   No service period  -> recognised entirely on paid_at.
+ *   Has service period -> apportioned across that period by overlapping days,
+ *                         so a $40 annual renewal recognises ~1/12 into a month.
+ *
+ * Recognition follows the transaction's OWN dates. It is never influenced by how
+ * much revenue a period happened to produce.
+ */
+export function recognizeExpenseRowsExact(
+  rows: ExpenseTxnRow[],
+  startDate: string,
+  endDate: string,
+): { operating: number; development: number } {
+  const rs = utcDay(startDate)
+  const re = utcDay(endDate)
+  let operating = 0
+  let development = 0
+  if (Number.isNaN(rs) || Number.isNaN(re) || re < rs) return { operating, development }
+
+  for (const r of rows) {
+    if (!r.paidAt) continue                       // unsettled: not yet a cost
+    const amount = Number(r.amountCents)
+    if (!Number.isFinite(amount)) continue
+
+    let share: number
+    if (r.periodStart) {
+      const ps = utcDay(r.periodStart)
+      const pe = utcDay(r.periodEnd ?? r.periodStart)
+      if (Number.isNaN(ps) || Number.isNaN(pe) || pe < ps) continue
+      const spanDays    = Math.floor((pe - ps) / DAY_MS) + 1
+      const overlapDays = overlapDaysInclusive(ps, pe, rs, re)
+      if (overlapDays <= 0 || spanDays <= 0) continue
+      share = amount * (overlapDays / spanDays)
+    } else {
+      const paid = utcDay(r.paidAt)
+      if (Number.isNaN(paid) || paid < rs || paid > re) continue
+      share = amount
+    }
+
+    if (r.category === 'development') development += share
+    else                              operating   += share
+  }
+  return { operating, development }
+}
+
+export interface AdSpendRow {
+  spendCents:  number
+  periodStart: string
+  periodEnd:   string
+}
+
+/**
+ * Advertising is apportioned across its configured campaign period by overlapping
+ * days, so a 30-day campaign viewed through a 7-day window contributes 7/30.
+ * Driven by the campaign's own dates only.
+ */
+export function recognizeAdSpendRowsExact(
+  rows: AdSpendRow[],
+  startDate: string,
+  endDate: string,
+): number {
+  const rs = utcDay(startDate)
+  const re = utcDay(endDate)
+  if (Number.isNaN(rs) || Number.isNaN(re) || re < rs) return 0
+
+  let total = 0
+  for (const r of rows) {
+    const ps = utcDay(r.periodStart)
+    const pe = utcDay(r.periodEnd)
+    const spend = Number(r.spendCents)
+    if (Number.isNaN(ps) || Number.isNaN(pe) || pe < ps || !Number.isFinite(spend)) continue
+    const campaignDays = Math.floor((pe - ps) / DAY_MS) + 1
+    const overlapDays  = overlapDaysInclusive(ps, pe, rs, re)
+    if (overlapDays <= 0 || campaignDays <= 0) continue
+    total += spend * (overlapDays / campaignDays)
+  }
+  return total
+}

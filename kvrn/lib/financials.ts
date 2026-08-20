@@ -17,9 +17,20 @@
 
 import type { NeonQueryFunction } from '@neondatabase/serverless'
 import {
+  autoGranularity,
+  buildBuckets,
+  bucketIndexFor,
+  allocateAcrossBuckets,
+  type Granularity,
+} from './chart-math'
+import {
   computeOrderEconomics,
   computePeriodEconomics,
   allocateDiscountToLines,
+  recognizeExpenseRowsExact,
+  recognizeAdSpendRowsExact,
+  type ExpenseTxnRow,
+  type AdSpendRow,
   type OrderEconomics,
   type PeriodEconomics,
   type OrderFinancialInputs,
@@ -129,6 +140,63 @@ function toInputs(r: any): OrderFinancialRow {
   }
 }
 
+/** Convert a half-open [start, end) ISO range into inclusive yyyy-mm-dd bounds. */
+function toDateBounds(range: DateRange): { startDate: string; endDate: string } {
+  return {
+    startDate: range.start.slice(0, 10),
+    endDate:   new Date(Date.parse(range.end) - 1).toISOString().slice(0, 10),
+  }
+}
+
+/**
+ * Expense transactions that could touch [startDate, endDate].
+ * Fetched once and reused across every chart bucket so the time series costs one
+ * query rather than one per bucket.
+ */
+async function fetchExpenseRows(
+  sql: NeonQueryFunction<false, false>,
+  startDate: string,
+  endDate: string,
+): Promise<ExpenseTxnRow[]> {
+  const rows = await sql.query(
+    `SELECT amount_cents, category, paid_at, period_start, period_end
+     FROM expense_transactions
+     WHERE paid_at IS NOT NULL
+       AND (
+         (period_start IS NULL AND paid_at >= $1 AND paid_at <= $2)
+         OR (period_start IS NOT NULL AND period_start <= $2
+             AND COALESCE(period_end, period_start) >= $1)
+       )`,
+    [startDate, endDate],
+  )
+  return (rows as any[]).map(r => ({
+    amountCents: Number(r.amount_cents),
+    category:    String(r.category),
+    paidAt:      r.paid_at      ? String(r.paid_at).slice(0, 10)      : null,
+    periodStart: r.period_start ? String(r.period_start).slice(0, 10) : null,
+    periodEnd:   r.period_end   ? String(r.period_end).slice(0, 10)   : null,
+  }))
+}
+
+/** Ad spend rows overlapping [startDate, endDate]. Fetched once, reused per bucket. */
+async function fetchAdSpendRows(
+  sql: NeonQueryFunction<false, false>,
+  startDate: string,
+  endDate: string,
+): Promise<AdSpendRow[]> {
+  const rows = await sql.query(
+    `SELECT spend_cents, period_start, period_end
+     FROM ad_spend
+     WHERE period_start <= $1 AND period_end >= $2`,
+    [endDate, startDate],
+  )
+  return (rows as any[]).map(r => ({
+    spendCents:  Number(r.spend_cents),
+    periodStart: String(r.period_start).slice(0, 10),
+    periodEnd:   String(r.period_end).slice(0, 10),
+  }))
+}
+
 export function createFinancialService(sql: NeonQueryFunction<false, false>) {
   return {
     /** Paid orders in [start, end) with full economics computed. */
@@ -191,48 +259,14 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
       operating: number
       development: number
     }> {
-      const startDate = range.start.slice(0, 10)
-      const endDate   = new Date(Date.parse(range.end) - 1).toISOString().slice(0, 10)
-
-      const rows = await sql.query(
-        `SELECT amount_cents, category, paid_at, period_start, period_end
-         FROM expense_transactions
-         WHERE paid_at IS NOT NULL
-           AND (
-             (period_start IS NULL AND paid_at >= $1 AND paid_at <= $2)
-             OR (period_start IS NOT NULL AND period_start <= $2
-                 AND COALESCE(period_end, period_start) >= $1)
-           )`,
-        [startDate, endDate],
-      )
-
-      const DAY = 86400000
-      const rs = Date.parse(startDate + 'T00:00:00Z')
-      const re = Date.parse(endDate   + 'T00:00:00Z')
-
-      let operating = 0
-      let development = 0
-
-      for (const r of rows as any[]) {
-        const amount = Number(r.amount_cents)
-        let share = amount
-
-        if (r.period_start) {
-          const ps = Date.parse(String(r.period_start).slice(0, 10) + 'T00:00:00Z')
-          const pe = Date.parse(
-            String(r.period_end ?? r.period_start).slice(0, 10) + 'T00:00:00Z')
-          const spanDays    = Math.floor((pe - ps) / DAY) + 1
-          const overlapDays =
-            Math.floor((Math.min(pe, re) - Math.max(ps, rs)) / DAY) + 1
-          if (overlapDays <= 0 || spanDays <= 0) continue
-          share = Math.round(amount * (overlapDays / spanDays))
-        }
-
-        if (r.category === 'development') development += share
-        else                              operating   += share
+      const { startDate, endDate } = toDateBounds(range)
+      const rows = await fetchExpenseRows(sql, startDate, endDate)
+      // Canonical primitive, shared with the per-bucket chart path.
+      const exact = recognizeExpenseRowsExact(rows, startDate, endDate)
+      return {
+        operating:   Math.round(exact.operating),
+        development: Math.round(exact.development),
       }
-
-      return { operating, development }
     },
 
     /**
@@ -268,33 +302,10 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
      * window contributes 7/30 of its spend rather than all or nothing.
      */
     async getAdvertisingSpendCents(range: DateRange): Promise<number> {
-      const startDate = range.start.slice(0, 10)
-      const endDate   = new Date(Date.parse(range.end) - 1).toISOString().slice(0, 10)
-
-      const rows = await sql.query(
-        `SELECT spend_cents, period_start, period_end
-         FROM ad_spend
-         WHERE period_start <= $1 AND period_end >= $2`,
-        [endDate, startDate],
-      )
-
-      const DAY = 86400000
-      let total = 0
-      for (const r of rows as any[]) {
-        const ps = Date.parse(String(r.period_start).slice(0, 10) + 'T00:00:00Z')
-        const pe = Date.parse(String(r.period_end).slice(0, 10)   + 'T00:00:00Z')
-        const rs = Date.parse(startDate + 'T00:00:00Z')
-        const re = Date.parse(endDate   + 'T00:00:00Z')
-
-        const campaignDays = Math.floor((pe - ps) / DAY) + 1
-        const overlapStart = Math.max(ps, rs)
-        const overlapEnd   = Math.min(pe, re)
-        const overlapDays  = Math.floor((overlapEnd - overlapStart) / DAY) + 1
-
-        if (overlapDays <= 0 || campaignDays <= 0) continue
-        total += Math.round(Number(r.spend_cents) * (overlapDays / campaignDays))
-      }
-      return total
+      const { startDate, endDate } = toDateBounds(range)
+      const rows = await fetchAdSpendRows(sql, startDate, endDate)
+      // Canonical primitive, shared with the per-bucket chart path.
+      return Math.round(recognizeAdSpendRowsExact(rows, startDate, endDate))
     },
 
     /** Full period report: order economics + operating expenses + ad spend. */
@@ -323,6 +334,152 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         }),
         orders,
       }
+    },
+
+    /**
+     * Financial time series for the Overview chart.
+     *
+     * RECONCILIATION GUARANTEE: buckets are contiguous and non-overlapping, and
+     * order-derived series are summed from the SAME computeOrderEconomics results
+     * the summary cards use.
+     *
+     * Operating expense and advertising are recognised per bucket using the SAME
+     * canonical primitives as the period totals, driven by each cost's own dates.
+     * They are NOT weighted by revenue: a cost must not appear to move into a
+     * different day merely because that day sold more. The exact per-bucket
+     * amounts then act as weights for a largest-remainder apportionment of the
+     * rounded period total, which keeps the sum cent-exact.
+     *
+     * The consequence is that adding up any series across every bucket reproduces
+     * the headline figure exactly — the chart can never quietly disagree with the
+     * cards above it. This is asserted in the test suite.
+     */
+    async getFinancialTimeSeries(range: DateRange, granularity?: Granularity): Promise<{
+      granularity: Granularity
+      buckets: Array<{
+        label: string
+        start: string
+        end: string
+        orderCount: number
+        netRevenueCents: number
+        grossMerchandiseCents: number
+        cogsCents: number
+        shippingCostCents: number
+        stripeFeeCents: number
+        operatingExpenseCents: number
+        developmentExpenseCents: number
+        advertisingCents: number
+        contributionProfitCents: number
+        realizedProfitCents: number
+      }>
+    }> {
+      const g = granularity ?? autoGranularity(range.start, range.end)
+      const buckets = buildBuckets(range.start, range.end, g)
+      if (buckets.length === 0) return { granularity: g, buckets: [] }
+
+      const { startDate, endDate } = toDateBounds(range)
+
+      const [orders, expenseRows, adRows] = await Promise.all([
+        this.getOrderEconomicsInRange(range),
+        // Fetched once for the whole window, then recognised per bucket below.
+        fetchExpenseRows(sql, startDate, endDate),
+        fetchAdSpendRows(sql, startDate, endDate),
+      ])
+
+      // Bucket each order by the instant revenue was recognised (paid_at).
+      const perBucket = buckets.map(() => ({
+        orderCount: 0, netRevenueCents: 0, grossMerchandiseCents: 0,
+        cogsCents: 0, shippingCostCents: 0, stripeFeeCents: 0,
+        contributionProfitCents: 0,
+      }))
+
+      for (const row of orders) {
+        if (!row.paidAt) continue
+        const i = bucketIndexFor(buckets, row.paidAt)
+        if (i < 0) continue
+        const e = row.economics
+        const b = perBucket[i]
+        b.orderCount            += 1
+        b.netRevenueCents       += e.netRevenueCents
+        b.grossMerchandiseCents += e.grossMerchandiseCents
+        // Unknown costs contribute 0 to the bar rather than voiding the bucket;
+        // the summary cards carry the "partial" warning for the same window.
+        b.cogsCents             += e.cogsCents ?? 0
+        b.shippingCostCents     += e.shippingCostCents ?? 0
+        b.stripeFeeCents        += e.netStripeFeeCents ?? 0
+        b.contributionProfitCents += e.contributionProfitCents ?? 0
+      }
+
+      // ── Period costs are recognised by their OWN dates, never by revenue ──
+      //
+      // Each bucket is run through the same canonical recognition primitives the
+      // period totals use, with that bucket's real date bounds. A cost therefore
+      // lands in the period it economically belongs to and cannot drift into a
+      // different day merely because more revenue happened there.
+      //
+      // The primitives return unrounded cents. Rounding each bucket then summing
+      // would drift from the period figure, so the exact per-bucket amounts are
+      // used as WEIGHTS and the already-rounded period total is apportioned with
+      // largest-remainder. That is timing-faithful and cent-exact simultaneously.
+      const bucketBounds = buckets.map(bk => toDateBounds({ start: bk.start, end: bk.end }))
+
+      const opexExact = bucketBounds.map(b =>
+        recognizeExpenseRowsExact(expenseRows, b.startDate, b.endDate))
+      const adsExact = bucketBounds.map(b =>
+        recognizeAdSpendRowsExact(adRows, b.startDate, b.endDate))
+
+      const periodOperating   = Math.round(
+        recognizeExpenseRowsExact(expenseRows, startDate, endDate).operating)
+      const periodDevelopment = Math.round(
+        recognizeExpenseRowsExact(expenseRows, startDate, endDate).development)
+      const periodAds         = Math.round(
+        recognizeAdSpendRowsExact(adRows, startDate, endDate))
+
+      const operatingPerBucket   = allocateAcrossBuckets(
+        periodOperating, opexExact.map(e => e.operating))
+      const developmentPerBucket = allocateAcrossBuckets(
+        periodDevelopment, opexExact.map(e => e.development))
+      const adsPerBucket         = allocateAcrossBuckets(periodAds, adsExact)
+
+      // Development stays distinguishable, matching the P&L semantics, but both
+      // are surfaced as one chart line to keep the series list readable.
+      const opexPerBucket = operatingPerBucket.map((v, i) => v + developmentPerBucket[i])
+
+      return {
+        granularity: g,
+        buckets: buckets.map((bk, i) => {
+          const b = perBucket[i]
+          return {
+            label: bk.label,
+            start: bk.start,
+            end:   bk.end,
+            ...b,
+            operatingExpenseCents:   opexPerBucket[i],
+            developmentExpenseCents: developmentPerBucket[i],
+            advertisingCents:        adsPerBucket[i],
+            realizedProfitCents:
+              b.contributionProfitCents - opexPerBucket[i] - adsPerBucket[i],
+          }
+        }),
+      }
+    },
+
+    /**
+     * Cost composition for the breakdown / donut view.
+     * Only positive components are returned — a pie implies parts of a whole and
+     * a negative slice has no coherent area.
+     */
+    async getCostComposition(range: DateRange): Promise<Array<{ label: string; valueCents: number }>> {
+      const report = await this.getPeriodReport(range)
+      const p = report.period
+      return [
+        { label: 'Product COGS',       valueCents: p.cogsCents },
+        { label: 'Shipping cost',      valueCents: p.shippingCostCents },
+        { label: 'Stripe fees',        valueCents: p.stripeFeeCents },
+        { label: 'Operating expenses', valueCents: p.recognizedOperatingExpensesCents },
+        { label: 'Development',        valueCents: p.recognizedDevelopmentExpensesCents },
+        { label: 'Advertising',        valueCents: p.advertisingSpendCents },
+      ].filter(c => c.valueCents > 0)
     },
 
     /**
@@ -456,7 +613,7 @@ export type FinancialService = ReturnType<typeof createFinancialService>
 // DATE RANGE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type RangePreset = 'today' | '7d' | '30d' | 'mtd' | 'ytd'
+export type RangePreset = 'today' | '7d' | '30d' | '90d' | 'mtd' | 'ytd' | '1y' | 'all'
 
 /** Resolve a preset into a half-open UTC [start, end) range. */
 export function resolveRangePreset(preset: RangePreset, now: Date = new Date()): DateRange {
@@ -478,8 +635,19 @@ export function resolveRangePreset(preset: RangePreset, now: Date = new Date()):
     case 'mtd':
       start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
       break
+    case '90d':
+      start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 89))
+      break
     case 'ytd':
       start = new Date(Date.UTC(now.getUTCFullYear(), 0, 1))
+      break
+    case '1y':
+      start = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth(), now.getUTCDate() + 1))
+      break
+    case 'all':
+      // KVRN has no orders before 2024; this is a safe floor that still lets the
+      // query planner use the paid_at index rather than scanning unbounded time.
+      start = new Date(Date.UTC(2024, 0, 1))
       break
   }
 

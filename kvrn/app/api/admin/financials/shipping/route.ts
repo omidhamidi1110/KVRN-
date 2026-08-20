@@ -34,6 +34,26 @@ export async function GET(req: NextRequest) {
     const service = createFinancialService(sql)
     const rows = await service.getOrderEconomicsInRange(range)
 
+    // Shipments in this window whose actual carrier cost has not been recorded.
+    // KVRN does not purchase labels programmatically yet, so this is the manual
+    // reconciliation worklist that makes shipping margin computable.
+    const pendingCost = await sql`
+      SELECT s.id            AS "shipmentId",
+             o.id            AS "orderId",
+             o.order_number  AS "orderNumber",
+             o.shipping_cents AS "shippingRevenueCents",
+             s.carrier, s.tracking_number AS "trackingNumber",
+             s.service_level AS "serviceLevel",
+             s.shipped_at    AS "shippedAt"
+      FROM shipments s
+      JOIN orders o ON o.id = s.order_id
+      WHERE s.label_cost_cents IS NULL
+        AND o.paid_at IS NOT NULL
+        AND o.paid_at >= ${range.start} AND o.paid_at < ${range.end}
+      ORDER BY o.paid_at DESC
+      LIMIT 100
+    `
+
     const withCost = rows.filter(r => r.economics.shippingCostCents !== null)
 
     return NextResponse.json({
@@ -54,6 +74,16 @@ export async function GET(req: NextRequest) {
         ordersUnderwater: withCost.filter(r => (r.economics.shippingMarginCents ?? 0) < 0).length,
         ordersProfitable: withCost.filter(r => (r.economics.shippingMarginCents ?? 0) > 0).length,
       },
+      pendingCost: (pendingCost as any[]).map(p2 => ({
+        shipmentId:           p2.shipmentId,
+        orderId:              p2.orderId,
+        orderNumber:          p2.orderNumber,
+        shippingRevenueCents: Number(p2.shippingRevenueCents ?? 0),
+        carrier:              p2.carrier ?? null,
+        trackingNumber:       p2.trackingNumber ?? null,
+        serviceLevel:         p2.serviceLevel ?? null,
+        shippedAt:            p2.shippedAt ? new Date(p2.shippedAt).toISOString() : null,
+      })),
       orders: rows.map(r => ({
         orderId:              r.orderId,
         orderNumber:          r.orderNumber,
