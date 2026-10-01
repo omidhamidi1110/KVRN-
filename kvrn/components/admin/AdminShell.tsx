@@ -126,6 +126,55 @@ const navGroups: NavGroup[] = [
         ),
       },
       {
+        label: 'Affiliates',
+        href: '/admin/financials/affiliates',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M3.5 20a5.5 5.5 0 0 1 11 0" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinecap="round"/>
+            <path d="M16.5 7.5h4M18.5 5.5v4" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Inventory Value',
+        href: '/admin/financials/inventory',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinejoin="round"/>
+            <path d="M3 12.5 12 17l9-4.5M3 16.5 12 21l9-4.5" stroke="currentColor"
+                  strokeWidth="1.5" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Returns',
+        href: '/admin/financials/returns',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 14 4 9l5-5" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4 9h10a6 6 0 0 1 0 12h-3" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
+      {
+        label: 'Disputes',
+        href: '/admin/financials/disputes',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3 3 20h18L12 3Z" stroke="currentColor" strokeWidth="1.5"
+                  strokeLinejoin="round"/>
+            <path d="M12 10v4M12 17h.01" stroke="currentColor" strokeWidth="1.6"
+                  strokeLinecap="round"/>
+          </svg>
+        ),
+      },
+      {
         label: 'Expenses',
         href: '/admin/financials/expenses',
         icon: (

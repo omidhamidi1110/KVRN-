@@ -100,7 +100,26 @@ export async function getAllVariantsForAdmin() {
   return rows
 }
 
-/** Adjust stock — returns the updated variant */
+/**
+ * Adjust stock — returns the updated variant.
+ *
+ * ── 019: NOW ATOMIC, AND MAINTAINS FIFO COST LAYERS ────────────────────────
+ *
+ * This previously issued three separate statements (stock update, movement
+ * insert, audit insert). Neon's HTTP driver commits each independently, so a
+ * failure between them left inventory inconsistent — and none of them touched
+ * cost layers, meaning an admin edit silently broke the invariant
+ * SUM(units_remaining) = stock_on_hand.
+ *
+ * All of it now happens inside adjust_inventory_with_layers() in one
+ * transaction:
+ *   ADD / SET-up    -> creates a layer at the currently effective cost, or
+ *                      unknown when no authoritative cost exists (never zero)
+ *   REMOVE / SET-down -> consumes FIFO with consumption_type='adjustment'
+ *
+ * The original guards are preserved: non-negative quantity, no negative stock,
+ * and never below reserved_quantity.
+ */
 export async function adjustStock(opts: {
   variantId:    string
   type:         'SET' | 'ADD' | 'REMOVE'
@@ -116,43 +135,32 @@ export async function adjustStock(opts: {
   }
 
   try {
-    // Fetch current variant
-    const rows = await sql`SELECT * FROM product_variants WHERE id = ${variantId} LIMIT 1`
-    if (rows.length === 0) return { success: false, error: 'Variant not found.' }
-    const variant = rows[0] as any
+    const rows = await sql`SELECT adjust_inventory_with_layers(
+      ${variantId}::uuid, ${type}, ${quantity}, ${reason},
+      ${note ?? null}, ${actorEmail}
+    ) AS result`
+    const result = (rows as any[])[0]?.result
 
-    let newStock: number
-    let delta: number
-
-    if (type === 'SET') {
-      newStock = quantity; delta = quantity - Number(variant.stock_on_hand)
-    } else if (type === 'ADD') {
-      newStock = Number(variant.stock_on_hand) + quantity; delta = quantity
-    } else {
-      newStock = Number(variant.stock_on_hand) - quantity; delta = -quantity
-    }
-
-    if (newStock < 0) return { success: false, error: 'Cannot reduce stock below zero.' }
-    if (newStock < Number(variant.reserved_quantity)) {
-      return { success: false, error: 'Cannot reduce stock below reserved quantity.' }
-    }
-
-    const [updated] = await sql`
-      UPDATE product_variants SET stock_on_hand = ${newStock}, updated_at = NOW()
-      WHERE id = ${variantId} RETURNING *
+    const [variant] = await sql`
+      SELECT * FROM product_variants WHERE id = ${variantId} LIMIT 1
     `
-    await sql`
-      INSERT INTO inventory_movements (variant_id, quantity_delta, movement_type, reason, note, actor_email)
-      VALUES (${variantId}, ${delta}, ${type}, ${reason}, ${note ?? null}, ${actorEmail})
-    `
+    // Audit stays here: it is not part of the inventory invariant, and a failed
+    // audit write must not roll back a correct stock movement.
     await sql`
       INSERT INTO admin_audit_logs (actor_email, action, resource, resource_id, payload)
       VALUES (${actorEmail}, ${'INVENTORY_' + type}, 'product_variants', ${variantId},
-              ${JSON.stringify({ delta, newStock, reason, note })}::jsonb)
+              ${JSON.stringify({ delta: result?.delta, newStock: result?.new_stock,
+                                 reason, note, fifo: result?.fifo })}::jsonb)
     `
-    return { success: true, variant: updated }
+    return { success: true, variant }
   } catch (err: any) {
-    return { success: false, error: err.message ?? 'Unknown error.' }
+    // Surface the guard reason rather than a raw SQL string.
+    const msg = String(err?.message ?? '')
+    if (msg.includes('BELOW_ZERO'))     return { success: false, error: 'Cannot reduce stock below zero.' }
+    if (msg.includes('BELOW_RESERVED')) return { success: false, error: 'Cannot reduce stock below reserved quantity.' }
+    if (msg.includes('VARIANT_NOT_FOUND')) return { success: false, error: 'Variant not found.' }
+    if (msg.includes('INVALID_QUANTITY')) return { success: false, error: 'Quantity must be a non-negative integer.' }
+    return { success: false, error: msg || 'Unknown error.' }
   }
 }
 

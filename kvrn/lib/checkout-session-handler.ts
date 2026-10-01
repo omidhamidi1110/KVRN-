@@ -9,6 +9,8 @@ import {
   FIELD_MAX,
 } from './checkout-validation'
 import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
+import { AFFILIATE_SESSION_COOKIE, isValidSessionId } from './affiliate-session'
+import { sql } from './db'
 import { COUNTRY_CODES } from './countries'
 import { US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
 // calculateShippingCents intentionally not imported — static cents must never
@@ -40,8 +42,86 @@ function isValidHttpsUrl(s: unknown): s is string {
   try { return new URL(s).protocol === 'https:' } catch { return false }
 }
 
+/**
+ * The visitor's first-party session id, if any.
+ *
+ * Only the SHAPE is trusted. A forged value matches no affiliate_clicks row, so
+ * it can only fail to attribute — it can never mis-attribute to an affiliate the
+ * visitor never came through.
+ */
+function readAffiliateSessionId(req: { cookies?: { get(name: string): { value: string } | undefined } }):
+  string | null {
+  try {
+    const raw = req.cookies?.get(AFFILIATE_SESSION_COOKIE)?.value
+    return isValidSessionId(raw) ? raw : null
+  } catch { return null }
+}
+
 export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
   return async function POST(req: NextRequest): Promise<NextResponse> {
+    // Server-side identity for affiliate attribution. Never body-supplied.
+    const affiliateSessionId = readAffiliateSessionId(req)
+
+    /**
+     * Persist that identity on the reservation so late attribution can recover
+     * it from order data alone. finalize_paid_order already copies
+     * reservations.attribution to orders.attribution, so this survives into the
+     * order without touching that frozen function.
+     *
+     * Non-fatal: failing to record it costs a backfill hint, not a checkout.
+     */
+    /**
+     * Durably preserve the referral session BEFORE Stripe Checkout is created.
+     *
+     * FAIL-CLOSED, BUT ONLY FOR REAL REFERRALS. Two cases must not be conflated:
+     *
+     *   no referral evidence  -> nothing to preserve. Checkout proceeds
+     *                            untouched and no affiliate state is fabricated.
+     *   real referral evidence -> the opaque session id is the ONLY link between
+     *                            this order and a commission obligation. If the
+     *                            authoritative write fails and we continue
+     *                            anyway, payment-time attribution later fails and
+     *                            the obligation is lost permanently with nothing
+     *                            left to recover it from.
+     *
+     * "Real evidence" means the cookie actually maps to a stored affiliate_clicks
+     * row. A stale or forged cookie with no click behind it is not a referral and
+     * must never block a customer's checkout.
+     *
+     * Returns true when checkout may proceed.
+     */
+    const preserveAffiliateSession = async (reservationId: string): Promise<boolean> => {
+      if (!affiliateSessionId) return true
+
+      let hasReferralEvidence = false
+      try {
+        const rows = await sql`
+          SELECT 1 FROM affiliate_clicks
+          WHERE session_id = ${affiliateSessionId} LIMIT 1
+        `
+        hasReferralEvidence = (rows as any[]).length > 0
+      } catch (e: any) {
+        // Cannot determine whether this is a referral. Treating "unknown" as
+        // "no referral" is the failure mode that loses obligations, so this is
+        // handled as a real referral and fails closed below.
+        console.error('[checkout] referral evidence check failed:', e?.message?.slice(0, 80))
+        hasReferralEvidence = true
+      }
+
+      try {
+        await sql`SELECT persist_checkout_affiliate_session(
+          ${reservationId}::uuid, ${affiliateSessionId}
+        )`
+        return true
+      } catch (e: any) {
+        console.error('[checkout] affiliate session persist failed:', e?.message?.slice(0, 120))
+        // No referral behind the cookie: losing it costs nothing.
+        if (!hasReferralEvidence) return true
+        // A real referral whose identity we could not durably record.
+        return false
+      }
+    }
+
     if (!deps.isCheckoutEnabled()) {
       return NextResponse.json({ error: 'Checkout is not enabled.' }, { status: 503 })
     }
@@ -395,6 +475,41 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     }
     let saved = false
     try {
+      // Preserve the referral identity BEFORE any Stripe session exists. A real
+      // referral that cannot be durably recorded stops here, so Stripe is never
+      // called and no order is created that could never be attributed.
+      if (!(await preserveAffiliateSession(reservation.reservationId))) {
+        // ── FAIL CLOSED, BUT CLEAN UP ────────────────────────────────────────
+        //
+        // The reservation and any discount claim were taken BEFORE this point.
+        // Returning 503 without releasing them would strand stock and hold a
+        // single-use discount until expiry, blocking the customer's own retry.
+        //
+        // Deterministic order: discount claim first, then the reservation. The
+        // claim is keyed to the reservation, so releasing it while the
+        // reservation still exists keeps the relationship intact. Each is
+        // attempted independently, so one failing cannot prevent the other.
+        //
+        // Stripe is never called on this path.
+        try {
+          await releaseDiscountClaim(reservation.reservationId)
+        } catch (e: any) {
+          // Surfaced, never allowed to mask the original referral failure.
+          console.error('[checkout/session] discount claim release failed after referral '
+            + 'persistence failure:', e?.message?.slice(0, 100))
+        }
+        try {
+          await deps.failReservation(reservation.reservationId, 'affiliate_session_persist_failed')
+        } catch (e: any) {
+          console.error('[checkout/session] reservation release failed after referral '
+            + 'persistence failure:', e?.message?.slice(0, 100))
+        }
+
+        return NextResponse.json(
+          { error: 'We could not start checkout. Please try again in a moment.' },
+          { status: 503 })
+      }
+
       saved = await deps.saveReservationCheckoutDetails(reservation.reservationId, {
         customerEmail:   email,
         customerName:    fullName,
@@ -448,6 +563,12 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           mode:           'payment',
           currency:       'usd',
           customer_email: email,
+          // ── AFFILIATE ATTRIBUTION IDENTITY ───────────────────────────────
+          // Read SERVER-SIDE from the first-party cookie, never from the
+          // request body: a browser-supplied value must not be able to claim
+          // another visitor's referral. An absent or malformed cookie yields
+          // null, which simply means no link attribution for this order.
+          client_reference_id: affiliateSessionId,
           line_items: [
             ...reservation.items.map((item: any) => ({
             price_data: {
