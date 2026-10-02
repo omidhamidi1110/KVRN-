@@ -67,3 +67,48 @@ best-effort release the discount claim if one was taken, then
 the error response. This should be proven first against the real checkout
 route (a reservation row's status after each of the four rejection paths),
 per this project's own reproduce-before-fix methodology, not patched blind.
+
+
+============================================================
+RESOLUTION — checkout reservation leak on the four discount-rejection paths
+============================================================
+STATUS: RESOLVED for the four paths described above. The description above is
+preserved unchanged as the historical record.
+
+FIX (lib/checkout-session-handler.ts): one best-effort helper,
+failReservationForDiscountRejection(reason, { releaseClaim }), called before
+each of the four rejection returns. Status codes and customer-facing messages
+are unchanged. Reservation timing, discount economics and inventory accounting
+are untouched. No migration was needed.
+
+  invalid code        400  -> failReservation 'discount_code_invalid'
+  blockedReason       400  -> failReservation 'discount_blocked'
+  claim 'conflict'    409  -> release the claim this reservation already
+                              holds, then failReservation 'discount_claim_conflict'
+  claim 'exhausted'   409  -> failReservation 'discount_claim_exhausted'
+                              (no claim exists for this reservation, so no
+                              release is attempted)
+
+Cleanup errors are logged and never replace the customer-facing rejection.
+
+PROOF: nine runtime tests in lib/__tests__/affiliate-http-integration.test.ts
+("Post-020 — discount rejections fail the inventory reservation") drive the real
+handler against a real PostgreSQL reservation row. Before the fix the four leak
+tests failed with reservations.status = 'open' and zero failReservation calls;
+after it they pass with status 'failed'. See
+CHECKOUT-RESERVATION-LEAK-FIX-EVIDENCE.txt.
+
+SAFETY PASS (follow-up): the exception class above is now RESOLVED too.
+validateDiscount() and claimDiscount() are each wrapped; on a throw the handler
+fails the reservation (best-effort, errors logged) and returns 503 with
+'Could not apply the discount code at this time. Please try again.' - not a 400
+invalid-code answer.
+  validateDiscount throws  -> failReservation 'discount_validation_error'
+  claimDiscount throws     -> release_discount_claim (idempotent; a no-op if no
+                              claim was written, releases it if the claim was
+                              written but the response was lost), then
+                              failReservation 'discount_claim_error'
+Real-stock proof: tests S1/S2/E1-E3 use real products, variants, reservation_items
+and the real reserve_inventory / release_reservation_by_id SQL; reserved stock
+returns to 0 and available to 10. See CHECKOUT-RESERVATION-LEAK-FIX-EVIDENCE.txt
+section 9.

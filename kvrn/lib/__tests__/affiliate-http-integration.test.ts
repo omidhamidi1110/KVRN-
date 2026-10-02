@@ -64,7 +64,8 @@ beforeAll(async () => {
     affiliate_clicks, affiliate_links, affiliate_terms_events,
     affiliate_status_events, affiliates, analytics_sessions,
     order_dispute_financial_adjustments, order_disputes, order_refunds,
-    orders, reservations, discounts, admin_audit_logs RESTART IDENTITY CASCADE`)
+    orders, reservations, discounts, admin_audit_logs,
+    products, product_variants RESTART IDENTITY CASCADE`)
   referralGET = (await import('../../app/r/[slug]/route')).GET
   backfillPOST = (await import('../../app/api/admin/affiliates/backfill/route')).POST
 })
@@ -1878,5 +1879,500 @@ describe('Blocker 5 — ambiguous ownership is never reported as success', () =>
       [orderId])).toHaveLength(0)
     expect(await raw(`SELECT 1 FROM affiliate_commissions WHERE order_id=$1`,
       [orderId])).toHaveLength(0)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POST-020 — discount-rejection paths must not leave the inventory reservation
+// active (recorded in POST-020-FOLLOWUPS.txt)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// REAL: createCheckoutPostHandler, the real discounts module (validateDiscount,
+// applyDiscountPriority, claimDiscount and the claim_discount /
+// release_discount_claim SQL), and a real `reservations` row in PostgreSQL.
+// failReservation is a spy that CALLS THROUGH to the real
+// release_reservation_by_id SQL, so "still active" is read from
+// reservations.status rather than inferred from a mock.
+// Substituted: the reservation dependency (reserveInventory returns the row this
+// test inserted), Shippo and Stripe, exactly as in the other checkout tests here.
+// releaseDiscountClaim is a call-through spy so claim cleanup is observable.
+
+describe('Post-020 — discount rejections fail the inventory reservation', () => {
+  let checkoutPOST: any
+  const reserveInventory = jest.fn()
+  const saveReservationCheckoutDetails = jest.fn()
+  const attachStripeSession = jest.fn()
+  const releaseClaimSpy = jest.fn()
+  const failReservation = jest.fn()
+  let reservationId: string
+
+  beforeAll(async () => {
+    jest.resetModules()
+    jest.doMock('../discounts', () => {
+      const actual = jest.requireActual('../discounts')
+      return {
+        ...actual,
+        releaseDiscountClaim: (...a: any[]) => releaseClaimSpy(...a),
+      }
+    })
+    const { createCheckoutPostHandler } = await import('../checkout-session-handler')
+    checkoutPOST = createCheckoutPostHandler({
+      isCheckoutEnabled: () => true,
+      getSiteOrigin: () => 'https://kvrn.shop',
+      getStripe: () => ({ checkout: { sessions: { create: stripeCreate } } }) as any,
+      reserveInventory,
+      saveReservationCheckoutDetails,
+      failReservation,
+      attachStripeSession,
+      releaseExpiredReservations: jest.fn(),
+    } as any)
+  })
+  afterAll(() => { jest.dontMock('../discounts'); jest.resetModules() })
+
+  async function realReleaseDiscountClaim(id: string) {
+    await raw(`SELECT release_discount_claim($1::uuid)`, [id])
+  }
+
+  beforeEach(async () => {
+    process.env.ENABLE_STRIPE_TEST_CHECKOUT = 'true'
+    process.env.SHIPPO_API_TOKEN = 'shippo_test_token'
+    reservationId = uid()
+    await raw(`INSERT INTO reservations (id, status, expires_at)
+               VALUES ($1, 'open', NOW() + INTERVAL '15 minutes')`, [reservationId])
+    failReservation.mockReset().mockImplementation(async (id: string, reason: string) =>
+      ((await raw(`SELECT release_reservation_by_id($1::uuid,$2) AS r`, [id, reason]))[0] as any).r)
+    releaseClaimSpy.mockReset().mockImplementation(realReleaseDiscountClaim)
+    reserveInventory.mockReset().mockResolvedValue({
+      ok: true, reservationId,
+      items: [{ sku: 'KVRN-LK-M', variantId: uid(), quantity: 1, unitPriceCents: 10000,
+                name: 'Leak Tee', size: 'M', colorName: 'Black' }],
+      subtotalCents: 10000, expiresAt: new Date(Date.now() + 9e5).toISOString(),
+    })
+    saveReservationCheckoutDetails.mockReset().mockResolvedValue(true)
+    attachStripeSession.mockReset().mockResolvedValue(undefined)
+    stripeCreate.mockReset().mockResolvedValue({ id: 'cs_lk', url: 'https://stripe.test/pay' })
+  })
+
+  async function makeDiscount(code: string, o: {
+    type?: string; amountCents?: number; singleUse?: boolean; maxRedemptions?: number | null
+    redemptionCount?: number } = {}) {
+    const rows = await raw(
+      `INSERT INTO discounts (code, name, type, amount_cents, active, single_use,
+         max_redemptions, redemption_count)
+       VALUES ($1,$1,$2,$3,TRUE,$4,$5,$6) RETURNING id`,
+      [code, o.type ?? 'fixed_amount', o.type === 'shipping' ? 500 : (o.amountCents ?? 500),
+       o.singleUse ?? false, o.maxRedemptions ?? null, o.redemptionCount ?? 0])
+    return (rows[0] as any).id as string
+  }
+
+  function request(discountCode: string) {
+    const headers = new Headers({ 'content-type': 'application/json' })
+    const req: any = new Request('https://kvrn.shop/api/checkout/session', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        items: [{ sku: 'KVRN-LK-M', quantity: 1 }],
+        email: 'leak@example.com', discountCode,
+        shippingAddress: { firstName: 'L', lastName: 'Eak', line1: '1 Test St',
+                           city: 'Austin', state: 'TX', postalCode: '78701', country: 'US' },
+        shippingMethod: 'standard',
+      }),
+    })
+    req.nextUrl = new URL('https://kvrn.shop/api/checkout/session')
+    req.cookies = { get: () => undefined }
+    return req
+  }
+
+  /** Everything observable about one rejected checkout, in a single object. */
+  async function observe(discountCode: string, claimDiscountId?: string) {
+    const res = await checkoutPOST(request(discountCode))
+    const body = await res.json()
+    const resv = (await raw(`SELECT status, release_reason FROM reservations WHERE id=$1`,
+      [reservationId]))[0] as any
+    const claims = claimDiscountId
+      ? await raw(`SELECT released_at IS NOT NULL AS released FROM discount_claims
+                   WHERE reservation_id=$1 AND discount_id=$2`, [reservationId, claimDiscountId])
+      : []
+    return {
+      status: res.status,
+      error: body.error,
+      reservationStatus: resv.status,
+      reservationReason: resv.release_reason,
+      failReservationCalls: failReservation.mock.calls.map((c: any[]) => [c[0] === reservationId ? 'THIS_RESERVATION' : c[0], c[1]]),
+      releaseClaimCalls: releaseClaimSpy.mock.calls.length,
+      claimRows: (claims as any[]).map(c => ({ released: c.released })),
+      stripeCalls: stripeCreate.mock.calls.length,
+    }
+  }
+
+  test('1 invalid code: 400, reservation failed, no claim cleanup fabricated', async () => {
+    const obs = await observe('NOSUCHCODE')
+    expect(obs).toEqual({
+      status: 400, error: "That code isn't valid.",
+      reservationStatus: 'failed', reservationReason: 'discount_code_invalid',
+      failReservationCalls: [['THIS_RESERVATION', 'discount_code_invalid']],
+      releaseClaimCalls: 0, claimRows: [], stripeCalls: 0,
+    })
+  })
+
+  test('2 blockedReason (shipping code on a free-shipping order): 400, reservation failed', async () => {
+    reserveInventory.mockResolvedValue({
+      ok: true, reservationId,
+      items: [{ sku: 'KVRN-LK-M', variantId: uid(), quantity: 1, unitPriceCents: 20000,
+                name: 'Leak Tee', size: 'M', colorName: 'Black' }],
+      subtotalCents: 20000, expiresAt: new Date(Date.now() + 9e5).toISOString(),
+    })
+    await makeDiscount('LKSHIP', { type: 'shipping' })
+    const obs = await observe('LKSHIP')
+    expect(obs).toEqual({
+      status: 400,
+      error: 'This order already qualifies for free shipping. Discounts cannot be combined.',
+      reservationStatus: 'failed', reservationReason: 'discount_blocked',
+      failReservationCalls: [['THIS_RESERVATION', 'discount_blocked']],
+      releaseClaimCalls: 0, claimRows: [], stripeCalls: 0,
+    })
+  })
+
+  test('3 claim conflict: 409, the existing claim on this reservation is released, reservation failed', async () => {
+    const other = await makeDiscount('LKOTHER', { singleUse: true })
+    await makeDiscount('LKCONFLICT', { singleUse: true })
+    // This reservation already holds a claim for a DIFFERENT discount.
+    await raw(`INSERT INTO discount_claims (discount_id, reservation_id, expires_at)
+               VALUES ($1,$2,NOW() + INTERVAL '30 minutes')`, [other, reservationId])
+    const obs = await observe('LKCONFLICT', other)
+    expect(obs).toEqual({
+      status: 409, error: 'Only one discount can be applied per order.',
+      reservationStatus: 'failed', reservationReason: 'discount_claim_conflict',
+      failReservationCalls: [['THIS_RESERVATION', 'discount_claim_conflict']],
+      releaseClaimCalls: 1, claimRows: [{ released: true }], stripeCalls: 0,
+    })
+  })
+
+  test('4 claim exhausted: 409, reservation failed, no release fabricated (no claim exists)', async () => {
+    const d = await makeDiscount('LKEXHAUST', { singleUse: true })
+    // Another live checkout holds the only slot.
+    await raw(`INSERT INTO discount_claims (discount_id, reservation_id, expires_at)
+               VALUES ($1,$2,NOW() + INTERVAL '30 minutes')`, [d, uid()])
+    const obs = await observe('LKEXHAUST', d)
+    expect(obs).toEqual({
+      status: 409,
+      error: 'That code has already been used or is held by another active checkout.',
+      reservationStatus: 'failed', reservationReason: 'discount_claim_exhausted',
+      failReservationCalls: [['THIS_RESERVATION', 'discount_claim_exhausted']],
+      releaseClaimCalls: 0, claimRows: [], stripeCalls: 0,
+    })
+    // The OTHER checkout's claim must be untouched.
+    const held = await raw(`SELECT released_at FROM discount_claims WHERE discount_id=$1`, [d])
+    expect((held as any[]).every(r => r.released_at === null)).toBe(true)
+  })
+
+  test('5a cleanup failures never mask the invalid-code rejection', async () => {
+    failReservation.mockRejectedValue(new Error('db down'))
+    releaseClaimSpy.mockRejectedValue(new Error('db down'))
+    const res = await checkoutPOST(request('NOSUCHCODE2'))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe("That code isn't valid.")
+  })
+
+  test('5b cleanup failures never mask the conflict rejection', async () => {
+    const other = await makeDiscount('LKOTHER2', { singleUse: true })
+    await makeDiscount('LKCONFLICT2', { singleUse: true })
+    await raw(`INSERT INTO discount_claims (discount_id, reservation_id, expires_at)
+               VALUES ($1,$2,NOW() + INTERVAL '30 minutes')`, [other, reservationId])
+    failReservation.mockRejectedValue(new Error('db down'))
+    releaseClaimSpy.mockRejectedValue(new Error('db down'))
+    const res = await checkoutPOST(request('LKCONFLICT2'))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('Only one discount can be applied per order.')
+  })
+
+  test('5c cleanup failures never mask the exhausted rejection', async () => {
+    const ex = await makeDiscount('LKEXHAUST2', { singleUse: true })
+    await raw(`INSERT INTO discount_claims (discount_id, reservation_id, expires_at)
+               VALUES ($1,$2,NOW() + INTERVAL '30 minutes')`, [ex, uid()])
+    failReservation.mockRejectedValue(new Error('db down'))
+    releaseClaimSpy.mockRejectedValue(new Error('db down'))
+    const res = await checkoutPOST(request('LKEXHAUST2'))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error)
+      .toBe('That code has already been used or is held by another active checkout.')
+  })
+
+  test('6 blocked-path cleanup failure does not mask the rejection', async () => {
+    reserveInventory.mockResolvedValue({
+      ok: true, reservationId,
+      items: [{ sku: 'KVRN-LK-M', variantId: uid(), quantity: 1, unitPriceCents: 20000,
+                name: 'Leak Tee', size: 'M', colorName: 'Black' }],
+      subtotalCents: 20000, expiresAt: new Date(Date.now() + 9e5).toISOString(),
+    })
+    await makeDiscount('LKSHIP2', { type: 'shipping' })
+    failReservation.mockRejectedValue(new Error('db down'))
+    const res = await checkoutPOST(request('LKSHIP2'))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error)
+      .toBe('This order already qualifies for free shipping. Discounts cannot be combined.')
+  })
+
+  test('7 the already-correct stripe_coupon_unavailable path is unchanged', async () => {
+    // A valid, unlimited merchandise code; Stripe cannot create a coupon (the
+    // stubbed Stripe has no coupons API), so the existing fail-closed branch runs.
+    await makeDiscount('LKCOUPON', { amountCents: 500 })
+    const obs = await observe('LKCOUPON')
+    expect(obs.status).toBe(503)
+    expect(obs.error).toBe('Could not apply the discount code at this time. Please try again.')
+    expect(obs.reservationStatus).toBe('failed')
+    expect(obs.failReservationCalls).toEqual([['THIS_RESERVATION', 'stripe_coupon_unavailable']])
+    expect(obs.stripeCalls).toBe(0)
+  })
+})
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+// POST-020 SAFETY PASS — exceptions in the discount calls, and REAL stock
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Everything here uses the REAL reservation service, so reserve_inventory and
+// release_reservation_by_id are the production SQL: real reservations, real
+// reservation_items, real product_variants.reserved_quantity and real
+// inventory_movements. Nothing about stock restoration is mocked.
+//
+// Substituted, as elsewhere in this file: Shippo and Stripe, and the database
+// transport. claimDiscount is a call-through wrapper so the "claim was taken,
+// then the call failed" (ambiguous) case can be produced faithfully.
+
+describe('Post-020 safety pass — real stock, and exceptions in the discount calls', () => {
+  let checkoutPOST: any
+  let reservationId: string | null
+  let sku: string
+  let variantId: string
+  let ambiguousClaimFailure = false
+  const releaseClaimSpy = jest.fn()
+  const failReservationSpy = jest.fn()
+  const reservedAfterReserve: number[] = []
+
+  beforeAll(async () => {
+    jest.resetModules()
+    jest.doMock('../discounts', () => {
+      const actual = jest.requireActual('../discounts')
+      return {
+        ...actual,
+        releaseDiscountClaim: (...a: any[]) => releaseClaimSpy(...a),
+        // The claim really runs; the failure is injected AFTER it, so the claim
+        // row may exist even though the caller saw an exception.
+        claimDiscount: async (...a: any[]) => {
+          const r = await actual.claimDiscount(...a)
+          if (ambiguousClaimFailure) throw new Error('RESPONSE_LOST_AFTER_CLAIM')
+          return r
+        },
+      }
+    })
+    const { createCheckoutPostHandler } = await import('../checkout-session-handler')
+    const { createReservationService } = await import('../reservations')
+    const real = createReservationService(pgSqlWithFaults as any)
+    checkoutPOST = createCheckoutPostHandler({
+      isCheckoutEnabled: () => true,
+      getSiteOrigin: () => 'https://kvrn.shop',
+      getStripe: () => ({ checkout: { sessions: { create: stripeCreate } } }) as any,
+      reserveInventory: async (items: any) => {
+        const r = await real.reserveInventory(items)
+        if (r.ok) {
+          reservationId = r.reservationId
+          // Stock as it stands the instant after the REAL reservation succeeded,
+          // i.e. before any discount handling.
+          const row = (await raw(`SELECT reserved_quantity FROM product_variants WHERE id=$1`,
+            [variantId]))[0] as any
+          reservedAfterReserve.push(Number(row.reserved_quantity))
+        }
+        return r
+      },
+      saveReservationCheckoutDetails: real.saveReservationCheckoutDetails,
+      failReservation: async (id: string, reason: string) => {
+        failReservationSpy(id, reason)
+        return real.failReservation(id, reason)
+      },
+      attachStripeSession: real.attachStripeSession,
+      releaseExpiredReservations: async () => 0,
+    } as any)
+  })
+  afterAll(() => { jest.dontMock('../discounts'); jest.resetModules() })
+
+  beforeEach(async () => {
+    process.env.ENABLE_STRIPE_TEST_CHECKOUT = 'true'
+    process.env.SHIPPO_API_TOKEN = 'shippo_test_token'
+    ambiguousClaimFailure = false
+    reservationId = null
+    reservedAfterReserve.length = 0
+    failReservationSpy.mockReset()
+    releaseClaimSpy.mockReset().mockImplementation(async (id: string) => {
+      await raw(`SELECT release_discount_claim($1::uuid)`, [id])
+    })
+    stripeCreate.mockReset().mockResolvedValue({ id: 'cs_sp', url: 'https://stripe.test/pay' })
+    // Real catalog rows: 10 on hand, nothing reserved.
+    const productId = uid(); variantId = uid(); sku = `KVRN-SP-${++seq}`
+    await raw(`INSERT INTO products (id,drop_code,product_code,name,slug,price_cents,active)
+               VALUES ($1,'SP','SP','SP Tee',$2,10000,true)`, [productId, `sp-${seq}`])
+    await raw(`INSERT INTO product_variants
+                 (id,product_id,sku,color_name,color_code,size,size_sort,stock_on_hand,
+                  reserved_quantity,active)
+               VALUES ($1,$2,$3,'Black','BLK','M',2,10,0,true)`, [variantId, productId, sku])
+  })
+
+  const stock = async () => {
+    const r = (await raw(
+      `SELECT stock_on_hand, reserved_quantity FROM product_variants WHERE id=$1`, [variantId]))[0] as any
+    return { onHand: Number(r.stock_on_hand), reserved: Number(r.reserved_quantity),
+             available: Number(r.stock_on_hand) - Number(r.reserved_quantity) }
+  }
+
+  function request(discountCode: string, qty = 2) {
+    const req: any = new Request('https://kvrn.shop/api/checkout/session', {
+      method: 'POST', headers: new Headers({ 'content-type': 'application/json' }),
+      body: JSON.stringify({
+        items: [{ sku, quantity: qty }], email: 'sp@example.com', discountCode,
+        shippingAddress: { firstName: 'S', lastName: 'Afe', line1: '1 Test St',
+                           city: 'Austin', state: 'TX', postalCode: '78701', country: 'US' },
+        shippingMethod: 'standard',
+      }),
+    })
+    req.nextUrl = new URL('https://kvrn.shop/api/checkout/session')
+    req.cookies = { get: () => undefined }
+    return req
+  }
+
+  async function makeDiscount(code: string, singleUse = false) {
+    const rows = await raw(
+      `INSERT INTO discounts (code,name,type,amount_cents,active,single_use,redemption_count)
+       VALUES ($1,$1,'fixed_amount',500,TRUE,$2,0) RETURNING id`, [code, singleUse])
+    return (rows[0] as any).id as string
+  }
+
+  /** One object holding everything observable, so a failure prints all of it. */
+  async function observe(code: string, extra?: { claimDiscountId?: string }) {
+    let status: number | string, error: unknown = null
+    try {
+      const res = await checkoutPOST(request(code))
+      status = res.status; error = (await res.json()).error
+    } catch (e: any) {
+      status = 'HANDLER_THREW'; error = e?.message
+    }
+    const resv = reservationId
+      ? (await raw(`SELECT status, release_reason FROM reservations WHERE id=$1`, [reservationId]))[0] as any
+      : null
+    const items = reservationId
+      ? await raw(`SELECT quantity FROM reservation_items WHERE reservation_id=$1`, [reservationId])
+      : []
+    const moves = reservationId
+      ? await raw(`SELECT movement_type, quantity_delta FROM inventory_movements
+                   WHERE reservation_id=$1 ORDER BY movement_type`, [reservationId])
+      : []
+    const claim = reservationId
+      ? await raw(`SELECT released_at IS NOT NULL AS released FROM discount_claims
+                   WHERE reservation_id=$1`, [reservationId])
+      : []
+    void extra
+    return {
+      status, error,
+      reservationStatus: resv?.status ?? null,
+      reservationReason: resv?.release_reason ?? null,
+      reservationItemQuantities: (items as any[]).map(i => Number(i.quantity)),
+      reservedRightAfterReserve: [...reservedAfterReserve],
+      stockAfter: await stock(),
+      movements: (moves as any[]).map(m => `${m.movement_type}:${m.quantity_delta}`),
+      claimRows: (claim as any[]).map(c => ({ released: c.released })),
+      failReservationCalls: failReservationSpy.mock.calls.map((c: any[]) => c[1]),
+      stripeCalls: stripeCreate.mock.calls.length,
+    }
+  }
+
+  const RESTORED = { onHand: 10, reserved: 0, available: 10 }
+  const SERVER_MSG = 'Could not apply the discount code at this time. Please try again.'
+
+  // ── GAP 2: real stock restoration on an ordinary rejection ───────────────
+  test('S1 invalid code: 2 units really reserved, then really released; available returns to 10', async () => {
+    const before = await stock()
+    expect(before).toEqual(RESTORED)
+    expect(await observe('NOSUCHCODE')).toEqual({
+      status: 400, error: "That code isn't valid.",
+      reservationStatus: 'failed', reservationReason: 'discount_code_invalid',
+      reservationItemQuantities: [2],
+      reservedRightAfterReserve: [2],            // stock WAS held before the rejection
+      stockAfter: RESTORED,                      // ... and is restored by the real SQL
+      movements: ['RELEASE:-2', 'RESERVE:2'],
+      claimRows: [], failReservationCalls: ['discount_code_invalid'], stripeCalls: 0,
+    })
+  })
+
+  test('S2 exhausted code: real stock restored, other checkout\'s claim untouched', async () => {
+    const d = await makeDiscount('SPEXHAUST', true)
+    await raw(`INSERT INTO discount_claims (discount_id, reservation_id, expires_at)
+               VALUES ($1,$2,NOW() + INTERVAL '30 minutes')`, [d, uid()])
+    const obs = await observe('SPEXHAUST')
+    expect(obs).toEqual({
+      status: 409,
+      error: 'That code has already been used or is held by another active checkout.',
+      reservationStatus: 'failed', reservationReason: 'discount_claim_exhausted',
+      reservationItemQuantities: [2], reservedRightAfterReserve: [2], stockAfter: RESTORED,
+      movements: ['RELEASE:-2', 'RESERVE:2'],
+      claimRows: [], failReservationCalls: ['discount_claim_exhausted'], stripeCalls: 0,
+    })
+    const held = await raw(`SELECT released_at FROM discount_claims WHERE discount_id=$1`, [d])
+    expect((held as any[]).every(r => r.released_at === null)).toBe(true)
+  })
+
+  // ── GAP 1: exceptions, not rejections ────────────────────────────────────
+  test('E1 validateDiscount THROWS: 503 (not an invalid-code 400), stock restored', async () => {
+    failNextMatching(/FROM discounts WHERE code/)
+    expect(await observe('ANYCODE')).toEqual({
+      status: 503, error: SERVER_MSG,
+      reservationStatus: 'failed', reservationReason: 'discount_validation_error',
+      reservationItemQuantities: [2], reservedRightAfterReserve: [2], stockAfter: RESTORED,
+      movements: ['RELEASE:-2', 'RESERVE:2'],
+      claimRows: [], failReservationCalls: ['discount_validation_error'], stripeCalls: 0,
+    })
+  })
+
+  test('E2 claimDiscount THROWS before claiming: 503, stock restored, idempotent release is harmless', async () => {
+    await makeDiscount('SPCLAIMERR', true)
+    failNextMatching(/claim_discount\(/)
+    const obs = await observe('SPCLAIMERR')
+    expect(obs).toEqual({
+      status: 503, error: SERVER_MSG,
+      reservationStatus: 'failed', reservationReason: 'discount_claim_error',
+      reservationItemQuantities: [2], reservedRightAfterReserve: [2], stockAfter: RESTORED,
+      movements: ['RELEASE:-2', 'RESERVE:2'],
+      claimRows: [], failReservationCalls: ['discount_claim_error'], stripeCalls: 0,
+    })
+  })
+
+  test('E3 claimDiscount THROWS AFTER the claim was taken (ambiguous): claim released, stock restored', async () => {
+    await makeDiscount('SPAMBIG', true)
+    ambiguousClaimFailure = true
+    const obs = await observe('SPAMBIG')
+    expect(obs).toEqual({
+      status: 503, error: SERVER_MSG,
+      reservationStatus: 'failed', reservationReason: 'discount_claim_error',
+      reservationItemQuantities: [2], reservedRightAfterReserve: [2], stockAfter: RESTORED,
+      movements: ['RELEASE:-2', 'RESERVE:2'],
+      claimRows: [{ released: true }],           // the claim that DID exist is not stranded
+      failReservationCalls: ['discount_claim_error'], stripeCalls: 0,
+    })
+    expect(releaseClaimSpy).toHaveBeenCalledTimes(1)
+  })
+
+  test('E4 cleanup failing too still returns the 503 and never throws out of the handler', async () => {
+    await makeDiscount('SPBOTH', true)
+    ambiguousClaimFailure = true
+    releaseClaimSpy.mockRejectedValue(new Error('db down'))
+    failReservationSpy.mockImplementation(() => { throw new Error('db down') })
+    const res = await checkoutPOST(request('SPBOTH'))
+    expect(res.status).toBe(503)
+    expect((await res.json()).error).toBe(SERVER_MSG)
+  })
+
+  test('E5 a throwing validateDiscount is not reported as an ordinary invalid code', async () => {
+    failNextMatching(/FROM discounts WHERE code/)
+    const res = await checkoutPOST(request('ANYCODE'))
+    const body = await res.json()
+    expect(res.status).toBeGreaterThanOrEqual(500)
+    expect(body.error).not.toMatch(/isn't valid|already been used/i)
   })
 })

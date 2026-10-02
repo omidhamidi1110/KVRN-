@@ -385,11 +385,46 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     let appliedDiscount: import('./discounts').AppliedDiscount | null = null
     let discountBlockedReason: string | null = null
 
+    // ── Discount rejections must not strand the inventory reservation ────────
+    //
+    // Inventory was reserved above, BEFORE the discount is evaluated. Every
+    // discount-rejection return below therefore has to fail that reservation, or
+    // the stock stays held until the reservation times out on a later checkout.
+    //
+    // Best-effort and independent, in the same style as the other cleanup in this
+    // handler: a cleanup error is logged and never replaces the customer-facing
+    // rejection. The claim is released only where one demonstrably exists, so no
+    // release is fabricated for a rejection that never took a claim.
+    const failReservationForDiscountRejection = async (
+      reason: string, opts: { releaseClaim: boolean }
+    ) => {
+      if (opts.releaseClaim) {
+        try { await releaseDiscountClaim(reservation.reservationId) } catch (e: any) {
+          console.error('[checkout/session] discount claim release failed after '
+            + `${reason}:`, e?.message?.slice(0, 100))
+        }
+      }
+      try { await deps.failReservation(reservation.reservationId, reason) } catch (e: any) {
+        console.error('[checkout/session] reservation release failed after '
+          + `${reason}:`, e?.message?.slice(0, 100))
+      }
+    }
+
+    const DISCOUNT_UNAVAILABLE_MSG = 'Could not apply the discount code at this time. Please try again.'
     let _appliedValidation: Awaited<ReturnType<typeof validateDiscount>> | null = null
     if (rawDiscountCode) {
-      const validation = await validateDiscount(rawDiscountCode, { subtotalCents, country })
+      let validation: Awaited<ReturnType<typeof validateDiscount>>
+      try {
+        validation = await validateDiscount(rawDiscountCode, { subtotalCents, country })
+      } catch (err: any) {
+        // Infrastructure failure (not an invalid code): free the stock, report 503.
+        console.error('[checkout] discount validation error:', err?.message?.slice(0, 100))
+        await failReservationForDiscountRejection('discount_validation_error', { releaseClaim: false })
+        return NextResponse.json({ error: DISCOUNT_UNAVAILABLE_MSG }, { status: 503 })
+      }
       _appliedValidation = validation
       if (!validation.valid) {
+        await failReservationForDiscountRejection('discount_code_invalid', { releaseClaim: false })
         return NextResponse.json({ error: validation.error }, { status: 400 })
       }
 
@@ -401,6 +436,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         shippingCents, // base shipping cost
       })
       if (priorityResult.blockedReason) {
+        await failReservationForDiscountRejection('discount_blocked', { releaseClaim: false })
         return NextResponse.json({ error: priorityResult.blockedReason }, { status: 400 })
       }
       appliedDiscount = priorityResult.applied
@@ -425,18 +461,32 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         // KVRN10 (unlimited) doesn't need exclusive claim, but SMS codes do
         if (validation.discount.singleUse || validation.discount.maxRedemptions !== null) {
           const sessionExpiresAt = new Date(Date.now() + 31 * 60 * 1000 + 60_000)
-          const claimResult = await claimDiscount({
-            discountId:    appliedDiscount.discountId,
-            reservationId: reservation.reservationId,
-            expiresAt:     sessionExpiresAt,
-          })
+          let claimResult: Awaited<ReturnType<typeof claimDiscount>>
+          try {
+            claimResult = await claimDiscount({
+              discountId:    appliedDiscount.discountId,
+              reservationId: reservation.reservationId,
+              expiresAt:     sessionExpiresAt,
+            })
+          } catch (err: any) {
+            // Ambiguous: the claim may or may not have been written before the
+            // failure. release_discount_claim is idempotent (no-op without a claim).
+            console.error('[checkout] discount claim error:', err?.message?.slice(0, 100))
+            await failReservationForDiscountRejection('discount_claim_error', { releaseClaim: true })
+            return NextResponse.json({ error: DISCOUNT_UNAVAILABLE_MSG }, { status: 503 })
+          }
           if (claimResult === 'conflict') {
+            // This reservation already holds a claim (for a different discount):
+            // release it, then fail the reservation.
+            await failReservationForDiscountRejection('discount_claim_conflict', { releaseClaim: true })
             return NextResponse.json(
               { error: 'Only one discount can be applied per order.' },
               { status: 409 }
             )
           }
           if (claimResult === 'exhausted') {
+            // No claim was taken for this reservation, so none is released.
+            await failReservationForDiscountRejection('discount_claim_exhausted', { releaseClaim: false })
             return NextResponse.json(
               { error: 'That code has already been used or is held by another active checkout.' },
               { status: 409 }
