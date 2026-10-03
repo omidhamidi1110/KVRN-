@@ -22,8 +22,9 @@ export interface CookiePrefsCtx {
   closePrefs:     () => void
 }
 
-const STORAGE_KEY = 'kvrn_cookie_prefs_v2'
-const EXPIRY_MS   = 365 * 24 * 60 * 60 * 1000
+export const STORAGE_KEY = 'kvrn_cookie_prefs_v2'
+export const COOKIE_PREFS_EXPIRY_MS = 365 * 24 * 60 * 60 * 1000
+const EXPIRY_MS   = COOKIE_PREFS_EXPIRY_MS
 
 const DEFAULT_PREFS: CookiePrefs = {
   essential:       true,

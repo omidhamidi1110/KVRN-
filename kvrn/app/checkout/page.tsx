@@ -10,6 +10,7 @@ import { type ShippingMethod } from '@/lib/stripe'
 import { qualifiesForFreeShipping, FREE_SHIPPING_THRESHOLD_CENTS } from '@/lib/free-shipping'
 import { COUNTRIES } from '@/lib/countries'
 import { cn } from '@/lib/utils'
+import { getFunnelSessionIdIfConsented } from '@/lib/funnel-client'
 
 type Step = 'contact' | 'shipping'
 
@@ -223,6 +224,7 @@ export default function CheckoutPage() {
 
     setCreatingSession(true)
     setPaymentError('')
+    const analyticsSid = getFunnelSessionIdIfConsented()
 
     try {
       const res = await fetch('/api/checkout/session', {
@@ -230,6 +232,8 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(discountApplied.code ? { discountCode: discountApplied.code } : {}),
+          // Opaque analytics session id; present only when analytics consent was given.
+          ...(analyticsSid ? { analyticsSessionId: analyticsSid } : {}),
           items:          items.map(i => ({ sku: i.sku, quantity: i.quantity })),
           email:          contact.email.trim(),
           phone:          contact.smsOptIn ? (contact.phone.trim() || undefined) : undefined,

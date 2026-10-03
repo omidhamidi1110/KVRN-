@@ -11,6 +11,7 @@ import {
 import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
 import { AFFILIATE_SESSION_COOKIE, isValidSessionId } from './affiliate-session'
 import { sql } from './db'
+import { isValidFunnelSessionId, tryRecordCheckoutStarted } from './funnel-analytics'
 import { COUNTRY_CODES } from './countries'
 import { US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
 // calculateShippingCents intentionally not imported — static cents must never
@@ -144,6 +145,10 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     }
 
     const items: LineItemInput[] = body.items
+    // Optional, shape-checked analytics session id (only sent by consenting browsers).
+    // Never affects checkout; an invalid value is simply ignored.
+    const analyticsSessionId: string | null =
+      isValidFunnelSessionId(body.analyticsSessionId) ? body.analyticsSessionId : null
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 })
     }
@@ -754,6 +759,23 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         { error: 'Checkout session could not be confirmed. Please try again.' },
         { status: 500 }
       )
+    }
+
+    // ── Funnel analytics: checkout_started ───────────────────────────────────
+    // Reached only after the Stripe session exists AND is attached to the reservation, so
+    // it can never claim a checkout that failed to start. Best-effort by construction:
+    // tryRecordCheckoutStarted never throws, and nothing above depends on it. Recorded only
+    // when the visitor's browser supplied an analytics session id (i.e. consented); the id's
+    // shape is the only thing trusted, and the cart/subtotal come from the reservation.
+    if (analyticsSessionId) {
+      await tryRecordCheckoutStarted(sql, {
+        sessionId:     analyticsSessionId,
+        reservationId: reservation.reservationId,
+        subtotalCents,
+        items: (reservation.items as any[]).map((i: any) => ({
+          variantId: i.variantId, quantity: i.quantity,
+        })),
+      })
     }
 
     return NextResponse.json({ url: session.url, sessionId: session.id })

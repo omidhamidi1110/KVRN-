@@ -9,6 +9,7 @@ import { I18nProvider }     from '@/context/I18nContext'
 import { WishlistDrawer }   from '@/components/ui/WishlistDrawer'
 import { ToastProvider }    from '@/components/ui/Toast'
 import { CookieBanner }     from '@/components/ui/CookieConsent'
+import { FunnelTracker }    from '@/components/analytics/FunnelTracker'
 import { AnnouncementBar }  from '@/components/ui/AnnouncementBar'
 import { Nav }              from '@/components/layout/Nav'
 import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
@@ -104,6 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main id="main-content">{children}</main>
                 <ConditionalFooter />
                 <CookieBanner />
+                <FunnelTracker />
               </ToastProvider>
             </CartProvider>
             </WishlistProvider>

@@ -67,6 +67,15 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+      {
+        label: 'Analytics',
+        href: '/admin/analytics',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
     ],
   },
   {

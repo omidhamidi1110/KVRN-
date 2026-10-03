@@ -9,6 +9,8 @@ import { useI18n }     from '@/context/I18nContext'
 import { cn }          from '@/lib/utils'
 import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
 import { PUBLIC_SLUG_TO_PRODUCT_CODE, buildSku } from '@/lib/catalog'
+import { useCookiePrefs } from '@/context/CookiePrefsContext'
+import { trackProductView } from '@/lib/funnel-client'
 
 const NAV = 92 // announcement bar (36) + nav (56)
 
@@ -19,6 +21,13 @@ export function PDPClient({ product, relatedProduct }: Props) {
   const { addItem, openCart } = useCart()
   const { formatPrice }       = useCurrency()
   const { t }                 = useI18n()
+  const { prefs: cookiePrefs } = useCookiePrefs()
+
+  // Funnel analytics: one product_viewed per product per session. Re-runs when analytics
+  // consent is granted while the page is already open; the client + server dedupe make a
+  // re-render or a double effect harmless.
+  const analyticsOn = cookiePrefs?.analytics === true
+  useEffect(() => { if (analyticsOn) trackProductView(product.slug) }, [analyticsOn, product.slug])
 
   const [color,   setColor]   = useState<ColorOption>(product.colors[0])
   const [size,    setSize]    = useState<SizeLabel | null>(null)

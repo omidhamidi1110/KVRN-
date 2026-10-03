@@ -97,3 +97,21 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
     default:            return state
   }
 }
+
+/**
+ * The quantity an ADD_ITEM would ACTUALLY add to the cart, using exactly the reducer's own
+ * semantics (a new line is added as requested; an existing line is incremented and clamped to
+ * the freshest availableQuantity). Pure: no side effects, does not run the reducer's business
+ * logic differently — it mirrors it. Returns 0 when nothing would be added (already at the
+ * cap, a stale line above the cap, or an invalid request). Used to record funnel analytics only
+ * for adds that really increased the cart.
+ */
+export function computeAddedQuantity(items: CartItem[], payload: CartItem): number {
+  const requested = payload.quantity
+  if (!Number.isInteger(requested) || requested < 1) return 0
+  const existing = items.find(item => item.cartItemId === payload.cartItemId)
+  if (!existing) return requested
+  const freshCap = payload.availableQuantity ?? existing.availableQuantity ?? Infinity
+  const newQty = Math.min(existing.quantity + requested, freshCap)
+  return Math.max(0, newQty - existing.quantity)
+}

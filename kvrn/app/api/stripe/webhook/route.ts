@@ -14,6 +14,7 @@ import { createDisputesService } from '@/lib/disputes'
 import { createAffiliatesService } from '@/lib/affiliates'
 import { reconcileStripeFeeForOrder } from '@/lib/stripe-fees'
 import { getStripe } from '@/lib/stripe-client'
+import { tryRecordPurchase } from '@/lib/funnel-analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -156,6 +157,15 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
     console.error('[WEBHOOK][LATE_PAYMENT_RECOVERED]', JSON.stringify({
       orderNumber: result.orderNumber, sessionId: session.id, eventId,
     }))
+  }
+
+  // Funnel analytics: purchase_completed. Canonical (server-side, from the paid-order
+  // path), idempotent by order id, and strictly best-effort: tryRecordPurchase never throws
+  // and runs AFTER the order is committed, so an analytics failure cannot block or roll back
+  // a paid order. Also runs for an already-processed replay so a first attempt that failed to
+  // write analytics heals on Stripe's retry; the deterministic event id prevents a duplicate.
+  if (result.orderId && ['order_created', 'already_processed', 'already_had_order'].includes(result.outcome)) {
+    await tryRecordPurchase(sql, { orderId: result.orderId, reservationId: session.metadata?.reservation_id })
   }
 
   // Attempt to send outbox email — non-fatal: provider failure must NOT affect order

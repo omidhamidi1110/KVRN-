@@ -6,10 +6,12 @@ import React, {
   useReducer,
   useEffect,
   useCallback,
+  useRef,
 } from 'react'
 import type { CartItem } from '@/types'
 import { buildCartItemId, getFromStorage, setInStorage } from '@/lib/utils'
-import { cartReducer, type CartState, type CartAction } from '@/lib/cart-reducer'
+import { cartReducer, computeAddedQuantity, type CartState, type CartAction } from '@/lib/cart-reducer'
+import { trackAddToCartEvent } from '@/lib/funnel-client'
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     items: [],
     isOpen: false,
   })
+
+  // Latest cart items, for deriving the actual quantity an add contributes (funnel analytics
+  // only). Refreshed on every render and advanced synchronously by addItem so two adds in the
+  // same tick each see the other.
+  const itemsRef = useRef<CartItem[]>(state.items)
+  itemsRef.current = state.items
 
   // ── Refresh helper ─────────────────────────────────────────────────────────
   // Accepts optional explicit items to avoid closure-timing issues during hydration.
@@ -112,7 +120,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = useCallback((item: Omit<CartItem, 'cartItemId'>) => {
     const cartItemId = buildCartItemId(item.productId, item.color, item.size)
-    dispatch({ type: 'ADD_ITEM', payload: { ...item, cartItemId } })
+    const payload: CartItem = { ...item, cartItemId }
+    // Funnel analytics must record what the reducer will ACTUALLY add (it clamps an existing
+    // line to availableQuantity), so derive the delta from the current cart BEFORE dispatching.
+    // The reducer itself is untouched.
+    const added = computeAddedQuantity(itemsRef.current, payload)
+    dispatch({ type: 'ADD_ITEM', payload })
+    itemsRef.current = cartReducer({ items: itemsRef.current, isOpen: false }, { type: 'ADD_ITEM', payload }).items
+    // addItem is the single place an item enters the cart (product page, quick-add, set bundle).
+    // Consent-gated and fire-and-forget; only a real increase (delta > 0) is recorded.
+    if (added > 0) trackAddToCartEvent({ slug: item.slug, sku: item.sku, quantity: added })
   }, [])
 
   const removeItem = useCallback((cartItemId: string) => {
