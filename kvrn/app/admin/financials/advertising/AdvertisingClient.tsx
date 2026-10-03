@@ -20,6 +20,10 @@ type AdSpend = {
   providerReportedOrders: number | null
   providerSource: string | null
   notes: string | null
+  /** Set when the row was VOIDED: retained as history, counted nowhere. */
+  voidedAt?: string | null
+  voidedBy?: string | null
+  voidReason?: string | null
 }
 
 const PLATFORMS = [
@@ -91,17 +95,26 @@ export function AdvertisingClient() {
     finally { setSaving(false) }
   }
 
-  async function remove(id: string) {
+  // Booked spend is a money fact: it is VOIDED (kept as history, counted nowhere), never erased.
+  async function voidRow(id: string) {
     setErr(null)
+    const reason = window.prompt(
+      'Void this ad-spend entry? It stays in the history but stops counting.\n\nReason (required):')
+    if (!reason || !reason.trim()) return
     try {
-      const res = await fetch(`/api/admin/ad-spend/${id}`, { method: 'DELETE' })
-      if (!res.ok) { const j = await res.json(); setErr(j.error ?? 'Could not delete.'); return }
+      const res = await fetch(`/api/admin/ad-spend/${id}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      })
+      if (!res.ok) { const j = await res.json(); setErr(j.error ?? 'Could not void.'); return }
       await load()
     } catch { setErr('Network error.') }
   }
 
-  const mediaTotal    = ads.filter(a =>  MEDIA.has(a.platform)).reduce((s, a) => s + a.spendCents, 0)
-  const creativeTotal = ads.filter(a => !MEDIA.has(a.platform)).reduce((s, a) => s + a.spendCents, 0)
+  // Voided rows are history only: excluded from every total shown here.
+  const activeAds     = ads.filter(a => !a.voidedAt)
+  const mediaTotal    = activeAds.filter(a =>  MEDIA.has(a.platform)).reduce((s, a) => s + a.spendCents, 0)
+  const creativeTotal = activeAds.filter(a => !MEDIA.has(a.platform)).reduce((s, a) => s + a.spendCents, 0)
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
@@ -212,7 +225,9 @@ export function AdvertisingClient() {
               </td></tr>
             )}
             {ads.map(a => (
-              <tr key={a.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
+              <tr key={a.id} style={{ borderBottom: '1px solid #F1EEE8',
+                                       opacity: a.voidedAt ? 0.55 : 1,
+                                       textDecoration: a.voidedAt ? 'line-through' : 'none' }}>
                 <td style={{ padding: '9px 12px' }}>{a.platform.replace(/_/g, ' ')}</td>
                 <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{a.campaignName ?? '—'}</td>
                 <td style={{ padding: '9px 12px' }}>{money(a.spendCents)}</td>
@@ -224,11 +239,18 @@ export function AdvertisingClient() {
                 </td>
                 <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{a.providerSource ?? '—'}</td>
                 <td style={{ padding: '9px 12px' }}>
-                  <button onClick={() => remove(a.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer',
-                             color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
-                    Delete
-                  </button>
+                  {a.voidedAt ? (
+                    <span style={{ fontSize: 11, color: '#6B6B6B', textDecoration: 'none', display: 'inline-block' }}
+                          title={`Voided ${a.voidedAt} by ${a.voidedBy ?? 'unknown'}: ${a.voidReason ?? ''}`}>
+                      Voided{a.voidReason ? ` — ${a.voidReason}` : ''}
+                    </span>
+                  ) : (
+                    <button onClick={() => voidRow(a.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer',
+                               color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
+                      Void
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

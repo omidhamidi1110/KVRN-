@@ -26,6 +26,8 @@ import {
 import {
   computeOrderEconomics,
   computePeriodEconomics,
+  applyIntegrityGate,
+  knownSoFarContribution,
   allocateDiscountToLines,
   recognizeExpenseRowsExact,
   recognizeAdSpendRowsExact,
@@ -34,7 +36,10 @@ import {
   type OrderEconomics,
   type PeriodEconomics,
   type OrderFinancialInputs,
+  type IntegrityVerdict,
 } from './financial-calculator'
+import { mapPeriodIntegrity, createFinancialIntegrityService, type PeriodIntegrity, type OrderIntegrity } from './financial-integrity'
+import { canonicalOrderContribution, type CanonicalOrderContribution } from './financial-presentation'
 
 export interface DateRange {
   /** Inclusive ISO timestamp. */
@@ -51,6 +56,19 @@ export interface OrderFinancialRow extends OrderFinancialInputs {
   customerEmail: string | null
 }
 
+/**
+ * One order as the Admin financial API presents it (REV2).
+ *   economics  RAW calculator output: known-so-far DIAGNOSTICS. Not authoritative: it cannot see
+ *              reconciliation contradictions, so it may hold a number for an EXCEPTION order.
+ *   integrity  the order's derived state from the canonical scan (RECONCILED/INCOMPLETE/EXCEPTION)
+ *   canonical  the AUTHORITATIVE contribution: exact only when integrity is RECONCILED and every
+ *              calculator input is known; otherwise null with Unknown / Invalid.
+ */
+export interface OrderFinancialView extends OrderEconomicsRow {
+  integrity: OrderIntegrity
+  canonical: CanonicalOrderContribution
+}
+
 export interface OrderEconomicsRow {
   orderId:       string
   orderNumber:   string
@@ -58,6 +76,12 @@ export interface OrderEconomicsRow {
   paymentStatus: string
   customerEmail: string | null
   economics:     OrderEconomics
+  /**
+   * Reconciliation state of THIS order (the order and its refunds, returns, exchanges,
+   * disputes, commission, COGS/FIFO, shipping and fee). Present on period reports; an
+   * order's exact contribution may only be shown as exact when this is RECONCILED.
+   */
+  integrityState?: IntegrityVerdict
 }
 
 /**
@@ -86,7 +110,16 @@ function financialSelect() {
       ci."cogsCents",
       sc."shippingCostCents",
       COALESCE(rf."refundCents", 0)       AS "refundCents",
-      rf."refundedFeeCents"
+      rf."refundRevenueCents",
+      rf."refundedFeeCents",
+      dp."disputeLossCents",
+      dp."disputeFeeCents",
+      af."affiliateCommissionCents",
+      rt."returnCogsCreditCents",
+      rl."returnLabelCostCents",
+      ex."exchangeCogsCents",
+      ex."exchangeShippingCostCents",
+      ex."exchangeRevenueCents"
     FROM orders o
     -- COGS: only known when every single line carries a snapshot
     LEFT JOIN LATERAL (
@@ -95,23 +128,114 @@ function financialSelect() {
                   ELSE NULL END AS "cogsCents"
       FROM order_items oi WHERE oi.order_id = o.id
     ) ci ON TRUE
-    -- Actual carrier cost: shipments is authoritative. NULL when nothing recorded.
+    -- Merchant carrier cost: ONE canonical definition shared with the integrity scan
+    -- (fi_order_shipping, migration 021). NULL = unknown: no shipment yet, any outbound
+    -- shipment without a cost, or any checkout-quote ESTIMATE. Never a partial sum.
     LEFT JOIN LATERAL (
-      SELECT CASE WHEN COUNT(s.label_cost_cents) = 0
-                  THEN NULL
-                  ELSE SUM(s.label_cost_cents)::int END AS "shippingCostCents"
-      FROM shipments s WHERE s.order_id = o.id
+      SELECT cost_cents AS "shippingCostCents" FROM fi_order_shipping(o.id)
     ) sc ON TRUE
-    -- Only succeeded refunds reduce recognised revenue
+    -- Only succeeded refunds count.
+    --   refundCents         total customer CASH refunded (cash-flow view)
+    --   refundRevenueCents  the part that reverses REVENUE: merchandise + shipping. Refunded
+    --                       sales tax reverses the tax liability, never revenue. When the
+    --                       decomposition is unresolved: a tax-free order's whole refund is
+    --                       revenue; an order WITH tax is NULL (the split is not guessed).
+    --   refundedFeeCents    processing fee Stripe returned (migration 015: NULL = UNKNOWN):
+    --                       no refund -> 0; ANY refund fee unknown -> NULL (never a partial
+    --                       sum); else the exact sum.
     LEFT JOIN LATERAL (
       SELECT
         COALESCE(SUM(r.amount_cents),0)::int AS "refundCents",
-        CASE WHEN COUNT(r.fee_refunded_cents) = 0
-             THEN NULL
+        CASE WHEN COUNT(*) = 0 THEN 0
+             WHEN bool_and(r.component_breakdown_status = 'resolved'
+                           AND r.merchandise_refund_cents IS NOT NULL
+                           AND r.shipping_refund_cents IS NOT NULL)
+                  THEN SUM(r.merchandise_refund_cents + r.shipping_refund_cents)::int
+             WHEN o.tax_cents = 0 THEN SUM(r.amount_cents)::int
+             ELSE NULL END AS "refundRevenueCents",
+        CASE WHEN COUNT(*) = 0 THEN 0
+             WHEN bool_or(r.fee_refunded_cents IS NULL) THEN NULL
              ELSE SUM(r.fee_refunded_cents)::int END AS "refundedFeeCents"
       FROM order_refunds r
       WHERE r.order_id = o.id AND r.status = 'succeeded'
     ) rf ON TRUE
+    -- ── Order-attributable effects (Financial Integrity batch) ──────────────
+    -- Every one of these is NULL when the effect exists but its amount is not yet
+    -- known, so the order's profit becomes unknown instead of silently higher.
+    --
+    -- Disputes: recognised revenue loss, and Stripe's dispute fees. A dispute in a
+    -- state that moves funds but has no balance transaction yet has an UNKNOWN fee.
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(SUM(d.net_revenue_impact_cents),0)::int AS "disputeLossCents",
+             CASE
+               WHEN COUNT(*) = 0 THEN 0
+               WHEN bool_or(d.status IN ('open','under_review','lost','won')
+                            AND NOT EXISTS (SELECT 1 FROM dispute_balance_transactions b
+                                            WHERE b.dispute_id = d.id)) THEN NULL
+               ELSE COALESCE((SELECT SUM(b.fee_cents) FROM dispute_balance_transactions b
+                              JOIN order_disputes d2 ON d2.id = b.dispute_id
+                              WHERE d2.order_id = o.id),0)::int
+             END AS "disputeFeeCents"
+      FROM order_disputes d WHERE d.order_id = o.id
+    ) dp ON TRUE
+    -- Affiliate commission EXPENSE = the append-only ledger net. Payout CASH is separate.
+    --   no attribution and no commission row          -> 0 (genuinely no obligation)
+    --   attribution but NO commission row             -> NULL (the obligation exists, its
+    --                                                    amount does not: never a $0 expense)
+    --   commission flagged incomplete, or a refund /
+    --   dispute that affects its base is unresolved   -> NULL
+    --   otherwise                                     -> the exact ledger amount (which is a
+    --                                                    legitimate 0 when it nets to zero)
+    LEFT JOIN LATERAL (
+      SELECT CASE
+               WHEN COUNT(c.id) = 0
+                    THEN CASE WHEN EXISTS (SELECT 1 FROM order_affiliate_attributions a
+                                           WHERE a.order_id = o.id)
+                              THEN NULL ELSE 0 END
+               WHEN bool_or(c.incomplete) THEN NULL
+               WHEN bool_or(EXISTS (SELECT 1 FROM affiliate_unresolved_sources(c.id))) THEN NULL
+               ELSE SUM((SELECT COALESCE(SUM(a.adjustment_cents),0)
+                         FROM affiliate_commission_adjustments a
+                         WHERE a.commission_id = c.id))::int
+             END AS "affiliateCommissionCents"
+      FROM affiliate_commissions c WHERE c.order_id = o.id
+    ) af ON TRUE
+    -- Sellable returns put units (and their cost) back into inventory: a COGS credit.
+    LEFT JOIN LATERAL (
+      SELECT CASE WHEN bool_or(ri.restocked AND ri.cogs_credit_cents IS NULL) THEN NULL
+                  ELSE COALESCE(SUM(ri.cogs_credit_cents),0)::int END AS "returnCogsCreditCents"
+      FROM order_returns rtn
+      JOIN order_return_items ri ON ri.return_id = rtn.id
+      WHERE rtn.order_id = o.id AND rtn.status <> 'cancelled'
+    ) rt ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT CASE WHEN bool_or(rtn.return_shipping_paid_by = 'kvrn'
+                               AND rtn.status IN ('received','completed')
+                               AND rtn.return_label_cost_cents IS NULL) THEN NULL
+                  ELSE COALESCE(SUM(rtn.return_label_cost_cents),0)::int END AS "returnLabelCostCents"
+      FROM order_returns rtn
+      WHERE rtn.order_id = o.id AND rtn.status <> 'cancelled'
+    ) rl ON TRUE
+    -- Exchanges: replacement COGS and carrier cost (only once shipped), plus any
+    -- price difference actually collected (net of tax, which is never revenue).
+    LEFT JOIN LATERAL (
+      SELECT
+        CASE WHEN bool_or(e.status IN ('shipped','completed')
+                          AND EXISTS (SELECT 1 FROM order_exchange_items i
+                                      WHERE i.exchange_id = e.id AND i.line_cogs_cents IS NULL)) THEN NULL
+             ELSE COALESCE(SUM((SELECT COALESCE(SUM(i.line_cogs_cents),0)
+                                FROM order_exchange_items i WHERE i.exchange_id = e.id))
+                           FILTER (WHERE e.status IN ('shipped','completed')),0)::int
+        END AS "exchangeCogsCents",
+        CASE WHEN bool_or(e.status IN ('shipped','completed')
+                          AND e.replacement_shipping_cost_cents IS NULL) THEN NULL
+             ELSE COALESCE(SUM(e.replacement_shipping_cost_cents),0)::int
+        END AS "exchangeShippingCostCents",
+        COALESCE(SUM(e.price_difference_cents - e.price_difference_tax_cents)
+                 FILTER (WHERE e.price_difference_status = 'succeeded'
+                           AND e.price_difference_cents > 0),0)::int AS "exchangeRevenueCents"
+      FROM order_exchanges e WHERE e.order_id = o.id AND e.status <> 'cancelled'
+    ) ex ON TRUE
   `
 }
 
@@ -136,7 +260,16 @@ function toInputs(r: any): OrderFinancialRow {
     shippingCostCents:             nullable(r.shippingCostCents),
     stripeFeeCents:                nullable(r.stripeFeeCents),
     refundCents:                   num(r.refundCents),
+    refundRevenueCents:            nullable(r.refundRevenueCents),
     refundedFeeCents:              nullable(r.refundedFeeCents),
+    disputeLossCents:              num(r.disputeLossCents),
+    disputeFeeCents:               nullable(r.disputeFeeCents),
+    affiliateCommissionCents:      nullable(r.affiliateCommissionCents),
+    returnCogsCreditCents:         nullable(r.returnCogsCreditCents),
+    returnLabelCostCents:          nullable(r.returnLabelCostCents),
+    exchangeCogsCents:             nullable(r.exchangeCogsCents),
+    exchangeShippingCostCents:     nullable(r.exchangeShippingCostCents),
+    exchangeRevenueCents:          num(r.exchangeRevenueCents),
   }
 }
 
@@ -162,6 +295,7 @@ async function fetchExpenseRows(
     `SELECT amount_cents, category, paid_at, period_start, period_end
      FROM expense_transactions
      WHERE paid_at IS NOT NULL
+       AND voided_at IS NULL
        AND (
          (period_start IS NULL AND paid_at >= $1 AND paid_at <= $2)
          OR (period_start IS NOT NULL AND period_start <= $2
@@ -187,7 +321,7 @@ async function fetchAdSpendRows(
   const rows = await sql.query(
     `SELECT spend_cents, period_start, period_end
      FROM ad_spend
-     WHERE period_start <= $1 AND period_end >= $2`,
+     WHERE voided_at IS NULL AND period_start <= $1 AND period_end >= $2`,
     [endDate, startDate],
   )
   return (rows as any[]).map(r => ({
@@ -234,6 +368,19 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         customerEmail: inputs.customerEmail,
         economics:     computeOrderEconomics(inputs),
       }
+    },
+
+    /** Economics + derived integrity + the authoritative (gated) contribution for one order. */
+    async getOrderFinancialView(orderId: string): Promise<OrderFinancialView | null> {
+      const row = await this.getOrderEconomics(orderId)
+      if (!row) return null
+      const integrity = await createFinancialIntegrityService(sql).getOrderIntegrity(orderId)
+      const canonical = canonicalOrderContribution({
+        integrityState: integrity.state,
+        contributionProfitCents: row.economics.contributionProfitCents,
+        contributionMarginPct: row.economics.contributionMarginPct,
+      })
+      return { ...row, integrity, canonical }
     },
 
     /**
@@ -308,31 +455,137 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
       return Math.round(recognizeAdSpendRowsExact(rows, startDate, endDate))
     },
 
-    /** Full period report: order economics + operating expenses + ad spend. */
+    /**
+     * Inventory written off or given away in a window. These units were bought and
+     * capitalised earlier; the loss is recognised when they leave stock, on the
+     * write-off's own timestamp (it belongs to no order). `unknown` is true when any
+     * of the units had no known cost: the sum is then a floor, never "complete".
+     */
+    async getWriteOffCostInRange(range: DateRange): Promise<{ costCents: number; unknown: boolean }> {
+      const rows = await sql.query(
+        `SELECT COALESCE(SUM(total_cost_cents),0)::int AS cost,
+                COALESCE(bool_or(total_cost_cents IS NULL OR unknown_cost_quantity > 0), FALSE) AS unknown
+         FROM inventory_write_offs
+         WHERE created_at >= $1 AND created_at < $2`,
+        [range.start, range.end],
+      )
+      const r = (rows as any[])[0] ?? {}
+      return { costCents: Number(r.cost ?? 0), unknown: Boolean(r.unknown) }
+    },
+
+    /**
+     * RECORDED CASH MOVEMENT for a window. THIS IS NOT PROFIT and is deliberately
+     * never combined with it: paying a supplier is capitalised inventory (not an
+     * expense), an affiliate payout settles a commission already expensed, and an
+     * annual bill is paid once but recognised over its service period.
+     *
+     * Only cash events that carry their own date are included. Stripe payouts,
+     * carrier label payments and ad-platform billing are not dated cash facts in the
+     * database, so they are listed in `notIncluded` instead of being guessed.
+     */
+    async getRecordedCashMovement(range: DateRange): Promise<{
+      customerReceiptsCents: number
+      refundsPaidCents: number
+      inventoryPurchasePaymentsCents: number
+      affiliatePayoutsPaidCents: number
+      expensePaymentsCents: number
+      recordedNetCashMovementCents: number
+      notIncluded: string[]
+      isComplete: false
+      label: string
+    }> {
+      const { startDate, endDate } = toDateBounds(range)
+      const [rec, ref, inv, exp, aff] = await Promise.all([
+        sql.query(`SELECT COALESCE(SUM(total_cents),0)::bigint AS v FROM orders
+                   WHERE paid_at IS NOT NULL AND paid_at >= $1 AND paid_at < $2`, [range.start, range.end]),
+        sql.query(`SELECT COALESCE(SUM(amount_cents),0)::bigint AS v FROM order_refunds
+                   WHERE status = 'succeeded' AND refunded_at >= $1 AND refunded_at < $2`, [range.start, range.end]),
+        sql.query(`SELECT COALESCE(SUM(amount_cents),0)::bigint AS v FROM inventory_purchase_payments
+                   WHERE paid_at >= $1 AND paid_at <= $2`, [startDate, endDate]),
+        sql.query(`SELECT COALESCE(SUM(amount_cents),0)::bigint AS v FROM expense_transactions
+                   WHERE voided_at IS NULL AND paid_at >= $1 AND paid_at <= $2`, [startDate, endDate]),
+        sql.query(`SELECT paid_cents AS v FROM affiliate_payout_cash($1::timestamptz, $2::timestamptz)`,
+                  [range.start, range.end]),
+      ])
+      const n = (x: any) => Number((x as any[])[0]?.v ?? 0)
+      const customerReceiptsCents = n(rec)
+      const refundsPaidCents = n(ref)
+      const inventoryPurchasePaymentsCents = n(inv)
+      const expensePaymentsCents = n(exp)
+      const affiliatePayoutsPaidCents = n(aff)
+      return {
+        customerReceiptsCents,
+        refundsPaidCents,
+        inventoryPurchasePaymentsCents,
+        affiliatePayoutsPaidCents,
+        expensePaymentsCents,
+        recordedNetCashMovementCents:
+          customerReceiptsCents - refundsPaidCents - inventoryPurchasePaymentsCents
+          - affiliatePayoutsPaidCents - expensePaymentsCents,
+        notIncluded: [
+          'Stripe processing fees and payout timing',
+          'Carrier label payments',
+          'Advertising platform billing',
+          'Dispute withdrawals and reinstatements',
+        ],
+        isComplete: false,
+        label: 'Recorded cash movement — not profit',
+      }
+    },
+
+    /**
+     * Reconciliation state RELEVANT to a period (see financial_integrity_period_state):
+     * the order cohort paid in the window plus the expenses, ad spend and write-offs
+     * actually included in it. Unrelated history outside the window is not consulted.
+     */
+    async getPeriodIntegrity(range: DateRange): Promise<PeriodIntegrity> {
+      const rows = await sql.query(
+        `SELECT financial_integrity_period_state($1::timestamptz, $2::timestamptz) AS s`,
+        [range.start, range.end])
+      return mapPeriodIntegrity((rows as any[])[0]?.s, new Date().toISOString())
+    },
+
+    /**
+     * Full period report: order economics + operating expenses + ad spend, GATED by the
+     * period's reconciliation state. `period.canonical*` are exact numbers only when
+     * `integrity.state` is RECONCILED; INCOMPLETE -> null (unknown), EXCEPTION -> null
+     * (invalid). The known-so-far figures stay available as non-authoritative diagnostics.
+     */
     async getPeriodReport(range: DateRange): Promise<{
       period:  PeriodEconomics
       orders:  OrderEconomicsRow[]
+      integrity: PeriodIntegrity
     }> {
-      const [orders, recognized, advertisingSpendCents, forecast] = await Promise.all([
+      const [orders, recognized, advertisingSpendCents, forecast, writeOffs, integrity] = await Promise.all([
         this.getOrderEconomicsInRange(range),
         this.getRecognizedOperatingExpensesCents(range),
         this.getAdvertisingSpendCents(range),
         this.getForecastOperatingExpensesCents(),
+        this.getWriteOffCostInRange(range),
+        this.getPeriodIntegrity(range),
       ])
 
-      return {
-        period: computePeriodEconomics({
+      const period = applyIntegrityGate(
+        computePeriodEconomics({
           orders: orders.map(o => o.economics),
           // RECOGNIZED from real transactions only — definitions and forecasts
           // are excluded by construction
           recognizedOperatingExpensesCents:   recognized.operating,
           recognizedDevelopmentExpensesCents: recognized.development,
           advertisingSpendCents,
+          writeOffCostCents:   writeOffs.costCents,
+          writeOffCostUnknown: writeOffs.unknown,
           // FORECASTS — carried for display, never subtracted from realised profit
           estimatedAccruedOperatingExpensesCents: forecast.estimatedAccrued,
           projectedOperatingExpensesCents:        forecast.projectedMonthEnd,
         }),
-        orders,
+        integrity.state,
+      )
+
+      return {
+        period,
+        orders: orders.map(o => ({ ...o, integrityState: integrity.orderStates[o.orderId] ?? 'RECONCILED' })),
+        integrity,
       }
     },
 
@@ -370,7 +623,11 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         developmentExpenseCents: number
         advertisingCents: number
         contributionProfitCents: number
+        /** Inventory written off in the bucket (known part). */
+        writeOffCostCents: number
         realizedProfitCents: number
+        /** True when anything in the bucket is unknown: every profit figure is then a floor. */
+        isPartial: boolean
       }>
     }> {
       const g = granularity ?? autoGranularity(range.start, range.end)
@@ -379,11 +636,16 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
 
       const { startDate, endDate } = toDateBounds(range)
 
-      const [orders, expenseRows, adRows] = await Promise.all([
+      const [orders, expenseRows, adRows, writeOffRows] = await Promise.all([
         this.getOrderEconomicsInRange(range),
         // Fetched once for the whole window, then recognised per bucket below.
         fetchExpenseRows(sql, startDate, endDate),
         fetchAdSpendRows(sql, startDate, endDate),
+        sql.query(
+          `SELECT created_at, COALESCE(total_cost_cents,0)::int AS cost,
+                  (total_cost_cents IS NULL OR unknown_cost_quantity > 0) AS unknown
+           FROM inventory_write_offs WHERE created_at >= $1 AND created_at < $2`,
+          [range.start, range.end]),
       ])
 
       // Bucket each order by the instant revenue was recognised (paid_at).
@@ -391,6 +653,8 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         orderCount: 0, netRevenueCents: 0, grossMerchandiseCents: 0,
         cogsCents: 0, shippingCostCents: 0, stripeFeeCents: 0,
         contributionProfitCents: 0,
+        writeOffCostCents: 0,
+        isPartial: false,
       }))
 
       for (const row of orders) {
@@ -407,7 +671,19 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         b.cogsCents             += e.cogsCents ?? 0
         b.shippingCostCents     += e.shippingCostCents ?? 0
         b.stripeFeeCents        += e.netStripeFeeCents ?? 0
-        b.contributionProfitCents += e.contributionProfitCents ?? 0
+        // Known-so-far, the SAME algebra the period total uses, so the buckets
+        // add up to the headline instead of dropping a whole order when one cost
+        // is unknown.
+        b.contributionProfitCents += knownSoFarContribution(e)
+        if (e.reconciliation.missing.length > 0) b.isPartial = true
+      }
+
+      // Write-offs belong to no order: bucket them by their own timestamp.
+      for (const w of writeOffRows as any[]) {
+        const i = bucketIndexFor(buckets, new Date(w.created_at).toISOString())
+        if (i < 0) continue
+        perBucket[i].writeOffCostCents += Number(w.cost)
+        if (w.unknown) perBucket[i].isPartial = true
       }
 
       // ── Period costs are recognised by their OWN dates, never by revenue ──
@@ -458,7 +734,7 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
             developmentExpenseCents: developmentPerBucket[i],
             advertisingCents:        adsPerBucket[i],
             realizedProfitCents:
-              b.contributionProfitCents - opexPerBucket[i] - adsPerBucket[i],
+              b.contributionProfitCents - b.writeOffCostCents - opexPerBucket[i] - adsPerBucket[i],
           }
         }),
       }
@@ -473,9 +749,12 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
       const report = await this.getPeriodReport(range)
       const p = report.period
       return [
-        { label: 'Product COGS',       valueCents: p.cogsCents },
-        { label: 'Shipping cost',      valueCents: p.shippingCostCents },
-        { label: 'Stripe fees',        valueCents: p.stripeFeeCents },
+        // Net of returned stock; a negative net is not a slice and is filtered below.
+        { label: 'Product COGS',       valueCents: p.cogsCents - p.returnCogsCreditCents + p.exchangeCogsCents },
+        { label: 'Shipping cost',      valueCents: p.shippingCostCents + p.exchangeShippingCostCents + p.returnLabelCostCents },
+        { label: 'Stripe fees',        valueCents: p.stripeFeeCents + p.disputeFeeCents },
+        { label: 'Affiliate commission', valueCents: p.affiliateCommissionCents },
+        { label: 'Inventory write-offs', valueCents: p.writeOffCostCents },
         { label: 'Operating expenses', valueCents: p.recognizedOperatingExpensesCents },
         { label: 'Development',        valueCents: p.recognizedDevelopmentExpensesCents },
         { label: 'Advertising',        valueCents: p.advertisingSpendCents },

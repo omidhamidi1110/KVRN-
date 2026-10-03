@@ -304,6 +304,7 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
                t.period_start AS "periodStart", t.period_end AS "periodEnd",
                t.paid_at AS "paidAt", t.invoice_id AS "invoiceId", t.source, t.notes,
                t.created_by AS "createdBy", t.created_at AS "createdAt",
+               t.voided_at AS "voidedAt", t.voided_by AS "voidedBy", t.void_reason AS "voidReason",
                d.name AS "definitionName"
         FROM expense_transactions t
         LEFT JOIN expense_definitions d ON d.id = t.expense_definition_id
@@ -317,6 +318,11 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
         periodEnd:   r.periodEnd   ? String(r.periodEnd).slice(0, 10)   : null,
         paidAt:      r.paidAt      ? String(r.paidAt).slice(0, 10)      : null,
         createdAt:   new Date(r.createdAt).toISOString(),
+        // Voided rows stay in the history (the money fact is retained) but are flagged so
+        // every total can exclude them exactly once.
+        voidedAt:    r.voidedAt ? new Date(r.voidedAt).toISOString() : null,
+        voidedBy:    r.voidedBy ?? null,
+        voidReason:  r.voidReason ?? null,
       }))
     },
 
@@ -337,9 +343,20 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
       return (rows as any[])[0]
     },
 
-    async deleteTransaction(id: string) {
-      const rows = await sql`DELETE FROM expense_transactions WHERE id = ${id}::uuid RETURNING id`
-      return (rows as any[]).length > 0
+    /**
+     * "Delete" of a booked expense is a VOID: the row, its amount and its history are
+     * retained (a database trigger refuses a physical DELETE), who/why/when are recorded,
+     * and every report stops counting it. Idempotent: a retry returns the original void.
+     * Returns null when the transaction does not exist.
+     */
+    async voidTransaction(id: string, actorEmail: string, reason: string) {
+      try {
+        const rows = await sql`SELECT void_expense_transaction(${id}::uuid, ${actorEmail}, ${reason}) AS r`
+        return (rows as any[])[0]?.r as { outcome: 'voided' | 'already_voided' } | null
+      } catch (err: any) {
+        if (String(err?.message ?? '').includes('KVRN_MONEY|NOT_FOUND')) return null
+        throw err
+      }
     },
 
     // ── Usage snapshots (ESTIMATE / PROJECTION) ──────────────────────────────
@@ -398,7 +415,8 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
                provider_reported_revenue_cents AS "providerReportedRevenueCents",
                provider_reported_orders        AS "providerReportedOrders",
                provider_source AS "providerSource",
-               notes, created_by AS "createdBy", created_at AS "createdAt"
+               notes, created_by AS "createdBy", created_at AS "createdAt",
+               voided_at AS "voidedAt", voided_by AS "voidedBy", void_reason AS "voidReason"
         FROM ad_spend
         ORDER BY period_start DESC, created_at DESC
       `
@@ -412,6 +430,9 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
         providerReportedOrders:
           r.providerReportedOrders === null ? null : Number(r.providerReportedOrders),
         createdAt: new Date(r.createdAt).toISOString(),
+        voidedAt:   r.voidedAt ? new Date(r.voidedAt).toISOString() : null,
+        voidedBy:   r.voidedBy ?? null,
+        voidReason: r.voidReason ?? null,
       }))
     },
 
@@ -434,9 +455,15 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
       return (rows as any[])[0]
     },
 
-    async deleteAdSpend(id: string) {
-      const rows = await sql`DELETE FROM ad_spend WHERE id = ${id}::uuid RETURNING id`
-      return (rows as any[]).length > 0
+    /** Void (never physically delete) an ad-spend row. Same contract as voidTransaction. */
+    async voidAdSpend(id: string, actorEmail: string, reason: string) {
+      try {
+        const rows = await sql`SELECT void_ad_spend(${id}::uuid, ${actorEmail}, ${reason}) AS r`
+        return (rows as any[])[0]?.r as { outcome: 'voided' | 'already_voided' } | null
+      } catch (err: any) {
+        if (String(err?.message ?? '').includes('KVRN_MONEY|NOT_FOUND')) return null
+        throw err
+      }
     },
 
     async getAdSpendByPlatform(startDate: string, endDate: string) {
@@ -445,7 +472,8 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
                SUM(spend_cents)::int AS "spendCents",
                COUNT(*)::int         AS "entries"
         FROM ad_spend
-        WHERE period_start <= ${endDate}::date AND period_end >= ${startDate}::date
+        WHERE voided_at IS NULL
+          AND period_start <= ${endDate}::date AND period_end >= ${startDate}::date
         GROUP BY platform
         ORDER BY SUM(spend_cents) DESC
       `
@@ -486,7 +514,7 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
                  SUM(amount_cents)::int AS "actualPaidCents",
                  COUNT(*)::int          AS "transactionCount"
           FROM expense_transactions
-          WHERE paid_at IS NOT NULL
+          WHERE voided_at IS NULL AND paid_at IS NOT NULL
             AND paid_at >= ${startDate}::date AND paid_at <= ${endDate}::date
           GROUP BY provider, category
         `,

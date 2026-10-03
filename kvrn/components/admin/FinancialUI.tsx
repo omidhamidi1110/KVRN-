@@ -174,3 +174,36 @@ export function buildQuery(range: string, custom: { start: string; end: string }
   }
   return `?range=${range}`
 }
+
+// ── Order integrity badge (REV2) ─────────────────────────────────────────────
+// Reflects the scan's per-order integrity state, which wins over the calculator's input
+// state. Green is reserved for a genuinely RECONCILED order; INCOMPLETE and EXCEPTION are
+// visibly different and (when not exact) link to the Reconciliation page.
+
+export function OrderIntegrityBadge({
+  text, tone, href, missing, reason,
+}: {
+  text: string
+  tone: 'ok' | 'warn' | 'bad' | 'neutral'
+  href?: string | null
+  missing?: Array<{ field: string; label: string }>
+  reason?: string
+}) {
+  const map = {
+    ok:      { bg: '#F0FDF4', border: '#BBF7D0', color: '#166534' },
+    warn:    { bg: '#FFFBEB', border: '#FDE68A', color: '#92400E' },
+    bad:     { bg: '#FEF2F2', border: '#FECACA', color: '#991B1B' },
+    neutral: { bg: '#F9FAFB', border: '#E5E7EB', color: '#6B7280' },
+  }[tone]
+  const parts = [
+    reason,
+    missing && missing.length > 0 ? `Missing: ${missing.map(m => m.label).join(', ')}` : undefined,
+  ].filter(Boolean)
+  const style = { display: 'inline-block', fontFamily: FONT, fontSize: 9, letterSpacing: '0.08em',
+                  textTransform: 'uppercase' as const, padding: '3px 8px', background: map.bg,
+                  border: `1px solid ${map.border}`, color: map.color, textDecoration: 'none' }
+  const title = parts.length ? parts.join(' · ') : undefined
+  return href
+    ? <a href={href} title={title} style={style}>{text}</a>
+    : <span title={title} style={style}>{text}</span>
+}

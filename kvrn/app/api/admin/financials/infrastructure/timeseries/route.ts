@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       sql`
         SELECT provider, amount_cents AS "amountCents", paid_at AS "paidAt"
         FROM expense_transactions
-        WHERE paid_at IS NOT NULL
+        WHERE voided_at IS NULL AND paid_at IS NOT NULL
           AND paid_at >= ${range.start}::date AND paid_at < ${range.end}::date
           AND (${provider}::text IS NULL OR provider = ${provider})
         ORDER BY paid_at ASC

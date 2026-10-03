@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
 import { createAdminOrderService } from '@/lib/admin-orders'
 import { getAllVariantsForAdmin } from '@/lib/inventory'
+import { createFinancialService, resolveRangePreset } from '@/lib/financials'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
       unfulfilledOrders,
       recentOrders,
       variants,
-      revenueRows,
+      mtdOrders,
     ] = await Promise.all([
       ordersService.countOrders({}),
       ordersService.countOrders({ fulfillmentStatus: 'unfulfilled' }),
@@ -27,15 +28,14 @@ export async function GET(req: NextRequest) {
         offset: 0,
       }),
       getAllVariantsForAdmin(),
-      sql`
-        SELECT COALESCE(SUM(total_cents), 0) AS revenue_cents
-        FROM orders
-        WHERE payment_status = 'paid'
-          AND paid_at >= date_trunc('month', NOW())
-      `,
+      // CANONICAL revenue: the same cohort the Financials summary uses (orders paid
+      // this UTC month, tax excluded, refunds and lost disputes subtracted). The
+      // previous SUM(total_cents) counted shipping, ignored partial refunds and
+      // dropped fully refunded orders, so it contradicted the P&L.
+      createFinancialService(sql).getOrderEconomicsInRange(resolveRangePreset('mtd')),
     ])
 
-    const revenueCents = Number((revenueRows[0] as any)?.revenue_cents ?? 0)
+    const revenueCents = mtdOrders.reduce((s, o) => s + o.economics.netRevenueCents, 0)
 
     const activeVariants = (variants as any[]).filter(v => v.active)
     const availableUnits = activeVariants.reduce(

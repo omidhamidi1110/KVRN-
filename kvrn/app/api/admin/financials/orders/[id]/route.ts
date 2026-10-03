@@ -1,4 +1,9 @@
 // GET /api/admin/financials/orders/[id] — full economics for one order.
+//
+// Response contract (REV2):
+//   canonical  the AUTHORITATIVE contribution + its state. Use this for any figure shown as profit.
+//   integrity  the order's reconciliation state and the open findings behind it.
+//   order      raw calculator economics for diagnostics only (order.authoritative === false).
 import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
@@ -21,7 +26,7 @@ export async function GET(
   }
 
   try {
-    const row = await createFinancialService(sql).getOrderEconomics(id)
+    const row = await createFinancialService(sql).getOrderFinancialView(id)
     if (!row) return NextResponse.json({ error: 'Order not found.' }, { status: 404 })
 
     const [items, shipments, refunds] = await Promise.all([
@@ -41,7 +46,13 @@ export async function GET(
     ])
 
     return NextResponse.json({
-      order:     row,
+      // order.economics is the RAW calculator output (known-so-far diagnostics, NOT authoritative:
+      // it cannot see reconciliation contradictions). The authoritative result is `canonical`.
+      order:     { ...row, economics: row.economics, authoritative: false },
+      // Derived reconciliation state of this order, from the canonical scan.
+      integrity: row.integrity,
+      // RECONCILED + complete inputs -> exact; INCOMPLETE -> null/Unknown; EXCEPTION -> null/Invalid.
+      canonical: row.canonical,
       items:     (items as any[]).map(i => ({
         ...i,
         unitPriceCents: Number(i.unitPriceCents),

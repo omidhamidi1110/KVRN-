@@ -23,6 +23,8 @@ type Transaction = {
   amountCents: number; periodStart: string | null; periodEnd: string | null
   paidAt: string | null; invoiceId: string | null; source: string
   definitionName: string | null
+  /** Set when the invoice was VOIDED: retained as history, counted nowhere. */
+  voidedAt?: string | null; voidedBy?: string | null; voidReason?: string | null
 }
 
 const CATEGORIES = ['infrastructure','development','communications','payments',
@@ -143,7 +145,8 @@ export function ExpensesClient() {
     finally { setSaving(false) }
   }
 
-  async function remove(kind: 'definitions' | 'transactions', id: string) {
+  // Expected obligations (definitions) are plans, not booked money: they may be deleted.
+  async function remove(kind: 'definitions', id: string) {
     setErr(null)
     try {
       const res = await fetch(`/api/admin/expenses/${kind}/${id}`, { method: 'DELETE' })
@@ -152,8 +155,26 @@ export function ExpensesClient() {
     } catch { setErr('Network error.') }
   }
 
-  const actualTotal = txns.reduce((s, t) => s + t.amountCents, 0)
-  const devTotal    = txns.filter(t => t.category === 'development')
+  // A booked invoice is a money fact: it is VOIDED (kept as history, counted nowhere), never erased.
+  async function voidTransaction(id: string) {
+    setErr(null)
+    const reason = window.prompt(
+      'Void this invoice? It stays in the history but stops counting.\n\nReason (required):')
+    if (!reason || !reason.trim()) return
+    try {
+      const res = await fetch(`/api/admin/expenses/transactions/${id}`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() }),
+      })
+      if (!res.ok) { const j = await res.json(); setErr(j.error ?? 'Could not void.'); return }
+      await load()
+    } catch { setErr('Network error.') }
+  }
+
+  // Voided rows are history only: excluded from every total shown here.
+  const activeTxns  = txns.filter(t => !t.voidedAt)
+  const actualTotal = activeTxns.reduce((s, t) => s + t.amountCents, 0)
+  const devTotal    = activeTxns.filter(t => t.category === 'development')
                           .reduce((s, t) => s + t.amountCents, 0)
 
   return (
@@ -301,7 +322,9 @@ export function ExpensesClient() {
                   </td></tr>
                 )}
                 {txns.map(t => (
-                  <tr key={t.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
+                  <tr key={t.id} style={{ borderBottom: '1px solid #F1EEE8',
+                                           opacity: t.voidedAt ? 0.55 : 1,
+                                           textDecoration: t.voidedAt ? 'line-through' : 'none' }}>
                     <td style={{ padding: '9px 10px' }}>{t.provider}</td>
                     <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{t.name}</td>
                     <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
@@ -314,11 +337,18 @@ export function ExpensesClient() {
                     </td>
                     <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{t.source.replace(/_/g, ' ')}</td>
                     <td style={{ padding: '9px 10px' }}>
-                      <button onClick={() => remove('transactions', t.id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer',
-                                 color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
-                        Delete
-                      </button>
+                      {t.voidedAt ? (
+                        <span style={{ fontSize: 11, color: '#6B6B6B', textDecoration: 'none', display: 'inline-block' }}
+                              title={`Voided ${t.voidedAt} by ${t.voidedBy ?? 'unknown'}: ${t.voidReason ?? ''}`}>
+                          Voided{t.voidReason ? ` — ${t.voidReason}` : ''}
+                        </span>
+                      ) : (
+                        <button onClick={() => voidTransaction(t.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer',
+                                   color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
+                          Void
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

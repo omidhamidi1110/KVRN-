@@ -5,11 +5,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import {
-  FONT, BORDER, money, moneyOrUnknown, pctOrDash,
-  Metric, ReconciliationBadge, RangePicker, SectionTitle, buildQuery,
+  FONT, BORDER, money, pctOrDash,
+  Metric, OrderIntegrityBadge, RangePicker, SectionTitle, buildQuery,
 } from '@/components/admin/FinancialUI'
 import { LineChart, type LineSeries } from '@/components/admin/charts/LineChart'
 import { DonutChart, BarBreakdown } from '@/components/admin/charts/BreakdownChart'
+import { profitPresentation, knownSoFarLabel, orderRowPresentation, RECONCILIATION_HREF } from '@/lib/financial-presentation'
 
 // Series palette. Colour carries no meaning beyond distinguishing lines.
 const SERIES_DEFS = [
@@ -68,6 +69,21 @@ type Period = {
   realizedOperatingProfitBeforeAdsCents: number
   realizedOperatingProfitAfterAdsCents: number
   realizedProfitAfterDevelopmentCents: number
+  disputeLossCents: number
+  returnCogsCreditCents: number
+  exchangeCogsCents: number
+  exchangeShippingCostCents: number
+  returnLabelCostCents: number
+  disputeFeeCents: number
+  affiliateCommissionCents: number
+  writeOffCostCents: number
+  ordersWithUnknownCosts: number
+  /** Exact, or null when ANY input is unknown. Null is shown as "Unknown", never $0. */
+  canonicalOrderContributionCents: number | null
+  canonicalOperatingProfitCents: number | null
+  profitCompleteness: 'complete' | 'incomplete' | 'exception'
+  /** Known-so-far diagnostic. NEVER authoritative; shown only with that label. */
+  nonAuthoritativeOperatingProfitCents: number
   contributionMarginPct: number | null
   realizedOperatingMarginPct: number | null
   totalOperatingCostCents: number
@@ -90,12 +106,23 @@ type RecentOrder = {
   contributionProfitCents: number | null
   contributionMarginPct: number | null
   reconciliation: { state: 'complete' | 'partial' | 'unknown'; missing: Array<{ field: string; label: string }> }
+  integrityState?: 'RECONCILED' | 'INCOMPLETE' | 'EXCEPTION'
+}
+
+type PeriodIntegrityView = {
+  state: 'RECONCILED' | 'INCOMPLETE' | 'EXCEPTION'
+  exceptionCount: number
+  incompleteCount: number
+  orderCohortCount: number
+  byCode: Array<{ issueCode: string; state: string; domain: string; count: number }>
+  scope: string
+  checkedAt: string
 }
 
 export function FinancialsClient() {
   const [range, setRange]   = useState('30d')
   const [custom, setCustom] = useState({ start: '', end: '' })
-  const [data, setData]     = useState<{ period: Period; recentOrders: RecentOrder[]; adSpendByPlatform: any[] } | null>(null)
+  const [data, setData]     = useState<{ period: Period; integrity?: PeriodIntegrityView; recentOrders: RecentOrder[]; adSpendByPlatform: any[]; cashMovement?: any } | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr]       = useState<string | null>(null)
   // Tax Scenario is a client-side planning tool only. It never posts anywhere.
@@ -128,6 +155,16 @@ export function FinancialsClient() {
   useEffect(() => { void load() }, [load])
 
   const p = data?.period
+  // Period-RELEVANT integrity state gates every "exact" claim. Missing integrity data
+  // (older cached response) is treated as INCOMPLETE, never as reconciled.
+  const intState = data?.integrity?.state ?? 'INCOMPLETE'
+  const present = p ? profitPresentation({
+    canonicalOperatingProfitCents: p.canonicalOperatingProfitCents,
+    integrityState: intState,
+    exceptionCount: data?.integrity?.exceptionCount,
+    incompleteCount: data?.integrity?.incompleteCount,
+  }) : null
+  const notExact = intState !== 'RECONCILED'
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
@@ -156,6 +193,21 @@ export function FinancialsClient() {
 
       {p && (
         <>
+          {notExact && (
+            <div role="alert" style={{ fontFamily: FONT, fontSize: 12,
+                          color: intState === 'EXCEPTION' ? '#991B1B' : '#92400E',
+                          background: intState === 'EXCEPTION' ? '#FEF2F2' : '#FFFBEB',
+                          border: `1px solid ${intState === 'EXCEPTION' ? '#FECACA' : '#FDE68A'}`,
+                          padding: '10px 14px', marginBottom: 18 }}>
+              <strong>{intState === 'EXCEPTION' ? 'Invalid — reconciliation exception in this period.' : 'Not exact — reconciliation is incomplete for this period.'}</strong>
+              {' '}{data?.integrity?.exceptionCount ? `${data.integrity.exceptionCount} exception(s)` : ''}
+              {data?.integrity?.exceptionCount && data?.integrity?.incompleteCount ? ' · ' : ''}
+              {data?.integrity?.incompleteCount ? `${data.integrity.incompleteCount} incomplete` : ''}
+              {data?.integrity?.byCode?.length ? ` (${data.integrity.byCode.slice(0, 4).map(c => c.issueCode).join(', ')})` : ''}
+              . Exact operating profit is not shown; figures below are known so far and are not authoritative.
+              {' '}<a href={RECONCILIATION_HREF} style={{ textDecoration: 'underline', color: 'inherit' }}>Open Reconciliation</a>
+            </div>
+          )}
           {p.isPartial && (
             <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E',
                           background: '#FFFBEB', border: '1px solid #FDE68A',
@@ -164,7 +216,9 @@ export function FinancialsClient() {
               {p.ordersMissingCogs > 0        && ` · ${p.ordersMissingCogs} missing COGS`}
               {p.ordersMissingShippingCost > 0 && ` · ${p.ordersMissingShippingCost} missing shipping cost`}
               {p.ordersMissingStripeFee > 0    && ` · ${p.ordersMissingStripeFee} missing Stripe fee`}
+              {p.ordersWithUnknownCosts > 0    && ` · ${p.ordersWithUnknownCosts} orders with an unknown cost in total`}
               . Costs shown are a floor and profit is an upper bound.
+              {' '}<a href="/admin/financials/integrity" style={{ color: '#92400E', textDecoration: 'underline' }}>See reconciliation</a>
             </div>
           )}
 
@@ -208,33 +262,61 @@ export function FinancialsClient() {
             <Metric label="Advertising" value={money(p.advertisingSpendCents)} tone="muted" />
             <Metric label="Tax collected" value={money(p.taxCollectedCents)} tone="muted"
                     sub="Pass-through — not revenue" />
+            <Metric label="Affiliate commission" value={money(p.affiliateCommissionCents)} tone="muted"
+                    sub="Expense (ledger) — payouts are cash" />
+            <Metric label="Dispute loss / fees"
+                    value={money(p.disputeLossCents + p.disputeFeeCents)} tone="muted"
+                    sub="Loss is netted against refunds" />
+            <Metric label="Returns & exchanges"
+                    value={money(p.exchangeCogsCents + p.exchangeShippingCostCents + p.returnLabelCostCents - p.returnCogsCreditCents)}
+                    tone="muted" sub="Replacement + labels − restocked cost" />
+            <Metric label="Inventory write-offs" value={money(p.writeOffCostCents)} tone="muted"
+                    sub="Recognized when units leave stock" />
+
           </div>
 
           {/* Profit */}
-          <SectionTitle note="Contribution profit = net revenue − COGS − shipping cost − Stripe fees. Realised operating profit subtracts RECOGNIZED expense — real transactions apportioned to this period. Expected obligations and usage forecasts are never deducted. Cash actually paid is shown on the Infrastructure page and will differ when a charge spans several months.">
+          <SectionTitle note="Canonical order contribution = net revenue − COGS − shipping cost − Stripe fees (net of returned fees), plus the order's return, exchange, dispute and affiliate-commission effects; it is exact only when the order is reconciled. Realised operating profit subtracts RECOGNIZED expense — real transactions apportioned to this period. Expected obligations and usage forecasts are never deducted. Cash actually paid is shown on the Infrastructure page and will differ when a charge spans several months.">
             Profit — realised
           </SectionTitle>
+          <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '-4px 0 10px' }}>
+            Cohort basis: orders paid in this period, with every refund, dispute, return, exchange
+            and commission that later touched them. “Exact” is shown only when this period is RECONCILED (Unknown when something is missing,
+            Invalid when the data contradicts itself); the other figures are known-so-far and non-authoritative. Cash movement is separate and is not profit.
+          </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))',
                         gap: 10, marginBottom: 26 }}>
-            <Metric label="Contribution profit" value={money(p.contributionProfitCents)}
+            <Metric label={present!.label}
+                    value={present!.word ?? money(present!.cents as number)}
+                    tone={present!.kind === 'exact'
+                      ? ((present!.cents as number) >= 0 ? 'positive' : 'negative') : 'muted'}
+                    sub={present!.sub}
+                    pending={present!.kind !== 'exact'} />
+            {present!.href && (
+              <a href={present!.href} style={{ fontFamily: FONT, fontSize: 11, alignSelf: 'center',
+                                               color: '#92400E', textDecoration: 'underline' }}>
+                Open Reconciliation →
+              </a>
+            )}
+            <Metric label={knownSoFarLabel("Contribution profit", intState)} value={money(p.contributionProfitCents)}
                     tone={p.contributionProfitCents >= 0 ? 'positive' : 'negative'}
                     sub={`Margin ${pctOrDash(p.contributionMarginPct)}`}
-                    pending={p.isPartial} />
-            <Metric label="Operating profit before ads"
+                    pending={p.isPartial || notExact} />
+            <Metric label={knownSoFarLabel("Operating profit before ads", intState)}
                     value={money(p.realizedOperatingProfitBeforeAdsCents)}
                     tone={p.realizedOperatingProfitBeforeAdsCents >= 0 ? 'positive' : 'negative'}
                     sub="− recognized operating expense"
-                    pending={p.isPartial} />
-            <Metric label="Operating profit after ads"
+                    pending={p.isPartial || notExact} />
+            <Metric label={knownSoFarLabel("Operating profit after ads", intState)}
                     value={money(p.realizedOperatingProfitAfterAdsCents)}
                     tone={p.realizedOperatingProfitAfterAdsCents >= 0 ? 'positive' : 'negative'}
                     sub={`Margin ${pctOrDash(p.realizedOperatingMarginPct)}`}
-                    pending={p.isPartial} />
-            <Metric label="After development spend"
+                    pending={p.isPartial || notExact} />
+            <Metric label={knownSoFarLabel("After development spend", intState)}
                     value={money(p.realizedProfitAfterDevelopmentCents)}
                     tone={p.realizedProfitAfterDevelopmentCents >= 0 ? 'positive' : 'negative'}
                     sub="− GitHub / Codespaces"
-                    pending={p.isPartial} />
+                    pending={p.isPartial || notExact} />
             <Metric label="Shipping margin" value={money(p.shippingMarginCents)}
                     tone={p.shippingMarginCents >= 0 ? 'positive' : 'negative'}
                     sub="Revenue − carrier cost" />
@@ -377,9 +459,9 @@ export function FinancialsClient() {
             <Metric label="Profit per order"
                     value={p.profitPerOrderCents === null ? '—' : money(p.profitPerOrderCents)}
                     tone={(p.profitPerOrderCents ?? 0) >= 0 ? 'positive' : 'negative'}
-                    sub="Contribution ÷ orders" pending={p.isPartial} />
+                    sub="Contribution ÷ orders" pending={p.isPartial || notExact} />
             <Metric label="Total operating cost" value={money(p.totalOperatingCostCents)} tone="muted"
-                    sub="All recognized costs" pending={p.isPartial} />
+                    sub="All recognized costs" pending={p.isPartial || notExact} />
             <Metric label="COGS % of revenue" value={pctOrDash(p.cogsPctOfRevenue)} tone="muted" />
             <Metric label="Shipping % of revenue" value={pctOrDash(p.shippingCostPctOfRevenue)} tone="muted" />
             <Metric label="Stripe fees % of revenue" value={pctOrDash(p.stripeFeePctOfRevenue)} tone="muted" />
@@ -489,7 +571,16 @@ export function FinancialsClient() {
                     No paid orders in this period.
                   </td></tr>
                 )}
-                {data!.recentOrders.map(o => (
+                {data!.recentOrders.map(o => {
+                  // The scan's per-order integrityState WINS over the calculator's own input state.
+                  const row = orderRowPresentation({
+                    integrityState: o.integrityState,
+                    contributionProfitCents: o.contributionProfitCents,
+                    contributionMarginPct: o.contributionMarginPct,
+                    calculatorState: o.reconciliation.state,
+                  })
+                  const c = row.contribution
+                  return (
                   <tr key={o.orderId} style={{ borderBottom: '1px solid #F1EEE8' }}>
                     <td style={{ padding: '9px 12px' }}>{o.orderNumber}</td>
                     <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>
@@ -497,19 +588,23 @@ export function FinancialsClient() {
                     </td>
                     <td style={{ padding: '9px 12px' }}>{money(o.netRevenueCents)}</td>
                     <td style={{ padding: '9px 12px',
-                                 color: o.contributionProfitCents === null ? '#6B7280'
-                                      : o.contributionProfitCents >= 0 ? '#047857' : '#B91C1C' }}>
-                      {moneyOrUnknown(o.contributionProfitCents, 'Pending')}
+                                 color: c.kind === 'exact'
+                                   ? ((c.contributionProfitCents as number) >= 0 ? '#047857' : '#B91C1C')
+                                   : c.kind === 'invalid' ? '#991B1B' : '#6B7280' }}
+                        title={c.kind === 'exact' ? undefined : c.reason}>
+                      {c.kind === 'exact' ? money(c.contributionProfitCents as number) : c.word}
                     </td>
                     <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>
-                      {pctOrDash(o.contributionMarginPct)}
+                      {c.kind === 'exact' ? pctOrDash(c.contributionMarginPct) : '—'}
                     </td>
                     <td style={{ padding: '9px 12px' }}>
-                      <ReconciliationBadge state={o.reconciliation.state}
-                                           missing={o.reconciliation.missing} />
+                      <OrderIntegrityBadge text={row.badgeText} tone={row.badgeTone} href={row.href}
+                                           missing={o.reconciliation.missing}
+                                           reason={c.kind === 'exact' ? undefined : c.reason} />
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

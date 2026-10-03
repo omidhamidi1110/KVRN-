@@ -134,7 +134,7 @@ describe('revenue and profit formulas', () => {
   })
 
   test('refunds reduce net revenue without erasing the original sale', () => {
-    const e = computeOrderEconomics(order({ refundCents: 2000 }))
+    const e = computeOrderEconomics(order({ refundCents: 2000, refundedFeeCents: 0 }))
     expect(e.grossMerchandiseCents).toBe(8000)       // original sale intact
     expect(e.grossCustomerRevenueCents).toBe(8800)
     expect(e.netRevenueCents).toBe(6800)
@@ -149,8 +149,10 @@ describe('revenue and profit formulas', () => {
 
   test('unknown refunded fee does not fabricate a fee return', () => {
     const e = computeOrderEconomics(order({ refundCents: 1000, refundedFeeCents: null }))
-    // Full fee still counted — we must not assume Stripe gave any of it back.
-    expect(e.netStripeFeeCents).toBe(285)
+    // REV1 B1: an UNKNOWN fee return is unknown, never "zero returned" and never a guess.
+    expect(e.netStripeFeeCents).toBeNull()
+    expect(e.contributionProfitCents).toBeNull()
+    expect(e.reconciliation.missing.map(m => m.field)).toContain('refund_fee')
   })
 
   test('contribution margin percentage is computed from net revenue', () => {

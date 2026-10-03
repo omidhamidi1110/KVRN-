@@ -175,6 +175,18 @@ const navGroups: NavGroup[] = [
         ),
       },
       {
+        label: 'Reconciliation',
+        href: '/admin/financials/integrity',
+        icon: (
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6l-8-3Z" stroke="currentColor"
+                  strokeWidth="1.5" strokeLinejoin="round"/>
+            <path d="m8.5 12 2.5 2.5L15.5 10" stroke="currentColor" strokeWidth="1.6"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ),
+      },
+      {
         label: 'Expenses',
         href: '/admin/financials/expenses',
         icon: (

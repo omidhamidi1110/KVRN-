@@ -16,6 +16,26 @@
 // the dependent profit figure is null too. A missing Stripe fee must never silently
 // become $0 and inflate profit. Callers surface this via ReconciliationStatus.
 
+// ── ONE PROFIT DERIVATION (Financial Integrity batch) ────────────────────────
+// There are three different money figures and they must never be mixed up:
+//
+//   ORDER CONTRIBUTION  per-order, cohort basis: every effect that can be tied to a
+//                       paid order (refunds, lost disputes + dispute fees, COGS net
+//                       of returned-stock credit, replacement COGS and shipping,
+//                       return labels, Stripe fees, affiliate commission expense).
+//   OPERATING PROFIT    contribution minus costs that belong to no order
+//                       (operating expense, development, advertising, write-offs).
+//   CASH FLOW           money that moved (supplier payments, affiliate payouts,
+//                       expense payments). NEVER called profit. See lib/cash-flow.ts
+//                       style reporting in financials.getCashFlow().
+//
+// COHORT BASIS: a period contains the orders PAID in it, together with every
+// lifetime effect of those orders (a refund next month still belongs to this
+// month's order). Non-order costs are recognised by their own dates. This is the
+// only basis used by every route; the ledger-basis helpers in SQL
+// (affiliate_commission_effect, dispute adjustments by effective_at) answer a
+// different question ("what moved in the window") and are labelled as such.
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,7 +46,11 @@ export type CentsOrUnknown = number | null
 export type ReconciliationState = 'complete' | 'partial' | 'unknown'
 
 export interface MissingCost {
-  field: 'cogs' | 'shipping_cost' | 'stripe_fee'
+  field:
+    | 'cogs' | 'shipping_cost' | 'stripe_fee'
+    | 'return_cogs_credit' | 'exchange_cogs' | 'exchange_shipping_cost'
+    | 'return_label_cost' | 'dispute_fee' | 'affiliate_commission'
+    | 'refund_fee' | 'refund_revenue_split'
   label: string
 }
 
@@ -53,14 +77,53 @@ export interface OrderFinancialInputs {
   taxCents: number
   /** SUM(order_items.line_cogs_cents). null when any line has no cost snapshot. */
   cogsCents: CentsOrUnknown
-  /** SUM(shipments.label_cost_cents). null when no label cost is recorded. */
+  /**
+   * Merchant carrier cost of the order's outbound shipments (SQL fi_order_shipping).
+   * null = unknown: nothing recorded yet, ANY relevant shipment without a cost, or ANY
+   * checkout-quote ESTIMATE (shippo_quote). A partial sum is never reported.
+   */
   shippingCostCents: CentsOrUnknown
   /** orders.stripe_fee_cents. null until reconciled from Stripe. */
   stripeFeeCents: CentsOrUnknown
-  /** SUM of succeeded refunds for this order. Always known (0 when none). */
+  /** SUM of succeeded refunds for this order: total customer CASH refunded. Always known (0 when none). */
   refundCents: number
-  /** SUM of processing fees Stripe returned with refunds. null = unknown. */
+  /**
+   * The part of the refunds that reverses REVENUE: merchandise + customer shipping.
+   * Refunded sales tax reverses the tax liability, never revenue.
+   *   undefined  derive: equals refundCents when the order carries no tax; with tax and a
+   *              refund the split is NOT guessed (treated as unresolved)
+   *   null       the refund decomposition is unresolved -> exact profit is incomplete
+   */
+  refundRevenueCents?: CentsOrUnknown
+  /**
+   * SUM of processing fees Stripe returned with refunds.
+   *   no succeeded refund        -> known 0 (enforced here when refundCents is 0)
+   *   any refund fee unknown     -> null: the fee-refund total is UNKNOWN, never a partial sum
+   *   all known                  -> their exact sum
+   */
   refundedFeeCents: CentsOrUnknown
+
+  // ── Order-attributable effects added by the Financial Integrity batch ──────
+  // All OPTIONAL so existing callers keep working: `undefined` means "this order
+  // has none of that effect" (0). `null` means the effect exists but its amount is
+  // not known yet, and it poisons the order's profit exactly like a missing fee.
+
+  /** Recognised revenue lost to disputes (SUM of net_revenue_impact_cents). */
+  disputeLossCents?: number
+  /** Stripe dispute fees (net of fee reversals). null = a dispute with no balance transaction yet. */
+  disputeFeeCents?: CentsOrUnknown
+  /** Net affiliate commission EXPENSE from the ledger. null = unresolved refund/dispute sources. */
+  affiliateCommissionCents?: CentsOrUnknown
+  /** COGS returned to stock by sellable restocks (a credit, reduces cost). null = restocked with unknown cost. */
+  returnCogsCreditCents?: CentsOrUnknown
+  /** COGS of replacement items shipped on exchanges. null = unknown. */
+  exchangeCogsCents?: CentsOrUnknown
+  /** Carrier cost of replacement shipments. null = a shipped exchange with no recorded cost. */
+  exchangeShippingCostCents?: CentsOrUnknown
+  /** Return-label cost KVRN paid. null = KVRN-paid return received with no recorded cost. */
+  returnLabelCostCents?: CentsOrUnknown
+  /** Extra merchandise revenue collected on exchanges (net of tax). */
+  exchangeRevenueCents?: number
 }
 
 export interface OrderEconomics {
@@ -70,7 +133,15 @@ export interface OrderEconomics {
   merchandiseRevenueCents:  number
   shippingRevenueCents:     number
   grossCustomerRevenueCents: number
+  /** Total customer cash refunded (cash-flow view). */
   refundCents:              number
+  /** The part of refundCents that reduced REVENUE (merchandise + shipping; never tax). */
+  refundRevenueCents:       number
+  /** Revenue lost to disputes AFTER removing any overlap with refunds (never double-reversed). */
+  disputeLossCents:         number
+  /** Dispute loss that was NOT applied because the same money was already refunded. */
+  disputeRefundOverlapCents: number
+  exchangeRevenueCents:     number
   netRevenueCents:          number
   /** Tracked and displayed separately. Never included in revenue or profit. */
   taxCollectedCents:        number
@@ -80,6 +151,16 @@ export interface OrderEconomics {
   shippingCostCents:  CentsOrUnknown
   stripeFeeCents:     CentsOrUnknown
   netStripeFeeCents:  CentsOrUnknown
+  disputeFeeCents:           CentsOrUnknown
+  affiliateCommissionCents:  CentsOrUnknown
+  returnCogsCreditCents:     CentsOrUnknown
+  exchangeCogsCents:         CentsOrUnknown
+  exchangeShippingCostCents: CentsOrUnknown
+  returnLabelCostCents:      CentsOrUnknown
+  /** COGS − returned-stock credit + replacement COGS. null if any part is unknown. */
+  netProductCostCents:       CentsOrUnknown
+  /** Every cost that is not product cost: carrier, return labels, fees, commission. */
+  otherOrderCostsCents:      CentsOrUnknown
 
   // Shipping economics
   shippingMarginCents:      CentsOrUnknown
@@ -126,12 +207,23 @@ function pct(numerator: number, denominator: number): number | null {
  *   merchandiseRevenue    = subtotal - merchandiseDiscount
  *   shippingRevenue       = orders.shipping_cents
  *   grossCustomerRevenue  = merchandiseRevenue + shippingRevenue
- *   netRevenue            = grossCustomerRevenue - refunds
+ *   disputeLoss           = MIN(recognised dispute loss,
+ *                               grossCustomerRevenue + exchangeRevenue - revenueRefunds)   (no double reversal)
+ *   netRevenue            = grossCustomerRevenue + exchangeRevenue - revenueRefunds - disputeLoss
+ *                           (revenueRefunds = merchandise + shipping refunds; refunded TAX
+ *                            reverses the liability, not revenue)
  *
- *   netStripeFee          = stripeFee - refundedFee
+ *   netStripeFee          = stripeFee - refundedFee   (null if either is unknown)
  *   shippingMargin        = shippingRevenue - shippingCost
  *
- *   contributionProfit    = netRevenue - cogs - shippingCost - netStripeFee
+ *   netProductCost        = cogs - returnedStockCredit + replacementCogs
+ *   otherOrderCosts       = shippingCost + replacementShipping + returnLabel
+ *                           + netStripeFee + disputeFee + affiliateCommission
+ *   contributionProfit    = netRevenue - netProductCost - otherOrderCosts
+ *
+ * Every term is null when unknown and nulls are contagious: contributionProfit is
+ * null unless EVERY cost term is known. Shipping revenue and shipping expense stay
+ * separate terms; the Stripe fee appears once; tax appears nowhere.
  *
  * The shipping subsidy is deliberately NOT subtracted separately: it is already
  * captured because shippingCost is subtracted while shippingRevenue is added.
@@ -148,15 +240,41 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
   const grossCustomerRevenueCents = merchandiseRevenueCents + shippingRevenueCents
 
   const refundCents     = input.refundCents
-  const netRevenueCents = grossCustomerRevenueCents - refundCents
+  const exchangeRevenueCents = input.exchangeRevenueCents ?? 0
 
-  // A refund may return part of the processing fee. Unknown stays unknown.
+  // Refunded sales tax reverses a liability, not revenue. Only the merchandise and
+  // customer-shipping portion of a refund reduces operating revenue. When the order
+  // carries tax and the split is not resolved it is NOT guessed: net revenue falls back
+  // to the full refund as a diagnostic floor and exact profit becomes incomplete.
+  let refundRevenueCents = refundCents
+  let refundSplitUnknown = false
+  if (input.refundRevenueCents === undefined) {
+    if (refundCents > 0 && input.taxCents > 0) refundSplitUnknown = true
+  } else if (input.refundRevenueCents === null) {
+    refundSplitUnknown = true
+  } else {
+    refundRevenueCents = input.refundRevenueCents
+  }
+
+  // A lost dispute and a refund can cover the SAME money. Only what the customer
+  // actually paid and has not already been refunded can still be lost, so the
+  // dispute loss is capped there. The part removed is reported, never silently lost.
+  const reversibleCents = Math.max(0, grossCustomerRevenueCents + exchangeRevenueCents - refundRevenueCents)
+  const rawDisputeLoss  = Math.max(0, input.disputeLossCents ?? 0)
+  const disputeLossCents = Math.min(rawDisputeLoss, reversibleCents)
+  const disputeRefundOverlapCents = rawDisputeLoss - disputeLossCents
+
+  const netRevenueCents =
+    grossCustomerRevenueCents + exchangeRevenueCents - refundRevenueCents - disputeLossCents
+
+  // A refund may return part of the processing fee (migration 015: NULL = UNKNOWN, not
+  // zero). With no refund the returned fee is known to be 0; with a refund whose fee
+  // return is unknown the net fee is UNKNOWN — it is never "keep the whole fee".
+  const refundedFeeCents: CentsOrUnknown = refundCents === 0 ? 0 : input.refundedFeeCents
   const netStripeFeeCents: CentsOrUnknown =
-    input.stripeFeeCents === null
+    input.stripeFeeCents === null || refundedFeeCents === null
       ? null
-      : input.refundedFeeCents === null
-        ? input.stripeFeeCents
-        : input.stripeFeeCents - input.refundedFeeCents
+      : input.stripeFeeCents - refundedFeeCents
 
   // Shipping economics
   const shippingMarginCents: CentsOrUnknown =
@@ -177,25 +295,55 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
   const freeShippingCostCents: CentsOrUnknown =
     !isAutoFreeShipping ? 0 : input.shippingCostCents
 
+  // Optional effects: undefined = none (0), null = exists but unknown.
+  const eff = (v: CentsOrUnknown | undefined): CentsOrUnknown => (v === undefined ? 0 : v)
+  const disputeFeeCents           = eff(input.disputeFeeCents)
+  const affiliateCommissionCents  = eff(input.affiliateCommissionCents)
+  const returnCogsCreditCents     = eff(input.returnCogsCreditCents)
+  const exchangeCogsCents         = eff(input.exchangeCogsCents)
+  const exchangeShippingCostCents = eff(input.exchangeShippingCostCents)
+  const returnLabelCostCents      = eff(input.returnLabelCostCents)
+
   // Reconciliation
   const missing: MissingCost[] = []
   if (input.cogsCents === null)         missing.push({ field: 'cogs',          label: 'Product COGS' })
   if (input.shippingCostCents === null) missing.push({ field: 'shipping_cost', label: 'Shipping cost' })
   if (input.stripeFeeCents === null)    missing.push({ field: 'stripe_fee',    label: 'Stripe fee' })
+  const coreMissing = missing.length
+  if (input.stripeFeeCents !== null && refundedFeeCents === null)
+    missing.push({ field: 'refund_fee', label: 'Processing fee returned on refunds' })
+  if (refundSplitUnknown)
+    missing.push({ field: 'refund_revenue_split', label: 'Refund split between revenue and sales tax' })
+  if (returnCogsCreditCents === null)     missing.push({ field: 'return_cogs_credit',     label: 'Returned-stock COGS credit' })
+  if (exchangeCogsCents === null)         missing.push({ field: 'exchange_cogs',          label: 'Replacement COGS' })
+  if (exchangeShippingCostCents === null) missing.push({ field: 'exchange_shipping_cost', label: 'Replacement shipping cost' })
+  if (returnLabelCostCents === null)      missing.push({ field: 'return_label_cost',      label: 'Return label cost' })
+  if (disputeFeeCents === null)           missing.push({ field: 'dispute_fee',            label: 'Dispute fee' })
+  if (affiliateCommissionCents === null)  missing.push({ field: 'affiliate_commission',   label: 'Affiliate commission' })
 
   const reconciliation: ReconciliationStatus = {
-    state:   missing.length === 0 ? 'complete' : missing.length === 3 ? 'unknown' : 'partial',
+    state:   missing.length === 0 ? 'complete' : coreMissing === 3 ? 'unknown' : 'partial',
     missing,
   }
 
-  const totalCostCents = sumOrUnknown(
+  // A returned-stock credit REDUCES cost, so it enters as a negative.
+  const netProductCostCents = sumOrUnknown(
     input.cogsCents,
-    input.shippingCostCents,
-    netStripeFeeCents,
+    returnCogsCreditCents === null ? null : -returnCogsCreditCents,
+    exchangeCogsCents,
   )
+  const otherOrderCostsCents = sumOrUnknown(
+    input.shippingCostCents,
+    exchangeShippingCostCents,
+    returnLabelCostCents,
+    netStripeFeeCents,
+    disputeFeeCents,
+    affiliateCommissionCents,
+  )
+  const totalCostCents = sumOrUnknown(netProductCostCents, otherOrderCostsCents)
 
   const contributionProfitCents: CentsOrUnknown =
-    totalCostCents === null ? null : netRevenueCents - totalCostCents
+    totalCostCents === null || refundSplitUnknown ? null : netRevenueCents - totalCostCents
 
   const contributionMarginPct =
     contributionProfitCents === null ? null : pct(contributionProfitCents, netRevenueCents)
@@ -207,6 +355,10 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
     shippingRevenueCents,
     grossCustomerRevenueCents,
     refundCents,
+    refundRevenueCents,
+    disputeLossCents,
+    disputeRefundOverlapCents,
+    exchangeRevenueCents,
     netRevenueCents,
     taxCollectedCents: input.taxCents,
 
@@ -214,6 +366,14 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
     shippingCostCents: input.shippingCostCents,
     stripeFeeCents:    input.stripeFeeCents,
     netStripeFeeCents,
+    disputeFeeCents,
+    affiliateCommissionCents,
+    returnCogsCreditCents,
+    exchangeCogsCents,
+    exchangeShippingCostCents,
+    returnLabelCostCents,
+    netProductCostCents,
+    otherOrderCostsCents,
 
     shippingMarginCents,
     shippingSubsidyCents,
@@ -226,6 +386,22 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
 
     reconciliation,
   }
+}
+
+/**
+ * KNOWN-SO-FAR contribution of one order: net revenue minus every cost that IS
+ * known. Used wherever a figure must be summed across orders even though some are
+ * incomplete (chart buckets, period floors). Algebraically
+ *   SUM(knownSoFarContribution(order)) == computePeriodEconomics(...).contributionProfitCents
+ * so a chart can never disagree with the cards above it. For an order with nothing
+ * unknown it equals contributionProfitCents exactly.
+ */
+export function knownSoFarContribution(e: OrderEconomics): number {
+  const k = (v: CentsOrUnknown) => (v === null ? 0 : v)
+  return e.netRevenueCents
+    - (k(e.cogsCents) - k(e.returnCogsCreditCents) + k(e.exchangeCogsCents))
+    - (k(e.shippingCostCents) + k(e.exchangeShippingCostCents) + k(e.returnLabelCostCents)
+       + k(e.netStripeFeeCents) + k(e.disputeFeeCents) + k(e.affiliateCommissionCents))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -334,6 +510,13 @@ export interface PeriodInputs {
   estimatedAccruedOperatingExpensesCents: number
   /** FORECAST month-end total. Informational only. */
   projectedOperatingExpensesCents: number
+  /**
+   * Inventory written off / given away in the window (a cost with no order).
+   * Known portion only; `writeOffCostUnknown` says some units had no cost.
+   * Optional: undefined = none.
+   */
+  writeOffCostCents?: number
+  writeOffCostUnknown?: boolean
 }
 
 export interface PeriodEconomics {
@@ -345,6 +528,9 @@ export interface PeriodEconomics {
   shippingRevenueCents:     number
   grossCustomerRevenueCents: number
   refundCents:              number
+  disputeLossCents:         number
+  disputeRefundOverlapCents: number
+  exchangeRevenueCents:     number
   netRevenueCents:          number
   taxCollectedCents:        number
 
@@ -356,6 +542,17 @@ export interface PeriodEconomics {
   ordersMissingCogs:         number
   ordersMissingShippingCost: number
   ordersMissingStripeFee:    number
+  /** Orders with ANY unknown order-attributable cost (the 3 above plus the new ones). */
+  ordersWithUnknownCosts:    number
+
+  // Known-so-far sums of the order effects added by the integrity batch.
+  returnCogsCreditCents:     number
+  exchangeCogsCents:         number
+  exchangeShippingCostCents: number
+  returnLabelCostCents:      number
+  disputeFeeCents:           number
+  affiliateCommissionCents:  number
+  writeOffCostCents:         number
 
   shippingMarginCents:   number
   shippingSubsidyCents:  number
@@ -374,6 +571,34 @@ export interface PeriodEconomics {
   // FORECASTS — displayed separately, never subtracted from realised profit
   estimatedAccruedOperatingExpensesCents: number
   projectedOperatingExpensesCents:        number
+
+  // ── CANONICAL, NULL-SAFE PROFIT ──────────────────────────────────────────
+  // The numeric figures below this block are KNOWN-SO-FAR: unknown costs are left
+  // out, so they are a ceiling on profit. The canonical figures are null the moment
+  // any input is unknown, which is what the Admin must show instead of a
+  // confident-looking number.
+  /** ORDER CONTRIBUTION for the cohort. null if any order has an unknown cost. */
+  canonicalOrderContributionCents: number | null
+  /** OPERATING PROFIT = contribution - opex - development - ads - write-offs. null if unknown. */
+  canonicalOperatingProfitCents:   number | null
+  /**
+   * 'complete'    every input is known AND the period's reconciliation is RECONCILED: the
+   *               canonical figures are exact.
+   * 'incomplete'  a required fact is unknown/estimated (or the period's reconciliation is
+   *               INCOMPLETE): canonical figures are null, the numeric figures are floors.
+   * 'exception'   the period's reconciliation reports an EXCEPTION (data contradicts an
+   *               invariant): canonical figures are null — a number would be INVALID.
+   * The calculator alone can only say 'complete' | 'incomplete';
+   * applyIntegrityGate() adds the reconciliation verdict.
+   */
+  profitCompleteness: 'complete' | 'incomplete' | 'exception'
+  /**
+   * NON-AUTHORITATIVE diagnostic: the known-so-far figure (unknown costs left out, and
+   * computed whatever the reconciliation state is). Never label it exact.
+   */
+  nonAuthoritativeOperatingProfitCents: number
+  /** Always 'cohort': orders paid in the window with all of their lifetime effects. */
+  profitBasis: 'cohort'
 
   contributionProfitCents:               number
   realizedOperatingProfitBeforeAdsCents: number
@@ -440,6 +665,9 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
   const shippingRevenueCents      = sum(e => e.shippingRevenueCents)
   const grossCustomerRevenueCents = sum(e => e.grossCustomerRevenueCents)
   const refundCents               = sum(e => e.refundCents)
+  const disputeLossCents          = sum(e => e.disputeLossCents)
+  const disputeRefundOverlapCents = sum(e => e.disputeRefundOverlapCents)
+  const exchangeRevenueCents      = sum(e => e.exchangeRevenueCents)
   const netRevenueCents           = sum(e => e.netRevenueCents)
   const taxCollectedCents         = sum(e => e.taxCollectedCents)
 
@@ -467,13 +695,28 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
     e => e.shippingMarginCents !== null && e.shippingMarginCents > 0
   ).length
 
-  // Known costs only; unknown treated as 0 here and flagged via isPartial.
+  const returnCogsCreditCents     = sumKnown(e => e.returnCogsCreditCents)
+  const exchangeCogsCents         = sumKnown(e => e.exchangeCogsCents)
+  const exchangeShippingCostCents = sumKnown(e => e.exchangeShippingCostCents)
+  const returnLabelCostCents      = sumKnown(e => e.returnLabelCostCents)
+  const disputeFeeCents           = sumKnown(e => e.disputeFeeCents)
+  const affiliateCommissionCents  = sumKnown(e => e.affiliateCommissionCents)
+  const writeOffCostCents         = input.writeOffCostCents ?? 0
+  const ordersWithUnknownCosts    = o.filter(e => e.reconciliation.missing.length > 0).length
+
+  // KNOWN-SO-FAR: unknown costs are left out here and flagged via isPartial, so
+  // this is a ceiling on profit. The nullable canonical figures below are the
+  // exact ones.
   const contributionProfitCents =
-    netRevenueCents - cogsCents - shippingCostCents - stripeFeeCents
+    netRevenueCents
+    - (cogsCents - returnCogsCreditCents + exchangeCogsCents)
+    - (shippingCostCents + exchangeShippingCostCents + returnLabelCostCents
+       + stripeFeeCents + disputeFeeCents + affiliateCommissionCents)
 
   // RECOGNIZED expenses from real transactions only. Forecasts never subtracted.
+  // Write-offs belong to no order, so they are recognised here by their own date.
   const realizedOperatingProfitBeforeAdsCents =
-    contributionProfitCents - input.recognizedOperatingExpensesCents
+    contributionProfitCents - input.recognizedOperatingExpensesCents - writeOffCostCents
 
   const realizedOperatingProfitAfterAdsCents =
     realizedOperatingProfitBeforeAdsCents - input.advertisingSpendCents
@@ -483,10 +726,23 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
   const realizedProfitAfterDevelopmentCents =
     realizedOperatingProfitAfterAdsCents - input.recognizedDevelopmentExpensesCents
 
+  // Canonical: null as soon as ANY order contribution or the write-off cost is unknown.
+  const canonicalOrderContributionCents = sumOrUnknown(...o.map(e => e.contributionProfitCents))
+  const canonicalOperatingProfitCents =
+    canonicalOrderContributionCents === null || input.writeOffCostUnknown
+      ? null
+      : canonicalOrderContributionCents
+          - input.recognizedOperatingExpensesCents
+          - input.recognizedDevelopmentExpensesCents
+          - input.advertisingSpendCents
+          - writeOffCostCents
+
   // Total of every cost that reduced realised profit this period.
   // Mirrors the profit chain exactly so cost + profit == revenue.
   const totalOperatingCostCents =
-    cogsCents + shippingCostCents + stripeFeeCents +
+    (cogsCents - returnCogsCreditCents + exchangeCogsCents) +
+    (shippingCostCents + exchangeShippingCostCents + returnLabelCostCents) +
+    stripeFeeCents + disputeFeeCents + affiliateCommissionCents + writeOffCostCents +
     input.recognizedOperatingExpensesCents +
     input.recognizedDevelopmentExpensesCents +
     input.advertisingSpendCents
@@ -502,6 +758,9 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
     shippingRevenueCents,
     grossCustomerRevenueCents,
     refundCents,
+    disputeLossCents,
+    disputeRefundOverlapCents,
+    exchangeRevenueCents,
     netRevenueCents,
     taxCollectedCents,
 
@@ -512,6 +771,14 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
     ordersMissingCogs,
     ordersMissingShippingCost,
     ordersMissingStripeFee,
+    ordersWithUnknownCosts,
+    returnCogsCreditCents,
+    exchangeCogsCents,
+    exchangeShippingCostCents,
+    returnLabelCostCents,
+    disputeFeeCents,
+    affiliateCommissionCents,
+    writeOffCostCents,
 
     shippingMarginCents,
     shippingSubsidyCents,
@@ -526,6 +793,12 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
 
     estimatedAccruedOperatingExpensesCents: input.estimatedAccruedOperatingExpensesCents,
     projectedOperatingExpensesCents:        input.projectedOperatingExpensesCents,
+
+    canonicalOrderContributionCents,
+    canonicalOperatingProfitCents,
+    profitCompleteness: canonicalOperatingProfitCents === null ? 'incomplete' : 'complete',
+    nonAuthoritativeOperatingProfitCents: realizedProfitAfterDevelopmentCents,
+    profitBasis: 'cohort',
 
     contributionProfitCents,
     realizedOperatingProfitBeforeAdsCents,
@@ -554,9 +827,7 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
     refundRatePct:                pct(refundCents, grossCustomerRevenueCents),
 
     isPartial:
-      ordersMissingCogs > 0 ||
-      ordersMissingShippingCost > 0 ||
-      ordersMissingStripeFee > 0,
+      ordersWithUnknownCosts > 0 || !!input.writeOffCostUnknown,
   }
 }
 
@@ -572,6 +843,35 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
 // never arrive. Realised operating expense is read exclusively from
 // expense_transactions — see getActualOperatingExpensesCents in lib/financials.ts,
 // which pro-rates a transaction's own service period across the reporting window.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECONCILIATION GATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type IntegrityVerdict = 'RECONCILED' | 'INCOMPLETE' | 'EXCEPTION'
+
+/**
+ * Connect the P&L to reconciliation. The calculator proves only that no INPUT is null.
+ * A figure is "exact" only if, in addition, the integrity state RELEVANT to the period
+ * (financial_integrity_period_state: the order cohort paid in the window plus the
+ * expenses, ad spend and write-offs actually included in it) is RECONCILED:
+ *
+ *   RECONCILED   canonical figures stand and may be shown as exact
+ *   INCOMPLETE   canonical figures become null  -> "Unknown / not exact"
+ *   EXCEPTION    canonical figures become null  -> "Invalid / Exception"
+ *
+ * The known-so-far numbers are kept for diagnosis but are never authoritative. Rows that
+ * contradict each other are NOT repaired here by choosing a side.
+ */
+export function applyIntegrityGate(period: PeriodEconomics, verdict: IntegrityVerdict): PeriodEconomics {
+  if (verdict === 'RECONCILED') return period
+  return {
+    ...period,
+    canonicalOrderContributionCents: null,
+    canonicalOperatingProfitCents: null,
+    profitCompleteness: verdict === 'EXCEPTION' ? 'exception' : 'incomplete',
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAX SCENARIO — PLANNING ONLY
