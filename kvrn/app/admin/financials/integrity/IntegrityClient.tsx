@@ -121,6 +121,10 @@ export function IntegrityClient() {
     finally { setRunning(false) }
   }
 
+  const thisYear = new Date().getUTCFullYear()
+  const taxYears = [thisYear, thisYear - 1, thisYear - 2].map(String)
+  const [taxYear, setTaxYear] = useState(taxYears[0])
+
   const domains = summary ? [...new Set(summary.byIssue.map(i => i.domain))].sort() : []
   const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never')
 
@@ -148,6 +152,17 @@ export function IntegrityClient() {
              style={{ padding: '8px 14px', border: BORDER, background: '#fff', fontSize: 12, color: '#111827', textDecoration: 'none' }}>
             Export CSV
           </a>
+          {/* Tax-year bookkeeping summary: not a tax return. Server validates the year. */}
+          <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+            <select value={taxYear} onChange={e => setTaxYear(e.target.value)}
+                    aria-label="Tax year" style={{ padding: '7px 8px', border: BORDER, fontSize: 12, background: '#fff' }}>
+              {taxYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <a href={`/api/admin/financials/tax-export?year=${encodeURIComponent(taxYear)}`}
+               style={{ padding: '8px 14px', border: BORDER, background: '#fff', fontSize: 12, color: '#111827', textDecoration: 'none' }}>
+              Tax summary CSV
+            </a>
+          </span>
         </div>
       </div>
 

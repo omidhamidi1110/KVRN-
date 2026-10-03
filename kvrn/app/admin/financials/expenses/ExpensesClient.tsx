@@ -53,6 +53,12 @@ const PACKAGING_WARNING =
   'Recording them here as well would double-count the same cost.'
 const CADENCES = ['monthly','annual','one_time','usage_based']
 const SOURCES  = ['manual','provider_api','imported']
+// monthly/annual = fixed recurring; one_time = one-time manual;
+// usage_based = variable bill, entered by hand under "Actual billed" when the real bill is known.
+const CADENCE_LABELS: Record<string, string> = {
+  monthly: 'monthly (fixed recurring)', annual: 'annual (fixed recurring)',
+  one_time: 'one-time (manual)', usage_based: 'variable bill (enter actual when billed)',
+}
 
 const inputStyle = { fontFamily: FONT, fontSize: 12, padding: '8px 10px',
                      border: BORDER, background: '#fff', width: '100%',
@@ -151,6 +157,19 @@ export function ExpensesClient() {
     try {
       const res = await fetch(`/api/admin/expenses/${kind}/${id}`, { method: 'DELETE' })
       if (!res.ok) { const j = await res.json(); setErr(j.error ?? 'Could not delete.'); return }
+      await load()
+    } catch { setErr('Network error.') }
+  }
+
+  // Ending a recurring obligation only flips what is EXPECTED; it never touches billed rows.
+  async function setActive(id: string, active: boolean) {
+    setErr(null)
+    try {
+      const res = await fetch(`/api/admin/expenses/definitions/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active }),
+      })
+      if (!res.ok) { const j = await res.json(); setErr(j.error ?? 'Could not update.'); return }
       await load()
     } catch { setErr('Network error.') }
   }
@@ -380,7 +399,7 @@ export function ExpensesClient() {
               <label style={{ fontFamily: FONT, fontSize: 11 }}>Cadence
                 <select value={defForm.cadence} onChange={e => setDefForm({ ...defForm, cadence: e.target.value })}
                         style={{ ...inputStyle, marginTop: 4 }}>
-                  {CADENCES.map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
+                  {CADENCES.map(c => <option key={c} value={c}>{CADENCE_LABELS[c] ?? c.replace(/_/g, ' ')}</option>)}
                 </select></label>
               <label style={{ fontFamily: FONT, fontSize: 11 }}>
                 Expected amount $ {defForm.cadence === 'usage_based' ? '(n/a)' : '*'}
@@ -390,7 +409,7 @@ export function ExpensesClient() {
                        placeholder="19.00"
                        style={{ ...inputStyle, marginTop: 4,
                                 opacity: defForm.cadence === 'usage_based' ? 0.5 : 1 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Renewal date
+              <label style={{ fontFamily: FONT, fontSize: 11 }}>Start / next renewal date
                 <input type="date" value={defForm.renewalDate}
                        onChange={e => setDefForm({ ...defForm, renewalDate: e.target.value })}
                        style={{ ...inputStyle, marginTop: 4 }} /></label>
@@ -416,15 +435,15 @@ export function ExpensesClient() {
           <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
               <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Provider','Name','Category','Cadence','Expected','Monthly equiv.','Renews',''].map((h,i) => (
+                {['Provider','Name','Category','Cadence','Expected','Monthly equiv.','Start / renews','Status',''].map((h,i) => (
                   <th key={i} style={{ textAlign: 'left', padding: '9px 10px', fontSize: 9,
                                        letterSpacing: '0.1em', textTransform: 'uppercase',
                                        color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>))}
               </tr></thead>
               <tbody>
-                {loading && <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>}
+                {loading && <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>}
                 {!loading && defs.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
+                  <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
                     No obligations recorded.
                   </td></tr>
                 )}
@@ -446,7 +465,16 @@ export function ExpensesClient() {
                         ? '—' : `${money(d.monthlyEquivalentCents)}/mo`}
                     </td>
                     <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{d.renewalDate ?? '—'}</td>
+                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+                      {d.active ? 'active' : 'ended'}
+                    </td>
                     <td style={{ padding: '9px 10px' }}>
+                      <button onClick={() => setActive(d.id, !d.active)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer',
+                                 color: '#6b7280', fontSize: 11, textDecoration: 'underline',
+                                 marginRight: 10 }}>
+                        {d.active ? 'End' : 'Reactivate'}
+                      </button>
                       <button onClick={() => remove('definitions', d.id)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer',
                                  color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>

@@ -50,6 +50,17 @@ export type AdProviderSource = typeof AD_PROVIDER_SOURCES[number]
 const DATE_RE   = /^\d{4}-\d{2}-\d{2}$/
 const MAX_CENTS = 100_000_00
 
+/**
+ * True only for a real calendar date in YYYY-MM-DD form. DATE_RE alone accepts
+ * '2026-02-31', which Postgres then rejects as a 500; this turns it into a 400.
+ */
+export function isCalendarDate(v: unknown): v is string {
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return false
+  const [y, m, d] = v.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -143,8 +154,12 @@ export function validateExpenseDefinition(d: Partial<ExpenseDefinitionInput>): R
     const err = checkCents('Expected amount', d.expectedAmountCents, false)
     if (err) return { ok: false, error: err }
   }
-  if (d.renewalDate && !DATE_RE.test(d.renewalDate)) {
-    return { ok: false, error: 'Renewal date must be YYYY-MM-DD.' }
+  // renewal_date doubles as the start/anchor date of a recurring obligation.
+  if (d.renewalDate && !isCalendarDate(d.renewalDate)) {
+    return { ok: false, error: 'Renewal date must be a valid date (YYYY-MM-DD).' }
+  }
+  if (d.active !== undefined && typeof d.active !== 'boolean') {
+    return { ok: false, error: 'Active must be true or false.' }
   }
   return { ok: true }
 }
@@ -161,8 +176,8 @@ export function validateExpenseTransaction(d: Partial<ExpenseTransactionInput>):
   for (const [label, v] of [
     ['Period start', d.periodStart], ['Period end', d.periodEnd], ['Paid date', d.paidAt],
   ] as Array<[string, unknown]>) {
-    if (v && !DATE_RE.test(v as string)) {
-      return { ok: false, error: `${label} must be YYYY-MM-DD.` }
+    if (v && !isCalendarDate(v)) {
+      return { ok: false, error: `${label} must be a valid date (YYYY-MM-DD).` }
     }
   }
   if (d.periodStart && d.periodEnd && d.periodEnd < d.periodStart) {
@@ -288,6 +303,19 @@ export function createExpenseService(sql: NeonQueryFunction<false, false>) {
         RETURNING id, created_at AS "createdAt"
       `
       return (rows as any[])[0]
+    },
+
+    /**
+     * Mark a definition active/inactive. This is the "ended" state of a recurring
+     * obligation: it only changes what is EXPECTED. It never creates, edits or voids
+     * an expense_transaction, so recognised expenses are untouched.
+     */
+    async setDefinitionActive(id: string, active: boolean) {
+      const rows = await sql`
+        UPDATE expense_definitions SET active = ${active}
+        WHERE id = ${id}::uuid RETURNING id, active
+      `
+      return (rows as any[])[0] ?? null
     },
 
     async deleteDefinition(id: string) {
