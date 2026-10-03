@@ -4,6 +4,7 @@
 import { createCheckoutPostHandler } from '@/lib/checkout-session-handler'
 import { getStripe }         from '@/lib/stripe-client'
 import { getSiteOrigin }     from '@/lib/site-origin'
+import { isCheckoutEnabled } from '@/lib/stripe-mode'
 import {
   reserveInventory,
   saveReservationCheckoutDetails,
@@ -13,10 +14,6 @@ import {
 } from '@/lib/reservations'
 
 export const dynamic = 'force-dynamic'
-
-function isCheckoutEnabled(): boolean {
-  return process.env.ENABLE_STRIPE_TEST_CHECKOUT === 'true'
-}
 
 export const POST = createCheckoutPostHandler({
   isCheckoutEnabled,

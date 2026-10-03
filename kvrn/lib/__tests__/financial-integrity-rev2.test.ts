@@ -130,9 +130,9 @@ describe('BLOCKER 1 (structure): 021 carries the guard and migration 015 is unto
     expect(M021).toMatch(/BEFORE UPDATE OF fee_refunded_cents ON order_refunds/)
     expect(M021).toMatch(/OLD\.fee_refunded_cents IS NOT NULL\s+AND NEW\.fee_refunded_cents IS DISTINCT FROM OLD\.fee_refunded_cents/)
   })
-  test('no 022 and migration 015 is byte-identical to ab857ed', () => {
+  test('021 is only ever followed by 022 (late-payment recovery) and migration 015 is byte-identical to ab857ed', () => {
     const files = fs.readdirSync(path.join(__dirname, '../../db/migrations')).filter(f => /^\d+_/.test(f)).sort()
-    expect(files[files.length - 1]).toBe('021_financial_integrity.sql')
+    expect(files.slice(-2)).toEqual(['021_financial_integrity.sql', '022_late_payment_recovery.sql'])
     const md5 = require('crypto').createHash('md5')
       .update(fs.readFileSync(path.join(__dirname, '../../db/migrations/015_order_refunds.sql'))).digest('hex')
     expect(md5).toBe('84206072efa488bc87e0107667ff86d2')

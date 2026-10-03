@@ -312,9 +312,10 @@ describe('migration 021 structure', () => {
     expect(md5('020_affiliates.sql')).toBe('9251fab7750f694dfa17303aad400f72')
   })
 
-  test('021 is the only new migration and runs after 020', () => {
+  test('021 runs after 020 (and is followed only by 022, the late-payment recovery migration)', () => {
     const files = fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => /^\d+_/.test(f)).sort()
-    expect(files.slice(-2)).toEqual(['020_affiliates.sql', '021_financial_integrity.sql'])
+    expect(files.slice(-3)).toEqual(['020_affiliates.sql', '021_financial_integrity.sql', '022_late_payment_recovery.sql'])
+    expect(crypto.createHash('md5').update(fs.readFileSync(path.join(ROOT, 'db/migrations/021_financial_integrity.sql'))).digest('hex')).toBe('e7e0cd801ec63b4f22345eb448a9ebba')
   })
 
   test('forward-only and non-destructive: never rewrites or deletes economic rows', () => {

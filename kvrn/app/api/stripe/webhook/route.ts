@@ -138,6 +138,26 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
     shippingAddress:     addr,
   })
 
+  // 022: money was taken but KVRN could not safely create the order. A durable
+  // payment_exceptions row already exists (admin-visible, requires resolution); this
+  // line makes it loud in the logs too. No PII: ids and amounts only. Returning
+  // normally is deliberate — the exception row, not a Stripe retry, is the record.
+  if (result.paymentExceptionId) {
+    console.error('[WEBHOOK][PAYMENT_EXCEPTION]', JSON.stringify({
+      exceptionId: result.paymentExceptionId,
+      reason:      result.reason ?? result.outcome,
+      sessionId:   session.id,
+      eventId,
+      amountTotal: session.amount_total ?? null,
+      duplicate:   result.alreadyProcessed || undefined,
+    }))
+  }
+  if (result.outcome === 'order_created' && result.recovered) {
+    console.error('[WEBHOOK][LATE_PAYMENT_RECOVERED]', JSON.stringify({
+      orderNumber: result.orderNumber, sessionId: session.id, eventId,
+    }))
+  }
+
   // Attempt to send outbox email — non-fatal: provider failure must NOT affect order
   if (result.outcome === 'order_created') {
     try {

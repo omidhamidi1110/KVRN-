@@ -133,6 +133,12 @@ export interface FinalizePaidOrderResult {
   orderId?:        string
   orderNumber?:    string
   alreadyProcessed: boolean
+  /** 022: set when a paid session could not be finalized and a durable payment exception exists. */
+  paymentExceptionId?: string
+  /** 022: why (insufficient_stock | reservation_not_eligible); 'no_reservation' keeps its legacy outcome. */
+  reason?:         string
+  /** 022: true when the order was created by re-reserving stock for a late payment. */
+  recovered?:      boolean
 }
 
 export interface CheckoutDetails {
@@ -250,6 +256,9 @@ export function createReservationService(sql: NeonQueryFunction<false, false>): 
         orderId:          p.order_id   ?? undefined,
         orderNumber:      p.order_number ?? undefined,
         alreadyProcessed: Boolean(p.already_processed),
+        paymentExceptionId: p.payment_exception_id ?? undefined,
+        reason:           p.reason ?? undefined,
+        recovered:        p.recovered === true ? true : undefined,
       }
     },
 
