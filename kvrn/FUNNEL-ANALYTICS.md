@@ -48,3 +48,6 @@ session that has a `checkout_started` row for that order's own reservation.
 * Stage counts are cumulative sessions that reached the stage **or later**, so rates never exceed 100%.
   Rates are `null` (shown as "—") when the denominator is 0, never a fake 0.
 * Product table counts distinct sessions per stage.
+
+
+Google Analytics 4 (a separate, consent-gated, external system that reuses these tracking points) is documented in `GA4-INTEGRATION.md`.

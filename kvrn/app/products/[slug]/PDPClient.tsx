@@ -11,6 +11,7 @@ import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
 import { PUBLIC_SLUG_TO_PRODUCT_CODE, buildSku } from '@/lib/catalog'
 import { useCookiePrefs } from '@/context/CookiePrefsContext'
 import { trackProductView } from '@/lib/funnel-client'
+import { gaViewItemWhenReady } from '@/lib/ga-client'
 
 const NAV = 92 // announcement bar (36) + nav (56)
 
@@ -27,7 +28,15 @@ export function PDPClient({ product, relatedProduct }: Props) {
   // consent is granted while the page is already open; the client + server dedupe make a
   // re-render or a double effect harmless.
   const analyticsOn = cookiePrefs?.analytics === true
-  useEffect(() => { if (analyticsOn) trackProductView(product.slug) }, [analyticsOn, product.slug])
+  useEffect(() => {
+    if (!analyticsOn) return
+    trackProductView(product.slug)
+    // GA4 view_item: same moment and same once-per-product-per-session rule as the first-party
+    // product_viewed. Consent-gated and deduped inside lib/ga-client; product-level (no variant yet).
+    // "WhenReady": if the visitor accepted analytics a moment ago on this very page, GA is still
+    // fetching its runtime config / initialising — the send waits for that (no pre-consent queue).
+    gaViewItemWhenReady({ slug: product.slug, name: product.name, priceCents: product.price })
+  }, [analyticsOn, product.slug, product.name, product.price])
 
   const [color,   setColor]   = useState<ColorOption>(product.colors[0])
   const [size,    setSize]    = useState<SizeLabel | null>(null)

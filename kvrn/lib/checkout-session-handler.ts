@@ -12,6 +12,7 @@ import { isValidUSState, isValidUSZip, isValidEmail } from './us-states'
 import { AFFILIATE_SESSION_COOKIE, isValidSessionId } from './affiliate-session'
 import { sql } from './db'
 import { isValidFunnelSessionId, tryRecordCheckoutStarted } from './funnel-analytics'
+import { gaClientId as parseGaClientId, gaSessionId as parseGaSessionId } from './ga-common'
 import { COUNTRY_CODES } from './countries'
 import { US_SHIPPING_OPTIONS, type ShippingMethod } from './stripe'
 // calculateShippingCents intentionally not imported — static cents must never
@@ -149,6 +150,12 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     // Never affects checkout; an invalid value is simply ignored.
     const analyticsSessionId: string | null =
       isValidFunnelSessionId(body.analyticsSessionId) ? body.analyticsSessionId : null
+    // GA4 client/session ids (pseudonymous; the browser sends them only while GA is active, i.e.
+    // after analytics consent). Only their strict digit.digit shape is trusted; anything else is
+    // dropped. They ride in Stripe session metadata so the webhook's server-side GA purchase can
+    // attach to this visitor's GA session. Absent => the server sends no GA purchase for the order.
+    const gaClientId  = parseGaClientId(body.gaClientId)
+    const gaSessionId = gaClientId ? parseGaSessionId(body.gaSessionId) : null
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 })
     }
@@ -669,6 +676,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           metadata: {
             reservation_id: reservation.reservationId,
             shipping_method: shippingMethod,
+            ...(gaClientId ? { ga_client_id: gaClientId, ...(gaSessionId ? { ga_session_id: gaSessionId } : {}) } : {}),
             ...(appliedDiscount ? {
               kvrn_discount_definition: appliedDiscount.type === 'fixed_amount'
                 ? `fixed_usd_${appliedDiscount.amountCents}`

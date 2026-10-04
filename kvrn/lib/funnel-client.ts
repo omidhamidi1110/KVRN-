@@ -13,6 +13,7 @@
 // Never throws, never awaits in a user flow: analytics must not be able to break the UI.
 
 import { STORAGE_KEY as PREFS_KEY, COOKIE_PREFS_EXPIRY_MS } from '@/context/CookiePrefsContext'
+import { browserOptOutActive, effectiveAnalyticsConsent } from './consent-effective'
 
 export const FUNNEL_SID_KEY     = 'kvrn_fa_sid'
 export const FUNNEL_STARTED_KEY = 'kvrn_fa_started'
@@ -25,13 +26,12 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 export function analyticsConsentGranted(): boolean {
   try {
     if (typeof window === 'undefined') return false
-    const nav = window.navigator as Navigator & { globalPrivacyControl?: boolean }
-    if (nav.doNotTrack === '1' || nav.globalPrivacyControl === true) return false
+    if (browserOptOutActive(window.navigator)) return false   // DNT / GPC (shared rule: lib/consent-effective)
     const raw = window.localStorage.getItem(PREFS_KEY)
     if (!raw) return false
     const { prefs, ts } = JSON.parse(raw) as { prefs?: { analytics?: boolean }; ts?: number }
     if (typeof ts !== 'number' || Date.now() - ts > COOKIE_PREFS_EXPIRY_MS) return false
-    return prefs?.analytics === true
+    return effectiveAnalyticsConsent(prefs?.analytics, window.navigator)
   } catch { return false }
 }
 

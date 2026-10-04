@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { FONT, BORDER, Metric, SectionTitle, pctOrDash, money } from '@/components/admin/FinancialUI'
+import type { GaAdminStatus } from '@/lib/ga-common'
 
 type Range = '7d' | '30d' | '90d'
 const RANGES: Range[] = ['7d', '30d', '90d']
@@ -27,7 +28,53 @@ interface Report {
 const th = { textAlign: 'left' as const, padding: '9px 10px', fontSize: 9, letterSpacing: '0.1em',
              textTransform: 'uppercase' as const, color: '#9B9B9B', borderBottom: BORDER }
 
-export function AnalyticsClient() {
+const STATE_LABEL = { unset: 'Not set', malformed: 'Set but malformed (ignored)', ok: 'Configured' } as const
+const STATE_COLOR = { unset: '#6B6B6B', malformed: '#B91C1C', ok: '#166534' } as const
+
+/** GA4 configuration status. States only: the secret is never shown, and GA numbers are NOT shown here. */
+function GaStatusPanel({ ga }: { ga: GaAdminStatus }) {
+  const row = (label: string, state: keyof typeof STATE_LABEL, extra?: string) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '5px 0', fontSize: 12 }}>
+      <span>{label}</span>
+      <span style={{ color: STATE_COLOR[state], textAlign: 'right' }}>{STATE_LABEL[state]}{extra ? ` — ${extra}` : ''}</span>
+    </div>
+  )
+  const serverReady = ga.clientState === 'ok' && ga.secretState === 'ok'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 12, marginBottom: 22 }}>
+      <div style={{ border: BORDER, background: '#fff', padding: '12px 16px' }}>
+        <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9B9B9B', marginBottom: 6 }}>
+          KVRN first-party funnel
+        </div>
+        <p style={{ fontSize: 12, color: '#6B6B6B', margin: 0, lineHeight: 1.5 }}>
+          Everything on this page: KVRN&rsquo;s own database, consenting visitors only, purchases from paid orders.
+        </p>
+      </div>
+      <div style={{ border: BORDER, background: '#fff', padding: '12px 16px' }}>
+        <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9B9B9B', marginBottom: 6 }}>
+          Google Analytics 4 (external system)
+        </div>
+        {row('Measurement ID (browser)', ga.clientState, ga.measurementId ?? undefined)}
+        {row('Server-side purchase secret', ga.secretState)}
+        <div style={{ fontSize: 11, color: '#6B6B6B', lineHeight: 1.5, margin: '6px 0 8px' }}>
+          {ga.clientState !== 'ok'
+            ? 'GA is off: no Google script is ever loaded.'
+            : serverReady
+              ? 'GA loads only after a visitor accepts analytics. Purchases are sent from the order webhook (transaction id = order number).'
+              : 'GA loads after consent, but no server-side purchase is sent until the secret is configured.'}
+          {' '}GA is a separate system: its numbers will differ from the first-party figures above (sampling, ad blockers,
+          processing delay, its own sessionisation).
+        </div>
+        <a href="https://analytics.google.com/analytics/web/" target="_blank" rel="noopener noreferrer"
+           style={{ fontSize: 11, color: '#1A1A1A' }}>
+          Open Google Analytics ↗
+        </a>
+      </div>
+    </div>
+  )
+}
+
+export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
   const [range, setRange] = useState<Range>('30d')
   const [data, setData] = useState<Report | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,6 +112,8 @@ export function AnalyticsClient() {
         (no choice, decline, Do Not Track and Global Privacy Control are never tracked), so these
         are the behaviour of consenting visitors, not total traffic.
       </p>
+
+      <GaStatusPanel ga={ga} />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {RANGES.map(o => (

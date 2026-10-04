@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { trackSmsEvent, type SmsAnalyticsEvent } from '@/lib/analytics'
+import { submitSmsSignup } from '@/lib/sms-signup'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const SMS_RAW = process.env.NEXT_PUBLIC_KVRN_SMS_NUMBER || '+16572149996'
@@ -30,8 +32,11 @@ const DIM   = '#45413B'
 const SERIF = "Georgia, 'Times New Roman', serif"
 const SANS  = '-apple-system, Helvetica Neue, Arial, sans-serif'
 
-function track(e: string) {
-  try { (window as any).gtag?.('event', e, { event_category: 'sms_popup' }) } catch {}
+// Consent-gated (lib/ga-client): a silent no-op unless analytics consent is granted. The parameter is
+// the declared SmsAnalyticsEvent union (lib/analytics.ts) — there is no cast, so an event name that
+// is not declared there is a compile error. The only GA param ever sent is event_category.
+function track(e: SmsAnalyticsEvent) {
+  try { trackSmsEvent(e) } catch {}
 }
 function isMobile(): boolean {
   if (typeof window === 'undefined') return false
@@ -69,6 +74,7 @@ export function SmsPopup() {
   const closeRef  = useRef<HTMLButtonElement>(null)
   const panelRef  = useRef<HTMLDivElement>(null)
   const priorFocus= useRef<HTMLElement|null>(null)
+  const signedUpRef = useRef(false)   // closing the "You're in" screen is not a decline
 
   // Fetch offer state
   useEffect(() => {
@@ -91,7 +97,7 @@ export function SmsPopup() {
     if (isSupp()) return
     if (isDism()) { setShowTab(true); setMobile(isMobile()); return }
     setMobile(isMobile())
-    const id = setTimeout(() => { setVisible(true); setShowTab(true); track('sms_popup_shown') }, 5000)
+    const id = setTimeout(() => { setVisible(true); setShowTab(true); track('sms_offer_view') }, 5000)
     return () => clearTimeout(id)
   }, [])
 
@@ -178,7 +184,7 @@ export function SmsPopup() {
     try { localStorage.setItem(KEY_DISMISSED, String(Date.now())) } catch {}
     setVisible(false); setShowTab(true)
     try { priorFocus.current?.focus() } catch {}
-    track('sms_popup_dismissed')
+    if (!signedUpRef.current) track('sms_offer_decline')
   }, [])
 
   const onDeeplink = useCallback(() => {
@@ -192,20 +198,16 @@ export function SmsPopup() {
     if (!smsConsent) { setError('Please confirm SMS consent to continue.'); return }
     setSubmitting(true); setError('')
     try {
-      const res  = await fetch('/api/sms/subscribe', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim(), source: 'homepage' }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) { setError(data.error ?? 'Could not sign up. Please try again.'); return }
+      // lib/sms-signup emits sms_manual_submit / sms_signup_success / sms_signup_error (no PII in them).
+      const result = await submitSmsSignup(phone, 'homepage', { track })
+      if (!result.ok) { setError(result.error); return }
+      signedUpRef.current = true
       try { localStorage.setItem(KEY_SUBSCRIBED, String(Date.now())) } catch {}
-      if (data.discountCode) {
-        try { localStorage.setItem(KEY_CODE, data.discountCode) } catch {}
-        setSuccessCode(data.discountCode)
+      if (result.discountCode) {
+        try { localStorage.setItem(KEY_CODE, result.discountCode) } catch {}
+        setSuccessCode(result.discountCode)
       }
-      track('sms_manual_subscribed')
-    } catch { setError('Network error. Please try again.') }
-    finally { setSubmitting(false) }
+    } finally { setSubmitting(false) }
   }, [phone, smsConsent])
 
   const handleCopy = useCallback(async () => {
@@ -215,7 +217,7 @@ export function SmsPopup() {
 
   // ── Reopen control ─────────────────────────────────────────────────────────
   if (showTab && !visible) {
-    const open = () => { setVisible(true); track('sms_tab_opened') }
+    const open = () => { setVisible(true); track('sms_offer_reopen') }
 
     return (
       <button

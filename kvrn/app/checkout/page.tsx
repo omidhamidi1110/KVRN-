@@ -10,6 +10,7 @@ import { type ShippingMethod } from '@/lib/stripe'
 import { qualifiesForFreeShipping, FREE_SHIPPING_THRESHOLD_CENTS } from '@/lib/free-shipping'
 import { COUNTRIES } from '@/lib/countries'
 import { cn } from '@/lib/utils'
+import { gaBeginCheckout, getGaIdentifiers } from '@/lib/ga-client'
 import { getFunnelSessionIdIfConsented } from '@/lib/funnel-client'
 
 type Step = 'contact' | 'shipping'
@@ -225,6 +226,9 @@ export default function CheckoutPage() {
     setCreatingSession(true)
     setPaymentError('')
     const analyticsSid = getFunnelSessionIdIfConsented()
+    // GA's pseudonymous client/session ids, only while GA is active (consent given). Lets the
+    // server-side purchase attach to this visitor's GA session. Cached, so it never delays checkout.
+    const ga = getGaIdentifiers()
 
     try {
       const res = await fetch('/api/checkout/session', {
@@ -234,6 +238,7 @@ export default function CheckoutPage() {
           ...(discountApplied.code ? { discountCode: discountApplied.code } : {}),
           // Opaque analytics session id; present only when analytics consent was given.
           ...(analyticsSid ? { analyticsSessionId: analyticsSid } : {}),
+          ...(ga ? { gaClientId: ga.clientId, ...(ga.sessionId ? { gaSessionId: ga.sessionId } : {}) } : {}),
           items:          items.map(i => ({ sku: i.sku, quantity: i.quantity })),
           email:          contact.email.trim(),
           phone:          contact.smsOptIn ? (contact.phone.trim() || undefined) : undefined,
@@ -265,6 +270,11 @@ export default function CheckoutPage() {
         return
       }
       if (!data.url) throw new Error('No checkout URL returned.')
+      // GA4 begin_checkout: only here, after the server created and attached the Stripe session
+      // (the same moment the first-party checkout_started is recorded) — never on a click.
+      gaBeginCheckout(items.map(i => ({
+        slug: i.slug, name: i.productName, sku: i.sku, priceCents: i.price, quantity: i.quantity,
+      })))
       window.location.href = data.url
     } catch (err) {
       setPaymentError(err instanceof Error ? err.message : 'Something went wrong.')

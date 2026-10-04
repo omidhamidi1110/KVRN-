@@ -1,13 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ANALYTICS HELPERS — GA4
+// ANALYTICS HELPERS — GA4 (typed, consent-gated)
 //
-// Client-side events are sent via the gtag() function loaded in layout.tsx.
-// Use these typed helpers instead of calling gtag() directly.
+// Thin typed wrappers over lib/ga-client.ts. EVERY call is gated there on the existing analytics
+// consent (cookie preferences), Do Not Track and Global Privacy Control; before consent GA is not
+// even loaded and these are silent no-ops. Do not call window.gtag directly anywhere else.
 //
-// Server-side events (Measurement Protocol) for purchases confirmed
-// via webhook — ensures purchase is recorded even if customer closes
-// the browser before the confirmation page loads.
+// Purchase is intentionally NOT here: it is canonical and server-side (lib/ga4-server.ts, sent from
+// the Stripe webhook), so the browser can never create a duplicate GA purchase.
+//
+// Money: KVRN money is integer cents; GA's currency-unit conversion happens only in lib/ga-common.ts.
+// Never pass PII (names, emails, phone numbers, addresses) to any of these.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { gaEventWhenReady as gaEvent } from './ga-client'
+
+export { gaViewItem, gaAddToCart, gaBeginCheckout, gaPageView, getGaIdentifiers } from './ga-client'
 
 declare global {
   interface Window {
@@ -16,203 +23,64 @@ declare global {
   }
 }
 
-// ─── TYPE DEFINITIONS ────────────────────────────────────────────────────────
-
-interface GtagItem {
-  item_id:       string
-  item_name:     string
-  item_variant?: string
-  item_category?: string
-  price:         number
-  quantity:      number
-}
-
-// ─── SAFE GTAG WRAPPER ────────────────────────────────────────────────────────
-function gtag(command: string, ...args: unknown[]): void {
-  if (typeof window === 'undefined' || !window.gtag) return
-  window.gtag(command, ...args)
-}
-
-// ─── E-COMMERCE EVENTS ───────────────────────────────────────────────────────
-
-export function trackViewItem(params: {
-  itemId:   string
-  itemName: string
-  price:    number // in pence
-  category: string
-}) {
-  gtag('event', 'view_item', {
-    currency: 'GBP',
-    value:    params.price / 100,
-    items: [{
-      item_id:       params.itemId,
-      item_name:     params.itemName,
-      item_category: params.category,
-      price:         params.price / 100,
-      quantity:      1,
-    }],
-  })
-}
-
-export function trackAddToCart(params: {
-  itemId:      string
-  itemName:    string
-  variant:     string // "Stone / L"
-  price:       number // in pence
-  quantity:    number
-  cartTotal:   number // in pence
-}) {
-  gtag('event', 'add_to_cart', {
-    currency: 'GBP',
-    value:    params.price / 100,
-    items: [{
-      item_id:      params.itemId,
-      item_name:    params.itemName,
-      item_variant: params.variant,
-      price:        params.price / 100,
-      quantity:     params.quantity,
-    }],
-  })
-}
-
-export function trackBeginCheckout(params: {
-  value:       number // in pence
-  items:       GtagItem[]
-  couponCode?: string
-}) {
-  gtag('event', 'begin_checkout', {
-    currency:    'GBP',
-    value:       params.value / 100,
-    coupon:      params.couponCode,
-    items:       params.items,
-  })
-}
-
-export function trackPurchase(params: {
-  transactionId: string
-  value:         number // in pence (total)
-  shipping:      number // in pence
-  tax:           number // in pence
-  items:         GtagItem[]
-}) {
-  gtag('event', 'purchase', {
-    transaction_id: params.transactionId,
-    currency:       'GBP',
-    value:          params.value / 100,
-    shipping:       params.shipping / 100,
-    tax:            params.tax / 100,
-    items:          params.items,
-  })
-}
-
-// ─── KVRN CUSTOM EVENTS ──────────────────────────────────────────────────────
+// ─── KVRN CUSTOM EVENTS (scalar, non-PII params only) ────────────────────────
 
 export function trackWaitlistSignup(source: string) {
-  gtag('event', 'waitlist_signup', { source })
+  gaEvent('waitlist_signup', { source })
 }
 
 export function trackSizeGuideOpen(productId: string) {
-  gtag('event', 'size_guide_open', { product_id: productId })
+  gaEvent('size_guide_open', { product_id: productId })
 }
 
 export function trackColorSelected(productId: string, color: string) {
-  gtag('event', 'color_selected', { product_id: productId, color })
+  gaEvent('color_selected', { product_id: productId, color })
 }
 
 export function trackSetUpsellView(triggerProduct: string) {
-  gtag('event', 'set_upsell_view', { trigger_product: triggerProduct })
+  gaEvent('set_upsell_view', { trigger_product: triggerProduct })
 }
 
-export function trackSetUpsellConvert(triggerProduct: string, newValue: number) {
-  gtag('event', 'set_upsell_convert', {
-    trigger_product: triggerProduct,
-    new_cart_value:  newValue / 100,
-  })
+export function trackSetUpsellConvert(triggerProduct: string, newValueCents: number) {
+  if (!Number.isSafeInteger(newValueCents) || newValueCents < 0) return
+  gaEvent('set_upsell_convert', { trigger_product: triggerProduct, new_cart_value: Number((newValueCents / 100).toFixed(2)) })
 }
 
 export function trackNotifyMeClick(productId: string, variant: string) {
-  gtag('event', 'notify_me_click', { product_id: productId, variant })
+  gaEvent('notify_me_click', { product_id: productId, variant })
 }
 
 export function trackReturnInitiated(orderId: string, reason: string) {
-  gtag('event', 'return_initiated', { order_id: orderId, reason })
-}
-
-// ─── SERVER-SIDE: MEASUREMENT PROTOCOL ───────────────────────────────────────
-// Sends a purchase event server-side via GA4 Measurement Protocol.
-// Called from the Stripe webhook handler after payment confirmation.
-// This ensures the purchase is recorded even if the customer never
-// reaches the confirmation page.
-
-export async function serverTrackPurchase(params: {
-  clientId:      string // GA4 client ID from cookie (_ga)
-  transactionId: string
-  value:         number // in pence
-  shipping:      number // in pence
-  tax:           number // in pence
-  items:         Array<{ id: string; name: string; variant: string; price: number; quantity: number }>
-}): Promise<void> {
-  const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
-  const apiSecret     = process.env.GA4_MEASUREMENT_PROTOCOL_SECRET
-
-  if (!measurementId || !apiSecret) {
-    // Silently skip — analytics is optional, never block order processing
-    return
-  }
-
-  try {
-    await fetch(
-      `https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`,
-      {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: params.clientId,
-          events: [{
-            name:   'purchase',
-            params: {
-              transaction_id: params.transactionId,
-              currency:       'GBP',
-              value:          params.value / 100,
-              shipping:       params.shipping / 100,
-              tax:            params.tax / 100,
-              items:          params.items.map(i => ({
-                item_id:      i.id,
-                item_name:    i.name,
-                item_variant: i.variant,
-                price:        i.price / 100,
-                quantity:     i.quantity,
-              })),
-            },
-          }],
-        }),
-      }
-    )
-  } catch (err) {
-    // Non-fatal — log but don't throw
-    console.error('[analytics] Measurement Protocol failed:', err)
-  }
+  gaEvent('return_initiated', { order_id: orderId, reason })
 }
 
 // ─── SMS POPUP ANALYTICS ──────────────────────────────────────────────────────
-// Call these from the SmsPopup component. Never pass phone numbers as properties.
+// The canonical event names. components/sms/SmsPopup.tsx and lib/sms-signup.ts call trackSmsEvent
+// with these literals ONLY (no cast): an undeclared name is a compile error. Never pass phone
+// numbers, discount codes or any other value as properties — the only param is event_category.
+//
+// Where each is emitted:
+//   sms_offer_view     popup becomes visible (5 s timer)
+//   sms_offer_decline  X / backdrop / Escape / NO THANKS (not the close of the "You're in" screen)
+//   sms_offer_reopen   persistent $10 OFF / JOIN THE LIST tab
+//   sms_deeplink_open  mobile sms: CTA tapped
+//   sms_manual_submit  manual phone form submitted (validation passed, request starting)
+//   sms_signup_success server answered success
+//   sms_signup_error   server error / success:false / network failure
+//   sms_offer_accept   RESERVED — declared but intentionally NOT emitted: the popup has no positive
+//                      action distinct from sms_deeplink_open / sms_manual_submit + success, and none is
+//                      fabricated. Emit it only if such a CTA is ever added.
 
 export type SmsAnalyticsEvent =
-  | 'sms_offer_view'     // popup becomes visible
-  | 'sms_offer_accept'   // user interacts positively (clicks any CTA)
-  | 'sms_offer_decline'  // user clicks X or NO THANKS
-  | 'sms_manual_submit'  // user submits manual phone field
-  | 'sms_signup_success' // server returns 200
-  | 'sms_signup_error'   // server returns error or network failure
-  | 'sms_deeplink_open'  // user taps mobile SMS:// CTA
-  | 'sms_offer_reopen'   // user clicks persistent $10 OFF tab
+  | 'sms_offer_view'
+  | 'sms_offer_accept'
+  | 'sms_offer_decline'
+  | 'sms_manual_submit'
+  | 'sms_signup_success'
+  | 'sms_signup_error'
+  | 'sms_deeplink_open'
+  | 'sms_offer_reopen'
 
 export function trackSmsEvent(event: SmsAnalyticsEvent): void {
-  try {
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', event, { event_category: 'sms_popup' })
-    }
-  } catch {
-    // Never throw — analytics must never break the UI
-  }
+  gaEvent(event, { event_category: 'sms_popup' })
 }

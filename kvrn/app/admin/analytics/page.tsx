@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { AnalyticsClient } from './AnalyticsClient'
+import { describeGaConfig } from '@/lib/ga4-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,5 +10,6 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
-  return <AnalyticsClient />
+  // Configuration STATE only (never the secret) is handed to the client component.
+  return <AnalyticsClient ga={describeGaConfig()} />
 }

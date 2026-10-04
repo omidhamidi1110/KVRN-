@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { buildGtagConsentUpdate } from '@/lib/consent-effective'
 
 export interface CookiePrefs {
   essential:     true          // always on, cannot be disabled
@@ -52,12 +53,10 @@ function write(prefs: CookiePrefs) {
 
 function applyToGtag(prefs: CookiePrefs) {
   if (typeof window === 'undefined' || !(window as any).gtag) return
-  ;(window as any).gtag('consent', 'update', {
-    analytics_storage:      prefs.analytics ? 'granted' : 'denied',
-    ad_storage:             prefs.advertising ? 'granted' : 'denied',
-    personalization_storage:prefs.personalization ? 'granted' : 'denied',
-    functionality_storage:  'granted',
-  })
+  // buildGtagConsentUpdate: analytics_storage follows EFFECTIVE consent (preference AND no DNT AND
+  // no GPC), so a stored "yes" can never send 'granted' while the browser is opted out; every
+  // advertising signal stays denied (KVRN runs no ads). See lib/consent-effective.ts.
+  ;(window as any).gtag('consent', 'update', buildGtagConsentUpdate(prefs))
 }
 
 const Ctx = createContext<CookiePrefsCtx>({

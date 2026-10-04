@@ -15,6 +15,7 @@ import { createAffiliatesService } from '@/lib/affiliates'
 import { reconcileStripeFeeForOrder } from '@/lib/stripe-fees'
 import { getStripe } from '@/lib/stripe-client'
 import { tryRecordPurchase } from '@/lib/funnel-analytics'
+import { tryRecordGaPurchase } from '@/lib/ga4-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -164,9 +165,26 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
   // and runs AFTER the order is committed, so an analytics failure cannot block or roll back
   // a paid order. Also runs for an already-processed replay so a first attempt that failed to
   // write analytics heals on Stripe's retry; the deterministic event id prevents a duplicate.
+  // GA4 purchase (Measurement Protocol): canonical and server-side. Attempted for the SAME outcomes
+  // as the first-party purchase above ('order_created', 'already_processed', 'already_had_order'),
+  // so a first send that timed out/failed heals on Stripe's retry/replay. Safe to repeat: the
+  // transaction_id is always the canonical KVRN order number, so Google collapses a purchase it
+  // already has; it is never attempted without a finalized order id (unpaid/failed/unfinalized
+  // outcomes have none), and lib/ga4-server refuses any order that is not 'paid'. It is started
+  // here so it runs concurrently with the first-party write, is hard-bounded and never rejects
+  // (lib/ga4-server), and is awaited below — total added latency is at most one bound.
+  const gaEligible = ['order_created', 'already_processed', 'already_had_order'].includes(result.outcome)
+  const gaPurchase = gaEligible && result.orderId
+    ? tryRecordGaPurchase(sql, {
+        orderId:     result.orderId,
+        gaClientId:  session.metadata?.ga_client_id,
+        gaSessionId: session.metadata?.ga_session_id,
+      })
+    : null
   if (result.orderId && ['order_created', 'already_processed', 'already_had_order'].includes(result.outcome)) {
     await tryRecordPurchase(sql, { orderId: result.orderId, reservationId: session.metadata?.reservation_id })
   }
+  if (gaPurchase) await gaPurchase
 
   // Attempt to send outbox email — non-fatal: provider failure must NOT affect order
   if (result.outcome === 'order_created') {

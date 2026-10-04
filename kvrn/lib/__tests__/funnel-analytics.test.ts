@@ -348,9 +348,16 @@ describe('source: consent and trust boundaries are wired where they must be', ()
     const ctx = read('context/CookiePrefsContext.tsx')
     expect(ctx).toMatch(/export const STORAGE_KEY = 'kvrn_cookie_prefs_v2'/)
     expect(ctx).toMatch(/export const COOKIE_PREFS_EXPIRY_MS = 365 \* 24 \* 60 \* 60 \* 1000/)
-    expect(client).toMatch(/prefs\?\.analytics === true/)
-    expect(client).toMatch(/doNotTrack === '1'/)
-    expect(client).toMatch(/globalPrivacyControl === true/)
+    // GA Audit Revision 1: the DNT/GPC + "analytics === true" rule now lives in ONE shared pure module
+    // (lib/consent-effective.ts) used by this tracker, the GA client and the cookie context. The same
+    // three rules are asserted — in that module — and the tracker must delegate to it.
+    const shared = read('lib/consent-effective.ts')
+    expect(client).toMatch(/from '\.\/consent-effective'/)
+    expect(client).toMatch(/effectiveAnalyticsConsent\(prefs\?\.analytics, window\.navigator\)/)
+    expect(client).toMatch(/browserOptOutActive\(window\.navigator\)/)
+    expect(shared).toMatch(/prefAnalytics === true/)
+    expect(shared).toMatch(/doNotTrack === '1'/)
+    expect(shared).toMatch(/globalPrivacyControl === true/)
   })
   test('no fingerprinting or persistent identifiers in the client tracker', () => {
     const code = client.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

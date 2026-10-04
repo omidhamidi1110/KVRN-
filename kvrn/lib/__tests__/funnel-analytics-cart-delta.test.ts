@@ -103,8 +103,15 @@ describe('CartContext records only a real increase, with the actual delta', () =
     expect(add.indexOf('computeAddedQuantity(')).toBeLessThan(add.indexOf("dispatch({ type: 'ADD_ITEM'"))
   })
   test('the event is sent only when delta > 0 and carries the delta, not the requested quantity', () => {
-    expect(add).toMatch(/if \(added > 0\) trackAddToCartEvent\(\{ slug: item\.slug, sku: item\.sku, quantity: added \}\)/)
+    // One guarded block: the first-party event AND the GA4 event (added in the GA batch) both carry the
+    // actual delta and neither can run when the cart did not grow.
+    const guarded = add.slice(add.indexOf('if (added > 0) {'))
+    expect(guarded).toMatch(/if \(added > 0\) \{/)
+    expect(guarded).toMatch(/trackAddToCartEvent\(\{ slug: item\.slug, sku: item\.sku, quantity: added \}\)/)
+    expect(guarded).toMatch(/gaAddToCartWhenReady\(\{[^}]*quantity: added \}\)/)
     expect(add).not.toMatch(/quantity: item\.quantity/)
+    // Nothing GA/first-party related runs outside the guard.
+    expect(add.slice(0, add.indexOf('if (added > 0) {'))).not.toMatch(/trackAddToCartEvent\(|gaAddToCart(WhenReady)?\(/)
   })
   test('the same-tick ref advance uses the real reducer', () => {
     expect(add).toMatch(/itemsRef\.current = cartReducer\(/)

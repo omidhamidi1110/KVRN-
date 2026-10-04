@@ -218,7 +218,13 @@ describe('existing behavior preserved', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain('/api/sms/subscribe')
+    // GA Audit Revision 2: the request itself moved, unchanged, into lib/sms-signup.ts (so its analytics
+    // lifecycle is unit-testable); the popup must still submit through it.
+    const signup = require('fs').readFileSync(
+      require('path').join(__dirname, '../../lib/sms-signup.ts'), 'utf8'
+    )
+    expect(src).toContain('submitSmsSignup(')
+    expect(signup).toContain("'/api/sms/subscribe'")
     expect(src).toContain("type=\"tel\"")
   })
 

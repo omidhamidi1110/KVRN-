@@ -12,6 +12,7 @@ import type { CartItem } from '@/types'
 import { buildCartItemId, getFromStorage, setInStorage } from '@/lib/utils'
 import { cartReducer, computeAddedQuantity, type CartState, type CartAction } from '@/lib/cart-reducer'
 import { trackAddToCartEvent } from '@/lib/funnel-client'
+import { gaAddToCartWhenReady } from '@/lib/ga-client'
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -129,7 +130,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     itemsRef.current = cartReducer({ items: itemsRef.current, isOpen: false }, { type: 'ADD_ITEM', payload }).items
     // addItem is the single place an item enters the cart (product page, quick-add, set bundle).
     // Consent-gated and fire-and-forget; only a real increase (delta > 0) is recorded.
-    if (added > 0) trackAddToCartEvent({ slug: item.slug, sku: item.sku, quantity: added })
+    if (added > 0) {
+      trackAddToCartEvent({ slug: item.slug, sku: item.sku, quantity: added })
+      // GA4 add_to_cart: the SAME delta (what the cart actually gained after stock clamping).
+      gaAddToCartWhenReady({ slug: item.slug, name: item.productName, sku: item.sku, priceCents: item.price, quantity: added })
+    }
   }, [])
 
   const removeItem = useCallback((cartItemId: string) => {
