@@ -9,12 +9,19 @@ import {
   Metric, OrderIntegrityBadge, RangePicker, SectionTitle, buildQuery,
 } from '@/components/admin/FinancialUI'
 import { LineChart, type LineSeries } from '@/components/admin/charts/LineChart'
+import { BarChart } from '@/components/admin/charts/BarChart'
+import { ChartBoundary, ChartError, ChartLoading } from '@/components/admin/charts/ChartBoundary'
 import { DonutChart, BarBreakdown } from '@/components/admin/charts/BreakdownChart'
+import {
+  plotFinancialSeries, summarizeCompleteness, salesTrend,
+  type FinancialBucketView, type FinancialSeriesKey,
+} from '@/lib/chart-data'
 import { profitPresentation, knownSoFarLabel, orderRowPresentation, RECONCILIATION_HREF } from '@/lib/financial-presentation'
 
 // Series palette. Colour carries no meaning beyond distinguishing lines.
 const SERIES_DEFS = [
   { key: 'netRevenueCents',         label: 'Net revenue',       color: '#047857' },
+  { key: 'refundCents',             label: 'Refunds',           color: '#6B7280' },
   { key: 'realizedProfitCents',     label: 'Profit',            color: '#1D4ED8' },
   { key: 'cogsCents',               label: 'COGS',              color: '#B45309' },
   { key: 'shippingCostCents',       label: 'Shipping cost',     color: '#7C3AED' },
@@ -27,7 +34,8 @@ type SeriesKey = typeof SERIES_DEFS[number]['key']
 
 type TimeSeries = {
   granularity: string
-  buckets: Array<Record<string, number | string>>
+  /** Buckets carry the money fields plus the per-bucket unknown counters (see lib/chart-data.ts). */
+  buckets: Array<FinancialBucketView & { start: string; end: string }>
   composition: Array<{ label: string; valueCents: number }>
 }
 
@@ -130,6 +138,8 @@ export function FinancialsClient() {
   // Chart state. The chart consumes the authoritative time-series API; it never
   // recomputes any financial figure locally.
   const [ts, setTs] = useState<TimeSeries | null>(null)
+  // A chart-data failure is shown as an error, never as an empty "no orders" chart.
+  const [tsFailed, setTsFailed] = useState(false)
   const [chartView, setChartView] = useState<'line' | 'breakdown'>('line')
   const [breakdownStyle, setBreakdownStyle] = useState<'donut' | 'bars'>('donut')
   const [enabled, setEnabled] = useState<Set<SeriesKey>>(
@@ -147,7 +157,7 @@ export function FinancialsClient() {
       if (!res.ok) { setErr(json.error ?? 'Could not load financials.'); return }
       setData(json)
       // A chart failure must never blank the numbers above it.
-      if (tsRes.ok) setTs(await tsRes.json()); else setTs(null)
+      if (tsRes.ok) { setTs(await tsRes.json()); setTsFailed(false) } else { setTs(null); setTsFailed(true) }
     } catch { setErr('Network error.') }
     finally { setLoading(false) }
   }, [range, custom])
@@ -165,6 +175,23 @@ export function FinancialsClient() {
     incompleteCount: data?.integrity?.incompleteCount,
   }) : null
   const notExact = intState !== 'RECONCILED'
+
+  // Chart series: every point is classified as exact / incomplete / unknown by the pure
+  // helper in lib/chart-data.ts. Nothing is recomputed and no unknown value becomes $0.
+  const buckets = ts?.buckets ?? []
+  const activeDefs = SERIES_DEFS.filter(d => enabled.has(d.key))
+  const lineSeries: LineSeries[] = activeDefs.map(d => {
+    const plotted = plotFinancialSeries(buckets, d.key as FinancialSeriesKey)
+    return {
+      key: d.key,
+      // Profit is "known so far" whenever the period is not fully reconciled.
+      label: d.key === 'realizedProfitCents' && notExact ? 'Profit (known so far)' : d.label,
+      color: d.color, unit: 'cents',
+      values: plotted.values, status: plotted.status, bounds: plotted.bounds, notes: plotted.notes,
+    }
+  })
+  const completeness = summarizeCompleteness(buckets, activeDefs.map(d => d.key as FinancialSeriesKey))
+  const sales = salesTrend(buckets)
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
@@ -407,21 +434,36 @@ export function FinancialsClient() {
                 })}
               </div>
 
-              <div style={{ marginBottom: 26 }}>
-                <LineChart
-                  labels={(ts?.buckets ?? []).map(b => String(b.label))}
-                  formatCents={money}
-                  series={SERIES_DEFS.filter(d => enabled.has(d.key)).map<LineSeries>(d => ({
-                    key: d.key, label: d.label, color: d.color, unit: 'cents',
-                    values: (ts?.buckets ?? []).map(b => Number(b[d.key] ?? 0)),
-                  }))}
-                  emptyMessage={
-                    enabled.size === 0
-                      ? 'Select at least one series above.'
-                      : 'No paid orders in this period.'
-                  }
-                />
+              <div style={{ marginBottom: 12 }}>
+                {tsFailed ? <ChartError /> : loading && !ts ? <ChartLoading height={240} /> : (
+                  <ChartBoundary label="The trend chart">
+                    <LineChart
+                      labels={buckets.map(b => b.label)}
+                      formatCents={money}
+                      series={lineSeries}
+                      emptyMessage={
+                        enabled.size === 0
+                          ? 'Select at least one series above.'
+                          : 'No data for this period'
+                      }
+                    />
+                  </ChartBoundary>
+                )}
               </div>
+              <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '0 0 26px', lineHeight: 1.5 }}>
+                Orders, refunds and costs are placed in the bucket where the order was <em>paid</em> (the same cohort as the
+                cards above; a refund appears against the order&rsquo;s payment date, not its refund date).
+                {(completeness.unknown > 0 || completeness.incomplete > 0) && (
+                  <strong style={{ color: '#92400E' }}>
+                    {' '}{completeness.unknown > 0 && `${completeness.unknown} period${completeness.unknown === 1 ? '' : 's'} unknown (shaded). `}
+                    {completeness.incomplete > 0 && `${completeness.incomplete} period${completeness.incomplete === 1 ? '' : 's'} incomplete (hollow markers): costs are floors and profit is an upper bound. `}
+                    Unrecorded costs are never drawn as $0.
+                  </strong>
+                )}
+                {notExact && !(completeness.unknown > 0 || completeness.incomplete > 0) && enabled.has('realizedProfitCents') && (
+                  <strong style={{ color: '#92400E' }}> The period is not fully reconciled, so the profit line is known-so-far, not exact.</strong>
+                )}
+              </p>
             </>
           )}
 
@@ -430,6 +472,7 @@ export function FinancialsClient() {
               <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '0 0 14px' }}>
                 Cost composition for the selected period. A breakdown shows parts of a
                 whole, so it is applied to composition only and never to the trend above.
+                {p?.isPartial && ' Costs that are not yet recorded are not included in these parts, so they are lower bounds, not the full cost.'}
               </p>
               {breakdownStyle === 'donut' ? (
                 <DonutChart formatCents={money}
@@ -444,6 +487,36 @@ export function FinancialsClient() {
                     color: COMPOSITION_COLORS[c.label] ?? '#9B9B9B',
                   }))} />
               )}
+            </div>
+          )}
+
+          {/* ── Sales & orders ─────────────────────────────────────────────── */}
+          <SectionTitle note="Paid orders are counted on the date they were paid. Average order value is merchandise + shipping charged to customers, ex-tax and before refunds — the same definition as the Average order value card below. A period with no orders has no average (a gap), not $0.">
+            Sales &amp; orders
+          </SectionTitle>
+          {tsFailed ? <ChartError /> : loading && !ts ? <ChartLoading /> : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))',
+                          gap: 12, marginBottom: 26 }}>
+              <div>
+                <p style={{ fontFamily: FONT, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+                            color: '#9B9B9B', margin: '0 0 6px' }}>Paid orders per {ts?.granularity ?? 'period'}</p>
+                <ChartBoundary label="The paid-orders chart">
+                  <BarChart labels={buckets.map(b => b.label)} values={sales.orders} unitLabel="orders"
+                            emptyMessage="No data for this period"
+                            zeroMessage="0 paid orders in this period" />
+                </ChartBoundary>
+              </div>
+              <div>
+                <p style={{ fontFamily: FONT, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
+                            color: '#9B9B9B', margin: '0 0 6px' }}>Average order value</p>
+                <ChartBoundary label="The average-order-value chart">
+                  <LineChart
+                    labels={buckets.map(b => b.label)} formatCents={money} height={200}
+                    series={[{ key: 'aov', label: 'Average order value', color: '#1D4ED8', unit: 'cents',
+                               values: sales.averageOrderValueCents }]}
+                    emptyMessage="No average order value — no paid orders in this period" />
+                </ChartBoundary>
+              </div>
             </div>
           )}
 

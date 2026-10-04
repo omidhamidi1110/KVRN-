@@ -34,6 +34,7 @@
 import { createHash } from 'crypto'
 import type { NeonQueryFunction } from '@neondatabase/serverless'
 import { normalizeReferrer } from './affiliate-session'
+import { buildBuckets } from './chart-math'
 
 type Sql = NeonQueryFunction<false, false>
 
@@ -271,6 +272,96 @@ export function funnelWindow(range: FunnelRange, now: Date = new Date()): { star
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TREND OVER TIME (pure)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * One UTC calendar day of the funnel, for the trend chart.
+ *
+ * COHORT BASIS: a session is placed in the day its session_start was recorded, and
+ * then carries its furthest stage whenever that stage happened. Summing every
+ * bucket therefore reproduces the summary funnel exactly (asserted in the test
+ * suite), and a purchase is credited to the day its session STARTED, not the day
+ * the order was paid. Revenue/order trends live in the financial charts instead.
+ */
+export interface FunnelTrendBucket {
+  /** YYYY-MM-DD, UTC. */
+  date: string
+  label: string
+  /** Bucket bounds, clipped to the requested window. */
+  start: string
+  end: string
+  /** True when the window edge cuts this UTC day short (first and last bucket of a rolling window). */
+  partial: boolean
+  /**
+   * Whether first-party collection existed for this bucket:
+   *   'full'    collection had begun before the bucket started
+   *   'partial' the very first recorded session falls inside the bucket
+   *   'none'    nothing had ever been recorded yet - the bucket is NOT a real zero
+   */
+  coverage: 'full' | 'partial' | 'none'
+  /** null when coverage is 'none': no data existed, so no zero is invented. */
+  stages: FunnelStages | null
+  /** null with no sessions (zero denominator) or no coverage; never 0%. */
+  rates: FunnelRates | null
+}
+
+export interface FunnelTrend {
+  granularity: 'day'
+  /** Instant of the first session_start ever recorded, or null when none exists. */
+  collectionStartedAt: string | null
+  buckets: FunnelTrendBucket[]
+}
+
+export interface FunnelTrendRow {
+  day: string
+  visits: number
+  reached_product: number
+  reached_cart: number
+  reached_checkout: number
+  purchased: number
+}
+
+export function buildFunnelTrend(
+  w: { start: string; end: string },
+  rows: FunnelTrendRow[],
+  collectionStartedAt: string | Date | null,
+): FunnelTrend {
+  const first = collectionStartedAt === null || collectionStartedAt === undefined
+    ? null : new Date(collectionStartedAt)
+  const firstMs = first && !Number.isNaN(first.getTime()) ? first.getTime() : null
+  const byDay = new Map<string, FunnelTrendRow>()
+  for (const r of rows) byDay.set(String(r.day), r)
+
+  const buckets = buildBuckets(w.start, w.end, 'day').map<FunnelTrendBucket>(b => {
+    const startMs = Date.parse(b.start)
+    const endMs = Date.parse(b.end)
+    const coverage: FunnelTrendBucket['coverage'] =
+      firstMs === null || endMs <= firstMs ? 'none'
+      : firstMs > startMs ? 'partial'
+      : 'full'
+    const date = b.start.slice(0, 10)
+    const partial = endMs - startMs < 86_400_000
+    if (coverage === 'none') {
+      return { date, label: b.label, start: b.start, end: b.end, partial, coverage, stages: null, rates: null }
+    }
+    // A day inside the collection period with no recorded sessions is a real count of zero;
+    // its rates are null (zero denominator), never 0%.
+    const r = byDay.get(date)
+    const stages: FunnelStages = {
+      visits: Number(r?.visits ?? 0),
+      reachedProduct: Number(r?.reached_product ?? 0),
+      reachedCart: Number(r?.reached_cart ?? 0),
+      reachedCheckout: Number(r?.reached_checkout ?? 0),
+      purchased: Number(r?.purchased ?? 0),
+    }
+    return { date, label: b.label, start: b.start, end: b.end, partial, coverage, stages, rates: computeFunnelRates(stages) }
+  })
+
+  return { granularity: 'day', collectionStartedAt: firstMs === null ? null : new Date(firstMs).toISOString(), buckets }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SERVICE
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -412,7 +503,7 @@ export function createFunnelService(sql: Sql) {
 
     /** Admin report for a half-open [start, end) window. */
     async getFunnelReport(w: { start: string; end: string }) {
-      const [stageRows, totalRows, orderRows, productRows] = await Promise.all([
+      const [stageRows, totalRows, orderRows, productRows, trendRows, firstRows] = await Promise.all([
         sql`
           WITH cohort AS (
             SELECT DISTINCT session_id FROM analytics_events
@@ -499,6 +590,38 @@ export function createFunnelService(sql: Sql) {
           ORDER BY views DESC, purchases DESC, p.name
           LIMIT 50
         `,
+        // TREND: the same cohort and the same stage ladder as the summary query above,
+        // grouped by the UTC day the session started. Aggregates only; no event rows.
+        sql`
+          WITH cohort AS (
+            SELECT session_id, MIN(created_at) AS started_at FROM analytics_events
+            WHERE event_name = 'session_start'
+              AND created_at >= ${w.start}::timestamptz AND created_at < ${w.end}::timestamptz
+            GROUP BY session_id
+          ), tops AS (
+            SELECT c.session_id, c.started_at,
+                   COALESCE(MAX(CASE e.event_name
+                     WHEN 'product_viewed'     THEN 2
+                     WHEN 'add_to_cart'        THEN 3
+                     WHEN 'checkout_started'   THEN 4
+                     WHEN 'purchase_completed' THEN 5 END), 1) AS top
+            FROM cohort c
+            LEFT JOIN analytics_events e
+              ON e.session_id = c.session_id AND e.event_name <> 'session_start'
+            GROUP BY c.session_id, c.started_at
+          )
+          SELECT to_char((started_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS day,
+                 COUNT(*)::int                          AS visits,
+                 COUNT(*) FILTER (WHERE top >= 2)::int  AS reached_product,
+                 COUNT(*) FILTER (WHERE top >= 3)::int  AS reached_cart,
+                 COUNT(*) FILTER (WHERE top >= 4)::int  AS reached_checkout,
+                 COUNT(*) FILTER (WHERE top >= 5)::int  AS purchased
+          FROM tops
+          GROUP BY 1
+          ORDER BY 1
+        `,
+        // When first-party collection began, so days before it are shown as "no data", not zero.
+        sql`SELECT MIN(created_at) AS first_at FROM analytics_events WHERE event_name = 'session_start'`,
       ]) as any[][]
 
       const s = (stageRows[0] ?? {}) as Record<string, number>
@@ -541,6 +664,7 @@ export function createFunnelService(sql: Sql) {
           // null, never 0%, when there were no orders to compare against
           trackedPurchaseSharePct: ratePct(ordersTracked, ordersPaid),
         },
+        trend: buildFunnelTrend(w, trendRows as FunnelTrendRow[], (firstRows[0]?.first_at ?? null) as string | Date | null),
         products: productRows.map((r: any) => {
           const reached = Number(r.reached)
           return {

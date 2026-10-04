@@ -626,8 +626,25 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         /** Inventory written off in the bucket (known part). */
         writeOffCostCents: number
         realizedProfitCents: number
-        /** True when anything in the bucket is unknown: every profit figure is then a floor. */
+        /** True when anything in the bucket is unknown: known costs are floors and known-so-far profit is an upper bound. */
         isPartial: boolean
+        // ── Additive, display-supporting fields (ADVANCED CHARTS) ───────────────
+        // None of these changes an existing figure above. They let a chart say
+        // honestly WHICH figures are floors, instead of drawing a floor as the truth.
+        /** Customer-charged merchandise + shipping, ex-tax, before refunds (the AOV numerator). */
+        grossCustomerRevenueCents: number
+        /** Refunds against orders PAID in this bucket (cohort basis, same as the cards). */
+        refundCents: number
+        /** Same definition as the period card: gross customer revenue / paid orders; null with no orders. */
+        averageOrderValueCents: number | null
+        /** Paid orders in the bucket whose COGS / shipping label cost / Stripe fee is still unknown. */
+        ordersMissingCogs: number
+        ordersMissingShippingCost: number
+        ordersMissingStripeFee: number
+        /** Paid orders with ANY unknown cost component (the cards' ordersWithUnknownCosts). */
+        ordersWithUnknownCosts: number
+        /** Inventory write-offs in the bucket whose cost is not fully known. */
+        unknownWriteOffs: number
       }>
     }> {
       const g = granularity ?? autoGranularity(range.start, range.end)
@@ -655,6 +672,9 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         contributionProfitCents: 0,
         writeOffCostCents: 0,
         isPartial: false,
+        grossCustomerRevenueCents: 0, refundCents: 0,
+        ordersMissingCogs: 0, ordersMissingShippingCost: 0, ordersMissingStripeFee: 0,
+        ordersWithUnknownCosts: 0, unknownWriteOffs: 0,
       }))
 
       for (const row of orders) {
@@ -676,6 +696,14 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         // is unknown.
         b.contributionProfitCents += knownSoFarContribution(e)
         if (e.reconciliation.missing.length > 0) b.isPartial = true
+        // Display support: same inputs and same null tests the period card uses
+        // (countMissing / ordersWithUnknownCosts in computePeriodEconomics).
+        b.grossCustomerRevenueCents += e.grossCustomerRevenueCents
+        b.refundCents               += e.refundCents
+        if (e.cogsCents === null)         b.ordersMissingCogs         += 1
+        if (e.shippingCostCents === null) b.ordersMissingShippingCost += 1
+        if (e.stripeFeeCents === null)    b.ordersMissingStripeFee    += 1
+        if (e.reconciliation.missing.length > 0) b.ordersWithUnknownCosts += 1
       }
 
       // Write-offs belong to no order: bucket them by their own timestamp.
@@ -683,7 +711,7 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
         const i = bucketIndexFor(buckets, new Date(w.created_at).toISOString())
         if (i < 0) continue
         perBucket[i].writeOffCostCents += Number(w.cost)
-        if (w.unknown) perBucket[i].isPartial = true
+        if (w.unknown) { perBucket[i].isPartial = true; perBucket[i].unknownWriteOffs += 1 }
       }
 
       // ── Period costs are recognised by their OWN dates, never by revenue ──
@@ -730,6 +758,9 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
             start: bk.start,
             end:   bk.end,
             ...b,
+            // Same expression as computePeriodEconomics' averageOrderValueCents.
+            averageOrderValueCents: b.orderCount === 0
+              ? null : Math.round(b.grossCustomerRevenueCents / b.orderCount),
             operatingExpenseCents:   opexPerBucket[i],
             developmentExpenseCents: developmentPerBucket[i],
             advertisingCents:        adsPerBucket[i],
