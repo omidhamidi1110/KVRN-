@@ -630,7 +630,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           // request body: a browser-supplied value must not be able to claim
           // another visitor's referral. An absent or malformed cookie yields
           // null, which simply means no link attribution for this order.
-          client_reference_id: affiliateSessionId,
+          ...(affiliateSessionId ? { client_reference_id: affiliateSessionId } : {}),
           line_items: [
             ...reservation.items.map((item: any) => ({
             price_data: {

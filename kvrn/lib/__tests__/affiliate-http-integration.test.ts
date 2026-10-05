@@ -592,7 +592,7 @@ describe('HTTP B — real checkout handler', () => {
     const res = await checkoutPOST(checkoutRequest(null))
     expect(res.status).toBe(200)
     expect(stripeCreate).toHaveBeenCalledTimes(1)
-    expect(stripeCreate.mock.calls[0][0].client_reference_id).toBeNull()
+    expect(stripeCreate.mock.calls[0][0]).not.toHaveProperty('client_reference_id')
     const rows = await raw(
       `SELECT attribution->>'kvrn_sid' AS sid FROM reservations WHERE id=$1`, [reservationId])
     expect((rows[0] as any)?.sid ?? null).toBeNull()
