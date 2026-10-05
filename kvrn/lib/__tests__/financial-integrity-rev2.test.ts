@@ -132,7 +132,9 @@ describe('BLOCKER 1 (structure): 021 carries the guard and migration 015 is unto
   })
   test('021 is only ever followed by 022 (late-payment recovery) and migration 015 is byte-identical to ab857ed', () => {
     const files = fs.readdirSync(path.join(__dirname, '../../db/migrations')).filter(f => /^\d+_/.test(f)).sort()
-    expect(files.slice(-2)).toEqual(['021_financial_integrity.sql', '022_late_payment_recovery.sql'])
+    // 021 is directly followed by 022 (023+ exist now for unrelated, later work).
+    const at = files.indexOf('021_financial_integrity.sql')
+    expect(files.slice(at, at + 2)).toEqual(['021_financial_integrity.sql', '022_late_payment_recovery.sql'])
     const md5 = require('crypto').createHash('md5')
       .update(fs.readFileSync(path.join(__dirname, '../../db/migrations/015_order_refunds.sql'))).digest('hex')
     expect(md5).toBe('84206072efa488bc87e0107667ff86d2')

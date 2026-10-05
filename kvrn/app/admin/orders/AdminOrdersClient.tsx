@@ -47,11 +47,23 @@ interface ShipmentInfo {
   shippedAt:      string | null
 }
 
+interface CancellationInfo {
+  id:               string
+  reason:           string
+  cancelledBy:      string
+  cancelledAt:      string
+  restockedUnits:   number
+  unknownCostUnits: number
+  /** null = a restored unit's cost is UNKNOWN (never shown as $0). */
+  cogsCreditCents:  number | null
+}
+
 interface OrderDetail extends OrderRow {
   customerPhone:   string | null
   shippingAddress: Record<string,string|null> | null
   items:           OrderItem[]
   shipment:        ShipmentInfo | null
+  cancellation:    CancellationInfo | null
 }
 
 interface Meta { total: number; limit: number; offset: number }
@@ -109,6 +121,8 @@ export function AdminOrdersClient() {
   const [offset,    setOffset]    = useState(0)
   const [transitioning, setTransitioning] = useState(false)
   const [txMsg,     setTxMsg]     = useState('')
+  const [txOk,      setTxOk]      = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
   const [carrier,   setCarrier]   = useState('')
   const [tracking,  setTracking]  = useState('')
 
@@ -137,7 +151,7 @@ export function AdminOrdersClient() {
   useEffect(() => { fetchOrders(0) }, [fetchOrders])
 
   const openDetail = async (id: string) => {
-    setDetailLoading(true); setDetail(null); setTxMsg('')
+    setDetailLoading(true); setDetail(null); setTxMsg(''); setTxOk(false); setCancelReason('')
     try {
       const res  = await fetch(`/api/orders/${id}`, { cache:'no-store' })
       const json = await res.json()
@@ -148,7 +162,7 @@ export function AdminOrdersClient() {
   const markProcessing = async () => {
     if (!detail) return
     if (!window.confirm(`Mark order ${detail.orderNumber} as processing?`)) return
-    setTransitioning(true); setTxMsg('')
+    setTransitioning(true); setTxMsg(''); setTxOk(false)
     try {
       const res  = await fetch(`/api/orders/${detail.id}`, {
         method: 'PATCH',
@@ -158,6 +172,7 @@ export function AdminOrdersClient() {
       const json = await res.json()
       if (res.ok) {
         setDetail(json.data)
+        setTxOk(true)
         setTxMsg('Moved to processing.')
         fetchOrders(offset)
       } else {
@@ -175,7 +190,7 @@ export function AdminOrdersClient() {
     if (!trimCarrier)  { setTxMsg('Carrier is required.'); return }
     if (!trimTracking) { setTxMsg('Tracking number is required.'); return }
     if (!window.confirm(`Mark order ${detail.orderNumber} as shipped via ${trimCarrier}?`)) return
-    setTransitioning(true); setTxMsg('')
+    setTransitioning(true); setTxMsg(''); setTxOk(false)
     try {
       const res  = await fetch(`/api/orders/${detail.id}`, {
         method: 'PATCH',
@@ -186,7 +201,45 @@ export function AdminOrdersClient() {
       if (res.ok) {
         setDetail(json.data)
         setCarrier(''); setTracking('')
+        setTxOk(true)
         setTxMsg('Order marked shipped.')
+        fetchOrders(offset)
+      } else {
+        setTxMsg(json.error ?? 'Failed.')
+      }
+    } catch {
+      setTxMsg('Network error.')
+    } finally { setTransitioning(false) }
+  }
+
+  /**
+   * Cancel a FULLY REFUNDED, NEVER-SHIPPED order and put its units back in stock.
+   * The server and database re-check everything; this only asks for an explicit confirmation.
+   */
+  const cancelUnshipped = async () => {
+    if (!detail) return
+    const reason = cancelReason.trim()
+    if (reason.length < 3) { setTxOk(false); setTxMsg('Enter a reason (at least 3 characters).'); return }
+    if (!window.confirm(
+      `Cancel order ${detail.orderNumber} and restore its inventory?\n\n` +
+      'This returns the sold units to stock at their original cost and cancels the order. ' +
+      'It does NOT create a return or a shipment, and it cannot be undone.'
+    )) return
+    setTransitioning(true); setTxMsg(''); setTxOk(false)
+    try {
+      const res  = await fetch(`/api/orders/${detail.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ fulfillmentStatus:'cancelled', reason, confirm:true }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setDetail(json.data)
+        setCancelReason('')
+        setTxOk(true)
+        setTxMsg(json.outcome === 'already_cancelled'
+          ? 'This order was already cancelled; nothing was changed.'
+          : 'Order cancelled and inventory restored.')
         fetchOrders(offset)
       } else {
         setTxMsg(json.error ?? 'Failed.')
@@ -558,7 +611,55 @@ export function AdminOrdersClient() {
                   )}
                   <Row label="Total" bold>{formatCheckoutPrice(detail.totalCents)}</Row>
 
-                  {detail.fulfillmentStatus === 'unfulfilled' && (
+                  {detail.paymentStatus === 'refunded'
+                    && (detail.fulfillmentStatus === 'unfulfilled' || detail.fulfillmentStatus === 'processing')
+                    && !detail.shipment && (
+                    <>
+                      <Divider />
+                      <p className="mb-2 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                        Refunded before shipment
+                      </p>
+                      <p className="mb-3 text-[11px] leading-relaxed text-black/55">
+                        This order is fully refunded and has no shipment. Cancelling it puts the sold
+                        units back in stock at their original cost and settles its cost. It does not
+                        create a return or a shipment. The server re-checks eligibility.
+                      </p>
+                      <input
+                        value={cancelReason}
+                        onChange={e => setCancelReason(e.target.value)}
+                        maxLength={500}
+                        placeholder="Reason (required)"
+                        aria-label="Cancellation reason"
+                        className="mb-2 h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none placeholder:text-black/25 focus:border-black/25"
+                      />
+                      <button
+                        onClick={cancelUnshipped}
+                        disabled={transitioning || cancelReason.trim().length < 3}
+                        className="h-11 w-full rounded-lg bg-[#7F1D1D] text-[11px] font-medium tracking-[0.04em] text-white transition hover:bg-[#991B1B] disabled:opacity-50"
+                      >
+                        {transitioning ? 'Cancelling…' : 'Cancel unshipped order & restore inventory'}
+                      </button>
+                    </>
+                  )}
+
+                  {detail.cancellation && (
+                    <>
+                      <Divider />
+                      <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
+                        Cancelled before shipment
+                      </p>
+                      <Row label="Units restocked">{detail.cancellation.restockedUnits}</Row>
+                      <Row label="COGS credit">
+                        {detail.cancellation.cogsCreditCents === null
+                          ? 'Unknown'
+                          : formatCheckoutPrice(detail.cancellation.cogsCreditCents)}
+                      </Row>
+                      <Row label="Cancelled">{new Date(detail.cancellation.cancelledAt).toLocaleString()}</Row>
+                      <Row label="Reason">{detail.cancellation.reason}</Row>
+                    </>
+                  )}
+
+                  {detail.paymentStatus !== 'refunded' && detail.fulfillmentStatus === 'unfulfilled' && (
                     <>
                       <Divider />
                       <button
@@ -571,7 +672,7 @@ export function AdminOrdersClient() {
                     </>
                   )}
 
-                  {detail.fulfillmentStatus === 'processing' && (
+                  {detail.paymentStatus !== 'refunded' && detail.fulfillmentStatus === 'processing' && (
                     <>
                       <Divider />
                       <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
@@ -627,7 +728,7 @@ export function AdminOrdersClient() {
                   {txMsg && (
                     <div className={[
                       'mt-4 rounded-lg border px-3 py-2.5 text-[11px]',
-                      txMsg.includes('processing')
+                      txOk
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                         : 'border-red-200 bg-red-50 text-red-700',
                     ].join(' ')}>

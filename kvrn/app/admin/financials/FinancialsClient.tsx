@@ -79,6 +79,7 @@ type Period = {
   realizedProfitAfterDevelopmentCents: number
   disputeLossCents: number
   returnCogsCreditCents: number
+  cancellationCogsCreditCents: number
   exchangeCogsCents: number
   exchangeShippingCostCents: number
   returnLabelCostCents: number
@@ -297,6 +298,9 @@ export function FinancialsClient() {
             <Metric label="Returns & exchanges"
                     value={money(p.exchangeCogsCents + p.exchangeShippingCostCents + p.returnLabelCostCents - p.returnCogsCreditCents)}
                     tone="muted" sub="Replacement + labels − restocked cost" />
+            <Metric label="Cancelled-order COGS credit"
+                    value={money(p.cancellationCogsCreditCents)} tone="muted"
+                    sub="Restocked cost of fully refunded, never-shipped orders (offsets sale COGS)" />
             <Metric label="Inventory write-offs" value={money(p.writeOffCostCents)} tone="muted"
                     sub="Recognized when units leave stock" />
 

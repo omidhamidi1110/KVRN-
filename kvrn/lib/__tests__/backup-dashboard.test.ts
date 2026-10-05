@@ -759,10 +759,11 @@ describe('admin routes', () => {
 describe('scope: additive, no schema change, nothing mutating or secret', () => {
   const FILES = ['lib/backup-records.ts', 'app/api/admin/backups/route.ts', 'app/api/admin/backups/verify/route.ts',
                  'app/api/admin/backups/drills/route.ts', 'app/admin/backups/page.tsx', 'app/admin/backups/BackupsClient.tsx']
-  test('no migration 023', () => {
+  test('the backup dashboard added no migration of its own', () => {
+    // (Was "no 023 / the chain ends at 022"; 023+ now exist for unrelated, later work.)
     const files = fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => f.endsWith('.sql'))
-    expect(files.some(f => f.startsWith('023'))).toBe(false)
-    expect(files[files.length - 1]).toMatch(/^022_/)
+    expect(files.some(f => /backup/i.test(f))).toBe(false)
+    expect(files).toContain('022_late_payment_recovery.sql')
   })
   test('no file of the feature updates or deletes audit rows, or runs schema SQL', () => {
     for (const f of FILES) expect(code(f)).not.toMatch(/\b(UPDATE|DELETE\s+FROM|TRUNCATE|DROP\s+TABLE|ALTER\s+TABLE|CREATE\s+TABLE)\b/i)

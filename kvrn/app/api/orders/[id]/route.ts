@@ -1,7 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
-import { createAdminOrderService, UUID_RE } from '@/lib/admin-orders'
+import {
+  createAdminOrderService, UUID_RE, validateCancelReason, CancelOrderError,
+} from '@/lib/admin-orders'
 import { getEmailProvider } from '@/lib/resend-adapter'
 import { processPendingTransactionalEmails } from '@/lib/transactional-email'
 
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest, context: Context) {
 }
 
 export async function PATCH(req: NextRequest, context: Context) {
-  const { error } = await requireAdmin(req)
+  const { identity, error } = await requireAdmin(req)
   if (error) return error
 
   const { id } = await context.params
@@ -133,9 +135,47 @@ export async function PATCH(req: NextRequest, context: Context) {
     }
   }
 
+  // ── Branch 3: cancel a FULLY REFUNDED, NEVER-SHIPPED order and restore its inventory ──
+  // Body: { fulfillmentStatus: 'cancelled', reason: string, confirm: true }
+  // The database function re-checks every eligibility rule under a row lock and is the only
+  // authority; this branch validates shape, requires explicit confirmation and maps refusals.
+  // It never creates a return, a shipment or a label, and never touches a shipped order.
+  if (requestedStatus === 'cancelled') {
+    const extraKeys = Object.keys(body).filter(k => !['fulfillmentStatus', 'reason', 'confirm'].includes(k))
+    if (extraKeys.length > 0) {
+      return NextResponse.json(
+        { error: `Unsupported fields: ${extraKeys.join(', ')}.` },
+        { status: 400 }
+      )
+    }
+    if (body.confirm !== true) {
+      return NextResponse.json(
+        { error: 'Confirmation is required: this changes inventory and accounting.' },
+        { status: 400 }
+      )
+    }
+    const v = validateCancelReason(body.reason)
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 })
+    const actor = identity?.email
+    if (!actor) return NextResponse.json({ error: 'Admin identity unavailable.' }, { status: 401 })
+
+    try {
+      const svc    = createAdminOrderService(sql)
+      const result = await svc.cancelUnshippedOrder(id, actor, v.reason)
+      const order  = await svc.getOrderDetail(id)
+      return NextResponse.json({ success: true, outcome: result.outcome, result, data: order })
+    } catch (err: any) {
+      if (err instanceof CancelOrderError) {
+        return NextResponse.json({ error: err.message, code: err.code }, { status: err.status })
+      }
+      console.error('[orders/id PATCH cancel]', String(err?.message ?? '').slice(0, 120))
+      return NextResponse.json({ error: 'Failed to cancel order.' }, { status: 500 })
+    }
+  }
+
   // ── Unknown transition ─────────────────────────────────────────────────────
   return NextResponse.json(
-    { error: 'Only fulfillmentStatus "processing" or "shipped" (with carrier and trackingNumber) are supported.' },
+    { error: 'Only fulfillmentStatus "processing", "shipped" (with carrier and trackingNumber) or "cancelled" (with reason and confirm) are supported.' },
     { status: 400 }
   )
 }

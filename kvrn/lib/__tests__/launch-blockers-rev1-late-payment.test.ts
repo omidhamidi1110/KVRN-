@@ -30,7 +30,9 @@ describe('migration 022 structure', () => {
   })
   test('022 is the only new migration and runs after 021', () => {
     const files = fs.readdirSync(MIG).filter(f => /^\d+_/.test(f)).sort()
-    expect(files.slice(-2)).toEqual(['021_financial_integrity.sql', '022_late_payment_recovery.sql'])
+    // 022 directly follows 021 (023+ exist now for unrelated, later work).
+    const at = files.indexOf('021_financial_integrity.sql')
+    expect(files.slice(at, at + 2)).toEqual(['021_financial_integrity.sql', '022_late_payment_recovery.sql'])
   })
   test('is idempotent by construction', () => {
     const sql = read('022_late_payment_recovery.sql').replace(/--.*$/gm, '')

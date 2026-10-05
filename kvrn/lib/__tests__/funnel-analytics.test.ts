@@ -397,9 +397,11 @@ describe('source: consent and trust boundaries are wired where they must be', ()
     expect(r.indexOf('requireAdmin(req)')).toBeGreaterThan(-1)
     expect(r.indexOf('requireAdmin(req)')).toBeLessThan(r.indexOf('parseFunnelRange('))
   })
-  test('no migration was needed: migrations 001-022 are untouched and there is no 023', () => {
+  test('no migration was needed: the funnel feature added none of its own', () => {
+    // (Was "the chain ends at 022"; 023+ now exist for unrelated, later work.)
     const files = fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => /^\d+_/.test(f)).sort()
-    expect(files[files.length - 1]).toBe('022_late_payment_recovery.sql')
+    expect(files.some(f => /funnel/i.test(f))).toBe(false)
+    expect(files).toContain('022_late_payment_recovery.sql')
   })
 })
 

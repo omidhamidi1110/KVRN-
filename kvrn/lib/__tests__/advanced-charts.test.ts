@@ -553,8 +553,9 @@ describe('chart code is display-only', () => {
 
   test('no migration was added for the charts', () => {
     const files = fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => f.endsWith('.sql'))
-    expect(files.some(f => f.startsWith('023'))).toBe(false)
-    expect(files[files.length - 1]).toMatch(/^022_/)
+    // The charts feature added no migration of its own. (Migrations 023+ exist for unrelated, later
+    // work; this guard used to assert the chain ended at 022 and went stale when 023/024 landed.)
+    expect(files.some(f => /chart/i.test(f))).toBe(false)
   })
 
   test('no chart library was added', () => {

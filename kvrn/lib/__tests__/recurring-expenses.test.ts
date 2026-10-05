@@ -160,7 +160,9 @@ describe('no automatic or duplicate transaction generation (source scan)', () =>
   })
   test('migration 023 was not needed and migrations 018-022 are byte-identical to the base', () => {
     expect(fs.existsSync(path.join(ROOT, 'db/migrations/023_recurring_expenses.sql'))).toBe(false)
-    expect(fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => /^023/.test(f))).toEqual([])
+    // (No migration of this feature exists. 023+ now exist for unrelated, later work; the frozen 018-022
+    // hashes below still prove nothing before them was edited.)
+    expect(fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => /recurring/i.test(f))).toEqual([])
     expect({
       '018': md5('db/migrations/018_returns_exchanges_disputes.sql'),
       '019': md5('db/migrations/019_inventory_fifo_layers.sql'),

@@ -311,6 +311,40 @@ export function createReturnsService(sql: NeonQueryFunction<false, false>) {
     },
 
     /**
+     * Succeeded refunds whose processing-fee return is still UNKNOWN (fee_refunded_cents IS NULL).
+     * Migration 015: NULL is "unknown", never zero. This worklist is independent of the component
+     * breakdown: a refund whose merchandise/shipping/tax split is resolved still appears here until
+     * the fee fact is recorded (POST /api/admin/refunds/[id]/fee-returned; write-once).
+     */
+    async listRefundsAwaitingFeeReturn() {
+      const rows = await sql`
+        SELECT f.id, f.stripe_refund_id AS "stripeRefundId",
+               f.amount_cents AS "amountCents", f.refunded_at AS "refundedAt",
+               f.order_id AS "orderId", o.order_number AS "orderNumber",
+               o.stripe_fee_cents AS "orderStripeFeeCents",
+               COALESCE((SELECT SUM(x.fee_refunded_cents) FROM order_refunds x
+                         WHERE x.order_id = f.order_id AND x.status = 'succeeded'
+                           AND x.id <> f.id), 0) AS "otherFeeReturnedCents"
+        FROM order_refunds f
+        JOIN orders o ON o.id = f.order_id
+        WHERE f.status = 'succeeded' AND f.fee_refunded_cents IS NULL
+        ORDER BY f.created_at DESC
+        LIMIT 200
+      `
+      return (rows as any[]).map(r => ({
+        id:                    r.id as string,
+        stripeRefundId:        r.stripeRefundId as string | null,
+        orderId:               r.orderId as string,
+        orderNumber:           r.orderNumber as string,
+        amountCents:           Number(r.amountCents),
+        // null = the order's own Stripe fee is unknown too; shown as Unknown, not $0.
+        orderStripeFeeCents:   r.orderStripeFeeCents === null ? null : Number(r.orderStripeFeeCents),
+        otherFeeReturnedCents: Number(r.otherFeeReturnedCents),
+        refundedAt:            r.refundedAt ? new Date(r.refundedAt).toISOString() : null,
+      }))
+    },
+
+    /**
      * Resolve a refund's component breakdown.
      *
      * Pass no components to derive deterministically (full refunds only).

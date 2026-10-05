@@ -116,6 +116,7 @@ function financialSelect() {
       dp."disputeFeeCents",
       af."affiliateCommissionCents",
       rt."returnCogsCreditCents",
+      oc."cancellationCogsCreditCents",
       rl."returnLabelCostCents",
       ex."exchangeCogsCents",
       ex."exchangeShippingCostCents",
@@ -208,6 +209,16 @@ function financialSelect() {
       JOIN order_return_items ri ON ri.return_id = rtn.id
       WHERE rtn.order_id = o.id AND rtn.status <> 'cancelled'
     ) rt ON TRUE
+    -- A PRE-SHIPMENT CANCELLATION (migration 025) puts the sold units back into inventory without any
+    -- physical return. Its COGS credit is a SEPARATE term that offsets the (immutable) sale COGS:
+    --   no cancellation               -> 0
+    --   a cancellation, all costs known -> the exact credit (the value of the restored layers)
+    --   a restored unit of unknown cost -> NULL (never zero)
+    LEFT JOIN LATERAL (
+      SELECT CASE WHEN bool_or(k.cogs_credit_cents IS NULL) THEN NULL
+                  ELSE COALESCE(SUM(k.cogs_credit_cents),0)::int END AS "cancellationCogsCreditCents"
+      FROM order_cancellations k WHERE k.order_id = o.id
+    ) oc ON TRUE
     LEFT JOIN LATERAL (
       SELECT CASE WHEN bool_or(rtn.return_shipping_paid_by = 'kvrn'
                                AND rtn.status IN ('received','completed')
@@ -266,6 +277,7 @@ function toInputs(r: any): OrderFinancialRow {
     disputeFeeCents:               nullable(r.disputeFeeCents),
     affiliateCommissionCents:      nullable(r.affiliateCommissionCents),
     returnCogsCreditCents:         nullable(r.returnCogsCreditCents),
+    cancellationCogsCreditCents:   nullable(r.cancellationCogsCreditCents),
     returnLabelCostCents:          nullable(r.returnLabelCostCents),
     exchangeCogsCents:             nullable(r.exchangeCogsCents),
     exchangeShippingCostCents:     nullable(r.exchangeShippingCostCents),
@@ -780,8 +792,8 @@ export function createFinancialService(sql: NeonQueryFunction<false, false>) {
       const report = await this.getPeriodReport(range)
       const p = report.period
       return [
-        // Net of returned stock; a negative net is not a slice and is filtered below.
-        { label: 'Product COGS',       valueCents: p.cogsCents - p.returnCogsCreditCents + p.exchangeCogsCents },
+        // Net of returned stock and cancelled-order restocks; a negative net is not a slice and is filtered below.
+        { label: 'Product COGS',       valueCents: p.cogsCents - p.returnCogsCreditCents - p.cancellationCogsCreditCents + p.exchangeCogsCents },
         { label: 'Shipping cost',      valueCents: p.shippingCostCents + p.exchangeShippingCostCents + p.returnLabelCostCents },
         { label: 'Stripe fees',        valueCents: p.stripeFeeCents + p.disputeFeeCents },
         { label: 'Affiliate commission', valueCents: p.affiliateCommissionCents },

@@ -314,7 +314,9 @@ describe('migration 021 structure', () => {
 
   test('021 runs after 020 (and is followed only by 022, the late-payment recovery migration)', () => {
     const files = fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => /^\d+_/.test(f)).sort()
-    expect(files.slice(-3)).toEqual(['020_affiliates.sql', '021_financial_integrity.sql', '022_late_payment_recovery.sql'])
+    // 021 sits between 020 and 022 (023+ exist now for unrelated, later work).
+    const at = files.indexOf('021_financial_integrity.sql')
+    expect(files.slice(at - 1, at + 2)).toEqual(['020_affiliates.sql', '021_financial_integrity.sql', '022_late_payment_recovery.sql'])
     expect(crypto.createHash('md5').update(fs.readFileSync(path.join(ROOT, 'db/migrations/021_financial_integrity.sql'))).digest('hex')).toBe('e7e0cd801ec63b4f22345eb448a9ebba')
   })
 

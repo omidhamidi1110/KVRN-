@@ -14,11 +14,12 @@ export async function GET(req: NextRequest) {
   if (error) return error
   try {
     const service = createReturnsService(sql)
-    const [returns, awaitingBreakdown] = await Promise.all([
+    const [returns, awaitingBreakdown, awaitingFee] = await Promise.all([
       service.listReturns(),
       service.listRefundsAwaitingBreakdown(),
+      service.listRefundsAwaitingFeeReturn(),
     ])
-    return NextResponse.json({ returns, awaitingBreakdown })
+    return NextResponse.json({ returns, awaitingBreakdown, awaitingFee })
   } catch (err: any) {
     console.error('[admin/returns GET]', err?.message?.slice(0, 120))
     return NextResponse.json({ error: 'Could not load returns.' }, { status: 500 })

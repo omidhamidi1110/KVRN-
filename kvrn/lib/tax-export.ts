@@ -193,6 +193,9 @@ export function buildTaxExportRows(i: TaxExportInput): TaxRow[] {
     'capitalised and are not expensed here.', ['cogs'])
   money('COSTS', 'Less: returned-stock COGS credit', p.returnCogsCreditCents,
     'Reduces COGS when returned stock goes back to inventory.', ['return_cogs_credit'])
+  money('COSTS', 'Less: cancelled-order COGS credit', p.cancellationCogsCreditCents,
+    'Reduces COGS when a fully refunded, never-shipped order is cancelled and its units go back to inventory. ' +
+    'The original sale COGS above is unchanged; this is the offsetting credit.', ['cancellation_cogs_credit'])
   money('COSTS', 'Replacement (exchange) COGS', p.exchangeCogsCents,
     'COGS of replacement items sent on exchanges.', ['exchange_cogs'])
   money('COSTS', 'Shipping / fulfillment expense', p.shippingCostCents,

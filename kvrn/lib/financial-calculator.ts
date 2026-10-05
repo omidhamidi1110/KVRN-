@@ -48,7 +48,7 @@ export type ReconciliationState = 'complete' | 'partial' | 'unknown'
 export interface MissingCost {
   field:
     | 'cogs' | 'shipping_cost' | 'stripe_fee'
-    | 'return_cogs_credit' | 'exchange_cogs' | 'exchange_shipping_cost'
+    | 'return_cogs_credit' | 'cancellation_cogs_credit' | 'exchange_cogs' | 'exchange_shipping_cost'
     | 'return_label_cost' | 'dispute_fee' | 'affiliate_commission'
     | 'refund_fee' | 'refund_revenue_split'
   label: string
@@ -116,6 +116,12 @@ export interface OrderFinancialInputs {
   affiliateCommissionCents?: CentsOrUnknown
   /** COGS returned to stock by sellable restocks (a credit, reduces cost). null = restocked with unknown cost. */
   returnCogsCreditCents?: CentsOrUnknown
+  /**
+   * COGS credit of a PRE-SHIPMENT CANCELLATION (migration 025): the value of the layers restored when a
+   * fully refunded, never-shipped order was cancelled. A SEPARATE term from the return credit: the original
+   * sale COGS (cogsCents) is never edited, this offsets it. null = a restored unit's cost is unknown.
+   */
+  cancellationCogsCreditCents?: CentsOrUnknown
   /** COGS of replacement items shipped on exchanges. null = unknown. */
   exchangeCogsCents?: CentsOrUnknown
   /** Carrier cost of replacement shipments. null = a shipped exchange with no recorded cost. */
@@ -154,10 +160,11 @@ export interface OrderEconomics {
   disputeFeeCents:           CentsOrUnknown
   affiliateCommissionCents:  CentsOrUnknown
   returnCogsCreditCents:     CentsOrUnknown
+  cancellationCogsCreditCents: CentsOrUnknown
   exchangeCogsCents:         CentsOrUnknown
   exchangeShippingCostCents: CentsOrUnknown
   returnLabelCostCents:      CentsOrUnknown
-  /** COGS − returned-stock credit + replacement COGS. null if any part is unknown. */
+  /** COGS − returned-stock credit − cancellation credit + replacement COGS. null if any part is unknown. */
   netProductCostCents:       CentsOrUnknown
   /** Every cost that is not product cost: carrier, return labels, fees, commission. */
   otherOrderCostsCents:      CentsOrUnknown
@@ -300,6 +307,7 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
   const disputeFeeCents           = eff(input.disputeFeeCents)
   const affiliateCommissionCents  = eff(input.affiliateCommissionCents)
   const returnCogsCreditCents     = eff(input.returnCogsCreditCents)
+  const cancellationCogsCreditCents = eff(input.cancellationCogsCreditCents)
   const exchangeCogsCents         = eff(input.exchangeCogsCents)
   const exchangeShippingCostCents = eff(input.exchangeShippingCostCents)
   const returnLabelCostCents      = eff(input.returnLabelCostCents)
@@ -315,6 +323,7 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
   if (refundSplitUnknown)
     missing.push({ field: 'refund_revenue_split', label: 'Refund split between revenue and sales tax' })
   if (returnCogsCreditCents === null)     missing.push({ field: 'return_cogs_credit',     label: 'Returned-stock COGS credit' })
+  if (cancellationCogsCreditCents === null) missing.push({ field: 'cancellation_cogs_credit', label: 'Cancelled-order COGS credit' })
   if (exchangeCogsCents === null)         missing.push({ field: 'exchange_cogs',          label: 'Replacement COGS' })
   if (exchangeShippingCostCents === null) missing.push({ field: 'exchange_shipping_cost', label: 'Replacement shipping cost' })
   if (returnLabelCostCents === null)      missing.push({ field: 'return_label_cost',      label: 'Return label cost' })
@@ -330,6 +339,7 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
   const netProductCostCents = sumOrUnknown(
     input.cogsCents,
     returnCogsCreditCents === null ? null : -returnCogsCreditCents,
+    cancellationCogsCreditCents === null ? null : -cancellationCogsCreditCents,
     exchangeCogsCents,
   )
   const otherOrderCostsCents = sumOrUnknown(
@@ -369,6 +379,7 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
     disputeFeeCents,
     affiliateCommissionCents,
     returnCogsCreditCents,
+    cancellationCogsCreditCents,
     exchangeCogsCents,
     exchangeShippingCostCents,
     returnLabelCostCents,
@@ -399,7 +410,7 @@ export function computeOrderEconomics(input: OrderFinancialInputs): OrderEconomi
 export function knownSoFarContribution(e: OrderEconomics): number {
   const k = (v: CentsOrUnknown) => (v === null ? 0 : v)
   return e.netRevenueCents
-    - (k(e.cogsCents) - k(e.returnCogsCreditCents) + k(e.exchangeCogsCents))
+    - (k(e.cogsCents) - k(e.returnCogsCreditCents) - k(e.cancellationCogsCreditCents) + k(e.exchangeCogsCents))
     - (k(e.shippingCostCents) + k(e.exchangeShippingCostCents) + k(e.returnLabelCostCents)
        + k(e.netStripeFeeCents) + k(e.disputeFeeCents) + k(e.affiliateCommissionCents))
 }
@@ -547,6 +558,8 @@ export interface PeriodEconomics {
 
   // Known-so-far sums of the order effects added by the integrity batch.
   returnCogsCreditCents:     number
+  /** Known-so-far COGS credits from pre-shipment cancellations (migration 025). */
+  cancellationCogsCreditCents: number
   exchangeCogsCents:         number
   exchangeShippingCostCents: number
   returnLabelCostCents:      number
@@ -696,6 +709,7 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
   ).length
 
   const returnCogsCreditCents     = sumKnown(e => e.returnCogsCreditCents)
+  const cancellationCogsCreditCents = sumKnown(e => e.cancellationCogsCreditCents)
   const exchangeCogsCents         = sumKnown(e => e.exchangeCogsCents)
   const exchangeShippingCostCents = sumKnown(e => e.exchangeShippingCostCents)
   const returnLabelCostCents      = sumKnown(e => e.returnLabelCostCents)
@@ -709,7 +723,7 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
   // exact ones.
   const contributionProfitCents =
     netRevenueCents
-    - (cogsCents - returnCogsCreditCents + exchangeCogsCents)
+    - (cogsCents - returnCogsCreditCents - cancellationCogsCreditCents + exchangeCogsCents)
     - (shippingCostCents + exchangeShippingCostCents + returnLabelCostCents
        + stripeFeeCents + disputeFeeCents + affiliateCommissionCents)
 
@@ -740,7 +754,7 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
   // Total of every cost that reduced realised profit this period.
   // Mirrors the profit chain exactly so cost + profit == revenue.
   const totalOperatingCostCents =
-    (cogsCents - returnCogsCreditCents + exchangeCogsCents) +
+    (cogsCents - returnCogsCreditCents - cancellationCogsCreditCents + exchangeCogsCents) +
     (shippingCostCents + exchangeShippingCostCents + returnLabelCostCents) +
     stripeFeeCents + disputeFeeCents + affiliateCommissionCents + writeOffCostCents +
     input.recognizedOperatingExpensesCents +
@@ -773,6 +787,7 @@ export function computePeriodEconomics(input: PeriodInputs): PeriodEconomics {
     ordersMissingStripeFee,
     ordersWithUnknownCosts,
     returnCogsCreditCents,
+    cancellationCogsCreditCents,
     exchangeCogsCents,
     exchangeShippingCostCents,
     returnLabelCostCents,
