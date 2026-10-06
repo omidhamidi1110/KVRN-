@@ -16,6 +16,10 @@ import { reconcileStripeFeeForOrder } from '@/lib/stripe-fees'
 import { getStripe } from '@/lib/stripe-client'
 import { tryRecordPurchase } from '@/lib/funnel-analytics'
 import { tryRecordGaPurchase } from '@/lib/ga4-server'
+import {
+  notifyDispute, notifyPaymentIssue, notifyRefund, notifySaleAndInventory, readRefundStatusForNotify,
+  recordProviderFailure,
+} from '@/lib/owner-notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,6 +157,15 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
       amountTotal: session.amount_total ?? null,
       duplicate:   result.alreadyProcessed || undefined,
     }))
+    // Owner push is best-effort and only for the first durable exception, never
+    // for Stripe webhook replays of the same payment exception.
+    if (!result.alreadyProcessed) {
+      await notifyPaymentIssue({
+        amountCents: Number(session.amount_total ?? 0),
+        currency: session.currency ?? 'usd',
+        reason: result.reason ?? result.outcome,
+      })
+    }
   }
   if (result.outcome === 'order_created' && result.recovered) {
     console.error('[WEBHOOK][LATE_PAYMENT_RECOVERED]', JSON.stringify({
@@ -194,6 +207,7 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
     } catch (emailErr: any) {
       // Log without PII — order remains paid regardless
       console.error('[WEBHOOK] Email send failed (non-fatal):', emailErr?.message?.slice(0, 100))
+      await recordProviderFailure('Resend', 'paid_order_email')
     }
 
     // Opportunistic Stripe fee capture. Usually not settled yet, in which case the
@@ -202,6 +216,9 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
       await tryEnrichStripeFee(result.orderId)
       // Affiliate attribution is resolved once, immutably, at finalization.
       await tryResolveAffiliateAttribution(result.orderId, session.client_reference_id ?? null)
+      // Push only on the canonical order_created outcome. Webhook replays never
+      // generate duplicate sale/stock notifications.
+      await notifySaleAndInventory(result.orderId)
     }
   }
 }
@@ -258,13 +275,16 @@ async function handleChargeRefunded(charge: any) {
 
   for (const refund of refunds) {
     if (!refund?.id) continue
+    const incomingStatus = normalizeRefundStatus(refund.status)
+    // Notification evidence only (never throws); refund persistence below stays authoritative.
+    const priorStatus = await readRefundStatusForNotify(refund.id)
     const result = await recordOrderRefund(sql, {
       stripeRefundId:   refund.id,
       paymentIntentId,
       chargeId:         charge.id ?? null,
       amountCents:      Number(refund.amount ?? 0),
       currency:         refund.currency ?? 'usd',
-      status:           normalizeRefundStatus(refund.status),
+      status:           incomingStatus,
       reason:           refund.reason ?? null,
       // Stripe reports a returned processing fee only sometimes.
       // Absent => NULL => "unknown", never assumed to be zero.
@@ -279,6 +299,22 @@ async function handleChargeRefunded(charge: any) {
       continue
     }
     console.log(`[WEBHOOK] refund ${result.outcome}`)
+
+    // Owner push comes BEFORE the affiliate reversal: the refund is already persisted (authoritative),
+    // so if the follow-up below throws and Stripe retries, the retry is no longer a "new transition" and
+    // would never notify. notifyRefund is fail-open (never throws, 2s bound) and claim-deduped per Stripe refund id.
+    const firstSucceededObservation = incomingStatus === 'succeeded' && (
+      result.outcome === 'recorded' || (priorStatus !== undefined && priorStatus !== null && priorStatus !== 'succeeded')
+    )
+    if (firstSucceededObservation && result.orderId) {
+      await notifyRefund({
+        orderId: result.orderId,
+        stripeRefundId: refund.id,
+        amountCents: Number(refund.amount ?? 0),
+        currency: refund.currency ?? 'usd',
+        fullyRefunded: result.fullyRefunded,
+      })
+    }
 
     // Reverse affiliate commission for the merchandise actually refunded.
     // Propagates on failure for the same reason the refund does.
@@ -306,6 +342,10 @@ async function handleRefundObject(refund: any) {
     return
   }
 
+  const incomingStatus = normalizeRefundStatus(refund.status)
+  // Notification evidence only (never throws); refund persistence below stays authoritative.
+  const priorStatus = await readRefundStatusForNotify(refund.id)
+
   const result = await recordOrderRefund(sql, {
     stripeRefundId:   refund.id,
     paymentIntentId,
@@ -314,7 +354,7 @@ async function handleRefundObject(refund: any) {
       : refund.charge?.id ?? null,
     amountCents:      Number(refund.amount ?? 0),
     currency:         refund.currency ?? 'usd',
-    status:           normalizeRefundStatus(refund.status),
+    status:           incomingStatus,
     reason:           refund.reason ?? null,
     feeRefundedCents: null,
     refundedAt:       refund.created
@@ -327,6 +367,22 @@ async function handleRefundObject(refund: any) {
     return
   }
   console.log(`[WEBHOOK] refund ${result.outcome}`)
+
+  // Owner push comes BEFORE the affiliate reversal: the refund is already persisted (authoritative),
+  // so if the follow-up below throws and Stripe retries, the retry is no longer a "new transition" and
+  // would never notify. notifyRefund is fail-open (never throws, 2s bound) and claim-deduped per Stripe refund id.
+  const firstSucceededObservation = incomingStatus === 'succeeded' && (
+    result.outcome === 'recorded' || (priorStatus !== undefined && priorStatus !== null && priorStatus !== 'succeeded')
+  )
+  if (firstSucceededObservation && result.orderId) {
+    await notifyRefund({
+      orderId: result.orderId,
+      stripeRefundId: refund.id,
+      amountCents: Number(refund.amount ?? 0),
+      currency: refund.currency ?? 'usd',
+      fullyRefunded: result.fullyRefunded,
+    })
+  }
 
   const refundRow = await sql`
     SELECT id FROM order_refunds WHERE stripe_refund_id = ${refund.id} LIMIT 1
@@ -538,6 +594,18 @@ async function handleDispute(
     })
     console.log(`[WEBHOOK] dispute ${reconciled?.outcome ?? 'unknown'}`)
 
+    // Owner push comes right after the authoritative status transition is persisted and BEFORE the
+    // balance/affiliate follow-up: if that follow-up throws and Stripe retries, the retry is no longer a
+    // status transition and would never notify. notifyDispute is fail-open (never throws, 2s bound).
+    if (reconciled?.from_status !== reconciled?.to_status && reconciled?.to_status) {
+      await notifyDispute({
+        stripeDisputeId: dispute.id,
+        amountCents: Number(authoritative.amount ?? dispute.amount ?? 0),
+        currency: authoritative.currency ?? dispute.currency ?? 'usd',
+        status: reconciled.to_status,
+      })
+    }
+
     // Record money from the authoritative object rather than the stale event.
     await recordDisputeBalanceTransactions(service, dispute.id,
       authoritative.balance_transactions ?? [])
@@ -546,6 +614,18 @@ async function handleDispute(
   }
 
   console.log(`[WEBHOOK] dispute ${result?.outcome ?? 'unknown'}`)
+
+  // Owner push right after the authoritative status transition is persisted and BEFORE the money /
+  // affiliate follow-up: a retry after a follow-up failure is no longer a transition and would never
+  // notify. notifyDispute is fail-open (never throws, 2s bound); the follow-up below is unchanged.
+  if (result?.outcome === 'applied' && result?.from_status !== result?.to_status && result?.to_status) {
+    await notifyDispute({
+      stripeDisputeId: dispute.id,
+      amountCents: Number(dispute.amount ?? 0),
+      currency: dispute.currency ?? 'usd',
+      status: result.to_status,
+    })
+  }
 
   // 2. MONEY — authoritative, and equally non-negotiable.
   await recordDisputeBalanceTransactions(service, dispute.id,

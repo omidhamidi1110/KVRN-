@@ -7,6 +7,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
 import { createFinancialIntegrityService, parseFindingFilter } from '@/lib/financial-integrity'
+import { notifyFinancialIntegrityRun } from '@/lib/owner-notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,9 @@ export async function POST(req: NextRequest) {
   try {
     const svc = createFinancialIntegrityService(sql)
     const run = await svc.recordRun(identity!.email, 'manual')
+    // Only newly detected/changed EXCEPTION findings generate a push; routine
+    // reconciled/incomplete/advisory runs stay quiet.
+    if (run?.run_id) await notifyFinancialIntegrityRun(run.run_id)
     return NextResponse.json({ ok: true, run })
   } catch (err: any) {
     console.error('[admin/financials/integrity:run]', err?.message?.slice(0, 120))

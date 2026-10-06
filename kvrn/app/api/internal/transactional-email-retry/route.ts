@@ -7,6 +7,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { getEmailProvider } from '@/lib/resend-adapter'
 import { processPendingTransactionalEmails } from '@/lib/transactional-email'
+import { recordProviderFailure } from '@/lib/owner-notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     provider = getEmailProvider()
   } catch (err: any) {
     console.error('[email-retry] Email provider not configured:', err?.message?.slice(0, 80))
+    await recordProviderFailure('Resend', 'email_retry_provider_config')
     return NextResponse.json(
       { error: 'Email provider not configured.' },
       { status: 500, headers: NO_STORE }
@@ -75,6 +77,7 @@ export async function POST(req: NextRequest) {
     )
   } catch (err: any) {
     console.error('[email-retry] Processing failed:', err?.message?.slice(0, 80))
+    await recordProviderFailure('Neon', 'email_retry_processing')
     return NextResponse.json(
       { error: 'Processing failed.' },
       { status: 500, headers: NO_STORE }

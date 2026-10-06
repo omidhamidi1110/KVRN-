@@ -1,6 +1,7 @@
 // lib/admin-auth.ts — Cloudflare Access JWT verification
 // Server-only. Never import in client code.
 import { type NextRequest } from 'next/server'
+import { notifySecurityAlert } from './owner-notifications'
 
 export type AdminIdentity = { email: string }
 
@@ -97,6 +98,15 @@ export async function requireAdmin(req: NextRequest): Promise<
 > {
   const identity = await verifyAdminRequest(req)
   const deny     = checkAllowlist(identity)
-  if (deny) return { identity: null, error: deny }
+  if (deny) {
+    // Missing/invalid JWTs are normally blocked by Cloudflare Access before they
+    // reach the app and are too noisy to push. A VERIFIED Access identity that
+    // reaches KVRN but is not on the owner allowlist is high-signal.
+    if (identity && deny.status === 403) {
+      // Fail-open belt and braces: nothing here may change the 403 the caller receives.
+      await notifySecurityAlert('An authenticated Cloudflare Access identity was blocked by the KVRN admin allowlist.').catch(() => {})
+    }
+    return { identity: null, error: deny }
+  }
   return { identity: identity!, error: null }
 }

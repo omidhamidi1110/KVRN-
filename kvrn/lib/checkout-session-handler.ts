@@ -22,6 +22,7 @@ import { applyFreeShippingToSingleRate } from './free-shipping'
 import { validateDiscount, applyDiscountPriority, normalizeDiscountCode, claimDiscount, releaseDiscountClaim, getOrCreateStripeCouponForTerms } from './discounts'
 import { qualifiesForFreeShipping } from './free-shipping'
 import { getProductShippingData } from './inventory'
+import { isProviderException, isStripeProviderFault, recordProviderFailure } from './owner-notifications'
 import type {
   ReservationService,
   LineItemInput,
@@ -137,6 +138,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     let stripe: any
     try { stripe = deps.getStripe() } catch (err: any) {
       console.error('Stripe config error:', err.message)
+      await recordProviderFailure('Stripe', 'checkout_config')
       return NextResponse.json({ error: 'Payment configuration error.' }, { status: 500 })
     }
 
@@ -262,6 +264,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       // Guard 1: Shippo token must be present
       if (!apiToken) {
         console.error('[checkout/session] SHIPPO_API_TOKEN missing — fail closed')
+        await recordProviderFailure('Shippo', 'checkout_missing_token')
         return SHIPPING_UNAVAILABLE_503
       }
 
@@ -275,6 +278,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         )
       } catch (shippoErr: any) {
         console.error('[checkout/session] Shippo threw (fail closed):', shippoErr?.message?.slice(0, 80))
+        if (isProviderException(shippoErr)) await recordProviderFailure('Shippo', 'checkout_rate_exception')
         return SHIPPING_UNAVAILABLE_503
       }
 
@@ -304,6 +308,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     } else {
       // Non-US: Shippo REQUIRED — no static fallback, no US price permitted
       if (!apiToken) {
+        await recordProviderFailure('Shippo', 'checkout_missing_token')
         return NextResponse.json(
           { error: 'Shipping is currently unavailable to this destination.' },
           { status: 503 }
@@ -319,6 +324,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         )
       } catch (shippoErr: any) {
         console.error('[checkout/session] Shippo error (international):', shippoErr?.message?.slice(0, 80))
+        if (isProviderException(shippoErr)) await recordProviderFailure('Shippo', 'checkout_rate_exception')
       }
 
       if (!shippoRatesResult) {
@@ -356,6 +362,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     // ── Step 1: Reserve inventory ─────────────────────────────────────────────
     const reservation = await deps.reserveInventory(items)
     if (!reservation.ok) {
+      if (reservation.code === 'DB_ERROR') await recordProviderFailure('Neon', 'reserve_inventory')
       return NextResponse.json(
         { error: reservation.message, code: reservation.code, sku: reservation.sku },
         { status: reservation.code === 'DB_ERROR' ? 503 : 400 }
@@ -611,6 +618,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       } catch (relErr: any) {
         console.error('CRITICAL: stranded reservation after snapshot failure:', relErr.message)
       }
+      await recordProviderFailure('Neon', 'checkout_snapshot_write')
       return NextResponse.json(
         { error: 'Checkout could not be initialised. Please try again.' },
         { status: 409 }
@@ -712,6 +720,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       } catch (relErr: any) {
         console.error(`CRITICAL: stranded reservation ${reservation.reservationId}:`, relErr.message)
       }
+      if (isStripeProviderFault(err)) await recordProviderFailure('Stripe', 'checkout_session_create')
       return NextResponse.json({ error: 'Unable to create checkout session. Please try again.' }, { status: 500 })
     }
 
@@ -728,6 +737,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       } catch (e: any) {
         console.error('CRITICAL: Could not expire/release after null url:', e.message)
       }
+      await recordProviderFailure('Stripe', 'checkout_invalid_session_url')
       return NextResponse.json({ error: 'Checkout unavailable. Please try again.' }, { status: 500 })
     }
 
@@ -763,6 +773,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           console.error('CRITICAL: Release failed after attach failure:', relErr.message)
         }
       }
+      await recordProviderFailure('Neon', 'checkout_attach_session')
       return NextResponse.json(
         { error: 'Checkout session could not be confirmed. Please try again.' },
         { status: 500 }

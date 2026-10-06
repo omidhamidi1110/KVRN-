@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { applyFreeShippingToRates } from '@/lib/free-shipping'
 import { getShippoRates } from '@/lib/shippo'
 import { getProductShippingData, getSubtotalCentsForItems } from '@/lib/inventory'
+import { isProviderException, recordProviderFailure } from '@/lib/owner-notifications'
 
 // ─── POST /api/shipping-rates ──────────────────────────────────────────────────
 // Returns available shipping options and costs.
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
         }
       } catch (shippoErr: any) {
         console.error('[shipping-rates] Shippo unavailable:', shippoErr?.message?.slice(0, 80))
+        if (isProviderException(shippoErr)) await recordProviderFailure('Shippo', 'shipping_rates_exception')
         // Fail closed: no static fallback. Customer sees unavailable state.
         return NextResponse.json({ success: true, data: { rates: [], unavailable: true } })
       }
@@ -104,6 +106,7 @@ export async function POST(req: NextRequest) {
 
     if (hasAddress && hasItems && !apiToken) {
       // Complete address + no Shippo token = provider unavailable (not address missing)
+      await recordProviderFailure('Shippo', 'shipping_rates_missing_token')
       return NextResponse.json({ success: true, data: { rates: [], unavailable: true } })
     }
 

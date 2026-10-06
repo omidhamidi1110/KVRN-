@@ -1,7 +1,7 @@
 'use client'
 
 import { PageHero } from '@/components/layout/PageHero'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { isValidEmail } from '@/lib/utils'
 
@@ -16,7 +16,13 @@ export default function ContactPage() {
     firstName: '', lastName: '', email: '', orderNumber: '', subject: '', message: '',
   })
 
+  // One id per page view: a double click or a retry after a network error cannot create two threads.
+  const submissionId = useRef<string>(
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : '')
+
   const set = (k: keyof typeof fields, v: string) => {
+    // Editing after a failed attempt is a NEW submission (the old id may already be stored server-side).
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) submissionId.current = crypto.randomUUID()
     setFields(p => ({ ...p, [k]: v }))
     setErrors(p => ({ ...p, [k]: '' }))
   }
@@ -40,7 +46,7 @@ export default function ContactPage() {
     try {
       const res = await fetch('/api/contact', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fields),
+        body: JSON.stringify({ ...fields, ...(submissionId.current ? { submissionId: submissionId.current } : {}) }),
       })
       if (!res.ok) throw new Error()
       setState('success')

@@ -12,6 +12,7 @@ import {
 } from './email'
 import type { EmailProvider }    from './resend-adapter'
 import { getSiteOrigin }         from './site-origin'
+import { isResendProviderFault, recordProviderFailure } from './owner-notifications'
 
 // FROM_ADDRESS: TRANSACTIONAL_EMAIL_FROM overrides; otherwise built from RESEND_FROM_NAME / RESEND_FROM_EMAIL
 function buildFromAddress(): string {
@@ -243,6 +244,7 @@ export async function processOneEmail(opts: ProcessEmailOpts): Promise<
     WHERE id=${row.id}
   `
   console.error(`[transactional-email] retry failed ${row.email_type} attempt=${newAttemptCount}`)
+  if (isResendProviderFault(result.message)) await recordProviderFailure('Resend', 'transactional_email_send')
   return { outcome: 'failed', error: safeError(result.message) }
 }
 

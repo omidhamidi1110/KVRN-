@@ -130,9 +130,11 @@ describe('A. validators', () => {
 describe('B. migration 025 source', () => {
   const m = read('db/migrations/025_preshipment_refund_cancellation.sql')
 
-  test('exists as 025 and is the newest migration', () => {
+  test('exists as 025 and anything after it is a later-numbered migration', () => {
     const all = fs.readdirSync(path.join(ROOT, 'db/migrations')).filter(f => /^\d+_/.test(f)).sort()
-    expect(all[all.length - 1]).toBe('025_preshipment_refund_cancellation.sql')
+    const i = all.indexOf('025_preshipment_refund_cancellation.sql')
+    expect(i).toBeGreaterThan(0)
+    expect(all.slice(i + 1).every(f => Number(f.slice(0, 3)) > 25)).toBe(true)
   })
   test('never rewrites history: no UPDATE/DELETE of order_items, consumptions, shipments or returns', () => {
     const code = m.replace(/--.*$/gm, '')

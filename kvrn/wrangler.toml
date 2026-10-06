@@ -14,6 +14,14 @@ keep_vars = true
 #   npx wrangler secret put EMAIL_FROM
 #   npx wrangler secret put CRON_SECRET            # required for /api/internal/transactional-email-retry
 #   npx wrangler secret put SUPPORT_EMAIL
+#   npx wrangler secret put SUPPORT_EMAIL_INGEST_SECRET  # required for support@kvrn.shop → Admin Support
+#                                                        # (random, >= 32 chars; authenticates the Email Worker's
+#                                                        #  internal POST to /api/internal/support-email-ingest)
+#   npx wrangler secret put SUPPORT_FORWARD_TO           # owner mailbox that receives a copy of support@kvrn.shop
+#                                                        # mail; MUST be a verified Cloudflare Email Routing
+#                                                        # destination. Runtime config only, never committed.
+# Cloudflare Email Routing (dashboard, after deploy): route support@kvrn.shop → Worker "kvrn".
+# See docs/SUPPORT-INBOX-RUNBOOK.md.
 #   npx wrangler secret put ORDERS_EMAIL
 #   npx wrangler secret put RETURNS_EMAIL
 

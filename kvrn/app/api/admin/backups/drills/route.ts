@@ -5,6 +5,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
 import { createBackupService, parseJsonBody, validateDrillInput } from '@/lib/backup-records'
+import { notifyBackupFailure } from '@/lib/owner-notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { id } = await createBackupService(sql as any).recordDrill(v.value, identity!.email)
+    if (v.value.result === 'failed') await notifyBackupFailure('dr_drill')
     return NextResponse.json({ id, recorded: true }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
   } catch (err: any) {
     console.error('[admin/backups/drills POST]', String(err?.message ?? err).slice(0, 120))

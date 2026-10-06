@@ -26,14 +26,37 @@
  * enforced by the route handler, so there is no reduction in security.
  *
  * CRON_SECRET must be set as a Cloudflare Worker secret (never in this file).
+ *
+ * EMAIL WORKER (support@kvrn.shop):
+ * This wrapper also exports an `email` handler. Cloudflare Email Routing delivers mail for
+ * support@kvrn.shop to it (the routing rule itself is configured in the Cloudflare dashboard;
+ * see docs/SUPPORT-INBOX-RUNBOOK.md). The handler logic lives in lib/support-email-handler.ts so
+ * it can be unit-tested; this file only wires it to postal-mime and to the in-process OpenNext
+ * worker (no self-fetch, same pattern as the cron handler above).
+ * Runtime configuration (never in this file): SUPPORT_FORWARD_TO, SUPPORT_EMAIL_INGEST_SECRET.
  */
 
 // @ts-expect-error: .open-next/worker.js is generated at build time
 import openNextWorker from './.open-next/worker.js'
+import PostalMime from 'postal-mime'
+import { handleSupportEmail } from './lib/support-email-handler'
 
 export default {
   // Delegate all fetch requests to the OpenNext worker unchanged
   fetch: openNextWorker.fetch,
+
+  /**
+   * Cloudflare Email Routing handler — support@kvrn.shop.
+   * Forwards the full original message to SUPPORT_FORWARD_TO and stores a database copy for
+   * Admin → Support through the internal ingest route. Never logs addresses, subjects or bodies.
+   */
+  async email(message, env, ctx) {
+    await handleSupportEmail(message, env, {
+      parseMime: (raw) => PostalMime.parse(raw),
+      ingest: (req) => openNextWorker.fetch(req, env, ctx),
+      log: { info: (m) => console.log(m), error: (m) => console.error(m) },
+    })
+  },
 
   /**
    * Cloudflare Cron Trigger handler — fires every 5 minutes.
