@@ -16,7 +16,7 @@ function gatewayHeaders(): Record<string, string> {
   }
 }
 
-function useStoredGatewayKeys(): boolean {
+function storedGatewayKeysEnabled(): boolean {
   return process.env.AI_GATEWAY_USE_STORED_KEYS === 'true'
 }
 
@@ -137,7 +137,7 @@ export function estimateWorstCaseCostMicros(config: ModelConfig, task: AiTask): 
 async function invokeAnthropic(config: ModelConfig, task: AiTask, fetchImpl: typeof fetch): Promise<AiModelResult> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
   assertGatewayAuthenticationConfigured()
-  if (!useStoredGatewayKeys() && !key) throw new Error('ANTHROPIC_API_KEY_NOT_CONFIGURED')
+  if (!storedGatewayKeysEnabled() && !key) throw new Error('ANTHROPIC_API_KEY_NOT_CONFIGURED')
   const t0 = Date.now()
   const t = timeoutSignal(Number(process.env.AI_PROVIDER_TIMEOUT_MS || 30_000))
   try {
@@ -147,7 +147,7 @@ async function invokeAnthropic(config: ModelConfig, task: AiTask, fetchImpl: typ
         'content-type': 'application/json',
         'anthropic-version': '2023-06-01',
         ...gatewayHeaders(),
-        ...(useStoredGatewayKeys() ? {} : { 'x-api-key': key! }),
+        ...(storedGatewayKeysEnabled() ? {} : { 'x-api-key': key! }),
       },
       body: JSON.stringify({
         model: config.model,
@@ -189,7 +189,7 @@ async function invokeAnthropic(config: ModelConfig, task: AiTask, fetchImpl: typ
 async function invokeOpenAi(config: ModelConfig, task: AiTask, fetchImpl: typeof fetch): Promise<AiModelResult> {
   const key = process.env.OPENAI_API_KEY?.trim()
   assertGatewayAuthenticationConfigured()
-  if (!useStoredGatewayKeys() && !key) throw new Error('OPENAI_API_KEY_NOT_CONFIGURED')
+  if (!storedGatewayKeysEnabled() && !key) throw new Error('OPENAI_API_KEY_NOT_CONFIGURED')
   const t0 = Date.now()
   const t = timeoutSignal(Number(process.env.AI_PROVIDER_TIMEOUT_MS || 30_000))
   try {
@@ -198,7 +198,7 @@ async function invokeOpenAi(config: ModelConfig, task: AiTask, fetchImpl: typeof
       headers: {
         'content-type': 'application/json',
         ...gatewayHeaders(),
-        ...(useStoredGatewayKeys() ? {} : { authorization: `Bearer ${key}` }),
+        ...(storedGatewayKeysEnabled() ? {} : { authorization: `Bearer ${key}` }),
       },
       body: JSON.stringify({
         model: config.model,
@@ -250,7 +250,7 @@ function interactionText(payload: any): string {
 async function invokeGoogle(config: ModelConfig, task: AiTask, fetchImpl: typeof fetch): Promise<AiModelResult> {
   const key = process.env.GOOGLE_AI_API_KEY?.trim()
   assertGatewayAuthenticationConfigured()
-  if (!useStoredGatewayKeys() && !key) throw new Error('GOOGLE_AI_API_KEY_NOT_CONFIGURED')
+  if (!storedGatewayKeysEnabled() && !key) throw new Error('GOOGLE_AI_API_KEY_NOT_CONFIGURED')
   const media = validateVideoMedia(task)
   const t0 = Date.now()
   const t = timeoutSignal(Number(process.env.AI_PROVIDER_TIMEOUT_MS || 30_000))
@@ -260,7 +260,7 @@ async function invokeGoogle(config: ModelConfig, task: AiTask, fetchImpl: typeof
     const headers = {
       'content-type': 'application/json',
       ...gatewayHeaders(),
-      ...(useStoredGatewayKeys() ? {} : { 'x-goog-api-key': key! }),
+      ...(storedGatewayKeysEnabled() ? {} : { 'x-goog-api-key': key! }),
     }
 
     if (media.length) {

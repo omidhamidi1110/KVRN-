@@ -97,6 +97,7 @@ export function initGa(measurementId: unknown): boolean {
     win.dataLayer = win.dataLayer || []
     if (typeof win.gtag !== 'function') {
       // gtag.js requires the `arguments` object itself to be pushed (not an array).
+      // eslint-disable-next-line prefer-rest-params -- Preserve gtag arguments object.
       win.gtag = function gtag() { win.dataLayer.push(arguments) }
     }
     win['ga-disable-' + id] = false

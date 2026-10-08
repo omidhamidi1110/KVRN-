@@ -280,7 +280,7 @@ export function SmsPopup() {
             CONFIRMED
           </p>
           <h1 style={{ fontFamily:SERIF, fontSize:'clamp(28px,7vw,36px)', fontWeight:300, color:FG, margin:'0 0 6px', lineHeight:1.05 }}>
-            You're in.
+            You&apos;re in.
           </h1>
           <p style={{ fontFamily:SANS, fontSize:13, color:MUTED, margin:'0 0 24px', lineHeight:1.5 }}>
             {hasOffer ? '$10 off your first order. Apply at checkout.' : 'Welcome to KVRN private access.'}

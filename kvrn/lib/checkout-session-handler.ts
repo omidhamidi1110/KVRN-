@@ -472,7 +472,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     // Discount priority: automatic free shipping may coexist with one merchandise promo.
     // Manual shipping promo codes remain redundant when automatic free shipping applies.
     let appliedDiscount: import('./discounts').AppliedDiscount | null = null
-    let discountBlockedReason: string | null = null
+    const discountBlockedReason: string | null = null
 
     // ── Discount rejections must not strand the inventory reservation ────────
     //

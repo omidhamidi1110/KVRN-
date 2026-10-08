@@ -371,7 +371,7 @@ export function allocateAcrossBuckets(
 
   const exact = weights.map(w => (totalCents * w) / weightSum)
   const floors = exact.map(Math.floor)
-  let leftover = totalCents - floors.reduce((s, v) => s + v, 0)
+  const leftover = totalCents - floors.reduce((s, v) => s + v, 0)
 
   const order = exact
     .map((e, i) => ({ i, rem: e - Math.floor(e), w: weights[i] }))

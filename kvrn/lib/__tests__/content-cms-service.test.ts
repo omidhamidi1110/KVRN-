@@ -190,7 +190,7 @@ d('content service (real PG)', () => {
 
     test('editing a shared guide invalidates every linked product page', async () => {
       const g = await svc.create('size-guides', guide('Shared'), A)
-      let rev = (await svc.publish('size-guides', g.data.id, g.data.revision, A)).data.revision
+      const rev = (await svc.publish('size-guides', g.data.id, g.data.revision, A)).data.revision
       await svc.assignSizeGuide(p1, g.data.id, A); await svc.assignSizeGuide(p2, g.data.id, A)
       const cur = await svc.get('size-guides', g.data.id)
       const s = await svc.saveDraft('size-guides', g.data.id, { ...cur.snapshot, notes: ['new note'] }, rev, A)

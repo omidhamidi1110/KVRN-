@@ -472,8 +472,8 @@ export function allocateDiscountToLines(
     return { line: l, floor, remainder: exact - floor }
   })
 
-  let assigned = withShares.reduce((s, w) => s + w.floor, 0)
-  let leftover = distributable - assigned
+  const assigned = withShares.reduce((s, w) => s + w.floor, 0)
+  const leftover = distributable - assigned
 
   const byRemainder = [...withShares].sort((a, b) => {
     if (b.remainder !== a.remainder)               return b.remainder - a.remainder
