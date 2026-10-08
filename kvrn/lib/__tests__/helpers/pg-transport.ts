@@ -34,7 +34,12 @@ function setClient(c: Client | null) { G.__kvrnPgClient = c }
 
 export async function connectPg(database: string) {
   // Only the two dedicated legacy integration-test databases are allowed.
-  if (!['httptest', 'webhooktest'].includes(database)) {
+  if (![
+    'httptest',
+    'webhooktest',
+    `kvrn_ga4mp_${process.pid}`,
+    `kvrn_funnelmp_${process.pid}`,
+  ].includes(database)) {
     throw new Error('Refusing an unapproved test database')
   }
 

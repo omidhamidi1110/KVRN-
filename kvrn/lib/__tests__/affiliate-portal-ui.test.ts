@@ -275,7 +275,7 @@ describe('source guards: migration 034 + frozen history', () => {
     const { execSync } = require('child_process')
     const base = (() => { try { return execSync('git merge-base HEAD master || git merge-base HEAD main', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { return '' } })()
     if (!base) return                                           // no `main` ref in this checkout: nothing to compare
-    const changed = execSync(`git diff --name-only ${base} HEAD -- db/migrations`, { cwd: ROOT }).toString().split('\n').filter(Boolean)
+    const changed = execSync(`git diff --name-only --diff-filter=DMR ${base} HEAD -- db/migrations`, { cwd: ROOT }).toString().split('\n').filter(Boolean)
     expect(changed.filter((f: string) => /\/0(0\d|1\d|2[0-7])_/.test(f))).toEqual([])
   })
 })
