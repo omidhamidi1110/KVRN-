@@ -33,7 +33,58 @@ function getClient(): Client | null { return G.__kvrnPgClient }
 function setClient(c: Client | null) { G.__kvrnPgClient = c }
 
 export async function connectPg(database: string) {
-  const c = new Client({ host: '/tmp', port: 5433, user: 'postgres', database })
+  // Only the two dedicated legacy integration-test databases are allowed.
+  if (!['httptest', 'webhooktest'].includes(database)) {
+    throw new Error('Refusing an unapproved test database')
+  }
+
+  const rawUrl = process.env.TEST_DATABASE_URL
+
+  if (!rawUrl || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL) {
+    throw new Error('Tests require an isolated TEST_DATABASE_URL')
+  }
+
+  const parsed = new URL(rawUrl)
+
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+    throw new Error('Invalid PostgreSQL test URL')
+  }
+
+  const localHosts = ['localhost', '127.0.0.1', '[::1]', '::1']
+
+  if (!localHosts.includes(parsed.hostname.toLowerCase())) {
+    throw new Error('Refusing a non-local PostgreSQL server')
+  }
+
+  if (decodeURIComponent(parsed.pathname) !== '/reservationtest') {
+    throw new Error('Unexpected test database configuration')
+  }
+
+  const socketHost = parsed.searchParams.get('host')
+
+  if (socketHost && socketHost !== '/tmp') {
+    throw new Error('Unapproved PostgreSQL socket')
+  }
+
+  const port = Number(
+    parsed.port || parsed.searchParams.get('port') || 5432
+  )
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Invalid test PostgreSQL port')
+  }
+
+  const c = new Client({
+    host: socketHost || parsed.hostname,
+    port,
+    user: decodeURIComponent(parsed.username) || 'postgres',
+    password: parsed.password
+      ? decodeURIComponent(parsed.password)
+      : undefined,
+    database,
+    ssl: false,
+  })
+
   await c.connect()
   setClient(c)
   return c
