@@ -136,3 +136,7 @@ AI_GATEWAY_USE_STORED_KEYS = "true"
 AI_GOOGLE_API_VERSION           = "v1beta"
 AI_BUSINESS_TIMEZONE = "America/Los_Angeles"
 AI_DAILY_BRIEF_HOUR_LOCAL = "19"
+
+[[r2_buckets]]
+binding = "KVRN_MEDIA"
+bucket_name = "kvrn-media"
