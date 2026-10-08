@@ -9,6 +9,10 @@
 // Attachments are metadata only; the original file is in the forwarded mailbox.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  AdminPage, AdminPageHeader, AdminButton, AdminTabs, AdminNotice, AdminTag, AdminLoading, StatusBadge,
+  adminInputClass, adminTextareaClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Filter = 'open' | 'unread' | 'closed' | 'all'
 
@@ -204,149 +208,131 @@ export function SupportInboxClient() {
     if (sendErr && sendErr.code !== 'sent_not_recorded') requestId.current = newRequestId()
   }
 
-  const tabs: { key: Filter; label: string; n: number | null }[] = [
-    { key: 'open', label: 'Open', n: counts.open },
-    { key: 'unread', label: 'Unread', n: counts.unread },
-    { key: 'closed', label: 'Closed', n: counts.closed },
-    { key: 'all', label: 'All', n: counts.open + counts.closed },
+  const tabs: Array<{ id: Filter; label: string; count: number }> = [
+    { id: 'open', label: 'Open', count: counts.open },
+    { id: 'unread', label: 'Unread', count: counts.unread },
+    { id: 'closed', label: 'Closed', count: counts.closed },
+    { id: 'all', label: 'All', count: counts.open + counts.closed },
   ]
 
   const showThreadOnMobile = selectedId !== null
 
   return (
-    <div className="px-4 py-6 sm:px-8 max-w-[1280px]">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-[20px] font-medium">Support</h1>
-          <p className="text-[12px] text-[#6B6B6B] mt-1">
-            Mailbox <span className="font-medium text-[#171717]">{MAILBOX}</span> · replies are sent from this address ·
-            storefront contact-form messages appear here too
-          </p>
-        </div>
-        <button onClick={() => loadList()} className="text-[11px] tracking-[0.08em] uppercase border border-[#1A1A1A] px-3 py-2 bg-white">
-          Refresh
-        </button>
-      </div>
+    <AdminPage width="wide">
+      <AdminPageHeader
+        title="Support"
+        description="Customer conversations."
+        info={<>
+          Mailbox <strong>{MAILBOX}</strong>. Replies are sent from this address, and storefront
+          contact-form messages appear here too. Attachments are listed only; the original file is in the
+          forwarded mailbox.
+        </>}
+        actions={<AdminButton size="sm" onClick={() => loadList()}>Refresh</AdminButton>}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
         {/* ── list ─────────────────────────────────────────── */}
-        <section className={`${showThreadOnMobile ? 'hidden lg:block' : 'block'} border border-[#E8E5E0] bg-white`} aria-label="Conversations">
-          <div className="p-3 border-b border-[#E8E5E0] space-y-3">
-            <div className="flex gap-1 flex-wrap" role="tablist">
-              {tabs.map(t => (
-                <button key={t.key} role="tab" aria-selected={filter === t.key} onClick={() => setFilter(t.key)}
-                  className={`text-[11px] px-3 py-1.5 border ${filter === t.key ? 'bg-[#111] text-white border-[#111]' : 'bg-white border-[#E8E5E0] text-[#444]'}`}>
-                  {t.label}{t.n !== null && <span className="ml-1.5 opacity-60">{t.n}</span>}
-                </button>
-              ))}
-            </div>
+        <section className={`${showThreadOnMobile ? 'hidden lg:block' : 'block'} min-w-0 rounded-[14px] border border-black/[0.08] bg-white`} aria-label="Conversations">
+          <div className="border-b border-black/[0.08] px-3 pt-2 pb-3">
+            <AdminTabs ariaLabel="Conversation filters" tabs={tabs} value={filter} onChange={setFilter} />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search email, name, subject, order #"
-              aria-label="Search conversations" maxLength={100}
-              className="w-full border border-[#E8E5E0] px-3 py-2 text-[12px] focus:outline-none focus:border-[#111]" />
+              aria-label="Search conversations" maxLength={100} className={adminInputClass} />
           </div>
 
-          {listErr && <p role="alert" className="p-3 text-[12px] text-[#B91C1C]">{listErr}</p>}
-          {loadingList && threads.length === 0 && <p className="p-4 text-[12px] text-[#6B6B6B]">Loading…</p>}
+          {listErr && <AdminNotice tone="danger" className="m-3">{listErr}</AdminNotice>}
+          {loadingList && threads.length === 0 && <div className="px-4"><AdminLoading /></div>}
           {!loadingList && !listErr && threads.length === 0 && (
-            <p className="p-4 text-[12px] text-[#6B6B6B]">
+            <p className="p-4 text-[12px] text-[#6B6B66]">
               {q ? 'No conversations match your search.' : filter === 'unread' ? 'Nothing unread.' : 'No conversations here yet.'}
             </p>
           )}
 
-          <ul className="max-h-[70vh] overflow-y-auto divide-y divide-[#F1EEE8]">
+          <ul className="max-h-[70vh] divide-y divide-black/[0.06] overflow-y-auto">
             {threads.map(t => (
               <li key={t.id}>
                 <button onClick={() => select(t.id)} aria-current={t.id === selectedId}
-                  className={`w-full text-left px-4 py-3 ${t.id === selectedId ? 'bg-[#F5F5F3]' : 'hover:bg-[#FAFAF8]'}`}>
+                  className={`w-full px-4 py-3 text-left focus:outline-none focus-visible:bg-black/[0.04] ${t.id === selectedId ? 'bg-[#F5F5F3]' : 'hover:bg-[#FAFAF8]'}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <p className={`text-[13px] truncate ${t.unreadCount > 0 ? 'font-semibold' : 'font-medium'}`}>
+                    <p className={`truncate text-[13px] ${t.unreadCount > 0 ? 'font-semibold' : 'font-medium'}`}>
                       {t.customerName || t.customerEmail}
                     </p>
-                    <span className="text-[10px] text-[#9B9B9B] whitespace-nowrap">{when(t.lastMessageAt)}</span>
+                    <span className="whitespace-nowrap text-[11px] text-[#8A8A85]">{when(t.lastMessageAt)}</span>
                   </div>
-                  {t.customerName && <p className="text-[11px] text-[#6B6B6B] truncate">{t.customerEmail}</p>}
-                  <p className={`text-[12px] truncate mt-0.5 ${t.unreadCount > 0 ? 'font-semibold' : ''}`}>
+                  {t.customerName && <p className="truncate text-[11px] text-[#6B6B66]">{t.customerEmail}</p>}
+                  <p className={`mt-0.5 truncate text-[12px] ${t.unreadCount > 0 ? 'font-semibold' : ''}`}>
                     {t.subject || '(no subject)'}
                   </p>
-                  <p className="text-[11px] text-[#6B6B6B] truncate mt-0.5">
+                  <p className="mt-0.5 truncate text-[11px] text-[#6B6B66]">
                     {t.lastMessageDirection === 'outbound' ? 'You: ' : ''}{t.preview || (t.attachmentCount ? 'Attachment only' : '')}
                   </p>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    {t.unreadCount > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-[#111] text-white" aria-label={`${t.unreadCount} unread`}>
-                        {t.unreadCount} new
-                      </span>
-                    )}
-                    {t.status === 'closed' && <span className="text-[10px] px-1.5 py-0.5 border border-[#D1D5DB] text-[#4B5563]">Closed</span>}
-                    {t.source === 'contact_form' && <span className="text-[10px] px-1.5 py-0.5 border border-[#BFDBFE] text-[#1E40AF] bg-[#EFF6FF]">Contact form</span>}
-                    {t.orderNumber && <span className="text-[10px] text-[#6B6B6B]">Order {t.orderNumber}</span>}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {t.unreadCount > 0 && <AdminTag tone="dark" label={`${t.unreadCount} unread`}>{t.unreadCount} new</AdminTag>}
+                    {t.status === 'closed' && <AdminTag>Closed</AdminTag>}
+                    {t.source === 'contact_form' && <AdminTag tone="info">Contact form</AdminTag>}
+                    {t.orderNumber && <span className="text-[11px] text-[#6B6B66]">Order {t.orderNumber}</span>}
                   </div>
                 </button>
               </li>
             ))}
           </ul>
           {nextCursor && (
-            <div className="p-3 border-t border-[#E8E5E0]">
-              <button onClick={() => loadList({ append: true, cursor: nextCursor })}
-                className="w-full text-[11px] tracking-[0.08em] uppercase border border-[#1A1A1A] px-3 py-2 bg-white">
-                Load more
-              </button>
+            <div className="border-t border-black/[0.08] p-3">
+              <AdminButton className="w-full" onClick={() => loadList({ append: true, cursor: nextCursor })}>Load more</AdminButton>
             </div>
           )}
         </section>
 
         {/* ── conversation ─────────────────────────────────── */}
-        <section className={`${showThreadOnMobile ? 'block' : 'hidden lg:block'} border border-[#E8E5E0] bg-white min-h-[320px]`} aria-label="Conversation">
-          {!selectedId && <p className="p-6 text-[13px] text-[#6B6B6B]">Select a conversation to read and reply.</p>}
-          {selectedId && loadingThread && !thread && <p className="p-6 text-[12px] text-[#6B6B6B]">Loading…</p>}
-          {selectedId && threadErr && <p role="alert" className="p-4 text-[12px] text-[#B91C1C]">{threadErr}</p>}
+        <section className={`${showThreadOnMobile ? 'block' : 'hidden lg:block'} min-h-[320px] min-w-0 rounded-[14px] border border-black/[0.08] bg-white`} aria-label="Conversation">
+          {!selectedId && <p className="p-6 text-[13px] text-[#6B6B66]">Select a conversation to read and reply.</p>}
+          {selectedId && loadingThread && !thread && <div className="px-6"><AdminLoading /></div>}
+          {selectedId && threadErr && <AdminNotice tone="danger" className="m-4">{threadErr}</AdminNotice>}
 
           {selectedId && thread && thread.id === selectedId && (
             <div className="flex flex-col">
-              <header className="p-4 border-b border-[#E8E5E0]">
+              <header className="border-b border-black/[0.08] p-4">
                 <button onClick={() => { setSelectedId(null); setThread(null) }}
-                  className="lg:hidden text-[11px] text-[#6B6B6B] mb-2 underline">← All conversations</button>
+                  className="mb-2 min-h-[28px] text-[12px] text-[#6B6B66] underline lg:hidden">← All conversations</button>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="text-[15px] font-medium break-words">{thread.subject || '(no subject)'}</h2>
-                    <p className="text-[12px] text-[#6B6B6B] mt-1 break-all">
+                    <h2 className="break-words text-[15px] font-medium">{thread.subject || '(no subject)'}</h2>
+                    <p className="mt-1 break-all text-[12px] text-[#6B6B66]">
                       {thread.customerName ? `${thread.customerName} · ` : ''}{thread.customerEmail}
                       {thread.orderNumber ? ` · Order ${thread.orderNumber}` : ''}
                     </p>
-                    <p className="text-[11px] text-[#9B9B9B] mt-1">
-                      {thread.source === 'contact_form' ? 'Started from the storefront contact form' : `Started by email to ${MAILBOX}`}
-                      {' · '}{thread.status === 'closed' ? 'Closed' : 'Open'}
+                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#8A8A85]">
+                      <span>{thread.source === 'contact_form' ? 'Started from the storefront contact form' : `Started by email to ${MAILBOX}`}</span>
+                      <StatusBadge status={thread.status === 'closed' ? 'Resolved' : 'Open'} label={thread.status === 'closed' ? 'Closed' : 'Open'} />
                     </p>
                   </div>
-                  <button disabled={statusBusy} onClick={() => setStatus(thread.status === 'open' ? 'closed' : 'open')}
-                    className="text-[11px] tracking-[0.08em] uppercase border border-[#1A1A1A] px-3 py-2 bg-white disabled:opacity-60">
+                  <AdminButton disabled={statusBusy} onClick={() => setStatus(thread.status === 'open' ? 'closed' : 'open')}>
                     {statusBusy ? '…' : thread.status === 'open' ? 'Mark closed' : 'Reopen'}
-                  </button>
+                  </AdminButton>
                 </div>
               </header>
 
-              <div className="p-4 space-y-3 max-h-[55vh] overflow-y-auto bg-[#FAFAF8]">
+              <div className="max-h-[55vh] space-y-3 overflow-y-auto bg-[#FAFAF8] p-4">
                 {thread.messages.map(m => (
                   <article key={m.id} data-direction={m.direction}
-                    className={`max-w-[92%] sm:max-w-[80%] p-3 border ${m.direction === 'outbound'
-                      ? 'ml-auto bg-[#111] text-white border-[#111]' : 'mr-auto bg-white border-[#E8E5E0]'}`}>
-                    <p className={`text-[10px] tracking-[0.06em] uppercase mb-1.5 ${m.direction === 'outbound' ? 'text-white/60' : 'text-[#9B9B9B]'}`}>
+                    className={`max-w-[92%] rounded-[12px] border p-3 sm:max-w-[80%] ${m.direction === 'outbound'
+                      ? 'ml-auto border-[#171717] bg-[#171717] text-white' : 'mr-auto border-black/[0.08] bg-white'}`}>
+                    <p className={`mb-1.5 text-[11px] ${m.direction === 'outbound' ? 'text-white/70' : 'text-[#6B6B66]'}`}>
                       {m.direction === 'outbound'
                         ? `Sent from ${MAILBOX}${m.actorEmail ? ` by ${m.actorEmail}` : ''}`
                         : `${m.fromName ? `${m.fromName} · ` : ''}${m.fromEmail}${m.channel === 'contact_form' ? ' · contact form' : ''}`}
                       {' · '}{full(m.occurredAt)}
                     </p>
                     {/* Plain text only: React escapes this string. */}
-                    <p className="text-[13px] whitespace-pre-wrap break-words">{m.bodyText || (m.attachments.length ? '' : '(empty message)')}</p>
+                    <p className="whitespace-pre-wrap break-words text-[13px]">{m.bodyText || (m.attachments.length ? '' : '(empty message)')}</p>
                     {m.importNote && (
-                      <p className={`text-[11px] mt-2 ${m.direction === 'outbound' ? 'text-white/70' : 'text-[#92400E]'}`}>⚠ {m.importNote}</p>
+                      <p className={`mt-2 text-[11px] ${m.direction === 'outbound' ? 'text-white/80' : 'text-[#92400E]'}`}>⚠ {m.importNote}</p>
                     )}
                     {m.attachments.length > 0 && (
-                      <div className="mt-2 border-t border-[#E8E5E0] pt-2">
+                      <div className="mt-2 border-t border-black/[0.08] pt-2">
                         <p className="text-[11px] font-medium">
                           {m.attachments.length} attachment{m.attachments.length === 1 ? '' : 's'} — the original file{m.attachments.length === 1 ? ' is' : 's are'} in the forwarded mailbox
                         </p>
-                        <ul className="mt-1 text-[11px] text-[#6B6B6B] space-y-0.5">
+                        <ul className="mt-1 space-y-0.5 text-[11px] opacity-80">
                           {m.attachments.map((a, i) => (
                             <li key={i} className="break-all">
                               {a.filename || '(unnamed)'} · {a.mimeType} · {bytes(a.size)}{a.disposition === 'inline' ? ' · inline' : ''}
@@ -360,29 +346,28 @@ export function SupportInboxClient() {
                 <div ref={bottomRef} />
               </div>
 
-              <form onSubmit={e => { e.preventDefault(); send() }} className="p-4 border-t border-[#E8E5E0]">
-                <label htmlFor="support-reply" className="block text-[11px] font-medium mb-1.5">
+              <form onSubmit={e => { e.preventDefault(); send() }} className="border-t border-black/[0.08] p-4">
+                <label htmlFor="support-reply" className="mb-1.5 block text-[11px] font-medium text-[#4A4A46]">
                   Reply to {thread.customerEmail}
                 </label>
                 <textarea id="support-reply" value={reply} onChange={e => onReplyChange(e.target.value)} rows={5}
                   maxLength={REPLY_MAX} disabled={sending} placeholder="Write your reply…"
-                  className="w-full border border-[#E8E5E0] px-3 py-2 text-[13px] focus:outline-none focus:border-[#111] disabled:bg-[#F5F5F3]" />
-                <div className="flex flex-wrap items-center justify-between gap-3 mt-2">
-                  <p className="text-[11px] text-[#9B9B9B]">
+                  className={`${adminTextareaClass} text-[13px]`} />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[11px] text-[#8A8A85]">
                     From {MAILBOX} · {reply.length.toLocaleString()} / {REPLY_MAX.toLocaleString()}
                   </p>
-                  <button type="submit" disabled={sending || !reply.trim()}
-                    className="text-[11px] tracking-[0.08em] uppercase bg-[#111] text-white px-4 py-2.5 disabled:opacity-50">
+                  <AdminButton type="submit" variant="primary" disabled={sending || !reply.trim()}>
                     {sending ? 'Sending…' : 'Send reply'}
-                  </button>
+                  </AdminButton>
                 </div>
-                {sendErr && <p role="alert" className="text-[12px] text-[#B91C1C] mt-2">{sendErr.text}</p>}
-                {sendOk && <p role="status" className="text-[12px] text-[#166534] mt-2">{sendOk}</p>}
+                {sendErr && <AdminNotice tone="danger" className="mt-2">{sendErr.text}</AdminNotice>}
+                {sendOk && <AdminNotice tone="success" className="mt-2">{sendOk}</AdminNotice>}
               </form>
             </div>
           )}
         </section>
       </div>
-    </div>
+    </AdminPage>
   )
 }

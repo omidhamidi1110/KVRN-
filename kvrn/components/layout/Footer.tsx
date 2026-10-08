@@ -3,99 +3,104 @@
 import Link from 'next/link'
 import { useI18n } from '@/context/I18nContext'
 import { useCookiePrefs } from '@/context/CookiePrefsContext'
+import type { ShellData } from '@/lib/content-shell'
+import { resolveGroupHeading, resolveLinkLabel, copyrightLine } from '@/lib/content-shell'
 
-const SHOP_LINKS    = [['Shop All','/shop'],['Hoodies','/shop?type=hoodies'],['Sweatpants','/shop?type=sweatpants']] as const
-const SUPPORT_LINKS = [['Shipping & Returns','/support/shipping-returns'],['Track Order','/support/track'],['Contact','/contact']] as const
-const LEGAL_LINKS   = [['Privacy','/privacy'],['Terms','/terms'],['Cookies','/cookies']] as const
+// [dictionary key, href] — the label is looked up in the visitor's language (English text is unchanged).
+const SHOP_LINKS    = [['shopAll','/shop'],['hoodies','/shop?type=hoodies'],['sweatpants','/shop?type=sweatpants']] as const
+const SUPPORT_LINKS = [['shippingReturns','/support/shipping-returns'],['trackOrder','/support/track'],['contact','/contact']] as const
+const LEGAL_LINKS   = [['privacy','/privacy'],['terms','/terms'],['cookies','/cookies']] as const
 
-export function Footer() {
-  const { t }               = useI18n()
+interface View {
+  brandName: string; taglines: string[]
+  groups: Array<{ id: string; heading: string; links: Array<{ id: string; label: string; href: string; newTab?: boolean }> }>
+  social: Array<{ id: string; platform: 'instagram' | 'tiktok' | 'other'; label: string; href: string }>
+  copyright: string
+}
+
+/** `shell` is provided only when Admin-managed content is enabled; without it this is the coded footer. */
+export function Footer({ shell }: { shell?: ShellData | null } = {}) {
+  const { t, locale }       = useI18n()
   const { openPreferences } = useCookiePrefs()
   const year                = new Date().getFullYear()
 
+  const f = shell?.footer
+  const view: View = f ? {
+    brandName: f.brandName, taglines: f.taglines,
+    groups: f.groups.map(g => ({
+      id: g.id, heading: resolveGroupHeading(g, locale, shell!.tr.footer, t),
+      links: g.links.map(l => ({ id: l.id, label: resolveLinkLabel(l, locale, shell!.tr.footer, t), href: l.href, newTab: l.newTab })),
+    })),
+    social: f.social,
+    copyright: copyrightLine(f, year, locale, shell!.tr.footer, t),
+  } : {
+    brandName: 'KVRN', taglines: [t['footer.tagline1'], t['footer.tagline2']],
+    groups: [
+      { id: 'shop',    heading: t.shop,    links: SHOP_LINKS.map(([k, href]) => ({ id: href, label: t[k], href })) },
+      { id: 'support', heading: t.support, links: SUPPORT_LINKS.map(([k, href]) => ({ id: href, label: t[k], href })) },
+      { id: 'legal',   heading: t.legal,   links: LEGAL_LINKS.map(([k, href]) => ({ id: href, label: t[k], href })) },
+    ],
+    social: [
+      { id: 'instagram', platform: 'instagram', label: t['nav.onInstagram'], href: 'https://instagram.com/thekvrn' },
+      { id: 'tiktok',    platform: 'tiktok',    label: t['nav.onTikTok'],    href: 'https://tiktok.com/@thekvrn' },
+    ],
+    copyright: `© ${year} KVRN. ${t.allRightsReserved}`,
+  }
+  const socialLinks = (cls: string) => view.social.map(sx => (
+    <a key={sx.id} href={sx.href} target="_blank" rel="noopener noreferrer"
+      aria-label={sx.label} className={cls}>
+      {sx.platform === 'instagram' ? <InstagramIcon /> : sx.platform === 'tiktok' ? <TikTokIcon /> : <LinkIcon />}
+    </a>
+  ))
+
   return (
     // No overflow-hidden, no giant wordmark, no decorative background
-    <footer className="border-t border-[#E8E5E0] bg-[#F9F8F6]" aria-label="Site footer">
+    <footer className="border-t border-[#E8E5E0] bg-[#F9F8F6]" aria-label={t['footer.siteFooter']}>
       <div className="container-kvrn">
 
         {/* ── Main columns ─────────────────────────────────────────── */}
-        <div className="py-10 md:py-12 grid grid-cols-3 md:grid-cols-4 gap-6 md:gap-8 text-center">
+        <div className={`py-10 md:py-12 grid ${view.groups.length <= 3 ? 'grid-cols-3' : 'grid-cols-2'} md:grid-cols-4 gap-6 md:gap-8 text-center`}>
 
           {/* Brand block — desktop only */}
           <div className="hidden md:block space-y-3">
-            <p className="text-[12px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">KVRN</p>
+            <p className="text-[12px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">{view.brandName}</p>
             <div className="space-y-0.5">
-              <p className="text-[12px] font-light text-[#6B6B6B]">Quiet garments.</p>
-              <p className="text-[12px] font-light text-[#6B6B6B]">Built with intention.</p>
+              {view.taglines.map(line => <p key={line} className="text-[12px] font-light text-[#6B6B6B]">{line}</p>)}
             </div>
             <div className="flex justify-center gap-4 pt-1">
-              <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
-                <InstagramIcon />
-              </a>
-              <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on TikTok" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
-                <TikTokIcon />
-              </a>
+              {socialLinks('text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors')}
             </div>
           </div>
 
-          {/* Shop */}
-          <div>
-            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">{t.shop}</p>
-            <ul className="space-y-2.5">
-              {SHOP_LINKS.map(([label, href]) => (
-                <li key={href}>
-                  <Link href={href} className="text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">{label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">{t.support}</p>
-            <ul className="space-y-2.5">
-              {SUPPORT_LINKS.map(([label, href]) => (
-                <li key={href}>
-                  <Link href={href} className="text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">{label}</Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal + mobile social */}
-          <div>
-            <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">{t.legal}</p>
-            <ul className="space-y-2.5">
-              {LEGAL_LINKS.map(([label, href]) => (
-                <li key={href}>
-                  <Link href={href} className="text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">{label}</Link>
-                </li>
-              ))}
-            </ul>
-            {/* Social icons — mobile only (desktop shows in brand block) */}
-            <div className="flex md:hidden justify-center gap-4 mt-5">
-              <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on Instagram" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
-                <InstagramIcon />
-              </a>
-              <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on TikTok" className="text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors">
-                <TikTokIcon />
-              </a>
+          {view.groups.map((g, gi) => (
+            <div key={g.id}>
+              <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">{g.heading}</p>
+              <ul className="space-y-2.5">
+                {g.links.map(l => (
+                  <li key={l.id}>
+                    <Link href={l.href} {...(l.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      className="text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">{l.label}</Link>
+                  </li>
+                ))}
+              </ul>
+              {/* Social icons — mobile only (desktop shows in brand block) */}
+              {gi === view.groups.length - 1 && (
+                <div className="flex md:hidden justify-center gap-4 mt-5">
+                  {socialLinks('text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors')}
+                </div>
+              )}
             </div>
-          </div>
+          ))}
         </div>
 
         {/* ── Bottom bar ────────────────────────────────────────────── */}
         <div className="py-4 border-t border-[#E8E5E0] flex flex-row items-center justify-between gap-4">
-          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. {t.allRightsReserved}</p>
+          <p className="text-[11px] text-[#9B9B9B]">{view.copyright}</p>
           <button
             onClick={openPreferences}
             className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors flex-shrink-0"
           >
-            Cookie preferences
+            {t['nav.cookiePreferences']}
           </button>
         </div>
       </div>
@@ -103,6 +108,13 @@ export function Footer() {
   )
 }
 
+function LinkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    </svg>
+  )
+}
 function InstagramIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">

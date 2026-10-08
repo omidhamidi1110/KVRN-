@@ -41,6 +41,9 @@ import openNextWorker from './.open-next/worker.js'
 import PostalMime from 'postal-mime'
 import { handleSupportEmail } from './lib/support-email-handler'
 
+// Internal job routes run after the core jobs on every cron tick (see scheduled()).
+const ADDITIVE_CRON_JOBS = ['cms-scheduler', 'abandoned-checkout-sweep', 'affiliate-maintenance', 'affiliate-program-maintenance']
+
 export default {
   // Delegate all fetch requests to the OpenNext worker unchanged
   fetch: openNextWorker.fetch,
@@ -142,6 +145,61 @@ export default {
       }
     } catch (err) {
       console.error('[cron] Stripe fee reconcile failed:', err?.message || String(err))
+    }
+
+    // ── 4. KVRN AI Chief Operator ─────────────────────────────────────────────
+    // Runs every 5 minutes but is almost always deterministic / $0 inference:
+    //  * processes deduplicated owner alerts through ONE Pushover gate
+    //  * emits budget-threshold alerts
+    //  * sends the one mandatory daily executive brief after the configured local hour
+    // The route itself decides whether anything is due. It never requires a model call.
+    try {
+      const chiefReq = new Request('https://cron-internal/api/internal/ai-chief', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cronSecret}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      const chiefRes = await openNextWorker.fetch(chiefReq, env, ctx)
+      if (!chiefRes.ok) {
+        console.error(`[cron] AI Chief returned HTTP ${chiefRes.status}`)
+      } else {
+        const data = await chiefRes.json().catch(() => ({}))
+        const pushed = Number(data?.alerts?.pushed ?? 0)
+        const dailySent = Boolean(data?.daily?.sent)
+        if (pushed > 0 || dailySent) {
+          console.log(`[cron] AI Chief: alerts_pushed=${pushed} daily_sent=${dailySent ? 1 : 0}`)
+        }
+      }
+    } catch (err) {
+      console.error('[cron] AI Chief failed:', err?.message || String(err))
+    }
+
+    // ── 5. Additive internal jobs (Admin/CMS/commerce batch) ─────────────────
+    // Each route authenticates with CRON_SECRET, is idempotent, and remains
+    // feature/config-gated inside its own handler. One failure never blocks the
+    // other jobs or the Chief.
+    //   cms-scheduler                 due CMS/product schedules + cache retries
+    //   abandoned-checkout-sweep      recovery maintenance/email (flag-gated)
+    //   affiliate-maintenance         commission/session maintenance (flag-gated)
+    //   affiliate-program-maintenance lifecycle/invites/outbox (flag-gated)
+    for (const job of ADDITIVE_CRON_JOBS) {
+      try {
+        const jobReq = new Request(`https://cron-internal/api/internal/${job}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cronSecret}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        const jobRes = await openNextWorker.fetch(jobReq, env, ctx)
+        if (!jobRes.ok && jobRes.status !== 404) {
+          console.error(`[cron] ${job} returned HTTP ${jobRes.status}`)
+        }
+      } catch (err) {
+        console.error(`[cron] ${job} failed:`, err?.message || String(err))
+      }
     }
   },
 }

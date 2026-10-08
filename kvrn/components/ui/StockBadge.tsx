@@ -1,4 +1,7 @@
+'use client'
+
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/context/I18nContext'
 
 interface StockBadgeProps {
   stock:      number
@@ -7,22 +10,24 @@ interface StockBadgeProps {
 }
 
 export function StockBadge({ stock, className, position = 'card' }: StockBadgeProps) {
+  const { t } = useI18n()
   if (stock >= 3) return null
 
   const soldOut = stock === 0
-  const label   = soldOut ? 'Sold Out' : 'Few Left'
+  const label   = soldOut ? t.soldOut : t.fewLeft
+  const aria    = soldOut ? t['stock.soldOutLabel'] : t['stock.limitedLabel']
 
   if (position === 'card') {
     return (
       <span
         className={cn(
-          'absolute bottom-2.5 left-2.5 px-2 py-0.5 text-[10px] font-light tracking-[0.1em] uppercase',
+          'absolute bottom-2.5 start-2.5 px-2 py-0.5 text-[10px] font-light tracking-[0.1em] uppercase',
           soldOut
             ? 'bg-[#181818] text-[#F0EDE8]'
             : 'bg-[#F9F8F6]/90 text-[#1A1A1A] border border-[#E8E5E0]',
           className
         )}
-        aria-label={soldOut ? 'Sold out' : 'Limited stock remaining'}
+        aria-label={aria}
       >
         {label}
       </span>
@@ -38,7 +43,7 @@ export function StockBadge({ stock, className, position = 'card' }: StockBadgePr
           : 'border border-[#C8C4BF] text-[#1A1A1A]',
         className
       )}
-      aria-label={soldOut ? 'Sold out' : 'Limited stock remaining'}
+      aria-label={aria}
     >
       {label}
     </span>

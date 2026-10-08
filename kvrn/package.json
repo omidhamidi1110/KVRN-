@@ -11,14 +11,23 @@
     "deploy": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy",
     "deploy:preview": "npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy --env preview",
     "cf:build": "npx opennextjs-cloudflare build",
-    "test": "jest"
+    "test": "jest",
+    "qa:contracts": "node scripts/verify-route-contracts.mjs",
+    "qa:smoke": "node scripts/smoke-test.mjs",
+    "test:ci": "jest --runInBand --json --outputFile=/tmp/kvrn-jest.json",
+    "qa:ai-boundaries": "node scripts/verify-ai-boundaries.mjs",
+    "qa:browser": "node scripts/browser-smoke.mjs",
+    "qa:change-coverage": "node scripts/verify-change-test-coverage.mjs",
+    "qa:ai-readiness": "node scripts/verify-ai-os-readiness.mjs",
+    "qa:ai-imports": "node scripts/verify-ai-local-imports.mjs",
+    "qa:adversarial": "node scripts/verify-adversarial-continuation.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
     "@stripe/react-stripe-js": "^2.7.1",
     "@stripe/stripe-js": "^4.1.0",
     "clsx": "^2.1.1",
-    "next": "15.5.23",
+    "next": "15.5.27",
     "postal-mime": "^4.0.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -69,5 +78,9 @@
       "/node_modules/",
       "/.next/"
     ]
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "sharp": "0.35.5"
   }
 }

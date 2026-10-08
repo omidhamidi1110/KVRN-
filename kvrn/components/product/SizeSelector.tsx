@@ -3,6 +3,8 @@
 import { cn } from '@/lib/utils'
 import type { SizeLabel, SizeOption } from '@/types'
 import Link from 'next/link'
+import { useI18n } from '@/context/I18nContext'
+import { format } from '@/lib/i18n/messages'
 
 interface SizeSelectorProps {
   sizes:              SizeOption[]
@@ -27,19 +29,20 @@ export function SizeSelector({
   compact   = false,
   darkMode  = false,
 }: SizeSelectorProps) {
+  const { t } = useI18n()
   return (
     <fieldset
       id={id}
       className={cn('border-0 p-0 m-0', className)}
     >
       <div className="flex items-center justify-between mb-3">
-        {!hideSizeGuideLink && <legend className="label-11">Size</legend>}
+        {!hideSizeGuideLink && <legend className="label-11">{t.size}</legend>}
         {!hideSizeGuideLink && (
           <Link
             href="#size-guide"
             className="text-[11px] text-kvrn-muted hover:text-kvrn-text tracking-wide underline underline-offset-2 transition-colors duration-150"
           >
-            Size guide
+            {t.sizeGuideLink}
           </Link>
         )}
       </div>
@@ -51,7 +54,7 @@ export function SizeSelector({
           hasError && 'ring-1 ring-kvrn-error ring-offset-4 ring-offset-kvrn-bg rounded-[1px]'
         )}
         role="radiogroup"
-        aria-label="Select size"
+        aria-label={t['product.selectSize']}
         aria-required="true"
       >
         {sizes.map((size) => {
@@ -65,7 +68,7 @@ export function SizeSelector({
                 'relative cursor-pointer',
                 isOutOfStock && 'cursor-not-allowed'
               )}
-              title={isOutOfStock ? `${size.label} — Out of stock. Click to be notified when back.` : size.label}
+              title={isOutOfStock ? format(t['product.outOfStockNotify'], { size: size.label }) : size.label}
             >
               {/* Hidden radio */}
               <input
@@ -78,9 +81,9 @@ export function SizeSelector({
                 className="sr-only"
                 aria-label={
                   isOutOfStock
-                    ? `${size.label}, out of stock`
+                    ? format(t['product.sizeOutOfStock'], { size: size.label })
                     : isSelected
-                    ? `${size.label}, selected`
+                    ? format(t['product.sizeSelected'], { size: size.label })
                     : size.label
                 }
               />

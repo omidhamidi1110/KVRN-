@@ -1,8 +1,11 @@
+import { cmsContentEnabled, contentPublic } from '@/lib/content-public'
+import { PolicyView } from '@/components/content/cms-views'
+import { policyMetadata } from '@/lib/content-storefront'
 import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = {
+const LEGACY_METADATA: Metadata = {
   title: 'Privacy Policy — KVRN',
   robots: { index: false, follow: false },
 }
@@ -38,7 +41,7 @@ const sections = [
   },
 ]
 
-export default function PrivacyPage() {
+function LegacyLegalPrivacyPage() {
   return (
     <div className="pt-[60px]">
       <div className="kvrn-container section-y max-w-2xl">
@@ -81,4 +84,22 @@ export default function PrivacyPage() {
       </div>
     </div>
   )
+}
+
+// Legacy alias URL. With the CMS flag off this is the old (noindex) page, unchanged. With it on,
+// it shows the same published 'privacy' policy as its canonical URL, still noindex.
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (!cmsContentEnabled()) return LEGACY_METADATA
+  const view = await contentPublic().getPolicyById('privacy')
+  return view ? policyMetadata(view, LEGACY_METADATA, { noindex: true }) : LEGACY_METADATA
+}
+
+export default async function PrivacyPage() {
+  if (cmsContentEnabled()) {
+    const view = await contentPublic().getPolicyById('privacy')
+    if (view) return <PolicyView view={view} />
+  }
+  return <LegacyLegalPrivacyPage />
 }

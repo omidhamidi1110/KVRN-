@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature } from '@/lib/stripe-client'
+import { readLimitedText } from '@/lib/limited-json-request'
 import {
   finalizePaidOrder,
   releaseReservationForEvent,
@@ -14,6 +15,8 @@ import { createDisputesService } from '@/lib/disputes'
 import { createAffiliatesService } from '@/lib/affiliates'
 import { reconcileStripeFeeForOrder } from '@/lib/stripe-fees'
 import { getStripe } from '@/lib/stripe-client'
+import { createFraudReviewService } from '@/lib/fraud-review'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import { tryRecordPurchase } from '@/lib/funnel-analytics'
 import { tryRecordGaPurchase } from '@/lib/ga4-server'
 import {
@@ -30,9 +33,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Webhook not configured.' }, { status: 500 })
   }
 
-  const rawBody    = await req.text()
-  const sigHeader  = req.headers.get('stripe-signature') ?? ''
+  // Refuse oversized/chunked webhook bodies BEFORE parsing or signature verification.
+  // Normal Stripe event payloads are far smaller than this 1 MiB safety cap.
+  const sigHeader = req.headers.get('stripe-signature') ?? ''
   if (!sigHeader) return NextResponse.json({ error: 'Missing Stripe-Signature.' }, { status: 400 })
+  const read = await readLimitedText(req, 1024 * 1024)
+  if (!read.ok) return NextResponse.json({ error: 'Invalid webhook payload.' }, { status: read.status })
+  const rawBody = read.value
 
   let event: Awaited<ReturnType<typeof verifyWebhookSignature>>
   try {
@@ -99,6 +106,18 @@ export async function POST(req: NextRequest) {
       case 'charge.dispute.funds_withdrawn':
       case 'charge.dispute.funds_reinstated': {
         await handleDispute(session, event.id, event.type, event.created)
+        break
+      }
+
+      // ── Stripe Radar review / risk signals ─────────────────────────────────
+      // Additive. Idempotent (a redelivered event is a no-op), never creates or changes an order, a
+      // payment status, inventory or any financial record. A hold is created only with the
+      // RADAR_FULFILLMENT_HOLDS flag ON. See handleFraudSignalEvent for the failure policy.
+      case 'review.opened':
+      case 'review.closed':
+      case 'charge.succeeded':
+      case 'radar.early_fraud_warning.created': {
+        await handleFraudSignalEvent(event)
         break
       }
 
@@ -219,7 +238,57 @@ async function handlePaid(session: any, eventId: string, eventType: string) {
       // Push only on the canonical order_created outcome. Webhook replays never
       // generate duplicate sale/stock notifications.
       await notifySaleAndInventory(result.orderId)
+      // Radar: replay any early review signal and read the charge outcome once (flag ON only). Deliberately
+      // LAST: it can make Stripe GETs, and the steps above run only on `order_created` (a retry sees
+      // `already_processed`), so a slow Stripe call here must never be able to cost the order its attribution
+      // or notification. The Radar read itself heals on the replay branch below.
+      await tryIngestFraudForOrder(result.orderId, session.payment_intent ?? null)
     }
+  } else if (result.orderId && (result.outcome === 'already_processed' || result.outcome === 'already_had_order')) {
+    // A replay (e.g. Stripe retrying after a timed-out first attempt) heals a missed Radar read. Idempotent:
+    // once the charge outcome has been read this is a cheap no-op. Flag OFF: does nothing.
+    await tryIngestFraudForOrder(result.orderId, session.payment_intent ?? null)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE RADAR / FRAUD REVIEW
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * review.opened / review.closed / charge.succeeded / radar.early_fraud_warning.created.
+ *
+ * FAILURE POLICY
+ *   * Flag OFF: this is visibility-only recording. Any failure is logged (no PII) and the event is
+ *     acknowledged, so the feature being off can never cause webhook errors.
+ *   * Flag ON: a failure THROWS so Stripe retries. That is safe because ingestion is idempotent (unique
+ *     Stripe event id) and a missed review.opened would otherwise mean a missed hold. There is no order work
+ *     in these events, so nothing else is held up by the retry.
+ */
+async function handleFraudSignalEvent(event: any) {
+  try {
+    const result = await createFraudReviewService(sql).ingestStripeEvent(event, { getStripe })
+    if (result.outcome !== 'ignored') console.log(`[WEBHOOK] fraud signal ${event.type}: ${result.outcome}`)
+  } catch (err: any) {
+    console.error(`[WEBHOOK] fraud signal [${event.type}] ${event.id} failed:`, String(err?.message ?? '').slice(0, 100))
+    if (isFeatureEnabled('RADAR_FULFILLMENT_HOLDS')) throw err
+  }
+}
+
+/**
+ * Once an order exists: replay a review that arrived before it, and read the charge outcome from Stripe.
+ *
+ * NON-FATAL BY DESIGN, like fee enrichment: it runs AFTER the order is committed and can never fail,
+ * delay-fail or roll back a paid order. A failure leaves the risk state Unknown and retryable from the Admin
+ * ("Refresh from Stripe"). Flag OFF: does nothing at all (no extra Stripe call, no extra writes) so the
+ * previous webhook behavior is preserved exactly.
+ */
+async function tryIngestFraudForOrder(orderId: string, paymentIntentId: string | null) {
+  if (!isFeatureEnabled('RADAR_FULFILLMENT_HOLDS')) return
+  try {
+    await createFraudReviewService(sql).ingestForNewOrder({ orderId, paymentIntentId, getStripe })
+  } catch (err: any) {
+    console.error('[WEBHOOK] fraud review ingestion skipped (non-fatal):', String(err?.message ?? '').slice(0, 80))
   }
 }
 

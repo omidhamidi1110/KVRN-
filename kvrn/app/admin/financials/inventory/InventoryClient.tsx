@@ -6,12 +6,17 @@
 //               the total is labelled PARTIAL whenever any exist — a known-cost
 //               subtotal is never presented as a complete valuation.
 //   WRITE-OFFS  the client sends variant, quantity and reason only. Cost comes
-//               from the canonical FIFO function server-side.
+//               from the FIFO function server-side.
 //   PURCHASES   cash movements keyed on the date money actually left. These are
 //               never COGS and never operating expense.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, moneyOrUnknown, SectionTitle } from '@/components/admin/FinancialUI'
+import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
+  AdminTabs, AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, InfoTip, StatusBadge,
+  adminInputClass, adminSelectClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Row = {
   variantId: string; sku: string; productName: string
@@ -31,9 +36,6 @@ type WriteOff = {
 
 const REASONS = ['damaged','defective','lost','sample','giveaway',
                  'influencer','photography','promotional','other']
-
-const inputStyle = { fontFamily: FONT, fontSize: 12, padding: '7px 9px',
-                     border: BORDER, background: '#fff', boxSizing: 'border-box' as const }
 
 export function InventoryClient() {
   const [tab, setTab] = useState<'valuation' | 'receipts' | 'writeoffs' | 'purchases'>('valuation')
@@ -162,138 +164,102 @@ export function InventoryClient() {
     finally { setSaving(false) }
   }
 
-  const th = { textAlign: 'left' as const, padding: '9px 10px', fontSize: 9,
-               letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-               color: '#9B9B9B', borderBottom: BORDER, whiteSpace: 'nowrap' as const }
-  const btn = { fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-                textTransform: 'uppercase' as const, padding: '9px 16px',
-                background: '#1A1A1A', color: '#fff', border: 'none', cursor: 'pointer' as const }
-
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1240 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Inventory
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Valuation is derived from FIFO cost layers at cost, never from retail price.
-        Purchase payments are cash movements and are not COGS.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Inventory Value"
+        description="FIFO value, receipts, and write-offs."
+        info="Valuation is derived from FIFO cost layers at cost, never from retail price. Purchase payments are cash movements and are not COGS."
+      />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {([['valuation','Valuation'],['receipts','Receive stock'],
-           ['writeoffs','Write-offs'],['purchases','Purchases']] as const).map(([k,l]) => (
-          <button key={k} onClick={() => setTab(k)}
-            style={{ fontFamily: FONT, fontSize: 11, padding: '7px 14px', cursor: 'pointer',
-                     border: tab === k ? '1px solid #1A1A1A' : BORDER,
-                     background: tab === k ? '#1A1A1A' : '#fff',
-                     color: tab === k ? '#fff' : '#1A1A1A' }}>{l}</button>
-        ))}
-      </div>
+      <AdminTabs ariaLabel="Inventory value sections" value={tab} onChange={setTab}
+        tabs={[
+          { id: 'valuation', label: 'Valuation' },
+          { id: 'receipts', label: 'Receive stock' },
+          { id: 'writeoffs', label: 'Write-offs' },
+          { id: 'purchases', label: 'Purchases' },
+        ]} />
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-      {loading && <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B' }}>Loading…</p>}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {loading && <AdminLoading />}
 
       {tab === 'valuation' && totals && (
         <>
           {totals.isPartialValuation && (
-            <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                          border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 16 }}>
-              <strong>Partial valuation.</strong> {totals.unknownCostUnits} unit
-              {totals.unknownCostUnits === 1 ? '' : 's'} have no authoritative cost, so the
+            <AdminNotice tone="warning" className="mb-4" title="Partial valuation.">
+              {totals.unknownCostUnits} unit
+              {totals.unknownCostUnits === 1 ? '' : 's'} have no known cost, so the
               figure below covers only the {totals.knownCostUnits} units whose cost is known.
               It is not a complete inventory valuation.
-            </div>
+            </AdminNotice>
           )}
           {totals.reconciliationFailures > 0 && (
-            <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                          border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
+            <AdminNotice tone="danger" className="mb-4" title="Layers and stock disagree.">
               {totals.reconciliationFailures} variant(s) where layer quantity does not match
               physical stock. Investigate before relying on these figures.
-            </div>
+            </AdminNotice>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))',
-                        gap: 10, marginBottom: 22 }}>
-            {[['Value at cost', money(totals.knownValueCents),
-               totals.isPartialValuation ? 'Known-cost units only — partial' : 'All units costed'],
-              ['Known-cost units', String(totals.knownCostUnits), 'Included in the value'],
-              ['Unknown-cost units', String(totals.unknownCostUnits), 'Excluded from the value'],
-              ['Total units', String(totals.totalUnits), 'Physical on hand']
-            ].map(([label, value, note]) => (
-              <div key={label} style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-                <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                            textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>{label}</p>
-                <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '6px 0 0' }}>{value}</p>
-                <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>{note}</p>
-              </div>
-            ))}
-          </div>
+          <AdminStatGrid min={200} className="mb-6">
+            <AdminStat label="Value at cost" value={money(totals.knownValueCents)}
+              tone={totals.isPartialValuation ? 'warning' : 'default'}
+              sub={totals.isPartialValuation ? 'Known-cost units only — partial' : 'All units costed'}
+              info="Sum of the remaining FIFO layers at their cost. Retail price is never used." />
+            <AdminStat label="Known-cost units" value={String(totals.knownCostUnits)} sub="Included in the value" />
+            <AdminStat label="Unknown-cost units" value={String(totals.unknownCostUnits)}
+              tone={totals.unknownCostUnits > 0 ? 'warning' : 'default'} sub="Excluded from the value" />
+            <AdminStat label="Total units" value={String(totals.totalUnits)} sub="Physical on hand" />
+          </AdminStatGrid>
 
-          <SectionTitle note="Cost basis only. Retail price is never used to value inventory.">
-            By variant
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
+          <AdminSectionHeader title="By variant" description="Cost basis only." />
+          {rows.length === 0 && !loading ? <AdminEmpty title="No inventory." /> : (
+            <AdminTable minWidth={720} caption="Inventory value by variant">
+              <thead><tr>
                 {['SKU','Product','On hand','Layers','Known','Unknown','Value at cost','Reconciled'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
+                  <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
               <tbody>
-                {rows.length === 0 && !loading && (
-                  <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No inventory.
-                  </td></tr>
-                )}
                 {rows.map(r => (
-                  <tr key={r.variantId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{r.sku}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.productName}</td>
-                    <td style={{ padding: '9px 10px' }}>{r.stockOnHand}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.layerUnitsRemaining}</td>
-                    <td style={{ padding: '9px 10px' }}>{r.knownCostUnits}</td>
-                    <td style={{ padding: '9px 10px',
-                                 color: r.unknownCostUnits > 0 ? '#92400E' : '#6B6B6B' }}>
+                  <tr key={r.variantId}>
+                    <AdminTd className="font-mono text-[11px]">{r.sku}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{r.productName}</AdminTd>
+                    <AdminTd>{r.stockOnHand}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{r.layerUnitsRemaining}</AdminTd>
+                    <AdminTd>{r.knownCostUnits}</AdminTd>
+                    <AdminTd className={r.unknownCostUnits > 0 ? 'font-medium text-[#92400E]' : 'text-[#6B6B66]'}>
                       {r.unknownCostUnits}
-                    </td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>
+                    </AdminTd>
+                    <AdminTd className="font-medium">
                       {money(r.valueAtCostCents)}
                       {r.unknownCostUnits > 0 && (
-                        <span style={{ fontSize: 10, color: '#92400E', display: 'block' }}>partial</span>
+                        <span className="block text-[11px] font-normal text-[#92400E]">partial</span>
                       )}
-                    </td>
-                    <td style={{ padding: '9px 10px',
-                                 color: r.reconciled ? '#047857' : '#B91C1C' }}>
-                      {r.reconciled ? 'yes' : 'NO'}
-                    </td>
+                    </AdminTd>
+                    <AdminTd>
+                      <StatusBadge status={r.reconciled ? 'Reconciled' : 'Exception'} label={r.reconciled ? 'Yes' : 'No'} />
+                    </AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </AdminTable>
+          )}
         </>
       )}
 
       {tab === 'receipts' && (
         <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#3730A3', background: '#EEF2FF',
-                        border: '1px solid #C7D2FE', padding: '10px 14px', marginBottom: 18 }}>
-            Receiving is <strong>cumulative</strong>. A batch received 1+1+1 capitalises exactly
-            the same total as one received all at once — remainder cents are carried on a small
-            premium layer, never rounded away. Cost is derived from the batch; nothing here
-            accepts a cost from the browser.
-          </div>
-
-          <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 22 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Cost batch
-                <select value={rcForm.costBatchId}
+          <AdminCard className="mb-5">
+            <AdminSectionHeader title="Receive stock"
+              description="Cost comes from the batch, never from this form."
+              info={<>Receiving is <strong className="font-medium">cumulative</strong>. A batch received 1+1+1 capitalises exactly
+                the same total as one received all at once — remainder cents are carried on a small
+                premium layer, never rounded away. Cost is derived from the batch; nothing here
+                accepts a cost from the browser.</>} />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <AdminField label="Cost batch" htmlFor="rc-batch">
+                <select id="rc-batch" value={rcForm.costBatchId}
                   onChange={e => setRcForm({ ...rcForm, costBatchId: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}>
+                  className={adminSelectClass}>
                   <option value="">Select…</option>
                   {batches.filter(b => !b.fullyReceived).map(b => (
                     <option key={b.costBatchId} value={b.costBatchId}>
@@ -301,350 +267,296 @@ export function InventoryClient() {
                       {b.intendedUnits !== null ? ` (${b.remainingUnits} left)` : ''}
                     </option>
                   ))}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Variant
-                <select value={rcForm.variantId}
+                </select>
+              </AdminField>
+              <AdminField label="Variant" htmlFor="rc-variant">
+                <select id="rc-variant" value={rcForm.variantId}
                   onChange={e => setRcForm({ ...rcForm, variantId: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}>
+                  className={adminSelectClass}>
                   <option value="">Select…</option>
                   {rows.map(r => <option key={r.variantId} value={r.variantId}>{r.sku}</option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Quantity received
-                <input type="number" min="1" value={rcForm.quantity}
+                </select>
+              </AdminField>
+              <AdminField label="Quantity received" htmlFor="rc-qty">
+                <input id="rc-qty" type="number" min="1" value={rcForm.quantity}
                   onChange={e => setRcForm({ ...rcForm, quantity: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }} /></label>
+                  className={adminInputClass} />
+              </AdminField>
             </div>
-            <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '12px 0 0' }}>
+            <p className="mt-3 text-[11px] text-[#6B6B66]">
               The variant must belong to this batch. Receiving more than the batch was created
               for is rejected.
             </p>
-            <button onClick={submitReceipt}
-              disabled={saving || !rcForm.costBatchId || !rcForm.variantId || !rcForm.quantity}
-              style={{ ...btn, marginTop: 12,
-                       opacity: saving || !rcForm.costBatchId || !rcForm.variantId || !rcForm.quantity ? 0.45 : 1 }}>
-              {saving ? 'Receiving…' : 'Receive stock'}
-            </button>
+            <AdminButton variant="primary" className="mt-3" onClick={submitReceipt}
+              loading={saving}
+              disabled={!rcForm.costBatchId || !rcForm.variantId || !rcForm.quantity}>
+              Receive stock
+            </AdminButton>
+          </AdminCard>
+
+          <AdminSectionHeader title="Batch progress"
+            info="Layer value must equal the capitalised batch total once fully received." />
+          <div className="mb-7">
+            {batches.length === 0 && !loading ? (
+              <AdminEmpty title="No cost batches." description="Create one under Product Costs first." />
+            ) : (
+              <AdminTable minWidth={820} caption="Cost batch receiving progress">
+                <thead><tr>
+                  {['Product','Batch','Intended','Received','Remaining','Unit cost',
+                    'Intended cost','Received cost','Status'].map(h =>
+                    <AdminTh key={h}>{h}</AdminTh>)}
+                </tr></thead>
+                <tbody>
+                  {batches.map(b => {
+                    // Only a COMPLETE batch can be reconciled. A partially received
+                    // batch legitimately shows less received than intended and must
+                    // not be presented as a variance.
+                    const matches = b.capitalizationReconciled
+                    return (
+                      <tr key={b.costBatchId}>
+                        <AdminTd>{b.productName}</AdminTd>
+                        <AdminTd className="text-[#6B6B66]">{b.batchLabel ?? '—'}</AdminTd>
+                        <AdminTd>{b.intendedUnits ?? '—'}</AdminTd>
+                        <AdminTd>{b.receivedUnits}</AdminTd>
+                        <AdminTd className="text-[#6B6B66]">{b.intendedUnits === null ? '—' : b.remainingUnits}</AdminTd>
+                        <AdminTd>{b.unitCogsCents === null ? '—' : money(b.unitCogsCents)}</AdminTd>
+                        <AdminTd>{money(b.intendedCapitalizedCents)}</AdminTd>
+                        <AdminTd className={b.fullyReceived && !matches ? 'font-medium text-[#B91C1C]' : ''}>
+                          {money(b.receivedCapitalizedCents)}
+                        </AdminTd>
+                        <AdminTd>
+                          {b.fullyReceived
+                            ? <StatusBadge status={matches ? 'Reconciled' : 'Exception'} label={matches ? 'Reconciled' : 'Variance'} />
+                            : <StatusBadge status="Partial" />}
+                        </AdminTd>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </AdminTable>
+            )}
           </div>
 
-          <SectionTitle note="Layer value must equal the capitalised batch total once fully received.">
-            Batch progress
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Product','Batch','Intended','Received','Remaining','Unit cost',
-                  'Intended cost','Received cost',''].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {batches.length === 0 && !loading && (
-                  <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No cost batches. Create one under Product Costs first.
-                  </td></tr>
-                )}
-                {batches.map(b => {
-                  // Only a COMPLETE batch can be reconciled. A partially received
-                  // batch legitimately shows less received than intended and must
-                  // not be presented as a variance.
-                  const matches = b.capitalizationReconciled
-                  return (
-                    <tr key={b.costBatchId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                      <td style={{ padding: '9px 10px' }}>{b.productName}</td>
-                      <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{b.batchLabel ?? '—'}</td>
-                      <td style={{ padding: '9px 10px' }}>{b.intendedUnits ?? '—'}</td>
-                      <td style={{ padding: '9px 10px' }}>{b.receivedUnits}</td>
-                      <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                        {b.intendedUnits === null ? '—' : b.remainingUnits}
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        {b.unitCogsCents === null ? '—' : money(b.unitCogsCents)}
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        {money(b.intendedCapitalizedCents)}
-                      </td>
-                      <td style={{ padding: '9px 10px',
-                                   color: b.fullyReceived && !matches ? '#B91C1C' : '#1A1A1A' }}>
-                        {money(b.receivedCapitalizedCents)}
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        {b.fullyReceived
-                          ? <span style={{ fontSize: 9, letterSpacing: '0.08em',
-                                           textTransform: 'uppercase', padding: '3px 8px',
-                                           background: matches ? '#F0FDF4' : '#FEF2F2',
-                                           border: `1px solid ${matches ? '#BBF7D0' : '#FECACA'}`,
-                                           color: matches ? '#166534' : '#B91C1C' }}>
-                              {matches ? 'reconciled' : 'variance'}
-                            </span>
-                          : <span style={{ fontSize: 10, color: '#9B9B9B' }}>partial</span>}
-                      </td>
+          <AdminSectionHeader title="Purchase reconciliation"
+            description="A non-zero variance is a review flag, not an error."
+            info="Variance compares cash paid against the value ACTUALLY RECEIVED, not against the cost of units still in transit. A non-zero variance is expected while deposits or freight invoices are outstanding — it is a review flag, not an error." />
+          <div className="mb-7">
+            {recon.length === 0 && !loading ? <AdminEmpty title="No purchases recorded." /> : (
+              <AdminTable minWidth={720} caption="Purchase reconciliation">
+                <thead><tr>
+                  {['Supplier','Reference','Status','Batches','Ordered cost',
+                    'Received cost','Cash paid','Variance'].map(h =>
+                    <AdminTh key={h}>{h}</AdminTh>)}
+                </tr></thead>
+                <tbody>
+                  {recon.map(r => (
+                    <tr key={r.purchaseId}>
+                      <AdminTd>{r.supplier}</AdminTd>
+                      <AdminTd className="text-[#6B6B66]">{r.reference ?? '—'}</AdminTd>
+                      <AdminTd className="text-[#6B6B66]">{r.status}</AdminTd>
+                      <AdminTd>{r.costBatchCount}</AdminTd>
+                      <AdminTd className="text-[#6B6B66]">
+                        {money(r.intendedCapitalizedCents)}
+                        {!r.fullyReceived && (
+                          <span className="block text-[11px] text-[#92400E]">not all received</span>
+                        )}
+                      </AdminTd>
+                      <AdminTd>{money(r.receivedCapitalizedCents)}</AdminTd>
+                      <AdminTd>{money(r.cashPaidCents)}</AdminTd>
+                      <AdminTd className={r.varianceCents === 0 ? 'text-[#047857]' : 'font-medium text-[#92400E]'}>
+                        {r.varianceCents === 0 ? 'balanced' : money(r.varianceCents)}
+                      </AdminTd>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </AdminTable>
+            )}
           </div>
 
-          <SectionTitle note="Variance compares cash paid against the value ACTUALLY RECEIVED, not against the cost of units still in transit. A non-zero variance is expected while deposits or freight invoices are outstanding — it is a review flag, not an error.">
-            Purchase reconciliation
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Supplier','Reference','Status','Batches','Ordered cost',
-                  'Received cost','Cash paid','Variance'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
+          <AdminSectionHeader title="Recent receipts" />
+          {receipts.length === 0 && !loading ? <AdminEmpty title="No receipts recorded." /> : (
+            <AdminTable minWidth={560} caption="Recent receipts">
+              <thead><tr>
+                {['Received','SKU','Batch','Qty','Premium units','By'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
               <tbody>
-                {recon.length === 0 && !loading && (
-                  <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No purchases recorded.
-                  </td></tr>
-                )}
-                {recon.map(r => (
-                  <tr key={r.purchaseId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{r.supplier}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.reference ?? '—'}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.status}</td>
-                    <td style={{ padding: '9px 10px' }}>{r.costBatchCount}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {money(r.intendedCapitalizedCents)}
-                      {!r.fullyReceived && (
-                        <span style={{ fontSize: 10, display: 'block', color: '#92400E' }}>
-                          not all received
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '9px 10px' }}>{money(r.receivedCapitalizedCents)}</td>
-                    <td style={{ padding: '9px 10px' }}>{money(r.cashPaidCents)}</td>
-                    <td style={{ padding: '9px 10px',
-                                 color: r.varianceCents === 0 ? '#047857' : '#92400E' }}>
-                      {r.varianceCents === 0 ? 'balanced' : money(r.varianceCents)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <SectionTitle>Recent receipts</SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Received','SKU','Batch','Qty','Premium units','By'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {receipts.length === 0 && !loading && (
-                  <tr><td colSpan={6} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No receipts recorded.
-                  </td></tr>
-                )}
                 {receipts.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{r.receivedAt.slice(0, 10)}</td>
-                    <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{r.sku}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.batchLabel ?? '—'}</td>
-                    <td style={{ padding: '9px 10px' }}>{r.quantity}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.premiumUnits}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.createdBy ?? '—'}</td>
+                  <tr key={r.id}>
+                    <AdminTd>{r.receivedAt.slice(0, 10)}</AdminTd>
+                    <AdminTd className="font-mono text-[11px]">{r.sku}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{r.batchLabel ?? '—'}</AdminTd>
+                    <AdminTd>{r.quantity}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{r.premiumUnits}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{r.createdBy ?? '—'}</AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </AdminTable>
+          )}
         </>
       )}
 
       {tab === 'writeoffs' && (
         <>
-          <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 22 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12 }}>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Variant
-                <select value={woForm.variantId}
+          <AdminCard className="mb-6">
+            <AdminSectionHeader title="Record a write-off"
+              info="Cost is computed server-side from FIFO layers. Promotional use is a marketing cost; damage and loss are not. Neither creates sales revenue." />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <AdminField label="Variant" htmlFor="wo-variant">
+                <select id="wo-variant" value={woForm.variantId}
                   onChange={e => setWoForm({ ...woForm, variantId: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}>
+                  className={adminSelectClass}>
                   <option value="">Select…</option>
                   {rows.map(r => <option key={r.variantId} value={r.variantId}>
                     {r.sku} ({r.stockOnHand})
                   </option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Quantity
-                <input type="number" min="1" value={woForm.quantity}
+                </select>
+              </AdminField>
+              <AdminField label="Quantity" htmlFor="wo-qty">
+                <input id="wo-qty" type="number" min="1" value={woForm.quantity}
                   onChange={e => setWoForm({ ...woForm, quantity: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Reason
-                <select value={woForm.reason}
+                  className={adminInputClass} />
+              </AdminField>
+              <AdminField label="Reason" htmlFor="wo-reason">
+                <select id="wo-reason" value={woForm.reason}
                   onChange={e => setWoForm({ ...woForm, reason: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}>
+                  className={adminSelectClass}>
                   {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Notes
-                <input value={woForm.notes}
+                </select>
+              </AdminField>
+              <AdminField label="Notes" htmlFor="wo-notes">
+                <input id="wo-notes" value={woForm.notes}
                   onChange={e => setWoForm({ ...woForm, notes: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }} /></label>
+                  className={adminInputClass} />
+              </AdminField>
             </div>
-            <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '12px 0 0' }}>
-              Cost is computed server-side from FIFO layers. This permanently removes stock.
-            </p>
-            <button onClick={submitWriteOff}
-              disabled={saving || !woForm.variantId || !woForm.quantity}
-              style={{ ...btn, marginTop: 12,
-                       opacity: saving || !woForm.variantId || !woForm.quantity ? 0.45 : 1 }}>
-              {saving ? 'Saving…' : 'Record write-off'}
-            </button>
-          </div>
+            <AdminNotice tone="warning" className="mt-4">This permanently removes stock.</AdminNotice>
+            <AdminButton variant="danger" className="mt-3" onClick={submitWriteOff}
+              loading={saving} disabled={!woForm.variantId || !woForm.quantity}>
+              Record write-off
+            </AdminButton>
+          </AdminCard>
 
-          <SectionTitle note="Promotional use is a marketing cost; damage and loss are not. Neither creates sales revenue.">
-            Recorded write-offs
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['SKU','Qty','Reason','Type','Cost','Date','By'].map(h => <th key={h} style={th}>{h}</th>)}
+          <AdminSectionHeader title="Recorded write-offs" />
+          {writeOffs.length === 0 && !loading ? <AdminEmpty title="No write-offs recorded." /> : (
+            <AdminTable minWidth={640} caption="Recorded write-offs">
+              <thead><tr>
+                {['SKU','Qty','Reason','Type','Cost','Date','By'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
               <tbody>
-                {writeOffs.length === 0 && !loading && (
-                  <tr><td colSpan={7} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No write-offs recorded.
-                  </td></tr>
-                )}
                 {writeOffs.map(w => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{w.sku}</td>
-                    <td style={{ padding: '9px 10px' }}>{w.quantity}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{w.reason}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {w.isPromotional ? 'promotional' : 'loss'}
-                    </td>
-                    <td style={{ padding: '9px 10px',
-                                 color: w.totalCostCents === null ? '#92400E' : '#1A1A1A' }}>
+                  <tr key={w.id}>
+                    <AdminTd className="font-mono text-[11px]">{w.sku}</AdminTd>
+                    <AdminTd>{w.quantity}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{w.reason}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{w.isPromotional ? 'promotional' : 'loss'}</AdminTd>
+                    <AdminTd className={w.totalCostCents === null ? 'font-medium text-[#92400E]' : ''}>
                       {moneyOrUnknown(w.totalCostCents, 'Unknown')}
                       {w.unknownCostQuantity > 0 && (
-                        <span style={{ fontSize: 10, display: 'block' }}>
-                          {w.unknownCostQuantity} unit(s) uncosted
-                        </span>
+                        <span className="block text-[11px] font-normal">{w.unknownCostQuantity} unit(s) uncosted</span>
                       )}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {w.createdAt.slice(0, 10)}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{w.createdBy ?? '—'}</td>
+                    </AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{w.createdAt.slice(0, 10)}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{w.createdBy ?? '—'}</AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </AdminTable>
+          )}
         </>
       )}
 
       {tab === 'purchases' && (
         <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#3730A3', background: '#EEF2FF',
-                        border: '1px solid #C7D2FE', padding: '10px 14px', marginBottom: 18 }}>
-            Payments recorded here are <strong>cash movements</strong>, dated when money actually
-            left. They are never operating expenses and never COGS — capitalised inventory cost
-            reaches the P&amp;L only as units sell.
-          </div>
+          <AdminNotice tone="info" className="mb-5">
+            Payments here are cash movements, not expenses or COGS.
+            <InfoTip label="About purchase payments">Payments recorded here are <strong className="font-medium">cash movements</strong>, dated when money actually
+              left. They are never operating expenses and never COGS — capitalised inventory cost
+              reaches the P&amp;L only as units sell.</InfoTip>
+          </AdminNotice>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16, marginBottom: 22 }}>
-            <div style={{ border: BORDER, background: '#fff', padding: 18 }}>
-              <p style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, margin: '0 0 12px' }}>
-                New purchase
-              </p>
-              {([['supplier','Supplier','text'],['reference','Reference','text'],
-                 ['total','Expected total $','number'],['orderedAt','Ordered','date'],
-                 ['receivedAt','Received','date']] as const).map(([k,l,t]) => (
-                <label key={k} style={{ fontFamily: FONT, fontSize: 11, display: 'block', marginBottom: 8 }}>
-                  {l}
-                  <input type={t} step={t === 'number' ? '0.01' : undefined}
-                    value={(poForm as any)[k]}
-                    onChange={e => setPoForm({ ...poForm, [k]: e.target.value })}
-                    style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </label>
-              ))}
-              <button onClick={submitPurchase} disabled={saving || !poForm.supplier}
-                style={{ ...btn, marginTop: 6, opacity: saving || !poForm.supplier ? 0.45 : 1 }}>
+          <div className="mb-6 grid gap-4 md:grid-cols-2">
+            <AdminCard>
+              <AdminSectionHeader title="New purchase" />
+              <div className="space-y-3">
+                {([['supplier','Supplier','text'],['reference','Reference','text'],
+                   ['total','Expected total $','number'],['orderedAt','Ordered','date'],
+                   ['receivedAt','Received','date']] as const).map(([k,l,t]) => (
+                  <AdminField key={k} label={l} htmlFor={`po-${k}`}>
+                    <input id={`po-${k}`} type={t} step={t === 'number' ? '0.01' : undefined}
+                      value={(poForm as any)[k]}
+                      onChange={e => setPoForm({ ...poForm, [k]: e.target.value })}
+                      className={adminInputClass} />
+                  </AdminField>
+                ))}
+              </div>
+              <AdminButton variant="primary" className="mt-4" onClick={submitPurchase}
+                loading={saving} disabled={!poForm.supplier}>
                 Create purchase
-              </button>
-            </div>
+              </AdminButton>
+            </AdminCard>
 
-            <div style={{ border: BORDER, background: '#fff', padding: 18 }}>
-              <p style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600, margin: '0 0 12px' }}>
-                Record a cash payment
-              </p>
-              <label style={{ fontFamily: FONT, fontSize: 11, display: 'block', marginBottom: 8 }}>
-                Purchase
-                <select value={payForm.purchaseId}
-                  onChange={e => setPayForm({ ...payForm, purchaseId: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}>
-                  <option value="">Select…</option>
-                  {purchases.map(p => <option key={p.id} value={p.id}>
-                    {p.supplier}{p.reference ? ` · ${p.reference}` : ''}
-                  </option>)}
-                </select>
-              </label>
-              <label style={{ fontFamily: FONT, fontSize: 11, display: 'block', marginBottom: 8 }}>
-                Type
-                <select value={payForm.paymentType}
-                  onChange={e => setPayForm({ ...payForm, paymentType: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }}>
-                  {['deposit','partial','final','supplier','freight','duties','tariffs',
-                    'customs_brokerage','other'].map(t =>
-                    <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
-                </select>
-              </label>
-              <label style={{ fontFamily: FONT, fontSize: 11, display: 'block', marginBottom: 8 }}>
-                Amount $
-                <input type="number" step="0.01" min="0" value={payForm.amount}
-                  onChange={e => setPayForm({ ...payForm, amount: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-              </label>
-              <label style={{ fontFamily: FONT, fontSize: 11, display: 'block', marginBottom: 8 }}>
-                Paid on (when money left)
-                <input type="date" value={payForm.paidAt}
-                  onChange={e => setPayForm({ ...payForm, paidAt: e.target.value })}
-                  style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-              </label>
-              <button onClick={submitPayment}
-                disabled={saving || !payForm.purchaseId || !payForm.amount || !payForm.paidAt}
-                style={{ ...btn, marginTop: 6,
-                         opacity: saving || !payForm.purchaseId || !payForm.amount || !payForm.paidAt ? 0.45 : 1 }}>
+            <AdminCard>
+              <AdminSectionHeader title="Record a cash payment" />
+              <div className="space-y-3">
+                <AdminField label="Purchase" htmlFor="pay-purchase">
+                  <select id="pay-purchase" value={payForm.purchaseId}
+                    onChange={e => setPayForm({ ...payForm, purchaseId: e.target.value })}
+                    className={adminSelectClass}>
+                    <option value="">Select…</option>
+                    {purchases.map(p => <option key={p.id} value={p.id}>
+                      {p.supplier}{p.reference ? ` · ${p.reference}` : ''}
+                    </option>)}
+                  </select>
+                </AdminField>
+                <AdminField label="Type" htmlFor="pay-type">
+                  <select id="pay-type" value={payForm.paymentType}
+                    onChange={e => setPayForm({ ...payForm, paymentType: e.target.value })}
+                    className={adminSelectClass}>
+                    {['deposit','partial','final','supplier','freight','duties','tariffs',
+                      'customs_brokerage','other'].map(t =>
+                      <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                  </select>
+                </AdminField>
+                <AdminField label="Amount $" htmlFor="pay-amount">
+                  <input id="pay-amount" type="number" step="0.01" min="0" value={payForm.amount}
+                    onChange={e => setPayForm({ ...payForm, amount: e.target.value })}
+                    className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Paid on (when money left)" htmlFor="pay-date">
+                  <input id="pay-date" type="date" value={payForm.paidAt}
+                    onChange={e => setPayForm({ ...payForm, paidAt: e.target.value })}
+                    className={adminInputClass} />
+                </AdminField>
+              </div>
+              <AdminButton variant="primary" className="mt-4" onClick={submitPayment}
+                loading={saving} disabled={!payForm.purchaseId || !payForm.amount || !payForm.paidAt}>
                 Record payment
-              </button>
-            </div>
+              </AdminButton>
+            </AdminCard>
           </div>
 
-          <SectionTitle note="A payment date is not a receipt date. Cash flow uses the paid date only.">
-            Cash payments
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Paid on','Supplier','Type','Amount'].map(h => <th key={h} style={th}>{h}</th>)}
+          <AdminSectionHeader title="Cash payments"
+            info="A payment date is not a receipt date. Cash flow uses the paid date only." />
+          {payments.length === 0 && !loading ? <AdminEmpty title="No payments recorded." /> : (
+            <AdminTable minWidth={480} caption="Cash payments">
+              <thead><tr>
+                {['Paid on','Supplier','Type','Amount'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
               <tbody>
-                {payments.length === 0 && !loading && (
-                  <tr><td colSpan={4} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No payments recorded.
-                  </td></tr>
-                )}
                 {payments.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{p.paidAt}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {purchases.find(x => x.id === p.purchaseId)?.supplier ?? '—'}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {p.paymentType.replace(/_/g, ' ')}
-                    </td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(p.amountCents)}</td>
+                  <tr key={p.id}>
+                    <AdminTd>{p.paidAt}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{purchases.find(x => x.id === p.purchaseId)?.supplier ?? '—'}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{p.paymentType.replace(/_/g, ' ')}</AdminTd>
+                    <AdminTd className="font-medium">{money(p.amountCents)}</AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </AdminTable>
+          )}
         </>
       )}
-    </div>
+    </AdminPage>
   )
 }

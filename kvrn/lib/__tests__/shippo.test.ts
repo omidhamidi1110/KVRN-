@@ -507,3 +507,29 @@ describe('free-shipping rule: non-US never qualifies regardless of subtotal', ()
     expect(result[1].cents).toBe(9381)
   })
 })
+
+
+describe('malformed provider rate hardening', () => {
+  test('excludes negative, nonnumeric and infinite carrier amounts instead of undercharging', () => {
+    const bad = [
+      { ...US_GROUND, amount: '-2.00' },
+      { ...US_GROUND, amount: 'not-a-number' },
+      { ...US_GROUND, amount: 'Infinity' },
+    ]
+    const result = pickRatesForDestination([...bad, US_PRIORITY], 'US')
+    expect(result.standard?.cents).toBe(980)
+    expect(result.express).toBeNull()
+  })
+
+  test('normalizes string delivery days to safe numeric windows', () => {
+    const r = pickRatesForDestination([{ ...US_GROUND, estimated_days: '3' }], 'US')
+    expect(r.standard?.minDays).toBe(2)
+    expect(r.standard?.maxDays).toBe(4)
+  })
+
+  test('malformed estimated_days uses the conservative fallback rather than NaN', () => {
+    const r = pickRatesForDestination([{ ...US_GROUND, estimated_days: 'three' }], 'US')
+    expect(r.standard?.minDays).toBe(6)
+    expect(r.standard?.maxDays).toBe(8)
+  })
+})

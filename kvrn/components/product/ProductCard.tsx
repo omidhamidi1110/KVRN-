@@ -8,6 +8,7 @@ import { useI18n }     from '@/context/I18nContext'
 import { StockBadge, computeStock } from '@/components/ui/StockBadge'
 import { QuickAddModal } from '@/components/product/QuickAddModal'
 import { cn } from '@/lib/utils'
+import { format } from '@/lib/i18n/messages'
 import type { Product, ColorOption } from '@/types'
 
 interface Props {
@@ -64,9 +65,9 @@ export function ProductCard({ product, priority = false, className }: Props) {
           {stock > 0 && (
             <button
               onClick={e => { e.preventDefault(); e.stopPropagation(); setShowQuickAdd(true) }}
-              aria-label={`Quick add ${product.name}`}
+              aria-label={format(t['product.quickAdd'], { name: product.name })}
               className={cn(
-                'absolute bottom-3 right-3',
+                'absolute bottom-3 end-3',
                 'w-8 h-8 rounded-full flex items-center justify-center',
                 'bg-[#F9F8F6] border border-[#E8E5E0]',
                 'opacity-0 group-hover:opacity-100 transition-all duration-200',
@@ -93,7 +94,7 @@ export function ProductCard({ product, priority = false, className }: Props) {
 
           {/* Color swatches */}
           {product.colors.length > 1 && (
-            <div className="flex items-center gap-1.5" role="radiogroup" aria-label={`Color: ${activeColor.name}`}>
+            <div className="flex items-center gap-1.5" role="radiogroup" aria-label={format(t['product.colorIs'], { name: activeColor.name })}>
               {product.colors.map(c => (
                 <button
                   key={c.value} title={c.name} aria-label={c.name}

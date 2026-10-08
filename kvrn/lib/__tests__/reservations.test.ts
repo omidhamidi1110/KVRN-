@@ -153,7 +153,7 @@ if (!TEST_DB) {
 }
 
 describeDB('Integration — isolated per-test fixtures', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createReservationService>
 
@@ -362,7 +362,7 @@ if (!TEST_DB_50) {
 }
 
 describeDB50('Integration V50 — shipping snapshot and paid order finalization', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createReservationService>
 
@@ -426,7 +426,7 @@ describeDB50('Integration V50 — shipping snapshot and paid order finalization'
       expect(row.customer_email).toBe('test@example.com')
       expect(row.customer_name).toBe('Test Buyer')
       expect(row.shipping_method).toBe('standard')
-      expect(Number(row.shipping_cents)).toBe(1999)
+      expect(Number(row.shipping_cents)).toBe(MOCK_LIVE_STANDARD_CENTS)
     } finally { await teardown50(ids) }
   }, 20000)
 
@@ -606,7 +606,7 @@ describe('createCheckoutPostHandler — real production handler', () => {
 const describeDB502 = TEST_DB_50 ? describe : describe.skip
 
 describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong total, replay', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createReservationService>
 
@@ -636,7 +636,13 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
       await testSql`DELETE FROM reservation_items WHERE reservation_id = ANY(${o.rids}::uuid[])`
       await testSql`DELETE FROM reservations WHERE id = ANY(${o.rids}::uuid[])`
     }
-    if (o.vids?.length) await testSql`DELETE FROM product_variants WHERE id = ANY(${o.vids}::uuid[])`
+    if (o.vids?.length) {
+      // Delete only disposable test fixture accounting records.
+      // Never use this cleanup procedure against production.
+      await testSql`DELETE FROM inventory_layer_consumptions WHERE variant_id = ANY(${o.vids}::uuid[])`
+      await testSql`DELETE FROM inventory_cost_layers WHERE variant_id = ANY(${o.vids}::uuid[])`
+      await testSql`DELETE FROM product_variants WHERE id = ANY(${o.vids}::uuid[])`
+    }
     if (o.pids?.length) await testSql`DELETE FROM products WHERE id = ANY(${o.pids}::uuid[])`
   }
 
@@ -882,7 +888,7 @@ describeDB502('Integration V50.2 — shipping cents, snapshot override, wrong to
         stripeEventId:       ev,
         eventType:           'checkout.session.completed',
         currency:            'usd',
-        amountTotal:         9999,            // 8000 merch + 1999 standard
+        amountTotal:         8000 + MOCK_LIVE_STANDARD_CENTS, // match mocked Shippo quote
         customerEmail:       'WEBHOOK@IGNORED',
         customerName:        'WEBHOOK NAME',
         customerPhone:       '+19995550123',  // conflicting webhook phone — must NOT win
@@ -1376,7 +1382,7 @@ if (!TEST_DB_51) {
 }
 
 describeDB51('Integration V51.1 — transactional email outbox', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createReservationService>
 
@@ -1407,7 +1413,13 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       await testSql`DELETE FROM reservation_items WHERE reservation_id = ANY(${o.rids}::uuid[])`
       await testSql`DELETE FROM reservations WHERE id = ANY(${o.rids}::uuid[])`
     }
-    if (o.vids?.length) await testSql`DELETE FROM product_variants WHERE id = ANY(${o.vids}::uuid[])`
+    if (o.vids?.length) {
+      // Delete only disposable test fixture accounting records.
+      // Never use this cleanup procedure against production.
+      await testSql`DELETE FROM inventory_layer_consumptions WHERE variant_id = ANY(${o.vids}::uuid[])`
+      await testSql`DELETE FROM inventory_cost_layers WHERE variant_id = ANY(${o.vids}::uuid[])`
+      await testSql`DELETE FROM product_variants WHERE id = ANY(${o.vids}::uuid[])`
+    }
     if (o.pids?.length) await testSql`DELETE FROM products WHERE id = ANY(${o.pids}::uuid[])`
   }
 
@@ -1507,7 +1519,7 @@ describeDB51('Integration V51.1 — transactional email outbox', () => {
       expect(r.ok).toBe(true); if (!r.ok) return
       ids.rids.push(r.reservationId)
       // Do NOT save email — simulate no customer_email in reservation
-      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs}, shipping_method='standard', shipping_cents=1999 WHERE id=${r.reservationId}`
+      await testSql`UPDATE reservations SET stripe_checkout_session_id=${fs}, shipping_method='standard', shipping_cents=1999, shipping_before_discount_cents=1999, shipping_discount_cents=0, shipping_final_cents=1999 WHERE id=${r.reservationId}`
       // Clear the email
       await testSql`UPDATE reservations SET customer_email=NULL WHERE id=${r.reservationId}`
       const result = await svc.finalizePaidOrder({
@@ -1863,7 +1875,7 @@ if (!TEST_DB_512) {
 }
 
 describeDB512('Integration V51.2 — admin order service', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createAdminOrderService>
 
@@ -2155,7 +2167,7 @@ if (!TEST_DB_513) {
 }
 
 describeDB513('Integration V51.3 — shipment + shipping email outbox', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createAdminOrderService>
 
@@ -2500,7 +2512,7 @@ if (!TEST_DB_514) {
 }
 
 describeDB514('Integration V51.4 — retry batch processor and stale sending recovery', () => {
-  const { neon } = require('@neondatabase/serverless')
+  const { localTestNeon: neon } = require('./helpers/local-reservation-pg')
   let testSql: any
   let svc: ReturnType<typeof createAdminOrderService>
 

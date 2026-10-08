@@ -1,5 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
+import {
+  AdminPage, AdminPageHeader, AdminCard, AdminSectionHeader, AdminButton, AdminNotice, AdminField,
+  AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading, AdminError, StatusBadge,
+  adminInputClass, adminSelectClass, adminCheckboxClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Discount = {
   id: string; code: string; name: string; description: string | null
@@ -12,9 +17,6 @@ type Discount = {
   createdAt: string
 }
 
-const FONT = '-apple-system, Helvetica Neue, Arial, sans-serif'
-const BORDER = '1px solid #E8E5E0'
-
 function fmtVal(d: Discount): string {
   if (d.type === 'fixed_amount' && d.amountCents !== null) return `$${(d.amountCents/100).toFixed(2)}`
   if (d.type === 'percentage'   && d.percentageBps !== null) return `${d.percentageBps/100}%`
@@ -25,17 +27,6 @@ function fmtVal(d: Discount): string {
 function fmt(d: string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'2-digit' })
-}
-
-function Badge({ v }: { v: boolean }) {
-  return (
-    <span style={{ fontSize:10, padding:'2px 7px', borderRadius:2,
-      background: v ? '#D1FAE5' : '#F3F4F6',
-      color: v ? '#065F46' : '#6B7280',
-      fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase' }}>
-      {v ? 'Active' : 'Inactive'}
-    </span>
-  )
 }
 
 const emptyForm = {
@@ -54,9 +45,11 @@ export function AdminDiscountsClient() {
   const [creating,  setCreating]  = useState(false)
   const [showForm,  setShowForm]  = useState(false)
   const [saving,    setSaving]    = useState(false)
+  const [notice,    setNotice]    = useState('')
 
   const load = () => {
     setLoading(true)
+    setError('')
     fetch('/api/admin/discounts')
       .then(r => r.json())
       .then(j => { if (j.success) setDiscounts(j.data); else setError(j.error ?? 'Failed.') })
@@ -67,7 +60,7 @@ export function AdminDiscountsClient() {
   useEffect(() => { load() }, [])
 
   const handleDeactivate = async (id: string) => {
-    if (!confirm('Deactivate this discount?')) return
+    if (!confirm('Deactivate this discount? The code stops working at checkout.')) return
     const r = await fetch(`/api/admin/discounts/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ active: false })
@@ -76,10 +69,11 @@ export function AdminDiscountsClient() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this discount? Only allowed if no redemptions exist.')) return
+    if (!confirm('Delete this discount? This cannot be undone.')) return
     const r = await fetch(`/api/admin/discounts/${id}`, { method: 'DELETE' })
     const j = await r.json()
-    if (!r.ok) { alert(j.error ?? 'Delete failed.'); return }
+    if (!r.ok) { setNotice(j.error ?? 'Couldn’t delete this discount.'); return }
+    setNotice('')
     load()
   }
 
@@ -100,150 +94,129 @@ export function AdminDiscountsClient() {
     })
     const j = await r.json()
     setSaving(false)
-    if (!r.ok) { alert(j.error ?? 'Failed to create.'); return }
+    if (!r.ok) { setNotice(j.error ?? 'Couldn’t create this discount.'); return }
+    setNotice('')
     setShowForm(false)
     setForm(emptyForm)
     load()
   }
 
-  const inputSt = (extra?: any) => ({
-    width: '100%', padding: '8px 10px', border: BORDER, fontSize: 13,
-    outline: 'none', boxSizing: 'border-box' as const, fontFamily: FONT,
-    ...extra
-  })
-
   return (
-    <div style={{ minHeight:'100vh', background:'#F9F8F6', paddingTop:'calc(36px + 56px)' }}>
-      <div style={{ maxWidth:1200, margin:'0 auto', padding:'32px 24px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:24 }}>
-          <h1 style={{ fontSize:20, fontWeight:500, color:'#1A1A1A', letterSpacing:'0.04em', textTransform:'uppercase', margin:0 }}>
-            Discounts
-          </h1>
-          <button onClick={() => setShowForm(!showForm)}
-            style={{ background:'#1A1A1A', color:'#fff', border:'none', cursor:'pointer', padding:'9px 16px',
-                     fontFamily:FONT, fontSize:11, fontWeight:500, letterSpacing:'0.08em', textTransform:'uppercase' }}>
-            {showForm ? 'CANCEL' : '+ NEW DISCOUNT'}
-          </button>
-        </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Discounts"
+        description="Codes and checkout offers."
+        actions={
+          <AdminButton variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : 'New discount'}
+          </AdminButton>
+        }
+      />
 
-        {showForm && (
-          <div style={{ background:'#fff', border:BORDER, padding:24, marginBottom:24 }}>
-            <h2 style={{ fontSize:13, fontWeight:600, margin:'0 0 16px', letterSpacing:'0.04em' }}>CREATE DISCOUNT</h2>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:12 }}>
-              <div>
-                <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Code *</label>
-                <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} style={inputSt()} placeholder="KVRN10" />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Name *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputSt()} placeholder="Internal name" />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Type *</label>
-                <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as Discount['type'] }))} style={{ ...inputSt(), background:'#fff' }}>
-                  <option value="fixed_amount">Fixed amount</option>
-                  <option value="percentage">Percentage</option>
-                  <option value="shipping">Shipping</option>
-                </select>
-              </div>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12, marginBottom:12 }}>
-              {form.type === 'fixed_amount' && (
-                <div>
-                  <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Amount (cents)</label>
-                  <input type="number" value={form.amountCents ?? ''} onChange={e => setForm(f => ({ ...f, amountCents: Number(e.target.value) }))} style={inputSt()} placeholder="1000" />
-                </div>
-              )}
-              {form.type === 'percentage' && (
-                <div>
-                  <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>% BPS</label>
-                  <input type="number" value={form.percentageBps ?? ''} onChange={e => setForm(f => ({ ...f, percentageBps: Number(e.target.value) }))} style={inputSt()} placeholder="1000 = 10%" />
-                </div>
-              )}
-              <div>
-                <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Max uses</label>
-                <input type="number" value={form.maxRedemptions ?? ''} onChange={e => setForm(f => ({ ...f, maxRedemptions: e.target.value ? Number(e.target.value) : null }))} style={inputSt()} placeholder="∞" />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Min subtotal (cents)</label>
-                <input type="number" value={form.minimumSubtotalCents ?? ''} onChange={e => setForm(f => ({ ...f, minimumSubtotalCents: e.target.value ? Number(e.target.value) : null }))} style={inputSt()} placeholder="none" />
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:10, color:'#888', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:4 }}>Expires at</label>
-                <input type="date" value={form.expiresAt} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))} style={inputSt()} />
-              </div>
-            </div>
-            <div style={{ display:'flex', gap:16, marginBottom:16 }}>
-              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
-                <input type="checkbox" checked={form.singleUse} onChange={e => setForm(f => ({ ...f, singleUse: e.target.checked }))} />
-                Single use
-              </label>
-              <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
-                <input type="checkbox" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
-                Active
-              </label>
-            </div>
-            <button onClick={handleCreate} disabled={saving}
-              style={{ background:'#1A1A1A', color:'#fff', border:'none', cursor:'pointer', padding:'10px 20px',
-                       fontFamily:FONT, fontSize:11, fontWeight:500, letterSpacing:'0.08em', textTransform:'uppercase',
-                       opacity: saving ? 0.5 : 1 }}>
-              {saving ? 'SAVING…' : 'CREATE DISCOUNT'}
-            </button>
+      {notice && <AdminNotice tone="danger" className="mb-4">{notice}</AdminNotice>}
+
+      {showForm && (
+        <AdminCard className="mb-5">
+          <AdminSectionHeader title="Create discount" />
+          <div className="mb-3 grid gap-3 sm:grid-cols-3">
+            <AdminField label="Code *" htmlFor="dc-code">
+              <input id="dc-code" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className={adminInputClass} placeholder="KVRN10" />
+            </AdminField>
+            <AdminField label="Name *" htmlFor="dc-name">
+              <input id="dc-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={adminInputClass} placeholder="Internal name" />
+            </AdminField>
+            <AdminField label="Type *" htmlFor="dc-type">
+              <select id="dc-type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as Discount['type'] }))} className={adminSelectClass}>
+                <option value="fixed_amount">Fixed amount</option>
+                <option value="percentage">Percentage</option>
+                <option value="shipping">Shipping</option>
+              </select>
+            </AdminField>
           </div>
-        )}
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {form.type === 'fixed_amount' && (
+              <AdminField label="Amount (cents)" htmlFor="dc-amount"
+                info="Whole cents. 1000 = $10.00.">
+                <input id="dc-amount" type="number" value={form.amountCents ?? ''} onChange={e => setForm(f => ({ ...f, amountCents: Number(e.target.value) }))} className={adminInputClass} placeholder="1000" />
+              </AdminField>
+            )}
+            {form.type === 'percentage' && (
+              <AdminField label="Percent (BPS)" htmlFor="dc-bps"
+                info="Basis points: 100 BPS = 1%. 1000 = 10%.">
+                <input id="dc-bps" type="number" value={form.percentageBps ?? ''} onChange={e => setForm(f => ({ ...f, percentageBps: Number(e.target.value) }))} className={adminInputClass} placeholder="1000" />
+              </AdminField>
+            )}
+            <AdminField label="Max uses" htmlFor="dc-max">
+              <input id="dc-max" type="number" value={form.maxRedemptions ?? ''} onChange={e => setForm(f => ({ ...f, maxRedemptions: e.target.value ? Number(e.target.value) : null }))} className={adminInputClass} placeholder="Unlimited" />
+            </AdminField>
+            <AdminField label="Min subtotal (cents)" htmlFor="dc-min"
+              info="Whole cents. 5000 = $50.00. Leave empty for no minimum.">
+              <input id="dc-min" type="number" value={form.minimumSubtotalCents ?? ''} onChange={e => setForm(f => ({ ...f, minimumSubtotalCents: e.target.value ? Number(e.target.value) : null }))} className={adminInputClass} placeholder="None" />
+            </AdminField>
+            <AdminField label="Expires at" htmlFor="dc-exp">
+              <input id="dc-exp" type="date" value={form.expiresAt} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))} className={adminInputClass} />
+            </AdminField>
+          </div>
+          <div className="mb-4 flex flex-wrap gap-5">
+            <label className="flex min-h-[40px] cursor-pointer items-center gap-2 text-[12px]">
+              <input type="checkbox" className={adminCheckboxClass} checked={form.singleUse} onChange={e => setForm(f => ({ ...f, singleUse: e.target.checked }))} />
+              Single use
+            </label>
+            <label className="flex min-h-[40px] cursor-pointer items-center gap-2 text-[12px]">
+              <input type="checkbox" className={adminCheckboxClass} checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} />
+              Active
+            </label>
+          </div>
+          <AdminButton variant="primary" onClick={handleCreate} loading={saving}>Create discount</AdminButton>
+        </AdminCard>
+      )}
 
-        {loading && <p style={{ color:'#9B9B9B', fontSize:13 }}>Loading…</p>}
-        {error   && <p style={{ color:'#B91C1C', fontSize:13 }}>{error}</p>}
+      {loading && <AdminLoading />}
+      {error   && <AdminError message={error} onRetry={load} />}
 
-        {!loading && (
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-              <thead>
-                <tr style={{ borderBottom:'2px solid #E8E5E0' }}>
-                  {['Code','Name','Type','Value','Active','Single use','Uses','Max','Min subtotal','Expires','Created'].map(h => (
-                    <th key={h} style={{ padding:'8px 10px', textAlign:'left', fontSize:10, fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', color:'#6b7280', whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
-                  <th style={{ padding:'8px 10px' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {discounts.map(d => (
-                  <tr key={d.id} style={{ borderBottom:'1px solid #F1EEE8' }}>
-                    <td style={{ padding:'10px', fontFamily:'monospace', fontWeight:600 }}>{d.code}</td>
-                    <td style={{ padding:'10px', color:'#5A5A5A' }}>{d.name}</td>
-                    <td style={{ padding:'10px', color:'#6b7280', textTransform:'capitalize' }}>{d.type.replace('_',' ')}</td>
-                    <td style={{ padding:'10px' }}>{fmtVal(d)}</td>
-                    <td style={{ padding:'10px' }}><Badge v={d.active} /></td>
-                    <td style={{ padding:'10px', color:'#6b7280' }}>{d.singleUse ? 'Yes' : 'No'}</td>
-                    <td style={{ padding:'10px', color:'#6b7280' }}>{d.redemptionCount}</td>
-                    <td style={{ padding:'10px', color:'#6b7280' }}>{d.maxRedemptions ?? '∞'}</td>
-                    <td style={{ padding:'10px', color:'#6b7280' }}>{d.minimumSubtotalCents ? `$${(d.minimumSubtotalCents/100).toFixed(0)}` : '—'}</td>
-                    <td style={{ padding:'10px', color:'#6b7280', whiteSpace:'nowrap' }}>{fmt(d.expiresAt)}</td>
-                    <td style={{ padding:'10px', color:'#9B9B9B', whiteSpace:'nowrap' }}>{fmt(d.createdAt)}</td>
-                    <td style={{ padding:'10px', whiteSpace:'nowrap' }}>
+      {!loading && (
+        discounts.length === 0 && !error ? (
+          <AdminEmpty title="No discounts yet." />
+        ) : discounts.length > 0 && (
+          <AdminTable minWidth={900} caption="Discounts">
+            <thead>
+              <tr>
+                {['Code','Name','Type','Value','Status','Single use','Uses','Max','Min subtotal','Expires','Created'].map(h => (
+                  <AdminTh key={h}>{h}</AdminTh>
+                ))}
+                <AdminTh><span className="sr-only">Actions</span></AdminTh>
+              </tr>
+            </thead>
+            <tbody>
+              {discounts.map(d => (
+                <tr key={d.id}>
+                  <AdminTd className="font-mono font-medium">{d.code}</AdminTd>
+                  <AdminTd className="text-[#4A4A46]">{d.name}</AdminTd>
+                  <AdminTd className="capitalize text-[#6B6B66]">{d.type.replace('_',' ')}</AdminTd>
+                  <AdminTd>{fmtVal(d)}</AdminTd>
+                  <AdminTd><StatusBadge status={d.active ? 'Active' : 'Inactive'} /></AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{d.singleUse ? 'Yes' : 'No'}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{d.redemptionCount}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{d.maxRedemptions ?? '∞'}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{d.minimumSubtotalCents ? `$${(d.minimumSubtotalCents/100).toFixed(2)}` : '—'}</AdminTd>
+                  <AdminTd className="whitespace-nowrap text-[#6B6B66]">{fmt(d.expiresAt)}</AdminTd>
+                  <AdminTd className="whitespace-nowrap text-[#8A8A85]">{fmt(d.createdAt)}</AdminTd>
+                  <AdminTd className="whitespace-nowrap">
+                    <span className="flex gap-1.5">
                       {d.active && (
-                        <button onClick={() => handleDeactivate(d.id)}
-                          style={{ fontSize:10, padding:'3px 8px', border:BORDER, background:'none', cursor:'pointer', letterSpacing:'0.04em', textTransform:'uppercase', marginRight:4 }}>
-                          Deactivate
-                        </button>
+                        <AdminButton size="sm" onClick={() => handleDeactivate(d.id)}>Deactivate</AdminButton>
                       )}
                       {d.redemptionCount === 0 && (
-                        <button onClick={() => handleDelete(d.id)}
-                          style={{ fontSize:10, padding:'3px 8px', border:'1px solid #FCA5A5', background:'none', cursor:'pointer', letterSpacing:'0.04em', textTransform:'uppercase', color:'#B91C1C' }}>
-                          Delete
-                        </button>
+                        <AdminButton size="sm" variant="danger" onClick={() => handleDelete(d.id)}>Delete</AdminButton>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {discounts.length === 0 && (
-              <p style={{ color:'#9B9B9B', fontSize:13, padding:'16px 0' }}>No discounts yet.</p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+                    </span>
+                  </AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </AdminTable>
+        )
+      )}
+    </AdminPage>
   )
 }

@@ -10,7 +10,11 @@
 // allocation is blocked.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, moneyOrUnknown, SectionTitle } from '@/components/admin/FinancialUI'
+import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminNotice, AdminButton, AdminTable, AdminTh, AdminTd,
+  AdminLoading, AdminEmpty, adminInputClass,
+} from '@/components/admin/ui/AdminUI'
 
 type ReturnRow = {
   id: string; returnNumber: string; orderNumber: string; status: string
@@ -32,11 +36,6 @@ type AwaitingFeeRow = {
   id: string; stripeRefundId: string | null; orderId: string; orderNumber: string
   amountCents: number; orderStripeFeeCents: number | null
   otherFeeReturnedCents: number; refundedAt: string | null
-}
-
-const inputStyle = {
-  fontFamily: FONT, fontSize: 12, padding: '7px 9px',
-  border: BORDER, background: '#fff', width: 100, boxSizing: 'border-box' as const,
 }
 
 export function ReturnsClient() {
@@ -71,7 +70,7 @@ export function ReturnsClient() {
     return Number.isFinite(n) ? n : null
   }
 
-  /** Derive deterministically. Offered only for a genuine full refund. */
+  /** Derive the split from the order. Offered only for a genuine full refund. */
   async function derive(refundId: string) {
     setBusyId(refundId); setErr(null)
     try {
@@ -144,221 +143,163 @@ export function ReturnsClient() {
     finally { setBusyId(null) }
   }
 
-  const th = {
-    textAlign: 'left' as const, padding: '9px 10px', fontSize: 9,
-    letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-    color: '#9B9B9B', borderBottom: BORDER, whiteSpace: 'nowrap' as const,
-  }
+  const moneyInput = `${adminInputClass} !w-[104px]`
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1240 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Returns
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        A return records what physically came back and what it means for inventory and COGS.
-        It does not reduce revenue on its own — that is handled by the refund it is allocated to.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Returns"
+        description="Returns affect stock and COGS, not revenue."
+        info="A return records what physically came back and what it means for inventory and COGS. It does not reduce revenue on its own — that is handled by the refund it is allocated to."
+      />
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-
-      {note && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#047857', background: '#ECFDF5',
-                      border: '1px solid #A7F3D0', padding: '10px 14px', marginBottom: 16 }}>
-          {note}
-        </div>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {note && <AdminNotice tone="success" className="mb-4">{note}</AdminNotice>}
 
       {/* ── Refunds whose processing-fee return is not recorded ──────────── */}
       {awaitingFee.length > 0 && (
-        <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                        border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 12 }}>
-            Whether Stripe returned any of the original processing fee on these refunds is
-            <strong> unknown</strong> — not $0. Until it is recorded, the order&apos;s Stripe fee and
-            profit cannot be stated. If Stripe returned nothing, record <strong>$0.00</strong>
-            explicitly. A recorded value is permanent.
-          </div>
-          <SectionTitle note="Independent of the merchandise / shipping / tax split and of any return.">
-            Refunds awaiting processing-fee return ({awaitingFee.length})
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#FAF9F7' }}>
-                  {['Order', 'Refund', 'Original Stripe fee', 'Fee returned', 'Fee returned $', ''].map((h, i) => (
-                    <th key={i} style={th}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {awaitingFee.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{r.orderNumber}</td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(r.amountCents)}</td>
-                    <td style={{ padding: '9px 10px' }}>
-                      {moneyOrUnknown(r.orderStripeFeeCents, 'Unknown')}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#92400E' }}>Unknown</td>
-                    <td style={{ padding: '9px 10px' }}>
-                      <input type="number" step="0.01" min="0" value={feeDraft[r.id] ?? ''}
-                        onChange={e => setFeeDraft(x => ({ ...x, [r.id]: e.target.value }))}
-                        placeholder="0.00" style={inputStyle}
-                        aria-label={`Processing fee returned for ${r.orderNumber}`} />
-                    </td>
-                    <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
-                      <button onClick={() => setFeeDraft(x => ({ ...x, [r.id]: '0.00' }))}
-                        disabled={busyId === r.id}
-                        style={{ fontFamily: FONT, fontSize: 10, letterSpacing: '0.06em',
-                                 textTransform: 'uppercase', padding: '6px 10px', marginRight: 6,
-                                 background: '#fff', color: '#1A1A1A', border: BORDER, cursor: 'pointer' }}>
+        <div className="mb-7">
+          <AdminNotice tone="warning" className="mb-3" title="Fee returned is unknown, not $0.">
+            Until Stripe&apos;s returned processing fee is recorded, the order&apos;s Stripe fee and profit
+            cannot be stated. If Stripe returned nothing, record <strong>$0.00</strong> explicitly.
+            A recorded value is permanent.
+          </AdminNotice>
+          <AdminSectionHeader title={`Refunds awaiting processing-fee return (${awaitingFee.length})`}
+            info="Independent of the merchandise / shipping / tax split and of any return." />
+          <AdminTable minWidth={720} caption="Refunds awaiting processing-fee return">
+            <thead>
+              <tr>
+                {['Order', 'Refund', 'Original Stripe fee', 'Fee returned', 'Fee returned $'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+                <AdminTh><span className="sr-only">Actions</span></AdminTh>
+              </tr>
+            </thead>
+            <tbody>
+              {awaitingFee.map(r => (
+                <tr key={r.id}>
+                  <AdminTd>{r.orderNumber}</AdminTd>
+                  <AdminTd className="font-medium">{money(r.amountCents)}</AdminTd>
+                  <AdminTd>{moneyOrUnknown(r.orderStripeFeeCents, 'Unknown')}</AdminTd>
+                  <AdminTd className="font-medium text-[#92400E]">Unknown</AdminTd>
+                  <AdminTd>
+                    <input type="number" step="0.01" min="0" value={feeDraft[r.id] ?? ''}
+                      onChange={e => setFeeDraft(x => ({ ...x, [r.id]: e.target.value }))}
+                      placeholder="0.00" className={moneyInput}
+                      aria-label={`Processing fee returned for ${r.orderNumber}`} />
+                  </AdminTd>
+                  <AdminTd className="whitespace-nowrap">
+                    <span className="flex gap-1.5">
+                      <AdminButton size="sm" onClick={() => setFeeDraft(x => ({ ...x, [r.id]: '0.00' }))}
+                        disabled={busyId === r.id}>
                         Stripe returned $0
-                      </button>
-                      <button onClick={() => void submitFee(r)}
-                        disabled={busyId === r.id || (feeDraft[r.id] ?? '').trim() === ''}
-                        style={{ fontFamily: FONT, fontSize: 10, letterSpacing: '0.06em',
-                                 textTransform: 'uppercase', padding: '6px 10px',
-                                 background: '#1A1A1A', color: '#fff', border: 'none', cursor: 'pointer',
-                                 opacity: (feeDraft[r.id] ?? '').trim() === '' ? 0.4 : 1 }}>
-                        {busyId === r.id ? '…' : 'Record'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+                      </AdminButton>
+                      <AdminButton size="sm" variant="primary" onClick={() => void submitFee(r)}
+                        loading={busyId === r.id} disabled={(feeDraft[r.id] ?? '').trim() === ''}>
+                        Record
+                      </AdminButton>
+                    </span>
+                  </AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </AdminTable>
+        </div>
       )}
 
       {/* ── Refunds awaiting component breakdown ─────────────────────────── */}
       {awaiting.length > 0 && (
-        <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                        border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 12 }}>
-            Stripe reports a refund total but does not split it into merchandise, shipping
-            and tax. Until the split is recorded it is <strong>unknown</strong> — not zero,
-            and not the full amount — and these refunds cannot be allocated to a return.
-          </div>
+        <div className="mb-7">
+          <AdminNotice tone="warning" className="mb-3" title="Refund split is unknown.">
+            Stripe reports a refund total but not the merchandise, shipping and tax split. Until it
+            is recorded these refunds count as unknown — not zero, not the full amount — and cannot
+            be allocated to a return.
+          </AdminNotice>
 
-          <SectionTitle note="Derive automatically when the refund equals the order total. Otherwise enter a split that totals the refund exactly.">
-            Refunds awaiting breakdown ({awaiting.length})
-          </SectionTitle>
+          <AdminSectionHeader title={`Refunds awaiting breakdown (${awaiting.length})`}
+            description="Derive when the refund equals the order total; otherwise enter a split that totals the refund." />
 
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#FAF9F7' }}>
-                  {['Order', 'Refund', 'Merchandise $', 'Shipping $', 'Tax $', 'Total', ''].map((h, i) => (
-                    <th key={i} style={th}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {awaiting.map(r => {
-                  const d = draft[r.id] ?? { m: '', s: '', t: '' }
-                  const sum = (toCents(d.m) ?? 0) + (toCents(d.s) ?? 0) + (toCents(d.t) ?? 0)
-                  const complete = d.m.trim() && d.s.trim() && d.t.trim()
-                  const balanced = complete && sum === r.amountCents
-                  return (
-                    <tr key={r.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                      <td style={{ padding: '9px 10px' }}>{r.orderNumber}</td>
-                      <td style={{ padding: '9px 10px', fontWeight: 500 }}>
-                        {money(r.amountCents)}
-                      </td>
-                      {(['m', 's', 't'] as const).map(k => (
-                        <td key={k} style={{ padding: '9px 10px' }}>
-                          <input type="number" step="0.01" min="0" value={d[k]}
-                            onChange={e => setDraft(x => ({ ...x, [r.id]: { ...d, [k]: e.target.value } }))}
-                            placeholder="0.00" style={inputStyle}
-                            aria-label={`${k === 'm' ? 'Merchandise' : k === 's' ? 'Shipping' : 'Tax'} for ${r.orderNumber}`} />
-                        </td>
-                      ))}
-                      <td style={{ padding: '9px 10px',
-                                   color: !complete ? '#9B9B9B' : balanced ? '#047857' : '#B91C1C' }}>
-                        {complete ? money(sum) : '—'}
-                        {complete && !balanced && (
-                          <span style={{ display: 'block', fontSize: 10 }}>must equal refund</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
+          <AdminTable minWidth={760} caption="Refunds awaiting breakdown">
+            <thead>
+              <tr>
+                {['Order', 'Refund', 'Merchandise $', 'Shipping $', 'Tax $', 'Total'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+                <AdminTh><span className="sr-only">Actions</span></AdminTh>
+              </tr>
+            </thead>
+            <tbody>
+              {awaiting.map(r => {
+                const d = draft[r.id] ?? { m: '', s: '', t: '' }
+                const sum = (toCents(d.m) ?? 0) + (toCents(d.s) ?? 0) + (toCents(d.t) ?? 0)
+                const complete = d.m.trim() && d.s.trim() && d.t.trim()
+                const balanced = complete && sum === r.amountCents
+                return (
+                  <tr key={r.id}>
+                    <AdminTd>{r.orderNumber}</AdminTd>
+                    <AdminTd className="font-medium">{money(r.amountCents)}</AdminTd>
+                    {(['m', 's', 't'] as const).map(k => (
+                      <AdminTd key={k}>
+                        <input type="number" step="0.01" min="0" value={d[k]}
+                          onChange={e => setDraft(x => ({ ...x, [r.id]: { ...d, [k]: e.target.value } }))}
+                          placeholder="0.00" className={moneyInput}
+                          aria-label={`${k === 'm' ? 'Merchandise' : k === 's' ? 'Shipping' : 'Tax'} for ${r.orderNumber}`} />
+                      </AdminTd>
+                    ))}
+                    <AdminTd className={!complete ? 'text-[#8A8A85]' : balanced ? 'text-[#047857]' : 'font-medium text-[#B91C1C]'}>
+                      {complete ? money(sum) : '—'}
+                      {complete && !balanced && (
+                        <span className="block text-[11px]">must equal refund</span>
+                      )}
+                    </AdminTd>
+                    <AdminTd className="whitespace-nowrap">
+                      <span className="flex gap-1.5">
                         {r.canDeriveFullRefund && (
-                          <button onClick={() => void derive(r.id)} disabled={busyId === r.id}
-                            style={{ fontFamily: FONT, fontSize: 10, letterSpacing: '0.06em',
-                                     textTransform: 'uppercase', padding: '6px 10px',
-                                     marginRight: 6, background: '#fff', color: '#1A1A1A',
-                                     border: BORDER, cursor: 'pointer' }}>
+                          <AdminButton size="sm" onClick={() => void derive(r.id)} disabled={busyId === r.id}>
                             Derive
-                          </button>
+                          </AdminButton>
                         )}
-                        <button onClick={() => void submitSplit(r)}
-                          disabled={busyId === r.id || !balanced}
-                          style={{ fontFamily: FONT, fontSize: 10, letterSpacing: '0.06em',
-                                   textTransform: 'uppercase', padding: '6px 10px',
-                                   background: '#1A1A1A', color: '#fff', border: 'none',
-                                   cursor: 'pointer', opacity: balanced ? 1 : 0.4 }}>
-                          {busyId === r.id ? '…' : 'Save'}
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+                        <AdminButton size="sm" variant="primary" onClick={() => void submitSplit(r)}
+                          loading={busyId === r.id} disabled={!balanced}>
+                          Save
+                        </AdminButton>
+                      </span>
+                    </AdminTd>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </AdminTable>
+        </div>
       )}
 
       {/* ── Returns ───────────────────────────────────────────────────────── */}
-      <SectionTitle note="COGS is credited back only when a unit is sellable AND restocked. Damaged or lost units keep their original cost.">
-        Returns
-      </SectionTitle>
-      <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
+      <AdminSectionHeader title="Returns"
+        info="COGS is credited back only when a unit is sellable AND restocked. Damaged or lost units keep their original cost." />
+      {loading ? <AdminLoading /> : returns.length === 0 ? <AdminEmpty title="No returns recorded." /> : (
+        <AdminTable minWidth={720} caption="Returns">
           <thead>
-            <tr style={{ background: '#FAF9F7' }}>
-              {['Return', 'Order', 'Status', 'Units', 'Return shipping', 'KVRN label cost', 'Requested'].map((h, i) => (
-                <th key={i} style={th}>{h}</th>
-              ))}
+            <tr>
+              {['Return', 'Order', 'Status', 'Units', 'Return shipping', 'KVRN label cost', 'Requested'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr><td colSpan={7} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>
-            )}
-            {!loading && returns.length === 0 && (
-              <tr><td colSpan={7} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                No returns recorded.
-              </td></tr>
-            )}
             {returns.map(r => (
-              <tr key={r.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                <td style={{ padding: '9px 10px', fontWeight: 500 }}>{r.returnNumber}</td>
-                <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.orderNumber}</td>
-                <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{r.status}</td>
-                <td style={{ padding: '9px 10px' }}>{r.totalQuantity}</td>
-                <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                  {r.returnShippingPaidBy.replace(/_/g, ' ')}
-                </td>
-                <td style={{ padding: '9px 10px',
-                             color: r.returnLabelCostCents === null ? '#92400E' : '#1A1A1A' }}>
+              <tr key={r.id}>
+                <AdminTd className="font-medium">{r.returnNumber}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{r.orderNumber}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{r.status}</AdminTd>
+                <AdminTd>{r.totalQuantity}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{r.returnShippingPaidBy.replace(/_/g, ' ')}</AdminTd>
+                <AdminTd className={r.returnLabelCostCents === null && r.returnShippingPaidBy === 'kvrn' ? 'font-medium text-[#92400E]' : ''}>
                   {r.returnShippingPaidBy === 'kvrn'
                     ? moneyOrUnknown(r.returnLabelCostCents, 'Not recorded')
                     : '—'}
-                </td>
-                <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+                </AdminTd>
+                <AdminTd className="text-[#6B6B66]">
                   {r.requestedAt ? new Date(r.requestedAt).toISOString().slice(0, 10) : '—'}
-                </td>
+                </AdminTd>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-    </div>
+        </AdminTable>
+      )}
+    </AdminPage>
   )
 }

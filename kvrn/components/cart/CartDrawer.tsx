@@ -9,12 +9,17 @@ import { useCurrency } from '@/context/CurrencyContext'
 import { Button } from '@/components/ui/Button'
 import { ShippingProgress } from '@/components/cart/ShippingProgress'
 import { cn } from '@/lib/utils'
+import { bundleGroups } from '@/lib/bundle-cart'
+import { BagBundleGroup } from '@/components/cart/BagBundleGroup'
+import { format } from '@/lib/i18n/messages'
 
 export function CartDrawer() {
   const {
     items, isOpen, closeCart, removeItem, updateQuantity, itemCount, subtotalPence,
+    removeBundle, updateBundleQuantity, bundleNotice, dismissBundleNotice,
   } = useCart()
-  const { formatPrice } = useCurrency()
+  const groups = bundleGroups(items)
+  const { formatPrice, isEstimate } = useCurrency()
   const { t } = useI18n()
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -38,22 +43,22 @@ export function CartDrawer() {
       <div
         role="dialog" aria-modal="true" aria-label={t.bag}
         className={cn(
-          'fixed top-0 right-0 bottom-0 z-[400] w-full max-w-[400px]',
+          'fixed top-0 end-0 bottom-0 z-[400] w-full max-w-[400px]',
           'bg-kvrn-bg flex flex-col',
           'transition-transform duration-[500ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)]',
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+          isOpen ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'
         )}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-kvrn-border">
           <h2 className="text-[11px] font-light tracking-widest uppercase">
-            Bag {itemCount > 0 && `(${itemCount})`}
+            {t.bag} {itemCount > 0 && `(${itemCount})`}
           </h2>
           <button
             ref={closeRef}
             onClick={closeCart}
             aria-label={t.bag}
-            className="p-2 -mr-2 text-kvrn-muted hover:text-kvrn-text transition-colors"
+            className="p-2 -me-2 text-kvrn-muted hover:text-kvrn-text transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
               <path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
@@ -65,14 +70,20 @@ export function CartDrawer() {
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full px-6 text-center gap-5">
-              <p className="text-[13px] text-kvrn-muted">Your bag is empty.</p>
+              <p className="text-[13px] text-kvrn-muted">{t.emptyBag}</p>
               <Button variant="secondary" size="sm" onClick={closeCart}>
-                <Link href="/shop">Browse products</Link>
+                <Link href="/shop">{t.browse}</Link>
               </Button>
             </div>
           ) : (
-            <ul className="divide-y divide-kvrn-border" aria-label="Bag items">
-              {items.map(item => (
+            <ul className="divide-y divide-kvrn-border" aria-label={t['cart.bagItems']}>
+              {bundleNotice && (
+                <li className="px-6 py-3 text-[12px] text-kvrn-muted bg-kvrn-bg-raised flex items-start justify-between gap-3" role="status">
+                  <span>{bundleNotice}</span>
+                  <button onClick={dismissBundleNotice} className="text-kvrn-subtle hover:text-kvrn-text flex-shrink-0" aria-label="Dismiss">Dismiss</button>
+                </li>
+              )}
+              {items.filter(item => !item.bundle).map(item => (
                 <li key={item.cartItemId} className="px-6 py-5 flex gap-4">
                   {/* Thumbnail */}
                   <div className="relative w-[76px] h-[101px] flex-shrink-0 bg-kvrn-bg-raised overflow-hidden">
@@ -104,7 +115,7 @@ export function CartDrawer() {
                         const atCap = item.quantity >= cap
                         return (
                           <>
-                            <div className="flex items-center border border-kvrn-border" role="group" aria-label="Quantity">
+                            <div className="flex items-center border border-kvrn-border" role="group" aria-label={t['cart.quantity']}>
                               {[
                                 { label: '−', delta: -1, disabled: false },
                                 { label: '+', delta: +1, disabled: atCap },
@@ -112,7 +123,7 @@ export function CartDrawer() {
                                 <button
                                   key={i}
                                   onClick={() => !btn.disabled && updateQuantity(item.cartItemId, item.quantity + btn.delta)}
-                                  aria-label={`${btn.delta > 0 ? 'Increase' : 'Decrease'} quantity`}
+                                  aria-label={btn.delta > 0 ? t['cart.increase'] : t['cart.decrease']}
                                   aria-disabled={btn.disabled}
                                   className={`w-8 h-8 flex items-center justify-center text-[14px] transition-colors ${
                                     btn.disabled
@@ -128,10 +139,11 @@ export function CartDrawer() {
                                   : [el]
                               )}
                             </div>
+                            {/* Low-stock message. English source: 'Only 1 left' / 'Only {n} left' (cart.onlyOneLeft, cart.onlyNLeft) */}
                             {typeof cap === 'number' && cap <= 3 && cap > 0 && (
                               <span style={{ fontFamily: '-apple-system, Helvetica Neue, Arial, sans-serif',
                                 fontSize: 10, letterSpacing: '0.06em', color: cap === 1 ? '#B91C1C' : '#92400E' }}>
-                                {cap === 1 ? 'Only 1 left' : `Only ${cap} left`}
+                                {cap === 1 ? t['cart.onlyOneLeft'] : format(t['cart.onlyNLeft'], { n: cap })}
                               </span>
                             )}
                           </>
@@ -140,13 +152,18 @@ export function CartDrawer() {
                       <button
                         onClick={() => removeItem(item.cartItemId)}
                         className="text-[11px] text-kvrn-subtle hover:text-kvrn-text transition-colors tracking-wide"
-                        aria-label={`Remove ${item.productName}`}
+                        aria-label={format(t['cart.removeItem'], { name: item.productName })}
                       >
-                        Remove
+                        {t.remove}
                       </button>
                     </div>
                   </div>
                 </li>
+              ))}
+              {groups.map(g => (
+                <BagBundleGroup key={g.bundleId} group={g} formatPrice={formatPrice}
+                  onRemove={() => removeBundle(g.bundleId)}
+                  onQuantity={q => updateBundleQuantity(g.bundleId, q)} />
               ))}
             </ul>
           )}
@@ -160,19 +177,24 @@ export function CartDrawer() {
 
             {/* Subtotal */}
             <div className="flex justify-between text-[14px] font-light">
-              <span className="text-kvrn-muted">Subtotal</span>
+              <span className="text-kvrn-muted">{t.subtotal}</span>
               <span>{formatPrice(subtotalPence)}</span>
             </div>
             <p className="text-[11px] text-kvrn-subtle tracking-wide">
-              Shipping calculated at checkout
+              {t.shippingCalc}
             </p>
+            {isEstimate && (
+              <p className="text-[11px] text-kvrn-subtle tracking-wide">
+                {t['currency.approxNote']}
+              </p>
+            )}
 
             <Link href="/checkout" onClick={closeCart}>
-              <Button variant="primary" size="lg" fullWidth>Checkout</Button>
+              <Button variant="primary" size="lg" fullWidth>{t.checkout}</Button>
             </Link>
 
             <p className="text-[11px] text-kvrn-subtle text-center tracking-wide">
-              Store credit returns · Secure checkout
+              {t.storeCreditReturns} · {t.secureCheckout}
             </p>
           </div>
         )}

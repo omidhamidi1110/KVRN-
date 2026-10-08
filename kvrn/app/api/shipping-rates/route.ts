@@ -4,6 +4,10 @@ import { applyFreeShippingToRates } from '@/lib/free-shipping'
 import { getShippoRates } from '@/lib/shippo'
 import { getProductShippingData, getSubtotalCentsForItems } from '@/lib/inventory'
 import { isProviderException, recordProviderFailure } from '@/lib/owner-notifications'
+import { parseShippingQuoteInput } from '@/lib/shipping-quote-input'
+import { readLimitedJson } from '@/lib/limited-json-request'
+import { sql } from '@/lib/db'
+import { allowPublicApiRequest } from '@/lib/public-api-rate-limit'
 
 // ─── POST /api/shipping-rates ──────────────────────────────────────────────────
 // Returns available shipping options and costs.
@@ -15,22 +19,38 @@ import { isProviderException, recordProviderFailure } from '@/lib/owner-notifica
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  // Production rate-limit is fail-closed: never let an unauthenticated caller fan
+  // out an unlimited number of requests to the external shipping provider.
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const allowed = await allowPublicApiRequest(sql, {
+        bucket: 'shipping_quote', headers: req.headers, limit: 30, windowSeconds: 60,
+      })
+      if (!allowed) return NextResponse.json({ success: false, error: 'Too many requests.' }, {
+        status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' },
+      })
+    } catch {
+      return NextResponse.json({ success: false, error: 'Shipping temporarily unavailable.' }, { status: 503 })
+    }
+  }
+
+  const read = await readLimitedJson(req, 8192)
+  if (!read.ok) return NextResponse.json({ success: false, error: read.reason === 'too_large' ? 'Request too large.' : 'Invalid request.' }, { status: read.status })
+  const raw = read.value
+  const parsed = parseShippingQuoteInput(raw)
+  if (!parsed.ok) return NextResponse.json({ success: false, error: parsed.reason }, { status: 400 })
+  const { city, state, zip, country, items } = parsed.value
+
   try {
-    const body = await req.json()
-
-    const city    = body.city    ?? ''
-    const state   = body.state   ?? ''
-    const zip     = body.zip     ?? ''
-    const country = (body.country ?? 'US').toUpperCase()
-    const items: Array<{ sku: string; quantity: number }> =
-      Array.isArray(body.items) ? body.items : []
-
-    // ── Server-authoritative subtotal ─────────────────────────────────────────
-    // Prices resolved from Neon products table — never trusted from client.
-    // Returns null if any SKU is unknown/inactive; treat as "do not apply rule."
-    const subtotalCents = items.length > 0
-      ? await getSubtotalCentsForItems(items).catch(() => null)
-      : 0
+    // Unknown, inactive or unpriced SKUs must never trigger Shippo calls or
+    // silently qualify for discounted/free shipping.
+    let subtotalCents: number | null
+    try {
+      subtotalCents = items.length ? await getSubtotalCentsForItems(items) : 0
+    } catch {
+      return NextResponse.json({ success: true, data: { rates: [], unavailable: true } }, { status: 503 })
+    }
+    if (subtotalCents === null) return NextResponse.json({ success: false, error: 'Cart items are unavailable.' }, { status: 400 })
 
     // Attempt live Shippo rates when address is usable
     const apiToken   = process.env.SHIPPO_API_TOKEN ?? ''
@@ -41,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     if (hasAddress && hasItems && apiToken) {
       try {
-        const shippingDb  = await getProductShippingData().catch(() => [])
+        const shippingDb  = await getProductShippingData()
         const shippoRates = await getShippoRates({ city, state, zip, country }, items, shippingDb, apiToken)
 
         if (!shippoRates) {
@@ -83,9 +103,7 @@ export async function POST(req: NextRequest) {
 
           // Apply free-shipping rule with server-authoritative subtotal.
           // subtotalCents=null → unknown SKU(s), do not apply rule (safe default).
-          const qualifiedRates = subtotalCents !== null
-            ? applyFreeShippingToRates(rates, country, subtotalCents)
-            : rates
+          const qualifiedRates = applyFreeShippingToRates(rates, country, subtotalCents)
           return NextResponse.json({ success: true, data: { rates: qualifiedRates, source: 'shippo' } })
         }
       } catch (shippoErr: any) {

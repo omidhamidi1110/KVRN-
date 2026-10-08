@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import type { ColorOption } from '@/types'
+import { useI18n } from '@/context/I18nContext'
 
 interface ColorSelectorProps {
   colors:          ColorOption[]
@@ -16,23 +17,24 @@ export function ColorSelector({
   onChange,
   className,
 }: ColorSelectorProps) {
+  const { t } = useI18n()
   const selected = colors.find((c) => c.value === selectedColor)
 
   return (
     <fieldset className={cn('border-0 p-0 m-0', className)}>
-      <legend className="sr-only">Select color</legend>
+      <legend className="sr-only">{t['product.selectColor']}</legend>
 
       {/* Selected color name */}
       <p className="label-11 mb-3">
-        Color
+        {t.color}
         {selected && (
-          <span className="normal-case tracking-normal ml-2 text-kvrn-text font-light">
+          <span className="normal-case tracking-normal ms-2 text-kvrn-text font-light">
             — {selected.name}
           </span>
         )}
       </p>
 
-      <div className="flex items-center gap-2" role="radiogroup" aria-label="Product color">
+      <div className="flex items-center gap-2" role="radiogroup" aria-label={t['product.productColor']}>
         {colors.map((color) => {
           const isSelected = color.value === selectedColor
 

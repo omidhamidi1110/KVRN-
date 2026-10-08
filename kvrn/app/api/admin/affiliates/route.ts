@@ -11,6 +11,10 @@ import {
   AFFILIATE_STATUSES, type AffiliateStatus,
 } from '@/lib/affiliates'
 import { resolveRangePreset, parseCustomRange, type RangePreset } from '@/lib/financials'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import { createAffiliateProgramAdmin } from '@/lib/affiliate-program-admin'
+import { ProgramError, toProgramError } from '@/lib/affiliate-program'
+import { flushQueuedEmails } from '@/lib/affiliate-program-http'
 
 export const dynamic = 'force-dynamic'
 const PRESETS: RangePreset[] = ['today','7d','30d','90d','mtd','ytd','1y','all']
@@ -60,11 +64,49 @@ export async function POST(req: NextRequest) {
       if (!AFFILIATE_STATUSES.includes(body.status)) {
         return NextResponse.json({ error: 'Status is not valid.' }, { status: 400 })
       }
-      const ok = await service.setAffiliateStatus(
-        body.affiliateId, body.status as AffiliateStatus,
-        body.effectiveAt ?? null, body.reason ?? null, identity!.email)
-      if (!ok) return NextResponse.json({ error: 'Affiliate not found.' }, { status: 404 })
-      // Audit is written inside set_affiliate_status, atomically.
+      // The program lifecycle owns the status: the financial status event, the discount code, the
+      // referral link and the program profile change together in ONE transaction. Financial history
+      // (commissions, attributions, payouts, adjustments) is never touched.
+      const target = body.status === 'paused' ? 'suspended' : body.status === 'terminated' ? 'terminated' : 'active'
+      try {
+        await createAffiliateProgramAdmin(sql).setProgramStatus(body.affiliateId, target, {
+          actor: identity!.email, reason: body.reason ?? null,
+          effectiveAt: body.effectiveAt ?? null,
+          notify: isFeatureEnabled('AFFILIATE_APPLICATIONS'),
+        })
+        await flushQueuedEmails(sql, { affiliateId: body.affiliateId })
+      } catch (e) {
+        const pe = e instanceof ProgramError ? e : toProgramError(e)
+        if (pe?.code === 'NOT_FOUND') return NextResponse.json({ error: 'Affiliate not found.' }, { status: 404 })
+        if (pe) return NextResponse.json({ error: pe.message }, { status: pe.status })
+        throw e
+      }
+      // Audit is written inside the SQL functions, atomically.
+      return NextResponse.json({ ok: true })
+    }
+
+    // ── New effective-dated financial terms (history stays immutable) ───────
+    if (body.kind === 'terms') {
+      if (!UUID_RE.test(body.affiliateId ?? '')) {
+        return NextResponse.json({ error: 'A valid affiliate is required.' }, { status: 400 })
+      }
+      const type = body.commissionType
+      if (type !== 'percentage' && type !== 'fixed') return NextResponse.json({ error: 'Commission type is not valid.' }, { status: 400 })
+      const bps = body.commissionRateBps == null ? null : Number(body.commissionRateBps)
+      const fixed = body.commissionFixedCents == null ? null : Number(body.commissionFixedCents)
+      const win = Number(body.attributionWindowDays), hold = Number(body.commissionHoldDays)
+      if (type === 'percentage' && !(Number.isInteger(bps) && bps! > 0 && bps! <= 10000)) return NextResponse.json({ error: 'Rate must be 1–10000 basis points.' }, { status: 400 })
+      if (type === 'fixed' && !(Number.isInteger(fixed) && fixed! >= 0 && fixed! <= 100_000_000)) return NextResponse.json({ error: 'Fixed commission is not valid.' }, { status: 400 })
+      if (!Number.isInteger(win) || win < 1 || win > 365) return NextResponse.json({ error: 'Attribution window must be 1–365 days.' }, { status: 400 })
+      if (!Number.isInteger(hold) || hold < 0 || hold > 365) return NextResponse.json({ error: 'Hold must be 0–365 days.' }, { status: 400 })
+      const policy = body.fixedReversalPolicy ?? 'proportional'
+      if (policy !== 'proportional' && policy !== 'all_or_nothing') return NextResponse.json({ error: 'Reversal policy is not valid.' }, { status: 400 })
+      await service.updateTerms(body.affiliateId, {
+        commissionType: type, commissionRateBps: type === 'percentage' ? bps : null,
+        commissionFixedCents: type === 'fixed' ? fixed : null, fixedReversalPolicy: policy,
+        attributionWindowDays: win, commissionHoldDays: hold, discountId: body.discountId ?? null,
+        effectiveAt: body.effectiveAt ?? null, reason: body.reason ?? null,
+      }, identity!.email)
       return NextResponse.json({ ok: true })
     }
 

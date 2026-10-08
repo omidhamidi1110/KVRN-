@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "features": [
+    {
+      "id": "storefront_render",
+      "requiredTestCaseIds": [
+        "storefront_jest",
+        "storefront_smoke",
+        "browser_storefront"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/storefront-correctness.test.ts",
+        "scripts/smoke-test.mjs",
+        "scripts/browser-smoke.mjs"
+      ]
+    },
+    {
+      "id": "product_detail",
+      "requiredTestCaseIds": [
+        "product_detail_jest",
+        "product_build",
+        "browser_product_detail",
+        "browser_mobile"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/ga4-client.test.ts",
+        "app/products/[slug]/page.tsx",
+        "scripts/browser-smoke.mjs"
+      ]
+    },
+    {
+      "id": "cart",
+      "requiredTestCaseIds": [
+        "cart_jest",
+        "browser_cart"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/storefront-correctness.test.ts",
+        "scripts/browser-smoke.mjs"
+      ]
+    },
+    {
+      "id": "checkout",
+      "requiredTestCaseIds": [
+        "checkout_jest",
+        "browser_checkout_entry"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/checkout-intl.test.ts",
+        "lib/__tests__/reservations.test.ts",
+        "scripts/browser-smoke.mjs"
+      ]
+    },
+    {
+      "id": "stripe_order_finalization",
+      "requiredTestCaseIds": [
+        "stripe_finalization_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/reservations.test.ts",
+        "lib/__tests__/affiliate-webhook-integration.test.ts"
+      ]
+    },
+    {
+      "id": "inventory_accounting",
+      "requiredTestCaseIds": [
+        "inventory_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/financial-integrity.test.ts",
+        "lib/__tests__/phase-b-financials.test.ts"
+      ]
+    },
+    {
+      "id": "financial_integrity",
+      "requiredTestCaseIds": [
+        "financial_integrity_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/financial-integrity.test.ts"
+      ]
+    },
+    {
+      "id": "support_inbox",
+      "requiredTestCaseIds": [
+        "support_jest",
+        "support_smoke"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/support-inbox.test.ts",
+        "lib/__tests__/support-inbox-db.test.ts",
+        "scripts/smoke-test.mjs"
+      ]
+    },
+    {
+      "id": "discounts",
+      "requiredTestCaseIds": [
+        "discounts_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/discounts.test.ts",
+        "lib/__tests__/free-shipping.test.ts"
+      ]
+    },
+    {
+      "id": "affiliates",
+      "requiredTestCaseIds": [
+        "affiliates_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/affiliate-http-integration.test.ts",
+        "lib/__tests__/affiliate-webhook-integration.test.ts"
+      ]
+    },
+    {
+      "id": "analytics",
+      "requiredTestCaseIds": [
+        "analytics_jest",
+        "analytics_config_smoke"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/funnel-analytics.test.ts",
+        "lib/__tests__/ga4-client.test.ts",
+        "scripts/smoke-test.mjs"
+      ]
+    },
+    {
+      "id": "admin_auth",
+      "requiredTestCaseIds": [
+        "admin_auth_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/admin-auth-security-alert.test.ts",
+        "lib/__tests__/support-inbox-auth.test.ts"
+      ]
+    },
+    {
+      "id": "ai_os",
+      "requiredTestCaseIds": [
+        "ai_os_jest",
+        "route_contract_guard",
+        "ai_boundary_guard",
+        "ai_import_guard",
+        "typecheck_guard",
+        "regression_gate",
+        "build_guard",
+        "browser_runner_guard",
+        "change_coverage_guard"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/ai-os.test.ts",
+        "scripts/verify-route-contracts.mjs",
+        "scripts/verify-ai-boundaries.mjs",
+        "tsconfig.json",
+        "package.json",
+        "scripts/browser-smoke.mjs",
+        "scripts/verify-change-test-coverage.mjs",
+        "scripts/verify-ai-local-imports.mjs"
+      ]
+    },
+    {
+      "id": "cms_content",
+      "requiredTestCaseIds": [
+        "cms_foundation_jest",
+        "content_cms_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/cms-foundation.test.ts",
+        "lib/__tests__/cms-foundation-db.test.ts",
+        "lib/__tests__/content-cms-routes.test.ts",
+        "lib/__tests__/content-cms-service.test.ts",
+        "lib/__tests__/content-cms-public.test.ts",
+        "lib/__tests__/security-hardening-stage2.test.ts"
+      ]
+    },
+    {
+      "id": "product_cms",
+      "requiredTestCaseIds": [
+        "product_cms_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/product-cms-db.test.ts",
+        "lib/__tests__/product-cms-guards.test.ts",
+        "lib/__tests__/product-cms-logic.test.ts",
+        "lib/__tests__/product-cms-render.test.ts"
+      ]
+    },
+    {
+      "id": "media_library",
+      "requiredTestCaseIds": [
+        "media_library_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/cms-foundation.test.ts",
+        "lib/__tests__/cms-foundation-db.test.ts",
+        "lib/__tests__/product-cms-db.test.ts",
+        "lib/__tests__/security-hardening-stage2.test.ts"
+      ]
+    },
+    {
+      "id": "bundles",
+      "requiredTestCaseIds": [
+        "bundles_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/bundle-pure.test.ts",
+        "lib/__tests__/bundles-db.test.ts",
+        "lib/__tests__/bundles-checkout-handler.test.ts",
+        "lib/__tests__/bundles-render.test.ts",
+        "lib/__tests__/security-hardening-stage2.test.ts"
+      ],
+      "tests": [
+        "lib/__tests__/public-api-rate-limit.test.ts"
+      ]
+    },
+    {
+      "id": "fraud_review",
+      "requiredTestCaseIds": [
+        "fraud_review_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/fraud-review.test.ts",
+        "lib/__tests__/fraud-review-db.test.ts",
+        "lib/__tests__/fraud-review-webhook.test.ts",
+        "lib/__tests__/audit-b-fraud-db.test.ts",
+        "lib/__tests__/audit-b-webhook-order.test.ts"
+      ]
+    },
+    {
+      "id": "order_tags",
+      "requiredTestCaseIds": [
+        "order_tags_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/order-tags.test.ts",
+        "lib/__tests__/orders-ui.test.ts"
+      ]
+    },
+    {
+      "id": "abandoned_checkout",
+      "requiredTestCaseIds": [
+        "abandoned_checkout_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/abandoned-checkout.test.ts",
+        "lib/__tests__/abandoned-checkout-db.test.ts",
+        "lib/__tests__/abandoned-checkout-handler.test.ts",
+        "lib/__tests__/abandoned-checkout-routes.test.ts",
+        "lib/__tests__/audit-a-checkout.test.ts",
+        "lib/__tests__/security-hardening-stage2.test.ts"
+      ],
+      "tests": [
+        "lib/__tests__/public-api-rate-limit.test.ts"
+      ]
+    },
+    {
+      "id": "affiliate_program",
+      "requiredTestCaseIds": [
+        "affiliate_program_jest",
+        "affiliate_portal_jest",
+        "affiliate_audit_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/affiliate-program-db.test.ts",
+        "lib/__tests__/affiliate-program-http.test.ts",
+        "lib/__tests__/affiliate-program-pure.test.ts",
+        "lib/__tests__/affiliate-portal-api.test.ts",
+        "lib/__tests__/affiliate-portal-auth.test.ts",
+        "lib/__tests__/affiliate-portal-compliance.test.ts",
+        "lib/__tests__/audit-c-affiliate.test.ts",
+        "lib/__tests__/security-hardening-stage2.test.ts"
+      ]
+    },
+    {
+      "id": "localization_currency",
+      "requiredTestCaseIds": [
+        "localization_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/i18n-dictionaries.test.ts",
+        "lib/__tests__/i18n-currency-db.test.ts",
+        "lib/__tests__/i18n-storefront-guards.test.ts",
+        "lib/__tests__/i18n-rtl-render.test.ts"
+      ]
+    },
+    {
+      "id": "admin_ui_refresh",
+      "requiredTestCaseIds": [
+        "admin_ui_refresh_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/admin-ui-primitives.test.ts",
+        "lib/__tests__/admin-ui-refresh.test.ts",
+        "lib/__tests__/content-admin-ui.test.ts"
+      ]
+    }
+  ]
+}

@@ -9,6 +9,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
+import { FraudHoldError, isFraudHoldDbError } from '@/lib/fraud-review'
 
 export const dynamic = 'force-dynamic'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -57,6 +58,11 @@ export async function PATCH(
     `
     return NextResponse.json({ ok: true, orderId: updated.orderId })
   } catch (err: any) {
+    // An active fraud review hold refuses any label/shipment record (database trigger, migration 031).
+    if (isFraudHoldDbError(err)) {
+      const e = new FraudHoldError()
+      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+    }
     console.error('[admin/shipments/cost]', err?.message?.slice(0, 120))
     return NextResponse.json({ error: 'Could not record shipment cost.' }, { status: 500 })
   }

@@ -28,16 +28,40 @@ import type {
   LineItemInput,
   CheckoutDetails,
 } from './reservations'
+import type { RecordCheckoutInput } from './abandoned-checkout'
+import type { BundlePrep, BundlePrepResult } from './bundle-checkout'
+import { ABANDONED_RECOVERY_COOKIE } from './abandoned-checkout-token'
+import { checkoutPresentation } from './i18n/checkout'
+import { isFeatureEnabled } from './feature-flags'
 
 export interface CheckoutRouteDeps {
   isCheckoutEnabled:              () => boolean
   getSiteOrigin:                  () => string | null
   getStripe:                      () => any   // Stripe instance — avoids Stripe type import in tests
-  reserveInventory:               (items: LineItemInput[]) => ReturnType<ReservationService['reserveInventory']>
+  /**
+   * `bundle` is passed ONLY for a request that carries a set (then the production wiring reserves with
+   * reserve_inventory_v2); ordinary carts call it with the items alone, exactly as before.
+   */
+  reserveInventory:               (items: LineItemInput[], bundle?: BundlePrep) => ReturnType<ReservationService['reserveInventory']>
   saveReservationCheckoutDetails: (id: string, d: CheckoutDetails) => Promise<boolean>
   failReservation:                (id: string, reason: string) => Promise<'released'|'already_released'|'not_found'>
   attachStripeSession:            (id: string, sessionId: string, expiresAt: number) => Promise<void>
   releaseExpiredReservations:     () => Promise<number>
+  /**
+   * OPTIONAL, additive: records that a checkout was started so an abandoned one can later be
+   * recovered (lib/abandoned-checkout.ts). Called only AFTER the Stripe session exists and is
+   * attached. Non-fatal and time-bounded: it can never change the checkout response. Omitted
+   * (e.g. in older tests) => no-op.
+   */
+  recordCheckoutStarted?: (input: RecordCheckoutInput) => Promise<void>
+  /**
+   * OPTIONAL, additive: bundle ("Complete the Set") checkout (lib/bundle-checkout.ts). Used ONLY when
+   * the request carries `body.bundle`; ordinary carts never touch it and keep calling reserveInventory
+   * exactly as before. Omitted => a request with a bundle is refused (fail closed).
+   */
+  bundles?: {
+    prepare: (raw: unknown, plainItems: LineItemInput[], discountCode?: unknown) => Promise<BundlePrepResult>
+  }
 }
 
 function isValidHttpsUrl(s: unknown): s is string {
@@ -64,6 +88,16 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
   return async function POST(req: NextRequest): Promise<NextResponse> {
     // Server-side identity for affiliate attribution. Never body-supplied.
     const affiliateSessionId = readAffiliateSessionId(req)
+
+    // Language / currency the visitor chose (kvrn_locale / kvrn_currency cookies, read server-side).
+    // The Stripe-hosted page follows the language; the CHARGE stays USD whatever the currency cookie
+    // says — a non-USD choice is a display estimate (lib/i18n/currency-policy.ts).
+    const presentation = checkoutPresentation(req.cookies, { flagOn: isFeatureEnabled('MULTI_CURRENCY_CHECKOUT') })
+    // Fail closed: every amount below is USD cents and the Stripe objects are created in 'usd'. If the
+    // currency policy ever resolved to anything else, creating the session would mix currencies.
+    if (presentation.currency.chargedIn !== 'USD') {
+      return NextResponse.json({ error: 'Checkout could not be started. Please try again.' }, { status: 500 })
+    }
 
     /**
      * Persist that identity on the reservation so late attribution can recover
@@ -146,8 +180,15 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
     }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
+    }
 
-    const items: LineItemInput[] = body.items
+    let items: LineItemInput[] = body.items
+    // A bundle ("Complete the Set") rides next to the ordinary items; absent => nothing changes below.
+    const bundleRaw = body.bundle
+    const hasBundle = bundleRaw !== undefined && bundleRaw !== null
+    if (hasBundle && (items === undefined || items === null)) items = []
     // Optional, shape-checked analytics session id (only sent by consenting browsers).
     // Never affects checkout; an invalid value is simply ignored.
     const analyticsSessionId: string | null =
@@ -158,8 +199,17 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     // attach to this visitor's GA session. Absent => the server sends no GA purchase for the order.
     const gaClientId  = parseGaClientId(body.gaClientId)
     const gaSessionId = gaClientId ? parseGaSessionId(body.gaSessionId) : null
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || (items.length === 0 && !hasBundle)) {
       return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 })
+    }
+    // Bound work before any reservation, carrier API call, or Stripe request.
+    // Every line must be a well-formed, limited cart line; the DB still performs
+    // canonical SKU, stock and price validation before any charge is possible.
+    if (items.length > 20 || items.some((item: any) => !item || typeof item !== 'object'
+      || typeof item.sku !== 'string' || item.sku.length < 1 || item.sku.length > 120
+      || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 10)
+      || items.reduce((sum: number, item: any) => sum + item.quantity, 0) > 30) {
+      return NextResponse.json({ error: 'Cart quantity or size is invalid.' }, { status: 400 })
     }
 
     // ── Contact ──────────────────────────────────────────────────────────────
@@ -243,6 +293,26 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       return NextResponse.json({ error: 'Invalid shipping method.' }, { status: 400 })
     }
 
+    // ── Bundle expansion (only when the cart holds a set) ──────────────────────
+    // The set is re-read from the PUBLISHED definition and priced on the server; the browser never
+    // supplies a price. A discount code is not combinable with a set price (rejected here, before
+    // any stock is reserved). The set's REAL component SKUs feed the shipping quote below.
+    let bundlePrep: BundlePrep | null = null
+    if (hasBundle) {
+      if (!deps.bundles) {
+        return NextResponse.json({ error: 'Sets are not available right now.', code: 'BUNDLE_DISABLED' }, { status: 400 })
+      }
+      const pr = await deps.bundles.prepare(bundleRaw, items, body.discountCode)
+      if (!pr.ok) {
+        return NextResponse.json(
+          { error: pr.message, code: pr.code, ...(pr.sku ? { sku: pr.sku } : {}),
+            ...(pr.newSetNetCents !== undefined ? { newSetNetCents: pr.newSetNetCents } : {}) },
+          { status: pr.status })
+      }
+      bundlePrep = pr.prep
+    }
+    const rateItems: any[] = bundlePrep ? [...(items as any[]), ...bundlePrep.shippingItems] : (items as any[])
+
     // ── Get authoritative shipping cost ────────────────────────────────────────
     // Server re-fetches Shippo; never trusts browser-sent price.
     // US: live Shippo REQUIRED — no static fallback (fail closed).
@@ -269,10 +339,10 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       }
 
       try {
-        const shippingDb = await getProductShippingData().catch(() => [])
+        const shippingDb = await getProductShippingData()
         shippoRatesResult = await getShippoRates(
           { city, state, zip: postalCode, country },
-          (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
+          rateItems.map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
           shippingDb,
           apiToken
         )
@@ -315,10 +385,10 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         )
       }
       try {
-        const shippingDb  = await getProductShippingData().catch(() => [])
+        const shippingDb  = await getProductShippingData()
         shippoRatesResult = await getShippoRates(
           { city, state, zip: postalCode, country },
-          (items as any[]).map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
+          rateItems.map((i: any) => ({ sku: i.sku, quantity: i.quantity })),
           shippingDb,
           apiToken
         )
@@ -360,7 +430,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
     catch (e: any) { console.warn('Expired cleanup failed:', e?.message) }
 
     // ── Step 1: Reserve inventory ─────────────────────────────────────────────
-    const reservation = await deps.reserveInventory(items)
+    const reservation = await deps.reserveInventory(items, ...(bundlePrep ? [bundlePrep] : []))
     if (!reservation.ok) {
       if (reservation.code === 'DB_ERROR') await recordProviderFailure('Neon', 'reserve_inventory')
       return NextResponse.json(
@@ -633,6 +703,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           mode:           'payment',
           currency:       'usd',
           customer_email: email,
+          ...(presentation.stripeLocale ? { locale: presentation.stripeLocale } : {}),
           // ── AFFILIATE ATTRIBUTION IDENTITY ───────────────────────────────
           // Read SERVER-SIDE from the first-party cookie, never from the
           // request body: a browser-supplied value must not be able to claim
@@ -646,7 +717,10 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
               unit_amount: item.unitPriceCents,
               product_data: {
                 name:     `${item.productName} — ${item.size}`,
-                metadata: { sku: item.sku, variant_id: item.variantId },
+                // Bundle lines are charged at their allocated NET price, so the Stripe total equals
+                // the reservation total exactly; the description only explains why it is lower.
+                ...(item.bundleId ? { description: 'Part of a set' } : {}),
+                metadata: { sku: item.sku, variant_id: item.variantId, ...(item.bundleId ? { bundle_id: item.bundleId } : {}) },
               },
             },
             quantity: item.quantity,
@@ -684,6 +758,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           metadata: {
             reservation_id: reservation.reservationId,
             shipping_method: shippingMethod,
+            ...(bundlePrep ? { kvrn_bundle_id: bundlePrep.quote.bundleId } : {}),
             ...(gaClientId ? { ga_client_id: gaClientId, ...(gaSessionId ? { ga_session_id: gaSessionId } : {}) } : {}),
             ...(appliedDiscount ? {
               kvrn_discount_definition: appliedDiscount.type === 'fixed_amount'
@@ -778,6 +853,46 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
         { error: 'Checkout session could not be confirmed. Please try again.' },
         { status: 500 }
       )
+    }
+
+    // ── Abandoned-checkout record (additive, non-fatal, time-bounded) ─────────
+    // Reached only after the session exists AND is attached to the reservation. Never awaits
+    // longer than 2s and never alters the response: a failure costs one missing reminder.
+    if (deps.recordCheckoutStarted) {
+      const recordStarted = deps.recordCheckoutStarted   // alias: a funnel source-guard forbids a direct member call to the raw service name in this file
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        let recoveryCookie: string | null = null
+        try { recoveryCookie = req.cookies?.get(ABANDONED_RECOVERY_COOKIE)?.value ?? null } catch { /* none */ }
+        await Promise.race([
+          recordStarted({
+            reservationId:        reservation.reservationId,
+            stripeSessionId:      session.id,
+            sessionExpiresAtUnix: session.expires_at,
+            email,
+            locale:               presentation.recordLocale ?? req.headers?.get?.('accept-language') ?? null,
+            currency:             'usd',
+            items: (reservation.items as any[]).map((i: any) => ({
+              sku: i.sku, quantity: i.quantity, variantId: i.variantId,
+              productName: i.productName, size: i.size, color: i.color, unitPriceCents: i.unitPriceCents,
+            })),
+            discountCode:         appliedDiscount?.code ?? null,
+            affiliateSessionId,
+            ...(bundlePrep ? { bundleContext: {
+              bundleId: bundlePrep.quote.bundleId,
+              setQuantity: bundlePrep.quote.quantity,
+              seenSetNetCents: bundlePrep.quote.setNetCents,
+              components: bundlePrep.quote.lines.map(l => ({ sku: l.sku, quantity: l.quantity, productId: l.productId })),
+            } } : {}),
+            recoveryCookie,
+          }),
+          new Promise<void>(resolve => { timer = setTimeout(resolve, 2000) }),
+        ])
+      } catch (e: any) {
+        console.error('[checkout] abandoned-checkout record failed (non-fatal):', e?.message?.slice(0, 80))
+      } finally {
+        if (timer) clearTimeout(timer)
+      }
     }
 
     // ── Funnel analytics: checkout_started ───────────────────────────────────

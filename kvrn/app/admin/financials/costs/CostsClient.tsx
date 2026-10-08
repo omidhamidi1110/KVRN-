@@ -6,7 +6,11 @@
 // already been paid, because the cost is snapshotted onto order_items at sale time.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, moneyOrUnknown, SectionTitle } from '@/components/admin/FinancialUI'
+import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField,
+  AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, adminInputClass, adminSelectClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Batch = {
   id: string; productName: string | null; variantSku: string | null
@@ -92,71 +96,51 @@ export function CostsClient() {
   }
 
   const missing = coverage.filter(c => c.unitCogsCents === null)
-  const inputStyle = { fontFamily: FONT, fontSize: 12, padding: '8px 10px',
-                       border: BORDER, background: '#fff', width: '100%',
-                       boxSizing: 'border-box' as const }
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Product costs
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Landed unit cost per production batch: manufacturing + freight + duties + tariffs
-        + import tax + packaging + other landed costs. Cost batches are append-only —
-        adding a new batch affects future applicable orders only, and historical paid-order
-        COGS snapshots never change.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Product costs"
+        description="Landed cost per production batch."
+        info="Landed cost per batch: manufacturing + freight + duties + tariffs + import tax + packaging + other landed costs. Cost batches are append-only: a new batch affects future applicable orders only, and historical paid-order COGS snapshots never change."
+        actions={
+          <AdminButton variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm(v => !v)}>
+            {showForm ? 'Cancel' : 'Add cost batch'}
+          </AdminButton>
+        }
+      />
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
 
       {missing.length > 0 && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                      border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 18 }}>
-          {missing.length} active SKU{missing.length === 1 ? '' : 's'} have no cost defined.
-          Orders containing them will show profit as “Pending” rather than assuming zero cost.
-        </div>
+        <AdminNotice tone="warning" className="mb-4" title={`${missing.length} active SKU${missing.length === 1 ? '' : 's'} have no cost defined.`}>
+          Orders containing them show profit as “Pending”, not $0.
+        </AdminNotice>
       )}
 
-      <button onClick={() => setShowForm(v => !v)}
-        style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
-                 padding: '9px 16px', background: '#1A1A1A', color: '#fff',
-                 border: 'none', cursor: 'pointer', marginBottom: 18 }}>
-        {showForm ? 'Cancel' : 'Add cost batch'}
-      </button>
-
       {showForm && (
-        <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 26 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
-            <label style={{ fontFamily: FONT, fontSize: 11 }}>
-              Product *
-              <select value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })}
-                      style={{ ...inputStyle, marginTop: 4 }}>
+        <AdminCard className="mb-7">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <AdminField label="Product *" htmlFor="pc-product">
+              <select id="pc-product" value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })}
+                      className={adminSelectClass}>
                 <option value="">Select…</option>
                 {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-            </label>
-            <label style={{ fontFamily: FONT, fontSize: 11 }}>
-              Colour (optional — blank = all colours)
-              <input value={form.colorName} onChange={e => setForm({ ...form, colorName: e.target.value })}
-                     placeholder="Black" style={{ ...inputStyle, marginTop: 4 }} />
-            </label>
-            <label style={{ fontFamily: FONT, fontSize: 11 }}>
-              Batch label
-              <input value={form.batchLabel} onChange={e => setForm({ ...form, batchLabel: e.target.value })}
-                     placeholder="Run-2025-Q1" style={{ ...inputStyle, marginTop: 4 }} />
-            </label>
-            <label style={{ fontFamily: FONT, fontSize: 11 }}>
-              Effective from *
-              <input type="date" value={form.effectiveFrom}
+            </AdminField>
+            <AdminField label="Colour (optional — blank = all colours)" htmlFor="pc-colour">
+              <input id="pc-colour" value={form.colorName} onChange={e => setForm({ ...form, colorName: e.target.value })}
+                     placeholder="Black" className={adminInputClass} />
+            </AdminField>
+            <AdminField label="Batch label" htmlFor="pc-batch">
+              <input id="pc-batch" value={form.batchLabel} onChange={e => setForm({ ...form, batchLabel: e.target.value })}
+                     placeholder="Run-2025-Q1" className={adminInputClass} />
+            </AdminField>
+            <AdminField label="Effective from *" htmlFor="pc-eff">
+              <input id="pc-eff" type="date" value={form.effectiveFrom}
                      onChange={e => setForm({ ...form, effectiveFrom: e.target.value })}
-                     style={{ ...inputStyle, marginTop: 4 }} />
-            </label>
+                     className={adminInputClass} />
+            </AdminField>
             {([
               ['manufacturingCents', 'Manufacturing $'],
               ['freightCents',       'Inbound freight $'],
@@ -166,105 +150,76 @@ export function CostsClient() {
               ['packagingCents',     'Packaging $'],
               ['otherLandedCents',   'Other landed $'],
             ] as const).map(([key, label]) => (
-              <label key={key} style={{ fontFamily: FONT, fontSize: 11 }}>
-                {label}
-                <input type="number" step="0.01" min="0"
+              <AdminField key={key} label={label} htmlFor={`pc-${key}`}>
+                <input id={`pc-${key}`} type="number" step="0.01" min="0"
                        value={(form as any)[key]}
                        onChange={e => setForm({ ...form, [key]: e.target.value })}
-                       placeholder="0.00" style={{ ...inputStyle, marginTop: 4 }} />
-              </label>
+                       placeholder="0.00" className={adminInputClass} />
+              </AdminField>
             ))}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 16 }}>
-            <span style={{ fontFamily: FONT, fontSize: 12, color: '#1A1A1A' }}>
-              Landed unit cost: <strong>{money(preview)}</strong>
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <span className="text-[12px]">
+              Landed unit cost: <strong className="font-medium">{money(preview)}</strong>
             </span>
-            <button onClick={submit} disabled={saving || !form.productId || preview <= 0}
-              style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-                       textTransform: 'uppercase', padding: '9px 16px',
-                       background: '#1A1A1A', color: '#fff', border: 'none',
-                       cursor: saving ? 'default' : 'pointer',
-                       opacity: saving || !form.productId || preview <= 0 ? 0.45 : 1 }}>
-              {saving ? 'Saving…' : 'Save batch'}
-            </button>
+            <AdminButton variant="primary" onClick={submit} loading={saving} disabled={!form.productId || preview <= 0}>
+              Save batch
+            </AdminButton>
           </div>
-        </div>
+        </AdminCard>
       )}
 
-      <SectionTitle note="Current effective cost for each active SKU, resolved variant → colour → product.">
-        Coverage
-      </SectionTitle>
-      <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-          <thead>
-            <tr style={{ background: '#FAF9F7' }}>
-              {['SKU', 'Product', 'Colour', 'Size', 'Unit cost', 'Source'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 9,
-                                     letterSpacing: '0.1em', textTransform: 'uppercase',
-                                     color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>
+      <AdminSectionHeader title="Coverage" description="Current cost per active SKU."
+        info="Resolved in order: variant, then colour, then product." />
+      <div className="mb-7">
+        {loading ? <AdminLoading /> : coverage.length === 0 ? <AdminEmpty title="No active SKUs." /> : (
+          <AdminTable minWidth={600} caption="Cost coverage by SKU">
+            <thead>
+              <tr>{['SKU', 'Product', 'Colour', 'Size', 'Unit cost', 'Source'].map(h => <AdminTh key={h}>{h}</AdminTh>)}</tr>
+            </thead>
+            <tbody>
+              {coverage.map(c => (
+                <tr key={c.variantId}>
+                  <AdminTd className="font-mono text-[11px]">{c.sku}</AdminTd>
+                  <AdminTd>{c.productName}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{c.colorName}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{c.size}</AdminTd>
+                  <AdminTd className={c.unitCogsCents === null ? 'font-medium text-[#92400E]' : ''}>
+                    {moneyOrUnknown(c.unitCogsCents, 'Not set')}
+                  </AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{c.source ?? '—'}</AdminTd>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={6} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>}
-            {coverage.map(c => (
-              <tr key={c.variantId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                <td style={{ padding: '9px 12px', fontFamily: 'monospace' }}>{c.sku}</td>
-                <td style={{ padding: '9px 12px' }}>{c.productName}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{c.colorName}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{c.size}</td>
-                <td style={{ padding: '9px 12px',
-                             color: c.unitCogsCents === null ? '#92400E' : '#1A1A1A' }}>
-                  {moneyOrUnknown(c.unitCogsCents, 'Not set')}
-                </td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{c.source ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </AdminTable>
+        )}
       </div>
 
-      <SectionTitle note="Append-only history. A newer batch supersedes an older one from its effective date.">
-        Cost batches
-      </SectionTitle>
-      <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
+      <AdminSectionHeader title="Cost batches" description="Append-only history."
+        info="A newer batch supersedes an older one from its effective date." />
+      {batches.length === 0 && !loading ? <AdminEmpty title="No cost batches yet." /> : (
+        <AdminTable minWidth={760} caption="Cost batches">
           <thead>
-            <tr style={{ background: '#FAF9F7' }}>
-              {['Effective', 'Product', 'Scope', 'Batch', 'Mfg', 'Freight', 'Duties+Tax', 'Packaging', 'Unit cost'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 9,
-                                     letterSpacing: '0.1em', textTransform: 'uppercase',
-                                     color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>
-              ))}
-            </tr>
+            <tr>{['Effective', 'Product', 'Scope', 'Batch', 'Mfg', 'Freight', 'Duties+Tax', 'Packaging', 'Unit cost'].map(h => <AdminTh key={h}>{h}</AdminTh>)}</tr>
           </thead>
           <tbody>
-            {batches.length === 0 && !loading && (
-              <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                No cost batches yet.
-              </td></tr>
-            )}
             {batches.map(b => (
-              <tr key={b.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                <td style={{ padding: '9px 12px' }}>{b.effectiveFrom}</td>
-                <td style={{ padding: '9px 12px' }}>{b.productName ?? '—'}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>
-                  {b.variantSku ?? b.colorName ?? 'All variants'}
-                </td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{b.batchLabel ?? '—'}</td>
-                <td style={{ padding: '9px 12px' }}>{money(b.manufacturingCents)}</td>
-                <td style={{ padding: '9px 12px' }}>{money(b.freightCents)}</td>
-                <td style={{ padding: '9px 12px' }}>
-                  {money(b.dutiesCents + b.tariffsCents + b.importTaxCents)}
-                </td>
-                <td style={{ padding: '9px 12px' }}>{money(b.packagingCents)}</td>
-                <td style={{ padding: '9px 12px', fontWeight: 500 }}>{money(b.unitCogsCents)}</td>
+              <tr key={b.id}>
+                <AdminTd>{b.effectiveFrom}</AdminTd>
+                <AdminTd>{b.productName ?? '—'}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{b.variantSku ?? b.colorName ?? 'All variants'}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{b.batchLabel ?? '—'}</AdminTd>
+                <AdminTd>{money(b.manufacturingCents)}</AdminTd>
+                <AdminTd>{money(b.freightCents)}</AdminTd>
+                <AdminTd>{money(b.dutiesCents + b.tariffsCents + b.importTaxCents)}</AdminTd>
+                <AdminTd>{money(b.packagingCents)}</AdminTd>
+                <AdminTd className="font-medium">{money(b.unitCogsCents)}</AdminTd>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-    </div>
+        </AdminTable>
+      )}
+    </AdminPage>
   )
 }

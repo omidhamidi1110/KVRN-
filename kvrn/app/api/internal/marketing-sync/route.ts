@@ -22,7 +22,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 export async function POST(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET ?? ''
-  if (!cronSecret) {
+  if (!cronSecret || (process.env.NODE_ENV === 'production' && cronSecret.trim().length < 32)) {
     return NextResponse.json({ error: 'Not configured.' }, { status: 503, headers: NO_STORE })
   }
   const auth = req.headers.get('Authorization') ?? ''

@@ -56,6 +56,16 @@ function productCodeForSku(sku: string): string | null {
   return SKU_PREFIX_TO_CODE.find(m => sku.startsWith(m.prefix))?.code ?? null
 }
 
+/**
+ * Admin-managed products (Product Editor) use SKUs of the form KVRN-<PRODUCTCODE>-<COLOR>-<SIZE>.
+ * Resolve the product code from that prefix ONLY when the code exists in the products table
+ * (so a new product ships with its OWN weight/dimensions, never a guessed profile).
+ */
+function productCodeFromDbSku(sku: string, dbByCode: Record<string, unknown>): string | null {
+  const m = /^KVRN-([A-Z0-9]{2,12})-/.exec(sku)
+  return m && Object.prototype.hasOwnProperty.call(dbByCode, m[1]) ? m[1] : null
+}
+
 // ── Fallback data (used before migration 006 is applied) ─────────────────────
 // Garment weights only — packaging weight is added per parcel at calculation time.
 // Heights are estimates; update migration 006 once physically measured.
@@ -97,7 +107,7 @@ function buildParcels(
   const parcels:  ParcelSpec[] = []
 
   for (const item of items) {
-    const code = productCodeForSku(item.sku)
+    const code = productCodeForSku(item.sku) ?? productCodeFromDbSku(item.sku, dbByCode)
     const data = code ? (dbByCode[code] ?? FALLBACKS[code]) : null
     const pkg  = getPackageForProduct(code ?? '')
 
@@ -175,8 +185,12 @@ function hasExpressKeyword(rate: any): boolean {
  * Shared helper: convert a raw Shippo rate object to a typed ShippoRate.
  */
 function toShippoRate(r: any, method: 'standard' | 'express'): ShippoRate {
-  const cents       = Math.round(parseFloat(r.amount) * 100)
-  const estDays     = r.estimated_days ?? (method === 'standard' ? 7 : 3)
+  const cents       = Math.round(Number(r.amount) * 100)
+  // External carrier fields must never create NaN/negative Stripe amounts or
+  // nonsensical delivery promises (string concatenation on maxDays).
+  const rawDays = Number(r.estimated_days)
+  const estDays = r.estimated_days != null && Number.isInteger(rawDays) && rawDays >= 1 && rawDays <= 180
+    ? rawDays : (method === 'standard' ? 7 : 3)
   const minDays     = Math.max(estDays - 1, 1)
   const maxDays     = estDays + 1
   const provider    = r.provider ?? 'Carrier'
@@ -217,8 +231,11 @@ export function pickRatesForDestination(
   country: string
 ): { standard: ShippoRate | null; express: ShippoRate | null } {
   const valid = rates
-    .filter((r: any) => r.amount && r.currency?.toLowerCase() === 'usd' && !r.hidden)
-    .sort((a: any, b: any) => parseFloat(a.amount) - parseFloat(b.amount))
+    .filter((r: any) => r && (typeof r.amount === 'string' || typeof r.amount === 'number')
+      && String(r.amount).trim() !== '' && Number.isFinite(Number(r.amount))
+      && Number(r.amount) >= 0 && Number(r.amount) <= 100_000
+      && typeof r.currency === 'string' && r.currency.toLowerCase() === 'usd' && !r.hidden)
+    .sort((a: any, b: any) => Number(a.amount) - Number(b.amount))
 
   if (valid.length === 0) return { standard: null, express: null }
 
@@ -227,7 +244,8 @@ export function pickRatesForDestination(
   if (isInternational) {
     // ── International: cheapest is standard; real-faster-or-keyword rate is express ──
     const standardRaw = valid[0]
-    const stdDays     = standardRaw.estimated_days as number | null | undefined
+    const sd = Number(standardRaw.estimated_days)
+    const stdDays = standardRaw.estimated_days != null && Number.isFinite(sd) && sd > 0 ? sd : null
     const others      = valid.filter((r: any) => r.object_id !== standardRaw.object_id)
 
     let expressRaw: any = null
@@ -235,7 +253,8 @@ export function pickRatesForDestination(
     // Priority 1: a real Shippo rate with strictly fewer estimated_days than standard
     if (stdDays != null) {
       expressRaw = others.find(
-        (r: any) => r.estimated_days != null && r.estimated_days < stdDays
+        (r: any) => r.estimated_days != null && Number.isFinite(Number(r.estimated_days))
+          && Number(r.estimated_days) > 0 && Number(r.estimated_days) < stdDays
       ) ?? null  // others already sorted cheapest-first → first match = cheapest faster
     }
 
@@ -380,6 +399,7 @@ async function callShippoApi(payload: object, apiToken: string): Promise<any[] |
         'Content-Type':  'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(12_000),
     })
   } catch (err: any) {
     console.error('[shippo] Network error:', err?.message?.slice(0, 80))
@@ -442,7 +462,8 @@ async function callShippoApi(payload: object, apiToken: string): Promise<any[] |
     return null
   }
 
-  return data?.rates ?? []
+  // Malformed carrier payloads are NOT equivalent to an empty-but-valid quote.
+  return Array.isArray(data?.rates) ? data.rates : null
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────

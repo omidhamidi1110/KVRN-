@@ -5,6 +5,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/context/I18nContext'
+import { fillMessages, format, type MessageKey } from '@/lib/i18n/messages'
 
 type TrackState = 'idle' | 'loading' | 'found' | 'not-found'
 
@@ -19,21 +21,15 @@ interface OrderResult {
   lineItems:      Array<{ name: string; color: string; size: string }>
 }
 
-const STATUS_LABELS: Record<string, { label: string; description: string }> = {
-  pending:        { label: 'Order received',     description: 'Payment confirmed. Preparing for dispatch.' },
-  paid:           { label: 'Order confirmed',    description: 'Payment confirmed. Preparing for dispatch.' },
-  unfulfilled:    { label: 'Preparing',          description: 'Your order is being prepared.' },
-  processing:     { label: 'Processing',         description: 'Your order is being prepared.' },
-  fulfilled:      { label: 'Ready to ship',      description: 'Packed and ready for collection by the carrier.' },
-  shipped:        { label: 'Shipped',            description: 'On its way to you.' },
-  delivered:      { label: 'Delivered',          description: 'Your order has been delivered.' },
-  cancelled:      { label: 'Cancelled',          description: 'This order has been cancelled.' },
-  return_pending: { label: 'Return pending',     description: 'Return in progress.' },
-  returned:       { label: 'Returned',           description: 'Return received.' },
-  refunded:       { label: 'Refunded',           description: 'Refund has been issued.' },
-}
+// Known order statuses (the label/description for each lives in the dictionary: track.status.<key>).
+const KNOWN_STATUSES = new Set([
+  'pending', 'paid', 'unfulfilled', 'processing', 'fulfilled', 'shipped', 'delivered',
+  'cancelled', 'return_pending', 'returned', 'refunded',
+])
+
 
 export default function TrackOrderPage() {
+  const t = fillMessages(useI18n().t)
   const [orderId,  setOrderId]  = useState('')
   const [email,    setEmail]    = useState('')
   const [state,    setState]    = useState<TrackState>('idle')
@@ -45,7 +41,7 @@ export default function TrackOrderPage() {
     setInputErr('')
 
     if (!orderId.trim() || !email.trim()) {
-      setInputErr('Enter both your order number and email address.')
+      setInputErr(t['track.enterBoth'])
       return
     }
 
@@ -83,21 +79,25 @@ export default function TrackOrderPage() {
     }
   }
 
-  const status = result ? (STATUS_LABELS[result.status] ?? { label: result.status, description: '' }) : null
+  const status = result
+    ? (KNOWN_STATUSES.has(result.status)
+        ? { label: t[`track.status.${result.status}` as MessageKey], description: t[`track.status.${result.status}.desc` as MessageKey] }
+        : { label: result.status, description: '' })
+    : null
 
   return (
     <div>
-      <PageHero title="Track Order" breadcrumb="Track Order" />
+      <PageHero title={t['track.title']} breadcrumb={t['track.title']} />
       <div data-nav-theme="light" className="container-kvrn section-padding max-w-xl">
 <h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-10">
-          Track your order
+          {t.trackYourOrder}
         </h1>
 
         {/* Search form */}
         <form onSubmit={handleSearch} className="space-y-4" noValidate>
           <div>
             <label htmlFor="order-id" className="label-11 block mb-2">
-              Order number
+              {t['track.orderNumber']}
             </label>
             <input
               id="order-id"
@@ -111,13 +111,13 @@ export default function TrackOrderPage() {
 
           <div>
             <label htmlFor="track-email" className="label-11 block mb-2">
-              Email address
+              {t['track.emailAddress']}
             </label>
             <input
               id="track-email"
               type="email"
               autoComplete="email"
-              placeholder="Email used at checkout"
+              placeholder={t['track.emailPlaceholder']}
               value={email}
               onChange={e => { setEmail(e.target.value); setInputErr('') }}
               className="kvrn-input"
@@ -129,21 +129,20 @@ export default function TrackOrderPage() {
           )}
 
           <Button type="submit" variant="primary" size="md" loading={state === 'loading'}>
-            Find my order
+            {t['track.find']}
           </Button>
         </form>
 
         {/* Results */}
         {state === 'not-found' && (
           <div className="mt-10 border border-kvrn-border p-6">
-            <p className="text-[14px] font-light mb-2">Order not found.</p>
+            <p className="text-[14px] font-light mb-2">{t['track.notFoundTitle']}</p>
             <p className="text-[13px] text-kvrn-muted leading-relaxed">
-              Check your order number and email match what you entered at checkout.
-              If you&apos;re still having trouble, email{' '}
+              {t['track.notFoundBody']}{' '}
               <a href="mailto:orders@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
                 orders@kvrn.shop
               </a>{' '}
-              with your order details.
+              {t['track.notFoundBodyEnd']}
             </p>
           </div>
         )}
@@ -154,7 +153,7 @@ export default function TrackOrderPage() {
 
             {/* Status */}
             <div>
-              <p className="label-11 mb-2">Status</p>
+              <p className="label-11 mb-2">{t['track.status']}</p>
               <p className="text-[18px] font-light">{status.label}</p>
               {status.description && (
                 <p className="text-[13px] text-kvrn-muted mt-1">{status.description}</p>
@@ -164,7 +163,7 @@ export default function TrackOrderPage() {
             {/* Tracking */}
             {result.trackingNumber && (
               <div className="border-t border-kvrn-border pt-6">
-                <p className="label-11 mb-2">Tracking</p>
+                <p className="label-11 mb-2">{t['track.tracking']}</p>
                 <p className="text-[14px] font-light">{result.carrier} — {result.trackingNumber}</p>
                 {result.trackingUrl && (
                   <a
@@ -173,7 +172,7 @@ export default function TrackOrderPage() {
                     rel="noopener noreferrer"
                     className="inline-block mt-3 text-[11px] font-light tracking-widest uppercase border border-kvrn-text px-4 h-9 flex items-center hover:bg-kvrn-text hover:text-kvrn-bg transition-colors duration-150"
                   >
-                    Track with {result.carrier} →
+                    {format(t['track.trackWith'], { carrier: result.carrier ?? '' })}
                   </a>
                 )}
               </div>
@@ -182,12 +181,12 @@ export default function TrackOrderPage() {
             {/* Items */}
             {result.lineItems.length > 0 && (
               <div className="border-t border-kvrn-border pt-6">
-                <p className="label-11 mb-4">Items</p>
+                <p className="label-11 mb-4">{t['track.items']}</p>
                 <ul className="space-y-2">
                   {result.lineItems.map((item, i) => (
                     <li key={i} className="text-[14px] font-light">
                       {item.name}
-                      <span className="text-kvrn-muted ml-2 font-light">
+                      <span className="text-kvrn-muted ms-2 font-light">
                         {item.color} / {item.size}
                       </span>
                     </li>
@@ -199,7 +198,7 @@ export default function TrackOrderPage() {
             {/* Help */}
             <div className="border-t border-kvrn-border pt-6">
               <p className="text-[13px] text-kvrn-muted">
-                Questions about your order?{' '}
+                {t['track.questions']}{' '}
                 <a href="mailto:orders@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
                   orders@kvrn.shop
                 </a>

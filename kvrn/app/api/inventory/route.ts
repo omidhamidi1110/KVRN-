@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { toNeonSlug } from '@/lib/catalog'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import { resolveInventoryProductId } from '@/lib/product-public'
 
 // No caching — availability must always be current
 export const dynamic = 'force-dynamic'
@@ -11,13 +13,41 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'slug parameter is required.' }, { status: 400 })
   }
 
-  const neonSlug = toNeonSlug(publicSlug)
-  if (!neonSlug) {
-    return NextResponse.json({ error: `Unknown product slug: ${publicSlug}` }, { status: 404 })
+  // Flag OFF: the coded slug -> Neon slug mapping, exactly as before.
+  // Flag ON: any PUBLISHED Admin-managed product (public slug, old slug or alias) resolves to its
+  // canonical product id. An unpublished/unknown product is a 404 — availability is never exposed
+  // for something that is not live.
+  const cmsOn = isFeatureEnabled('CMS_PRODUCT_ROUTING')
+  let productId: string | null = null
+  let neonSlug: string | null = null
+  if (cmsOn) {
+    try { productId = await resolveInventoryProductId(publicSlug) } catch (err: any) {
+      console.error('Inventory slug resolution error:', err.message)
+      return NextResponse.json({ error: 'Inventory temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
+    }
+    if (!productId) return NextResponse.json({ error: `Unknown product slug: ${publicSlug}` }, { status: 404 })
+  } else {
+    neonSlug = toNeonSlug(publicSlug)
+    if (!neonSlug) {
+      return NextResponse.json({ error: `Unknown product slug: ${publicSlug}` }, { status: 404 })
+    }
   }
 
   try {
-    const rows = await sql`
+    const rows = cmsOn ? await sql`
+      SELECT
+        pv.sku,
+        pv.size,
+        pv.size_sort,
+        pv.color_code,
+        pv.active,
+        (pv.stock_on_hand - pv.reserved_quantity > 0 AND pv.active = true) AS in_stock,
+        GREATEST(0, pv.stock_on_hand - pv.reserved_quantity) AS available_qty
+      FROM product_variants pv
+      JOIN products p ON p.id = pv.product_id
+      WHERE p.id = ${productId}::uuid AND p.active = true
+      ORDER BY pv.size_sort ASC, pv.color_code ASC
+    ` : await sql`
       SELECT
         pv.sku,
         pv.size,

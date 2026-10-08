@@ -7,17 +7,28 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { validateDiscount, applyDiscountPriority, normalizeDiscountCode } from '@/lib/discounts'
 import { qualifiesForFreeShipping } from '@/lib/free-shipping'
+import { getSubtotalCentsForItems } from '@/lib/inventory'
+import { allowPublicApiRequest } from '@/lib/public-api-rate-limit'
+import { readLimitedJson } from '@/lib/limited-json-request'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  let body: any
-  try { body = await req.json() } catch {
-    return NextResponse.json({ valid: false, error: 'Invalid request.' }, { status: 400 })
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const allowed = await allowPublicApiRequest(sql, { bucket: 'discount_preview', headers: req.headers, limit: 30, windowSeconds: 60 })
+      if (!allowed) return NextResponse.json({ valid: false, error: 'Too many attempts.' }, { status: 429, headers: { 'Retry-After': '60' } })
+    } catch {
+      return NextResponse.json({ valid: false, error: 'Discount check temporarily unavailable.' }, { status: 503 })
+    }
   }
-
+  const read = await readLimitedJson(req, 8 * 1024)
+  if (!read.ok) return NextResponse.json({ valid: false, error: read.reason === 'too_large' ? 'Request too large.' : 'Invalid request.' }, { status: read.status })
+  const body: any = read.value
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ valid: false, error: 'Invalid request.' }, { status: 400 })
   const rawCode       = body.code
   const country       = typeof body.country === 'string' ? body.country.toUpperCase() : 'US'
+  if (body.items !== undefined && !Array.isArray(body.items)) return NextResponse.json({ valid: false, error: 'Invalid cart.' }, { status: 400 })
   const cartItems     = Array.isArray(body.items) ? body.items : []
   const rawMethod     = body.shippingMethod
   const rawShippingCents = body.shippingCents
@@ -37,32 +48,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ valid: false, error: "Enter a discount code." })
   }
 
-  // Resolve authoritative subtotal from product_variants (never trust client prices)
-  let subtotalCents = 0
+  // One authoritative query. Reject the ENTIRE cart on malformed, inactive or
+  // unknown lines; never silently drop bad items and show a false discount.
+  if (cartItems.length > 20 || cartItems.some((i: any) => !i || typeof i.sku !== 'string'
+    || i.sku.length < 1 || i.sku.length > 120 || !Number.isInteger(i.quantity)
+    || i.quantity < 1 || i.quantity > 10)) {
+    return NextResponse.json({ valid: false, error: 'Invalid cart.', reason: 'invalid_cart' }, { status: 400 })
+  }
+  let subtotalCents: number
   try {
-    if (cartItems.length > 0) {
-      for (const item of cartItems) {
-        if (typeof item.sku !== 'string' || !Number.isInteger(item.quantity) || item.quantity < 1) continue
-        const rows = await sql`
-          SELECT p.price_cents
-          FROM product_variants pv
-          JOIN products p ON p.id = pv.product_id
-          WHERE pv.sku = ${item.sku}
-          LIMIT 1
-        `
-        const price = (rows as any[])[0]?.price_cents
-        if (price === undefined || price === null) {
-          return NextResponse.json(
-            { valid: false, error: 'An item in your cart is no longer available.', reason: 'invalid_cart' },
-            { status: 400 }
-          )
-        }
-        subtotalCents += Number(price) * item.quantity
-      }
+    const authoritative = await getSubtotalCentsForItems(cartItems)
+    if (authoritative === null) {
+      return NextResponse.json({ valid: false, error: 'An item in your cart is no longer available.', reason: 'invalid_cart' }, { status: 400 })
     }
-  } catch (err: any) {
-    console.error('[discounts/validate] price lookup error:', err?.message?.slice(0, 60))
-    return NextResponse.json({ valid: false, error: 'Could not validate code at this time.' }, { status: 500 })
+    subtotalCents = authoritative
+  } catch {
+    return NextResponse.json({ valid: false, error: 'Could not validate code at this time.' }, { status: 503 })
   }
 
   // Automatic US free shipping is a store benefit and may stack with one merchandise promo.

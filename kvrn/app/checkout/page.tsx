@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Image from 'next/image'
 import { useCart } from '@/context/CartContext'
+import { useI18n } from '@/context/I18nContext'
+import { useCurrency } from '@/context/CurrencyContext'
+import { fillMessages, format } from '@/lib/i18n/messages'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/data/products'
 import { formatCheckoutPrice } from '@/lib/format-money'
@@ -12,6 +15,8 @@ import { COUNTRIES } from '@/lib/countries'
 import { cn } from '@/lib/utils'
 import { gaBeginCheckout, getGaIdentifiers } from '@/lib/ga-client'
 import { getFunnelSessionIdIfConsented } from '@/lib/funnel-client'
+import { effectiveUnitCents, splitCartForCheckout } from '@/lib/bundle-cart'
+import { BUNDLE_CODE_NOT_COMBINABLE_MESSAGE } from '@/lib/bundle-pricing'
 
 type Step = 'contact' | 'shipping'
 
@@ -34,7 +39,19 @@ interface AddressData {
 
 // ─── Main checkout page ───────────────────────────────────────────────────────
 export default function CheckoutPage() {
-  const { items, subtotalPence } = useCart()
+  const { items, subtotalPence, refreshBundles } = useCart()
+  const hasBundle = items.some(i => i.bundle)
+  const { t: dict, locale } = useI18n()
+  const t = fillMessages(dict)
+  const { currencyCode } = useCurrency()
+  // Country names in the visitor's language (English keeps the existing list's names).
+  const countryName = useMemo(() => {
+    if (locale === 'en') return (code: string, fallback: string) => fallback
+    try {
+      const dn = new Intl.DisplayNames([locale], { type: 'region' })
+      return (code: string, fallback: string) => { try { return dn.of(code) ?? fallback } catch { return fallback } }
+    } catch { return (_code: string, fallback: string) => fallback }
+  }, [locale])
 
   const [isClient,         setIsClient]         = useState(false)
   const [step,             setStep]             = useState<Step>('contact')
@@ -182,8 +199,8 @@ export default function CheckoutPage() {
   // ── Validate contact ──────────────────────────────────────────────────────
   const validateContact = () => {
     const errs: Record<string, string> = {}
-    if (!contact.email.trim()) errs.email = 'Email is required.'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) errs.email = 'Enter a valid email.'
+    if (!contact.email.trim()) errs.email = t['checkout.errEmailRequired']
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) errs.email = t['checkout.errEmailInvalid']
     setContactErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -191,22 +208,22 @@ export default function CheckoutPage() {
   // ── Validate address ──────────────────────────────────────────────────────
   const validateAddress = () => {
     const errs: Record<string, string> = {}
-    if (!address.firstName.trim()) errs.firstName = 'First name is required.'
-    if (!address.lastName.trim())  errs.lastName  = 'Last name is required.'
-    if (!address.line1.trim())     errs.line1     = 'Address is required.'
-    if (!address.city.trim())      errs.city      = 'City is required.'
+    if (!address.firstName.trim()) errs.firstName = t['checkout.errFirstName']
+    if (!address.lastName.trim())  errs.lastName  = t['checkout.errLastName']
+    if (!address.line1.trim())     errs.line1     = t['checkout.errAddress']
+    if (!address.city.trim())      errs.city      = t['checkout.errCity']
 
     if (isUS) {
       const st = address.state.trim().toUpperCase()
-      if (!st || !US_STATES.has(st)) errs.state = 'Enter a valid US state code (e.g. CA).'
-      if (!/^\d{5}(-\d{4})?$/.test(address.postalCode.trim())) errs.postalCode = 'Enter a valid ZIP code.'
+      if (!st || !US_STATES.has(st)) errs.state = t['checkout.errState']
+      if (!/^\d{5}(-\d{4})?$/.test(address.postalCode.trim())) errs.postalCode = t['checkout.errZip']
     } else {
       // International: postal required, state optional
-      if (!address.postalCode.trim()) errs.postalCode = 'Postal code is required.'
+      if (!address.postalCode.trim()) errs.postalCode = t['checkout.errPostal']
     }
 
     if (!canProceed) {
-      errs.shipping = 'Shipping rates are not available for this destination.'
+      errs.shipping = t['checkout.errNoRates']
     }
 
     setAddressErrors(errs)
@@ -219,9 +236,13 @@ export default function CheckoutPage() {
 
     const invalidItems = items.filter(i => !i.sku || !i.sku.startsWith('KVRN-'))
     if (invalidItems.length > 0) {
-      setPaymentError('One or more items need to be reselected. Please return to the product page and choose your size.')
+      setPaymentError(t['checkout.errReselect'])
       return
     }
+    // A set is sent as `bundle` next to the ordinary items (no prices: the server prices it).
+    const split = splitCartForCheckout(items)
+    if (!split.ok) { setPaymentError(split.message); return }
+    if (split.bundle && discountApplied.code) { setPaymentError(BUNDLE_CODE_NOT_COMBINABLE_MESSAGE); return }
 
     setCreatingSession(true)
     setPaymentError('')
@@ -239,7 +260,8 @@ export default function CheckoutPage() {
           // Opaque analytics session id; present only when analytics consent was given.
           ...(analyticsSid ? { analyticsSessionId: analyticsSid } : {}),
           ...(ga ? { gaClientId: ga.clientId, ...(ga.sessionId ? { gaSessionId: ga.sessionId } : {}) } : {}),
-          items:          items.map(i => ({ sku: i.sku, quantity: i.quantity })),
+          items:          split.plain,
+          ...(split.bundle ? { bundle: split.bundle } : {}),
           email:          contact.email.trim(),
           phone:          contact.smsOptIn ? (contact.phone.trim() || undefined) : undefined,
           shippingMethod,
@@ -260,12 +282,17 @@ export default function CheckoutPage() {
         if (data.code === 'OUT_OF_STOCK' || data.code === 'INSUFFICIENT_STOCK') {
           const cartItem = data.sku ? items.find(i => i.sku === data.sku) : null
           if (cartItem) {
-            setPaymentError(`${cartItem.productName} — ${cartItem.colorName} / ${cartItem.size} is sold out.`)
+            setPaymentError(format(t['checkout.errItemSoldOut'], { item: `${cartItem.productName} — ${cartItem.colorName} / ${cartItem.size}` }))
           } else {
-            setPaymentError('An item in your bag is sold out.')
+            setPaymentError(t['checkout.errAnItemSoldOut'])
           }
+        } else if (typeof data.code === 'string' && data.code.startsWith('BUNDLE_')) {
+          // The set changed (price, availability or choices): say so, refresh the bag from the
+          // server's current quote, and let the customer review before paying.
+          setPaymentError(data.error ?? 'Your set changed. Please review your bag.')
+          void refreshBundles()
         } else {
-          setPaymentError(data.error ?? 'Checkout unavailable. Please try again.')
+          setPaymentError(data.error ?? t['checkout.errUnavailable'])
         }
         return
       }
@@ -273,19 +300,21 @@ export default function CheckoutPage() {
       // GA4 begin_checkout: only here, after the server created and attached the Stripe session
       // (the same moment the first-party checkout_started is recorded) — never on a click.
       gaBeginCheckout(items.map(i => ({
-        slug: i.slug, name: i.productName, sku: i.sku, priceCents: i.price, quantity: i.quantity,
+        slug: i.slug, name: i.productName, sku: i.sku, priceCents: effectiveUnitCents(i), quantity: i.quantity,
       })))
       window.location.href = data.url
     } catch (err) {
-      setPaymentError(err instanceof Error ? err.message : 'Something went wrong.')
+      setPaymentError(err instanceof Error ? err.message : t['common.somethingWrong'])
     } finally {
       setCreatingSession(false)
     }
-  }, [items, contact, address, shippingMethod, canProceed])
+  }, [items, contact, address, shippingMethod, canProceed, discountApplied.code, refreshBundles, t])
 
   const handleApplyDiscount = async (overrideCode?: string) => {
     const code = (overrideCode ?? discountInput).trim().toUpperCase()
     if (!code) return
+    // A set price does not combine with a discount code (the server enforces this too).
+    if (hasBundle) { setDiscountInputError(BUNDLE_CODE_NOT_COMBINABLE_MESSAGE); return }
     setDiscountLoading(true)
     try {
       const cartItems = items.map((i: any) => ({ sku: i.sku ?? i.variantSku, quantity: i.quantity }))
@@ -314,7 +343,7 @@ export default function CheckoutPage() {
         }
         // Do NOT clear an existing valid applied code just because a new one failed
         // Show error under the input; keep applied code in place
-        const errorMsg = data.error ?? 'That code isn\'t valid.'
+        const errorMsg = data.error ?? t['checkout.errCodeInvalid']
         setDiscountInputError(errorMsg)
       } else {
         setDiscountInputError(null)
@@ -323,7 +352,7 @@ export default function CheckoutPage() {
           displayAmount: data.displayAmount, type: data.type })
       }
     } catch {
-      setDiscountInputError('Network error. Please try again.')
+      setDiscountInputError(t['checkout.errNetwork'])
     } finally {
       setDiscountLoading(false)
     }
@@ -408,7 +437,7 @@ export default function CheckoutPage() {
     return (
       <div style={{ minHeight:'100vh', paddingTop:'calc(36px + 56px + 80px)', background:'#F9F8F6' }}>
         <div style={{ maxWidth:480, margin:'0 auto', padding:'0 24px', textAlign:'center' }}>
-          <p style={{ fontSize:15, color:'#6b7280' }}>Your cart is empty.</p>
+          <p style={{ fontSize:15, color:'#6b7280' }}>{t['checkout.cartEmpty']}</p>
         </div>
       </div>
     )
@@ -425,7 +454,7 @@ export default function CheckoutPage() {
 
           <h1 style={{ fontSize:22, fontWeight:400, letterSpacing:'0.06em', textTransform:'uppercase',
                        color:'#1A1A1A', marginBottom:32 }}>
-            Checkout
+            {t.checkout}
           </h1>
 
           {/* Progress indicator */}
@@ -442,7 +471,7 @@ export default function CheckoutPage() {
                 </div>
                 <span style={{ fontSize:11, letterSpacing:'0.08em', textTransform:'uppercase',
                                color: step === s ? '#1A1A1A' : '#9B9B9B' }}>
-                  {s === 'contact' ? 'Contact' : 'Shipping'}
+                  {s === 'contact' ? t['checkout.stepContact'] : t['checkout.stepShipping']}
                 </span>
                 {i < stepLabels.length - 1 && (
                   <div style={{ width:32, height:1, background:'#E8E5E0', marginLeft:4 }} />
@@ -456,16 +485,16 @@ export default function CheckoutPage() {
             <section>
               <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
                            color:'#1A1A1A', marginBottom:20 }}>
-                Contact
+                {t['checkout.stepContact']}
               </h2>
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                 <div>
-                  <label style={labelStyle}>Email *</label>
+                  <label style={labelStyle}>{t['checkout.emailLabel']}</label>
                   <input
                     type="email" autoComplete="email" value={contact.email}
                     onChange={e => setContact(c => ({ ...c, email: e.target.value }))}
                     className="checkout-input"
-                    placeholder="you@example.com"
+                    placeholder={t['checkout.emailPlaceholder']}
                   />
                   {contactErrors.email && <p style={errStyle}>{contactErrors.email}</p>}
                 </div>
@@ -473,12 +502,12 @@ export default function CheckoutPage() {
                   <input type="checkbox" checked={contact.smsOptIn}
                     onChange={e => setContact(c => ({ ...c, smsOptIn: e.target.checked, phone: e.target.checked ? c.phone : '' }))} />
                   <span style={{ fontSize:13, color:'#6b7280' }}>
-                    Text me shipping updates (optional)
+                    {t['checkout.textMeUpdates']}
                   </span>
                 </label>
                 {contact.smsOptIn && (
                   <div>
-                    <label style={labelStyle}>Phone</label>
+                    <label style={labelStyle}>{t['checkout.phone']}</label>
                     <input
                       type="tel" autoComplete="tel" value={contact.phone}
                       onChange={e => setContact(c => ({ ...c, phone: e.target.value }))}
@@ -490,7 +519,7 @@ export default function CheckoutPage() {
               <Button variant="primary" size="lg" fullWidth
                 style={{ marginTop:28 }}
                 onClick={() => { if (validateContact()) setStep('shipping') }}>
-                Continue to shipping
+                {t['checkout.continueToShipping']}
               </Button>
             </section>
           )}
@@ -505,20 +534,20 @@ export default function CheckoutPage() {
                 <button onClick={() => setStep('contact')}
                   style={{ fontSize:12, color:'#1A1A1A', background:'none', border:'none',
                            cursor:'pointer', letterSpacing:'0.06em', textDecoration:'underline' }}>
-                  Edit
+                  {t['common.edit']}
                 </button>
               </div>
 
               <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
                            color:'#1A1A1A', marginBottom:20 }}>
-                Shipping address
+                {t['checkout.shippingAddress']}
               </h2>
 
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
                 {/* Country selector */}
                 <div>
-                  <label style={labelStyle}>Country *</label>
+                  <label style={labelStyle}>{t['checkout.country']}</label>
                   <select
                     value={address.country}
                     onChange={e => setAddress(a => ({
@@ -531,21 +560,21 @@ export default function CheckoutPage() {
                     autoComplete="country"
                   >
                     {COUNTRIES.map(c => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
+                      <option key={c.code} value={c.code}>{countryName(c.code, c.name)}</option>
                     ))}
                   </select>
                 </div>
 
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                   <div>
-                    <label style={labelStyle}>First name *</label>
+                    <label style={labelStyle}>{t['checkout.firstNameReq']}</label>
                     <input value={address.firstName} autoComplete="given-name"
                       onChange={e => setAddress(a => ({ ...a, firstName: e.target.value }))}
                       className="checkout-input" />
                     {addressErrors.firstName && <p style={errStyle}>{addressErrors.firstName}</p>}
                   </div>
                   <div>
-                    <label style={labelStyle}>Last name *</label>
+                    <label style={labelStyle}>{t['checkout.lastNameReq']}</label>
                     <input value={address.lastName} autoComplete="family-name"
                       onChange={e => setAddress(a => ({ ...a, lastName: e.target.value }))}
                       className="checkout-input" />
@@ -554,22 +583,22 @@ export default function CheckoutPage() {
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Address *</label>
+                  <label style={labelStyle}>{t['checkout.address']}</label>
                   <input value={address.line1} autoComplete="address-line1"
                     onChange={e => setAddress(a => ({ ...a, line1: e.target.value }))}
-                    className="checkout-input" placeholder="123 Main St" />
+                    className="checkout-input" placeholder={t['checkout.addressPlaceholder']} />
                   {addressErrors.line1 && <p style={errStyle}>{addressErrors.line1}</p>}
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Apartment, suite, etc. (optional)</label>
+                  <label style={labelStyle}>{t['checkout.apartment']}</label>
                   <input value={address.line2} autoComplete="address-line2"
                     onChange={e => setAddress(a => ({ ...a, line2: e.target.value }))}
                     className="checkout-input" />
                 </div>
 
                 <div>
-                  <label style={labelStyle}>City *</label>
+                  <label style={labelStyle}>{t['checkout.city']}</label>
                   <input value={address.city} autoComplete="address-level2"
                     onChange={e => setAddress(a => ({ ...a, city: e.target.value }))}
                     className="checkout-input" />
@@ -580,7 +609,7 @@ export default function CheckoutPage() {
                   <div>
                     {/* Label and maxLength differ by country */}
                     <label style={labelStyle}>
-                      {isUS ? 'State *' : 'State / Province / Region'}
+                      {isUS ? t['checkout.stateUs'] : t['checkout.stateIntl']}
                     </label>
                     <input
                       value={address.state}
@@ -594,7 +623,7 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <label style={labelStyle}>
-                      {isUS ? 'ZIP code *' : 'Postal code *'}
+                      {isUS ? t['checkout.zipUs'] : t['checkout.postalIntl']}
                     </label>
                     <input
                       value={address.postalCode}
@@ -611,7 +640,7 @@ export default function CheckoutPage() {
               {/* ── Shipping method ── */}
               <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
                            color:'#1A1A1A', marginTop:32, marginBottom:16 }}>
-                Shipping method
+                {t['checkout.shippingMethod']}
               </h2>
 
                 {!shippingAddressReady && (
@@ -624,7 +653,7 @@ export default function CheckoutPage() {
                     lineHeight:1.5,
                     marginBottom:16,
                   }}>
-                    Enter your shipping address to see available rates.
+                    {t['checkout.enterAddressForRates']}
                   </div>
                 )}
 
@@ -635,7 +664,7 @@ export default function CheckoutPage() {
                     marginBottom:16,
                     letterSpacing:'0.04em'
                   }}>
-                    Calculating shipping rates…
+                    {t['checkout.calculatingRates']}
                   </p>
                 )}
 
@@ -643,7 +672,7 @@ export default function CheckoutPage() {
               {!isUS && !fetchingRates && internationalUnavail && (
                 <div style={{ padding:'12px 16px', background:'#FEF2F2',
                               border:'1px solid #FECACA', color:'#B91C1C', fontSize:13, marginBottom:16 }}>
-                  Shipping is currently unavailable to this destination.
+                  {t['checkout.shippingUnavailableDest']}
                 </div>
               )}
 
@@ -651,7 +680,7 @@ export default function CheckoutPage() {
               {isUS && !fetchingRates && shippingUnavail && (
                 <div style={{ padding:'12px 16px', background:'#FFF7ED',
                               border:'1px solid #FED7AA', color:'#92400E', fontSize:13, marginBottom:16 }}>
-                  Shipping rates are temporarily unavailable. Please try again in a moment.
+                  {t['checkout.ratesUnavailable']}
                 </div>
               )}
 
@@ -673,7 +702,7 @@ export default function CheckoutPage() {
                           <span style={{ fontSize:13, fontWeight:500 }}>{opt.label}</span>
                           {opt.minDays > 0 && (
                             <span style={{ fontSize:12, color:'#9B9B9B', marginLeft:8 }}>
-                              {opt.minDays}–{opt.maxDays} business days
+                              {format(t['checkout.businessDays'], { min: opt.minDays, max: opt.maxDays })}
                             </span>
                           )}
                         </span>
@@ -683,7 +712,7 @@ export default function CheckoutPage() {
                         fontWeight: opt.cents === 0 ? 500 : 400,
                         color: opt.cents === 0 ? '#059669' : 'inherit',
                       }}>
-                        {opt.cents === 0 ? 'FREE' : formatCheckoutPrice(opt.cents)}
+                        {opt.cents === 0 ? t['common.free'] : formatCheckoutPrice(opt.cents)}
                       </span>
                     </label>
                   ))}
@@ -706,12 +735,12 @@ export default function CheckoutPage() {
                 disabled={!canProceed || creatingSession}
                 style={{ marginTop:28, opacity: canProceed ? 1 : 0.5 }}
                 onClick={handleCheckout}>
-                Continue to secure payment
+                {t['checkout.continueToPayment']}
               </Button>
 
               <p style={{ marginTop:16, fontSize:11, color:'#9B9B9B', textAlign:'center',
                           letterSpacing:'0.04em' }}>
-                You will be redirected to Stripe Hosted Checkout to enter payment details securely.
+                {t['checkout.stripeRedirect']}
               </p>
             </section>
           )}
@@ -722,7 +751,7 @@ export default function CheckoutPage() {
           <div style={{ background:'#fff', border:'1px solid #E8E5E0', padding:'24px' }}>
             <h2 style={{ fontSize:11, fontWeight:500, letterSpacing:'0.10em', textTransform:'uppercase',
                          color:'#1A1A1A', marginBottom:20 }}>
-              Order summary
+              {t['checkout.orderSummary']}
             </h2>
 
             <div style={{ display:'flex', flexDirection:'column', gap:16, marginBottom:24 }}>
@@ -739,10 +768,11 @@ export default function CheckoutPage() {
                     <p style={{ fontSize:11, color:'#9B9B9B', margin:'2px 0 0' }}>
                       {item.colorName} / {item.size}
                       {item.quantity > 1 && ` × ${item.quantity}`}
+                      {item.bundle && ` · Set`}
                     </p>
                   </div>
                   <span style={{ fontSize:13, fontWeight:500, flexShrink:0 }}>
-                    {formatPrice(item.price * item.quantity)}
+                    {formatPrice(effectiveUnitCents(item) * item.quantity)}
                   </span>
                 </div>
               ))}
@@ -750,15 +780,15 @@ export default function CheckoutPage() {
 
             <div style={{ borderTop:'1px solid #E8E5E0', paddingTop:16, display:'flex', flexDirection:'column', gap:10 }}>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
-                <span style={{ color:'#6b7280' }}>Subtotal</span>
+                <span style={{ color:'#6b7280' }}>{t.subtotal}</span>
                 <span>{formatPrice(subtotalPence)}</span>
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:13 }}>
-                <span style={{ color:'#6b7280' }}>Shipping</span>
+                <span style={{ color:'#6b7280' }}>{t['checkout.shippingLabel']}</span>
                 {shippingCents === null ? (
-                  <span style={{ color:'#9B9B9B' }}>Calculated after address</span>
+                  <span style={{ color:'#9B9B9B' }}>{t['checkout.calculatedAfterAddress']}</span>
                 ) : shippingCents === 0 ? (
-                  <span style={{ color:'#059669', fontWeight:500 }}>FREE</span>
+                  <span style={{ color:'#059669', fontWeight:500 }}>{t['common.free']}</span>
                 ) : (
                   <span>{formatCheckoutPrice(shippingCents)}</span>
                 )}
@@ -766,11 +796,12 @@ export default function CheckoutPage() {
 
 
               {/* ── AVAILABLE OFFERS ───────────────────────────────────── */}
+              {/* Available Offers: free shipping + the SMS signup code (heading text: checkout.availableOffers) */}
               {(freeShippingEligible || (smsOfferCode && !discountApplied.code)) && (
                 <div style={{ marginBottom:16 }}>
                   <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:9, letterSpacing:'0.12em',
                     textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
-                    Available Offers
+                    {t['checkout.availableOffers']}
                   </p>
 
                   {/* Free shipping — auto-detected, not a code */}
@@ -781,14 +812,14 @@ export default function CheckoutPage() {
                       <div>
                         <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, fontWeight:500,
                           letterSpacing:'0.06em', textTransform:'uppercase', color:'#1A4A1A', margin:0 }}>
-                          Free Shipping
+                          {t['checkout.freeShippingTitle']}
                         </p>
                         <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, color:'#4A7A4A', margin:'2px 0 0' }}>
-                          Orders ${(FREE_SHIPPING_THRESHOLD_CENTS / 100).toFixed(0)}+ · Applied automatically
+                          {format(t['checkout.freeShippingRule'], { amount: (FREE_SHIPPING_THRESHOLD_CENTS / 100).toFixed(0) })}
                         </p>
                       </div>
                       <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:10, fontWeight:600, letterSpacing:'0.10em',
-                        textTransform:'uppercase', color:'#1A4A1A' }}>APPLIED</span>
+                        textTransform:'uppercase', color:'#1A4A1A' }}>{t['checkout.applied']}</span>
                     </div>
                   )}
 
@@ -799,10 +830,10 @@ export default function CheckoutPage() {
                       <div>
                         <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, fontWeight:500,
                           letterSpacing:'0.06em', textTransform:'uppercase', color:'#1A1A1A', margin:0 }}>
-                          SMS Welcome — $10 Off
+                          {t['checkout.smsWelcome']}
                         </p>
                         <p style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:11, color:'#6B6B6B', margin:'2px 0 0' }}>
-                          Your signup offer · {smsOfferCode}
+                          {format(t['checkout.yourSignupOffer'], { code: smsOfferCode })}
                         </p>
                       </div>
                       <button
@@ -812,7 +843,7 @@ export default function CheckoutPage() {
                           fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif', fontSize:10, fontWeight:500, letterSpacing:'0.10em',
                           textTransform:'uppercase', padding:'7px 14px',
                           opacity: discountLoading ? 0.5 : 1 }}>
-                        APPLY
+                        {t['common.apply']}
                       </button>
                     </div>
                   )}
@@ -829,7 +860,7 @@ export default function CheckoutPage() {
                       value={discountInput}
                       onChange={e => { setDiscountInput(e.target.value.toUpperCase()); setDiscountInputError(null) }}
                       onKeyDown={e => { if (e.key === 'Enter') handleApplyDiscount() }}
-                      placeholder="DISCOUNT CODE"
+                      placeholder={t['checkout.discountCode']}
                       style={{ flex:1, padding:'10px 12px', fontSize:12,
                                border: discountInputError ? '1px solid #FCA5A5' : '1px solid #E8E5E0',
                                background:'#fff', outline:'none', letterSpacing:'0.06em',
@@ -882,12 +913,12 @@ export default function CheckoutPage() {
                                  fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
                                  display:'block' }}
                       >
-                        REMOVE
+                        {t['checkout.removeCaps']}
                       </button>
                       <span style={{ fontFamily:'-apple-system, Helvetica Neue, Arial, sans-serif',
                                      fontSize:10, color:'#9B9B9B', letterSpacing:'0.04em',
                                      display:'block', marginTop:2 }}>
-                        One promo code per order · Automatic offers may still apply
+                        {t['checkout.onePromo']}
                       </span>
                     </div>
                   </div>
@@ -906,19 +937,25 @@ export default function CheckoutPage() {
 
               {discountApplied.code && discountApplied.displayAmount && (
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#059669' }}>
-                  <span>Discount ({discountApplied.code})</span>
+                  <span>{format(t['checkout.discountLine'], { code: discountApplied.code })}</span>
                   <span>{discountApplied.displayAmount}</span>
                 </div>
               )}
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:500,
                             borderTop:'1px solid #E8E5E0', paddingTop:12, marginTop:4 }}>
-                <span>Total</span>
+                <span>{t['common.total']}</span>
                 {shippingCents === null ? (
                   <span style={{ color:'#9B9B9B' }}>—</span>
                 ) : (
                   <span>{formatCheckoutPrice(totalCents)}</span>
                 )}
               </div>
+              {/* Browsing in an estimated currency: say plainly that the charge is in USD. */}
+              {currencyCode !== 'USD' && (
+                <p style={{ fontSize:11, color:'#9B9B9B', lineHeight:1.5, margin:0 }}>
+                  {format(t['currency.chargedInUsd'], { code: currencyCode })}
+                </p>
+              )}
             </div>
           </div>
         </div>

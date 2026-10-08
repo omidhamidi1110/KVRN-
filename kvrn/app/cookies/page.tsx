@@ -1,14 +1,17 @@
+import { cmsContentEnabled, contentPublic } from '@/lib/content-public'
+import { PolicyView } from '@/components/content/cms-views'
+import { policyMetadata } from '@/lib/content-storefront'
 import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CookieControls } from './CookieControls'
 
-export const metadata: Metadata = {
+const LEGACY_METADATA: Metadata = {
   title:  'Cookie Policy — KVRN',
   robots: { index: true, follow: false },
 }
 
-export default function CookiesPage() {
+function LegacyCookiesPage() {
   return (
     <div>
       <PageHero title="Cookie Policy" breadcrumb="Cookies" />
@@ -130,4 +133,22 @@ export default function CookiesPage() {
     </div>
       </div>
   )
+}
+// With KVRN_FLAG_CMS_PUBLIC_CONTENT off (the default) this page is exactly the coded page above.
+// With it on, the PUBLISHED Admin policy is shown; if there is none (or the database is
+// unreachable) the coded page is shown instead — a legal page never disappears.
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (!cmsContentEnabled()) return LEGACY_METADATA
+  const view = await contentPublic().getPolicyById('cookies')
+  return view ? policyMetadata(view, LEGACY_METADATA) : LEGACY_METADATA
+}
+
+export default async function CookiesPage() {
+  if (cmsContentEnabled()) {
+    const view = await contentPublic().getPolicyById('cookies')
+    if (view) return <PolicyView view={view} />
+  }
+  return <LegacyCookiesPage />
 }

@@ -33,7 +33,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 export async function POST(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET ?? ''
-  if (!cronSecret) {
+  if (!cronSecret || (process.env.NODE_ENV === 'production' && cronSecret.trim().length < 32)) {
     // Fail closed — no secret means route is unusable
     return NextResponse.json(
       { error: 'Retry endpoint is not configured.' },

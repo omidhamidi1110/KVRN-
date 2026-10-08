@@ -16,7 +16,7 @@ export function WaitlistBlock() {
     e.preventDefault()
     setErrMsg('')
     if (!email.trim() || !isValidEmail(email)) {
-      setErrMsg('Enter a valid email address.')
+      setErrMsg(t['waitlist.enterValidEmail'])
       return
     }
     setState('loading')
@@ -30,7 +30,7 @@ export function WaitlistBlock() {
       setState('success')
     } catch {
       setState('error')
-      setErrMsg('Something went wrong. Please try again.')
+      setErrMsg(t['common.tryAgain'])
     }
   }
 
@@ -112,10 +112,10 @@ export function WaitlistBlock() {
         <div className="container-kvrn py-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             {[
-              ['Secure checkout',      'Encrypted payment'],
-              ['Store credit returns', 'Within return window'],
-              ['Ships 1–3 days',       'After confirmation'],
-              ['Built to last',        'Premium materials'],
+              [t.secureCheckout,      t['trust.encryptedPayment']],
+              [t.storeCreditReturns,  t['trust.withinReturnWindow']],
+              [t['trust.ships13'],    t['trust.afterConfirmation']],
+              [t['trust.builtToLast'], t['trust.premiumMaterials']],
             ].map(([title, sub]) => (
               <div key={title}>
                 <p className="text-[11px] font-light text-[#F0EDE8]/60">{title}</p>

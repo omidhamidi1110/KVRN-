@@ -7,11 +7,15 @@
 // not fixed overhead. Email infrastructure is NOT advertising — Resend fees are a
 // 'communications' operating expense unless a send is deliberately run as a campaign.
 //
-// provider-reported revenue/orders are the PLATFORM'S OWN claim, shown for
+// Provider-reported revenue/orders are the PLATFORM'S OWN claim, shown for
 // comparison only and never summed into KVRN revenue or profit.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, SectionTitle } from '@/components/admin/FinancialUI'
+import { money } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
+  AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, StatusBadge, adminInputClass, adminSelectClass,
+} from '@/components/admin/ui/AdminUI'
 
 type AdSpend = {
   id: string; platform: string; campaignName: string | null
@@ -33,10 +37,6 @@ const PLATFORMS = [
 const PROVIDER_SOURCES = ['manual', 'api', 'imported']
 
 const MEDIA = new Set(['meta', 'instagram', 'tiktok', 'google', 'influencer'])
-
-const inputStyle = { fontFamily: FONT, fontSize: 12, padding: '8px 10px',
-                     border: BORDER, background: '#fff', width: '100%',
-                     boxSizing: 'border-box' as const }
 
 export function AdvertisingClient() {
   const [ads, setAds]         = useState<AdSpend[]>([])
@@ -99,7 +99,7 @@ export function AdvertisingClient() {
   async function voidRow(id: string) {
     setErr(null)
     const reason = window.prompt(
-      'Void this ad-spend entry? It stays in the history but stops counting.\n\nReason (required):')
+      'Void this ad spend? It stays in the history but stops counting.\n\nReason (required):')
     if (!reason || !reason.trim()) return
     try {
       const res = await fetch(`/api/admin/ad-spend/${id}`, {
@@ -116,147 +116,112 @@ export function AdvertisingClient() {
   const mediaTotal    = activeAds.filter(a =>  MEDIA.has(a.platform)).reduce((s, a) => s + a.spendCents, 0)
   const creativeTotal = activeAds.filter(a => !MEDIA.has(a.platform)).reduce((s, a) => s + a.spendCents, 0)
 
+  const reportedInfo = "Platform-reported figures are the platform's own attribution claim. They are stored for comparison only and never counted as KVRN revenue."
+
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Advertising
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Media buying and creative production. Tracked separately from operating expenses
-        because it is a marketing investment measured against attributed revenue.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Advertising"
+        description="Media buying and creative production."
+        info="Tracked apart from operating expenses because it is a marketing investment measured against attributed revenue."
+      />
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))',
-                    gap: 10, marginBottom: 24 }}>
-        <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-          <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                      textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>Media spend</p>
-          <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '6px 0 0' }}>
-            {money(mediaTotal)}
-          </p>
-        </div>
-        <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-          <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                      textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>Creative production</p>
-          <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '6px 0 0' }}>
-            {money(creativeTotal)}
-          </p>
-          <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>
-            Photography, video, production
-          </p>
-        </div>
-      </div>
+      <AdminStatGrid min={200} className="mb-6">
+        <AdminStat label="Media spend" value={money(mediaTotal)} />
+        <AdminStat label="Creative production" value={money(creativeTotal)} sub="Photography, video, production" />
+      </AdminStatGrid>
 
-      <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 26 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Platform
-            <select value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}
-                    style={{ ...inputStyle, marginTop: 4 }}>
+      <AdminCard className="mb-7">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminField label="Platform" htmlFor="ad-platform">
+            <select id="ad-platform" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}
+                    className={adminSelectClass}>
               {PLATFORMS.map(p => <option key={p} value={p}>{p.replace(/_/g, ' ')}</option>)}
-            </select></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Campaign
-            <input value={form.campaignName}
+            </select>
+          </AdminField>
+          <AdminField label="Campaign" htmlFor="ad-campaign">
+            <input id="ad-campaign" value={form.campaignName}
                    onChange={e => setForm({ ...form, campaignName: e.target.value })}
-                   style={{ ...inputStyle, marginTop: 4 }} /></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Spend $ *
-            <input type="number" step="0.01" min="0" value={form.spend}
+                   className={adminInputClass} />
+          </AdminField>
+          <AdminField label="Spend $ *" htmlFor="ad-spend">
+            <input id="ad-spend" type="number" step="0.01" min="0" value={form.spend}
                    onChange={e => setForm({ ...form, spend: e.target.value })}
-                   placeholder="250.00" style={{ ...inputStyle, marginTop: 4 }} /></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Period start *
-            <input type="date" value={form.periodStart}
+                   placeholder="250.00" className={adminInputClass} />
+          </AdminField>
+          <AdminField label="Period start *" htmlFor="ad-start">
+            <input id="ad-start" type="date" value={form.periodStart}
                    onChange={e => setForm({ ...form, periodStart: e.target.value })}
-                   style={{ ...inputStyle, marginTop: 4 }} /></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Period end *
-            <input type="date" value={form.periodEnd}
+                   className={adminInputClass} />
+          </AdminField>
+          <AdminField label="Period end *" htmlFor="ad-end">
+            <input id="ad-end" type="date" value={form.periodEnd}
                    onChange={e => setForm({ ...form, periodEnd: e.target.value })}
-                   style={{ ...inputStyle, marginTop: 4 }} /></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Platform-reported revenue $
-            <input type="number" step="0.01" min="0" value={form.reportedRevenue}
+                   className={adminInputClass} />
+          </AdminField>
+          <AdminField label="Platform-reported revenue $" htmlFor="ad-rrev" info={reportedInfo}>
+            <input id="ad-rrev" type="number" step="0.01" min="0" value={form.reportedRevenue}
                    onChange={e => setForm({ ...form, reportedRevenue: e.target.value })}
-                   style={{ ...inputStyle, marginTop: 4 }} /></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Platform-reported orders
-            <input type="number" min="0" value={form.reportedOrders}
+                   className={adminInputClass} />
+          </AdminField>
+          <AdminField label="Platform-reported orders" htmlFor="ad-rord" info={reportedInfo}>
+            <input id="ad-rord" type="number" min="0" value={form.reportedOrders}
                    onChange={e => setForm({ ...form, reportedOrders: e.target.value })}
-                   style={{ ...inputStyle, marginTop: 4 }} /></label>
-          <label style={{ fontFamily: FONT, fontSize: 11 }}>Reported-metric source
-            <select value={form.providerSource}
+                   className={adminInputClass} />
+          </AdminField>
+          <AdminField label="Reported-metric source" htmlFor="ad-rsrc">
+            <select id="ad-rsrc" value={form.providerSource}
                     onChange={e => setForm({ ...form, providerSource: e.target.value })}
-                    style={{ ...inputStyle, marginTop: 4 }}>
+                    className={adminSelectClass}>
               <option value="">—</option>
               {PROVIDER_SOURCES.map(s2 => <option key={s2} value={s2}>{s2}</option>)}
-            </select></label>
+            </select>
+          </AdminField>
         </div>
-        <p style={{ fontFamily: FONT, fontSize: 11, color: '#92400E', margin: '12px 0 0' }}>
-          Platform-reported figures are the platform&apos;s own attribution claim. They are stored
-          for comparison and never counted as KVRN revenue.
-        </p>
-        <button onClick={save} disabled={saving || !form.spend}
-          style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-                   textTransform: 'uppercase', padding: '9px 16px', marginTop: 14,
-                   background: '#1A1A1A', color: '#fff', border: 'none',
-                   cursor: 'pointer', opacity: saving || !form.spend ? 0.45 : 1 }}>
-          {saving ? 'Saving…' : 'Add spend'}
-        </button>
-      </div>
+        <AdminButton variant="primary" className="mt-4" onClick={save} loading={saving} disabled={!form.spend}>
+          Add spend
+        </AdminButton>
+      </AdminCard>
 
-      <SectionTitle note="Spend straddling a report boundary is pro-rated by overlapping days.">
-        Recorded spend
-      </SectionTitle>
-      <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-          <thead><tr style={{ background: '#FAF9F7' }}>
-            {['Platform','Campaign','Spend','From','To','Reported rev.','Source',''].map((h,i) => (
-              <th key={i} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 9,
-                                   letterSpacing: '0.1em', textTransform: 'uppercase',
-                                   color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>))}
+      <AdminSectionHeader title="Recorded spend"
+        info="Spend straddling a report boundary is pro-rated by overlapping days." />
+      {loading ? <AdminLoading /> : ads.length === 0 ? <AdminEmpty title="No advertising spend recorded." /> : (
+        <AdminTable minWidth={760} caption="Recorded advertising spend">
+          <thead><tr>
+            {['Platform','Campaign','Spend','From','To','Reported rev.','Source'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+            <AdminTh><span className="sr-only">Actions</span></AdminTh>
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>}
-            {!loading && ads.length === 0 && (
-              <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                No advertising spend recorded.
-              </td></tr>
-            )}
             {ads.map(a => (
-              <tr key={a.id} style={{ borderBottom: '1px solid #F1EEE8',
-                                       opacity: a.voidedAt ? 0.55 : 1,
-                                       textDecoration: a.voidedAt ? 'line-through' : 'none' }}>
-                <td style={{ padding: '9px 12px' }}>{a.platform.replace(/_/g, ' ')}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{a.campaignName ?? '—'}</td>
-                <td style={{ padding: '9px 12px' }}>{money(a.spendCents)}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{a.periodStart}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{a.periodEnd}</td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>
+              <tr key={a.id} className={a.voidedAt ? 'opacity-60' : undefined}>
+                <AdminTd className={a.voidedAt ? 'line-through' : undefined}>{a.platform.replace(/_/g, ' ')}</AdminTd>
+                <AdminTd className={`text-[#6B6B66] ${a.voidedAt ? 'line-through' : ''}`}>{a.campaignName ?? '—'}</AdminTd>
+                <AdminTd className={a.voidedAt ? 'line-through' : undefined}>{money(a.spendCents)}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{a.periodStart}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">{a.periodEnd}</AdminTd>
+                <AdminTd className="text-[#6B6B66]">
                   {a.providerReportedRevenueCents === null
                     ? '—' : `${money(a.providerReportedRevenueCents)} (claimed)`}
-                </td>
-                <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{a.providerSource ?? '—'}</td>
-                <td style={{ padding: '9px 12px' }}>
+                </AdminTd>
+                <AdminTd className="text-[#6B6B66]">{a.providerSource ?? '—'}</AdminTd>
+                <AdminTd>
                   {a.voidedAt ? (
-                    <span style={{ fontSize: 11, color: '#6B6B6B', textDecoration: 'none', display: 'inline-block' }}
-                          title={`Voided ${a.voidedAt} by ${a.voidedBy ?? 'unknown'}: ${a.voidReason ?? ''}`}>
-                      Voided{a.voidReason ? ` — ${a.voidReason}` : ''}
+                    <span className="block text-[11px] text-[#4A4A46]">
+                      <StatusBadge status="Archived" label="Voided" />
+                      {a.voidReason ? ` ${a.voidReason}` : ''}
+                      <span className="block text-[#8A8A85]">{a.voidedBy ?? 'unknown'} · {a.voidedAt}</span>
                     </span>
                   ) : (
-                    <button onClick={() => voidRow(a.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer',
-                               color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
-                      Void
-                    </button>
+                    <AdminButton size="sm" variant="ghost" onClick={() => voidRow(a.id)}>Void</AdminButton>
                   )}
-                </td>
+                </AdminTd>
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-    </div>
+        </AdminTable>
+      )}
+    </AdminPage>
   )
 }

@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useCurrency } from '@/context/CurrencyContext'
-import { CURRENCIES, type CurrencyCode } from '@/lib/currency'
+import { useI18n } from '@/context/I18nContext'
+import { format } from '@/lib/i18n/messages'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -12,10 +13,10 @@ interface Props {
 }
 
 export function CurrencySelector({ className, align = 'right', inDrawer = false }: Props) {
-  const { currencyCode, setCurrency } = useCurrency()
+  const { currencyCode, setCurrency, available } = useCurrency()
+  const { t }                         = useI18n()
   const [open, setOpen]               = useState(false)
   const ref                           = useRef<HTMLDivElement>(null)
-  const current = CURRENCIES.find(c => c.code === currencyCode) ?? CURRENCIES[0]
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -29,9 +30,9 @@ export function CurrencySelector({ className, align = 'right', inDrawer = false 
   if (inDrawer) {
     return (
       <div className={cn('space-y-1', className)}>
-        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">Currency</p>
+        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">{t['nav.currency']}</p>
         <div className="flex flex-wrap gap-1.5">
-          {CURRENCIES.map(c => (
+          {available.map(c => (
             <button
               key={c.code}
               onClick={() => setCurrency(c.code)}
@@ -54,7 +55,7 @@ export function CurrencySelector({ className, align = 'right', inDrawer = false 
     <div ref={ref} className={cn('relative', className)}>
       <button
         onClick={() => setOpen(o => !o)}
-        aria-label={`Currency: ${currencyCode}`}
+        aria-label={format(t['nav.currencyIs'], { code: currencyCode })}
         aria-expanded={open}
         className="flex items-center gap-1 text-[11px] font-light tracking-[0.1em] hover:opacity-50 transition-opacity"
       >
@@ -67,22 +68,22 @@ export function CurrencySelector({ className, align = 'right', inDrawer = false 
 
       {open && (
         <div
-          role="listbox" aria-label="Select currency"
+          role="listbox" aria-label={t['nav.selectCurrency']}
           className={cn(
             'absolute top-full mt-3 z-[350]',
             'bg-[#F9F8F6] border border-[#1A1A1A]/10',
             'py-1 min-w-[220px] max-h-[300px] overflow-y-auto shadow-xl',
-            align === 'right' ? 'right-0' : 'left-0'
+            align === 'right' ? 'end-0' : 'start-0'
           )}
         >
-          {CURRENCIES.map(c => (
+          {available.map(c => (
             <button
               key={c.code}
               role="option"
               aria-selected={c.code === currencyCode}
               onClick={() => { setCurrency(c.code); setOpen(false) }}
               className={cn(
-                'w-full text-left px-4 py-2.5 flex items-center gap-3',
+                'w-full text-start px-4 py-2.5 flex items-center gap-3',
                 'transition-colors duration-100',
                 'hover:bg-[#F3F0EB]',
                 c.code === currencyCode ? 'bg-[#F3F0EB]' : ''
@@ -96,6 +97,10 @@ export function CurrencySelector({ className, align = 'right', inDrawer = false 
               <span className="text-[12px] text-[#6B6B6B] truncate">{c.label.split(' — ')[1]}</span>
             </button>
           ))}
+          {/* Always say what the card is charged in; with only USD on offer, say that too. */}
+          <p className="px-4 pt-2 pb-2 text-[11px] leading-snug text-[#6B6B6B] border-t border-[#E8E5E0] mt-1">
+            {available.length > 1 ? t['currency.approxNote'] : t['currency.usdOnly']}
+          </p>
         </div>
       )}
     </div>

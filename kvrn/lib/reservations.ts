@@ -18,6 +18,10 @@ export interface ReservationItemSnapshot {
   color:          string
   unitPriceCents: number
   quantity:       number
+  /** Bundle checkouts only (reserve_inventory_v2): the canonical price before the bundle discount. */
+  originalUnitPriceCents?: number
+  /** Bundle checkouts only: the bundle this line belongs to. Absent for ordinary lines. */
+  bundleId?:      string
 }
 
 export interface ReservationResult {
@@ -25,12 +29,18 @@ export interface ReservationResult {
   reservationId: string
   expiresAt:     Date
   items:         ReservationItemSnapshot[]
+  /** Bundle checkouts only: the configuration frozen with the reservation (reservation_bundles.config). */
+  bundle?:       Record<string, any>
 }
 
 export type ReservationErrCode =
   | 'EMPTY_CART' | 'INVALID_SKU' | 'INVALID_QUANTITY' | 'INACTIVE_VARIANT'
   | 'OUT_OF_STOCK' | 'INSUFFICIENT_STOCK' | 'DUPLICATE_SKU'
   | 'ITEM_UNAVAILABLE' | 'DB_ERROR' | 'CONFIG_ERROR'
+  // Bundle checkout (lib/bundle-checkout.ts); never produced by reserve_inventory()
+  | 'BUNDLE_UNAVAILABLE' | 'BUNDLE_SELECTION_INVALID' | 'BUNDLE_PRICE_MISMATCH' | 'BUNDLE_QUANTITY'
+  | 'BUNDLE_SKU_CONFLICT' | 'BUNDLE_COMPONENT_UNAVAILABLE' | 'BUNDLE_PRICE_CHANGED'
+  | 'BUNDLE_DISABLED' | 'BUNDLE_INVALID_REQUEST' | 'BUNDLE_DISCOUNT_NOT_COMBINABLE' | 'BUNDLE_ERROR'
 
 export interface ReservationErr {
   ok:      false

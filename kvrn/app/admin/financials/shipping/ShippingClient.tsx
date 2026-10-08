@@ -6,9 +6,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import {
-  FONT, BORDER, money, moneyOrUnknown,
-  Metric, RangePicker, SectionTitle, buildQuery,
+  money, moneyOrUnknown,
+  Metric, RangePicker, buildQuery,
 } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminNotice, AdminButton, AdminStatGrid,
+  AdminTable, AdminTh, AdminTd, AdminLoading, AdminTag, adminInputClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Totals = {
   orders: number
@@ -98,43 +102,31 @@ export function ShippingClient() {
   const t = data?.totals
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Shipping economics
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Shipping revenue is what customers paid. Shipping cost is what KVRN paid the carrier.
-        A negative margin means KVRN subsidised delivery.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Shipping"
+        description="Shipping revenue, carrier cost, and margin."
+        info="Shipping revenue is what customers paid. Shipping cost is what KVRN paid the carrier. A negative margin means KVRN subsidised delivery."
+      />
 
-      <div style={{ marginBottom: 22 }}>
+      <div className="mb-5">
         <RangePicker range={range} onRange={setRange} custom={custom} onCustom={setCustom} />
       </div>
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-      {loading && !data && (
-        <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B' }}>Loading…</p>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {loading && !data && <AdminLoading />}
 
       {t && (
         <>
           {t.ordersMissingCost > 0 && (
-            <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                          border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 18 }}>
-              {t.ordersMissingCost} of {t.orders} orders have no recorded label cost.
+            <AdminNotice tone="warning" className="mb-4" title={`${t.ordersMissingCost} of ${t.orders} orders have no recorded label cost.`}>
               Margin and subsidy below cover only the {t.ordersWithKnownCost} orders where the
               actual carrier cost is known.
-            </div>
+            </AdminNotice>
           )}
 
-          <SectionTitle>Totals</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))',
-                        gap: 10, marginBottom: 26 }}>
+          <AdminSectionHeader title="Totals" />
+          <AdminStatGrid className="mb-7">
             <Metric label="Shipping revenue" value={money(t.shippingRevenueCents)}
                     sub="Charged to customers" />
             <Metric label="Shipping discounts" value={`-${money(t.shippingDiscountCents)}`} tone="muted"
@@ -146,125 +138,97 @@ export function ShippingClient() {
                     tone={t.shippingMarginCents >= 0 ? 'positive' : 'negative'}
                     sub="Revenue − cost" />
             <Metric label="Subsidised" value={money(t.shippingSubsidyCents)} tone="negative"
-                    sub={`${t.ordersUnderwater} orders below cost`} />
+                    sub={`${t.ordersUnderwater} orders below cost`}
+                    info="Carrier cost above what the customer paid, summed over orders where the cost is known." />
             <Metric label="Free shipping cost" value={money(t.freeShippingCostCents)} tone="muted"
                     sub={`${t.freeShippingOrders} free-shipping orders`} />
-          </div>
+          </AdminStatGrid>
 
           {/* Manual label-cost worklist — makes shipping margin computable */}
           {data!.pendingCost.length > 0 && (
-            <>
-              <SectionTitle note="KVRN does not purchase labels programmatically yet. Until the real carrier cost is entered here, these orders report shipping margin as unknown rather than assuming zero.">
-                Label cost not recorded ({data!.pendingCost.length})
-              </SectionTitle>
-              <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ background: '#FAF9F7' }}>
-                      {['Order', 'Carrier', 'Service', 'Tracking', 'Customer paid', 'Actual label cost', ''].map((h, i) => (
-                        <th key={i} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 9,
-                                             letterSpacing: '0.1em', textTransform: 'uppercase',
-                                             color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>
-                      ))}
+            <div className="mb-7">
+              <AdminSectionHeader title={`Label cost not recorded (${data!.pendingCost.length})`}
+                description="Enter the real carrier cost. Until then margin is unknown, not $0."
+                info="KVRN does not purchase labels programmatically yet. Until the real carrier cost is entered here, these orders report shipping margin as unknown rather than assuming zero." />
+              <AdminTable minWidth={720} caption="Shipments without a label cost">
+                <thead>
+                  <tr>
+                    {['Order', 'Carrier', 'Service', 'Tracking', 'Customer paid', 'Actual label cost'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+                    <AdminTh><span className="sr-only">Save</span></AdminTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data!.pendingCost.map(p2 => (
+                    <tr key={p2.shipmentId}>
+                      <AdminTd>{p2.orderNumber}</AdminTd>
+                      <AdminTd className="text-[#6B6B66]">{p2.carrier ?? '—'}</AdminTd>
+                      <AdminTd className="text-[#6B6B66]">{p2.serviceLevel ?? '—'}</AdminTd>
+                      <AdminTd className="font-mono text-[11px] text-[#6B6B66]">{p2.trackingNumber ?? '—'}</AdminTd>
+                      <AdminTd>{money(p2.shippingRevenueCents)}</AdminTd>
+                      <AdminTd>
+                        <input
+                          type="number" step="0.01" min="0"
+                          value={costDraft[p2.shipmentId] ?? ''}
+                          onChange={e => setCostDraft(d => ({ ...d, [p2.shipmentId]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') void saveLabelCost(p2.shipmentId) }}
+                          placeholder="0.00"
+                          aria-label={`Actual label cost for ${p2.orderNumber}`}
+                          className={`${adminInputClass} !w-[96px]`}
+                        />
+                      </AdminTd>
+                      <AdminTd>
+                        <AdminButton
+                          variant="primary" size="sm"
+                          onClick={() => void saveLabelCost(p2.shipmentId)}
+                          disabled={!(costDraft[p2.shipmentId] ?? '').trim()}
+                          loading={savingId === p2.shipmentId}>
+                          Save
+                        </AdminButton>
+                      </AdminTd>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {data!.pendingCost.map(p2 => (
-                      <tr key={p2.shipmentId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                        <td style={{ padding: '9px 12px' }}>{p2.orderNumber}</td>
-                        <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{p2.carrier ?? '—'}</td>
-                        <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>{p2.serviceLevel ?? '—'}</td>
-                        <td style={{ padding: '9px 12px', color: '#6B6B6B', fontFamily: 'monospace', fontSize: 11 }}>
-                          {p2.trackingNumber ?? '—'}
-                        </td>
-                        <td style={{ padding: '9px 12px' }}>{money(p2.shippingRevenueCents)}</td>
-                        <td style={{ padding: '9px 12px' }}>
-                          <input
-                            type="number" step="0.01" min="0"
-                            value={costDraft[p2.shipmentId] ?? ''}
-                            onChange={e => setCostDraft(d => ({ ...d, [p2.shipmentId]: e.target.value }))}
-                            onKeyDown={e => { if (e.key === 'Enter') void saveLabelCost(p2.shipmentId) }}
-                            placeholder="0.00"
-                            aria-label={`Actual label cost for ${p2.orderNumber}`}
-                            style={{ width: 90, padding: '6px 8px', fontSize: 12,
-                                     border: BORDER, background: '#fff', fontFamily: FONT }}
-                          />
-                        </td>
-                        <td style={{ padding: '9px 12px' }}>
-                          <button
-                            onClick={() => void saveLabelCost(p2.shipmentId)}
-                            disabled={savingId === p2.shipmentId || !(costDraft[p2.shipmentId] ?? '').trim()}
-                            style={{ fontFamily: FONT, fontSize: 10, fontWeight: 500,
-                                     letterSpacing: '0.08em', textTransform: 'uppercase',
-                                     padding: '7px 12px', background: '#1A1A1A', color: '#fff',
-                                     border: 'none', cursor: 'pointer',
-                                     opacity: savingId === p2.shipmentId || !(costDraft[p2.shipmentId] ?? '').trim() ? 0.4 : 1 }}>
-                            {savingId === p2.shipmentId ? '…' : 'Save'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                  ))}
+                </tbody>
+              </AdminTable>
+            </div>
           )}
 
-          <SectionTitle note="Orders where shipping revenue exceeded or fell short of actual carrier cost.">
-            Per order
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#FAF9F7' }}>
-                  {['Order', 'Paid', 'Charged', 'Discount', 'Carrier cost', 'Margin', ''].map((h, i) => (
-                    <th key={i} style={{ textAlign: 'left', padding: '9px 12px', fontSize: 9,
-                                         letterSpacing: '0.1em', textTransform: 'uppercase',
-                                         color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>
-                  ))}
+          <AdminSectionHeader title="Per order"
+            description="Revenue against carrier cost for each paid order." />
+          <AdminTable minWidth={640} caption="Shipping by order">
+            <thead>
+              <tr>
+                {['Order', 'Paid', 'Charged', 'Discount', 'Carrier cost', 'Margin'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+                <AdminTh><span className="sr-only">Notes</span></AdminTh>
+              </tr>
+            </thead>
+            <tbody>
+              {data!.orders.length === 0 && (
+                <tr><AdminTd colSpan={7} className="text-[#6B6B66]">No paid orders in this period.</AdminTd></tr>
+              )}
+              {data!.orders.map(o => (
+                <tr key={o.orderId}>
+                  <AdminTd>{o.orderNumber}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">
+                    {o.paidAt ? new Date(o.paidAt).toISOString().slice(0, 10) : '—'}
+                  </AdminTd>
+                  <AdminTd>{money(o.shippingRevenueCents)}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">
+                    {o.shippingDiscountTotalCents > 0 ? `-${money(o.shippingDiscountTotalCents)}` : '—'}
+                  </AdminTd>
+                  <AdminTd className={o.shippingCostCents === null ? 'font-medium text-[#92400E]' : ''}>
+                    {moneyOrUnknown(o.shippingCostCents, 'Not recorded')}
+                  </AdminTd>
+                  <AdminTd className={o.shippingMarginCents === null ? 'text-[#6B6B66]'
+                                    : o.shippingMarginCents >= 0 ? 'text-[#047857]' : 'text-[#B91C1C]'}>
+                    {moneyOrUnknown(o.shippingMarginCents, '—')}
+                  </AdminTd>
+                  <AdminTd>{o.isAutoFreeShipping && <AdminTag tone="info">Free ship</AdminTag>}</AdminTd>
                 </tr>
-              </thead>
-              <tbody>
-                {data!.orders.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No paid orders in this period.
-                  </td></tr>
-                )}
-                {data!.orders.map(o => (
-                  <tr key={o.orderId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 12px' }}>{o.orderNumber}</td>
-                    <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>
-                      {o.paidAt ? new Date(o.paidAt).toISOString().slice(0, 10) : '—'}
-                    </td>
-                    <td style={{ padding: '9px 12px' }}>{money(o.shippingRevenueCents)}</td>
-                    <td style={{ padding: '9px 12px', color: '#6B6B6B' }}>
-                      {o.shippingDiscountTotalCents > 0 ? `-${money(o.shippingDiscountTotalCents)}` : '—'}
-                    </td>
-                    <td style={{ padding: '9px 12px',
-                                 color: o.shippingCostCents === null ? '#92400E' : '#1A1A1A' }}>
-                      {moneyOrUnknown(o.shippingCostCents, 'Not recorded')}
-                    </td>
-                    <td style={{ padding: '9px 12px',
-                                 color: o.shippingMarginCents === null ? '#6B7280'
-                                      : o.shippingMarginCents >= 0 ? '#047857' : '#B91C1C' }}>
-                      {moneyOrUnknown(o.shippingMarginCents, '—')}
-                    </td>
-                    <td style={{ padding: '9px 12px' }}>
-                      {o.isAutoFreeShipping && (
-                        <span style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase',
-                                       padding: '3px 8px', background: '#EFF6FF',
-                                       border: '1px solid #BFDBFE', color: '#1E40AF' }}>
-                          Free ship
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </AdminTable>
         </>
       )}
-    </div>
+    </AdminPage>
   )
 }

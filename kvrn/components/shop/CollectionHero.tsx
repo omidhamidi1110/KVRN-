@@ -2,6 +2,8 @@
 
 import Image from 'next/image'
 import Link  from 'next/link'
+import { useI18n } from '@/context/I18nContext'
+import { fillMessages } from '@/lib/i18n/messages'
 
 interface ProductLink {
   name:  string
@@ -35,6 +37,7 @@ export function CollectionHero({
   desktopLink,
   mobileLinks,
 }: CollectionHeroProps) {
+  const t = fillMessages(useI18n().t)
   const NAV_H = 92 // announcement bar 36px + navbar 56px
 
   return (
@@ -43,7 +46,7 @@ export function CollectionHero({
 
       {/* ── DESKTOP (≥ 901px) ──────────────────────────────────────────── */}
       <section
-        aria-label="Collection hero"
+        aria-label={t['shop.collectionHero']}
         className="hidden lg:block"
         style={{
           position:   'relative',
@@ -118,7 +121,7 @@ export function CollectionHero({
           </div>
           <p style={{ fontSize:15, letterSpacing:'0.08em', textTransform:'uppercase',
                       color:'rgba(255,255,255,0.88)', margin:0 }}>
-            AVAILABLE NOW.
+            {t['shop.availableNowCaps']}
           </p>
         </div>
 
@@ -143,7 +146,7 @@ export function CollectionHero({
             <p style={{ fontSize:14, lineHeight:1.55, letterSpacing:'0.07em',
                         textTransform:'uppercase', marginTop:6, fontWeight:300,
                         display:'flex', alignItems:'center', gap:6 }}>
-              VIEW PIECE
+              {t['shop.viewPiece']}
               <span style={{ display:'inline-block', transition:'transform 200ms ease' }}
                 className="group-hover:[transform:translateX(4px)]">→</span>
             </p>
@@ -176,7 +179,7 @@ export function CollectionHero({
                         letterSpacing:'0.07em', textTransform:'uppercase',
                         marginTop:6, fontWeight:300,
                         display:'flex', alignItems:'center', gap:6 }}>
-              VIEW PIECE
+              {t['shop.viewPiece']}
               <span style={{ display:'inline-block', transition:'transform 200ms ease' }}
                 className="group-hover:[transform:translateX(4px)]">→</span>
             </p>
@@ -186,7 +189,7 @@ export function CollectionHero({
 
       {/* ── MOBILE (≤ 900px) ─────────────────────────────────────────────── */}
       <section
-        aria-label="Collection hero"
+        aria-label={t['shop.collectionHero']}
         className="lg:hidden"
         style={{
           position:    'relative',
@@ -265,7 +268,7 @@ export function CollectionHero({
           <p style={{ fontSize:'clamp(11px,3.15vw,13px)', lineHeight:1.48,
                       letterSpacing:'0.10em', textTransform:'uppercase',
                       margin:0, color:'rgba(255,255,255,0.88)' }}>
-            AVAILABLE NOW.
+            {t['shop.availableNowCaps']}
           </p>
 
 

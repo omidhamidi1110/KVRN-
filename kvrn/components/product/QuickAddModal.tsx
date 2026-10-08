@@ -6,6 +6,7 @@ import { useCart }     from '@/context/CartContext'
 import { useCurrency } from '@/context/CurrencyContext'
 import { useI18n }     from '@/context/I18nContext'
 import { cn }          from '@/lib/utils'
+import { format }      from '@/lib/i18n/messages'
 import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
 
 interface Props {
@@ -63,14 +64,14 @@ export function QuickAddModal({ product, onClose, initialColor }: Props) {
       <div
         ref={modalRef}
         role="dialog" aria-modal="true"
-        aria-label={`Quick add: ${product.name}`}
+        aria-label={format(t['product.quickAddDialog'], { name: product.name })}
         className="fixed z-[460] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-32px)] max-w-[440px] bg-[#F9F8F6] shadow-2xl"
       >
         {/* Close */}
         <button
           onClick={onClose}
-          aria-label="Close"
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors z-10"
+          aria-label={t['common.close']}
+          className="absolute top-4 end-4 w-8 h-8 flex items-center justify-center text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors z-10"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -101,7 +102,7 @@ export function QuickAddModal({ product, onClose, initialColor }: Props) {
           {product.colors.length > 1 && (
             <div>
               <p className="text-[11px] font-light tracking-[0.09em] uppercase text-[#9B9B9B] mb-2">
-                Color — {selectedColor.name}
+                {format(t['product.colorDash'], { name: selectedColor.name })}
               </p>
               <div className="flex gap-2">
                 {product.colors.map(c => (
@@ -128,7 +129,7 @@ export function QuickAddModal({ product, onClose, initialColor }: Props) {
               'text-[11px] font-light tracking-[0.09em] uppercase mb-2',
               sizeError ? 'text-[#B91C1C]' : 'text-[#9B9B9B]'
             )}>
-              {sizeError ? 'Please select a size' : t.size}
+              {sizeError ? t['product.pleaseSelectSize'] : t.size}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {product.sizes.map((size: SizeOption) => (

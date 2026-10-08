@@ -10,7 +10,11 @@
 // the same money.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, SectionTitle } from '@/components/admin/FinancialUI'
+import { money } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminNotice, AdminStat, AdminStatGrid,
+  AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, AdminTag,
+} from '@/components/admin/ui/AdminUI'
 
 type Dispute = {
   id: string; stripeDisputeId: string; orderNumber: string
@@ -26,25 +30,18 @@ type Totals = {
   disputedCents: number; revenueImpactCents: number; feesCents: number
 }
 
+const STATUS_TONE: Record<string, 'warning' | 'info' | 'success' | 'danger' | 'neutral'> = {
+  open:         'warning',
+  under_review: 'info',
+  won:          'success',
+  lost:         'danger',
+  withdrawn:    'neutral',
+  // Terminal and favourable, but distinct from a contested win: the dispute
+  // was blocked or auto-resolved before becoming a formal chargeback.
+  prevented:    'info',
+}
 function StatusPill({ status }: { status: string }) {
-  const map: Record<string, { bg: string; bd: string; fg: string }> = {
-    open:         { bg: '#FFFBEB', bd: '#FDE68A', fg: '#92400E' },
-    under_review: { bg: '#EEF2FF', bd: '#C7D2FE', fg: '#3730A3' },
-    won:          { bg: '#F0FDF4', bd: '#BBF7D0', fg: '#166534' },
-    lost:         { bg: '#FEF2F2', bd: '#FECACA', fg: '#B91C1C' },
-    withdrawn:    { bg: '#F9FAFB', bd: '#E5E7EB', fg: '#6B7280' },
-    // Terminal and favourable, but distinct from a contested win: the dispute
-    // was blocked or auto-resolved before becoming a formal chargeback.
-    prevented:    { bg: '#F0F9FF', bd: '#BAE6FD', fg: '#075985' },
-  }
-  const c = map[status] ?? map.withdrawn
-  return (
-    <span style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase',
-                   padding: '3px 8px', background: c.bg,
-                   border: `1px solid ${c.bd}`, color: c.fg }}>
-      {status.replace(/_/g, ' ')}
-    </span>
-  )
+  return <AdminTag tone={STATUS_TONE[status] ?? 'neutral'}>{status.replace(/_/g, ' ')}</AdminTag>
 }
 
 export function DisputesClient() {
@@ -67,112 +64,67 @@ export function DisputesClient() {
 
   useEffect(() => { void load() }, [load])
 
-  const card = (label: string, value: string, note: string, tone = '#1A1A1A') => (
-    <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-      <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                  textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>{label}</p>
-      <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, color: tone,
-                  margin: '6px 0 0' }}>{value}</p>
-      <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>{note}</p>
-    </div>
-  )
-
-  const th = {
-    textAlign: 'left' as const, padding: '9px 10px', fontSize: 9,
-    letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-    color: '#9B9B9B', borderBottom: BORDER, whiteSpace: 'nowrap' as const,
-  }
-
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1240 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Disputes
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Chargebacks reported by Stripe. Only a lost dispute reduces revenue, and only for the
-        portion not already refunded. A prevented dispute was blocked or auto-resolved before
-        becoming a formal chargeback, so it never reduces revenue here.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Disputes"
+        description="Chargebacks and their revenue impact."
+        info="Chargebacks reported by Stripe. Only a lost dispute reduces revenue, and only for the portion not already refunded. A prevented dispute was blocked or auto-resolved before becoming a formal chargeback, so it never reduces revenue here."
+      />
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-      {loading && !totals && (
-        <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B' }}>Loading…</p>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {loading && !totals && <AdminLoading />}
 
       {totals && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))',
-                        gap: 10, marginBottom: 20 }}>
-            {card('Open', String(totals.openCount),
-                  `${totals.count} total · ${totals.preventedCount} prevented`, '#92400E')}
-            {card('Disputed amount', money(totals.disputedCents),
-                  'Gross amount under dispute')}
-            {card('Revenue impact', money(totals.revenueImpactCents),
-                  `${totals.lostCount} lost, net of refunds`,
-                  totals.revenueImpactCents > 0 ? '#B91C1C' : '#1A1A1A')}
-            {card('Dispute fees', money(totals.feesCents),
-                  'From Stripe balance transactions', '#B91C1C')}
-          </div>
+          <AdminStatGrid min={200} className="mb-6">
+            <AdminStat label="Open" value={String(totals.openCount)} tone={totals.openCount > 0 ? 'warning' : 'default'}
+              sub={`${totals.count} total · ${totals.preventedCount} prevented`} />
+            <AdminStat label="Disputed amount" value={money(totals.disputedCents)} sub="Gross amount under dispute" />
+            <AdminStat label="Revenue impact" value={money(totals.revenueImpactCents)}
+              tone={totals.revenueImpactCents > 0 ? 'negative' : 'default'}
+              sub={`${totals.lostCount} lost, net of refunds`}
+              info="Frozen at the terminal outcome and excludes any amount already refunded, so the same money is never counted against revenue twice." />
+            <AdminStat label="Dispute fees" value={money(totals.feesCents)} tone="negative"
+              sub="From Stripe balance transactions"
+              info="Fees and cash movement are read from Stripe balance transactions, never inferred from status. “Not reported” means Stripe has sent no fee data for that dispute yet." />
+          </AdminStatGrid>
 
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#3730A3', background: '#EEF2FF',
-                        border: '1px solid #C7D2FE', padding: '10px 14px', marginBottom: 20 }}>
-            Fees and cash movement are read from Stripe balance transactions, never inferred
-            from status. A dispute already covered by a refund is offset so the same money is
-            never counted against revenue twice.
-          </div>
-
-          <SectionTitle note="Revenue impact is frozen at the terminal outcome and excludes any amount already refunded.">
-            All disputes
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
+          <AdminSectionHeader title="All disputes" />
+          {disputes.length === 0 ? (
+            <AdminEmpty title="No disputes." description="Stripe dispute webhooks will populate this automatically." />
+          ) : (
+            <AdminTable minWidth={760} caption="Disputes">
               <thead>
-                <tr style={{ background: '#FAF9F7' }}>
+                <tr>
                   {['Order', 'Amount', 'Status', 'Stripe status', 'Refund offset',
-                    'Revenue impact', 'Fees', 'Opened'].map((h, i) => (
-                    <th key={i} style={th}>{h}</th>
-                  ))}
+                    'Revenue impact', 'Fees', 'Opened'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
                 </tr>
               </thead>
               <tbody>
-                {disputes.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No disputes. Stripe dispute webhooks will populate this automatically.
-                  </td></tr>
-                )}
                 {disputes.map(d => (
-                  <tr key={d.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{d.orderNumber}</td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(d.amountCents)}</td>
-                    <td style={{ padding: '9px 10px' }}><StatusPill status={d.status} /></td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {d.stripeStatus.replace(/_/g, ' ')}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {d.refundOffsetCents > 0 ? money(d.refundOffsetCents) : '—'}
-                    </td>
-                    <td style={{ padding: '9px 10px',
-                                 color: d.netRevenueImpactCents > 0 ? '#B91C1C' : '#6B6B6B' }}>
+                  <tr key={d.id}>
+                    <AdminTd>{d.orderNumber}</AdminTd>
+                    <AdminTd className="font-medium">{money(d.amountCents)}</AdminTd>
+                    <AdminTd><StatusPill status={d.status} /></AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{d.stripeStatus.replace(/_/g, ' ')}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{d.refundOffsetCents > 0 ? money(d.refundOffsetCents) : '—'}</AdminTd>
+                    <AdminTd className={d.netRevenueImpactCents > 0 ? 'font-medium text-[#B91C1C]' : 'text-[#6B6B66]'}>
                       {d.netRevenueImpactCents > 0 ? money(d.netRevenueImpactCents) : '—'}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+                    </AdminTd>
+                    <AdminTd className={d.balanceTxnCount === 0 ? 'text-[#92400E]' : 'text-[#6B6B66]'}>
                       {d.balanceTxnCount === 0 ? 'Not reported' : money(d.disputeFeesCents)}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+                    </AdminTd>
+                    <AdminTd className="text-[#6B6B66]">
                       {d.openedAt ? new Date(d.openedAt).toISOString().slice(0, 10) : '—'}
-                    </td>
+                    </AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </AdminTable>
+          )}
         </>
       )}
-    </div>
+    </AdminPage>
   )
 }

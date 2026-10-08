@@ -240,12 +240,11 @@ export async function getSubtotalCentsForItems(
 ): Promise<number | null> {
   if (items.length === 0) return 0
 
-  // Deduplicate SKUs for the DB query, validate quantities are positive integers
-  const validItems = items.filter(
-    i => typeof i.sku === 'string' && i.sku.length > 0 &&
-         Number.isInteger(i.quantity) && i.quantity > 0
-  )
-  if (validItems.length === 0) return null
+  // Reject the entire cart if even one item is invalid; never silently omit it
+  // from the server-authoritative subtotal.
+  if (items.length > 20 || items.some(i => !i || typeof i.sku !== 'string' || !i.sku ||
+      !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 10)) return null
+  const validItems = items
 
   const skus = [...new Set(validItems.map(i => i.sku))]
 
@@ -269,6 +268,7 @@ export async function getSubtotalCentsForItems(
     const price = priceMap[item.sku]
     if (!price) return null  // unknown/inactive SKU — cannot compute authoritative subtotal
     subtotal += price * item.quantity
+    if (!Number.isSafeInteger(subtotal)) return null
   }
 
   return subtotal

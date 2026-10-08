@@ -4,6 +4,7 @@ import { sql } from '@/lib/db'
 import {
   createAdminOrderService, UUID_RE, validateCancelReason, CancelOrderError,
 } from '@/lib/admin-orders'
+import { FraudHoldError } from '@/lib/fraud-review'
 import { getEmailProvider } from '@/lib/resend-adapter'
 import { processPendingTransactionalEmails } from '@/lib/transactional-email'
 
@@ -13,6 +14,12 @@ type Context = { params: Promise<{ id: string }> }
 
 const CARRIER_MAX  = 50
 const TRACKING_MAX = 100
+
+/** An active fraud review hold refuses fulfillment (the database enforces it; this is the clear 409). */
+function fraudHoldResponse() {
+  const e = new FraudHoldError()
+  return NextResponse.json({ error: e.message, code: e.code }, { status: e.status })
+}
 
 export async function GET(req: NextRequest, context: Context) {
   const { error } = await requireAdmin(req)
@@ -64,6 +71,7 @@ export async function PATCH(req: NextRequest, context: Context) {
       const result = await svc.transitionToProcessing(id)
       if (result === 'not_found')       return NextResponse.json({ error: 'Order not found.' }, { status: 404 })
       if (result === 'conflict')        return NextResponse.json({ error: 'Cannot move to processing from current status.' }, { status: 409 })
+      if (result === 'fraud_hold')      return fraudHoldResponse()
       const order = await svc.getOrderDetail(id)
       return NextResponse.json({ success: true, data: order })
     } catch {
@@ -118,6 +126,7 @@ export async function PATCH(req: NextRequest, context: Context) {
           { status: 409 }
         )
       }
+      if (result.outcome === 'fraud_hold') return fraudHoldResponse()
       // 'shipped' or 'already_shipped' — both are success; attempt email (non-fatal)
       if (result.outcome === 'shipped') {
         try {

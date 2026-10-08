@@ -10,6 +10,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
 import { createAffiliatesService } from '@/lib/affiliates'
+import { isFeatureEnabled } from '@/lib/feature-flags'
+import { canPayAffiliate } from '@/lib/affiliate-payout-gate'
 
 export const dynamic = 'force-dynamic'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -93,6 +95,18 @@ export async function POST(req: NextRequest) {
     const ids: string[] = Array.isArray(body.commissionIds) ? body.commissionIds : []
     if (ids.length === 0 || !ids.every(i => UUID_RE.test(i))) {
       return NextResponse.json({ error: 'Select at least one valid commission.' }, { status: 400 })
+    }
+
+    // Payout readiness gate (affiliate-portal workstream). Only evaluated when the affiliate programme features are
+    // ON, so flag-OFF behaviour is unchanged. The gate DECIDES; it never computes money — amounts still come only
+    // from the SQL below. A blocked payout creates nothing.
+    if (isFeatureEnabled('AFFILIATE_PORTAL') || isFeatureEnabled('AFFILIATE_APPLICATIONS')) {
+      const gate = await canPayAffiliate(sql, body.affiliateId, { commissionIds: ids })
+      if (!gate.allowed) {
+        return NextResponse.json(
+          { error: 'This payout is blocked until the items below are resolved.', blockers: gate.blockers, warnings: gate.warnings },
+          { status: 409 })
+      }
     }
 
     // Amounts are derived server-side; nothing from the body is trusted.

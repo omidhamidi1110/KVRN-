@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useCookiePrefs, type CookiePrefs } from '@/context/CookiePrefsContext'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/context/I18nContext'
+import { fillMessages } from '@/lib/i18n/messages'
 
 // ─── Slide-up banner ─────────────────────────────────────────────────────────
 export function CookieBanner() {
   const { showBanner, showPrefs, acceptAll, denyNonEssential, openPreferences } = useCookiePrefs()
+  const t = fillMessages(useI18n().t)
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -27,7 +30,7 @@ export function CookieBanner() {
       {/* Banner */}
       <div
         role="region"
-        aria-label="Cookie consent"
+        aria-label={t['consent.region']}
         aria-live="polite"
         className={cn(
           'fixed bottom-0 left-0 right-0 z-[480]',
@@ -40,27 +43,27 @@ export function CookieBanner() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-8">
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-light text-[#F0EDE8] leading-relaxed mb-1">
-                We use cookies to improve your experience.
+                {t['consent.headline']}
               </p>
               <p className="text-[12px] text-[#F0EDE8]/70 leading-relaxed">
-                Essential cookies keep the site working. Optional cookies help us understand usage.{' '}
-                <Link href="/privacy" className="text-[#F0EDE8]/80 underline underline-offset-2 hover:text-[#F0EDE8] transition-colors">Privacy Policy</Link>
+                {t['consent.body']}{' '}
+                <Link href="/privacy" className="text-[#F0EDE8]/80 underline underline-offset-2 hover:text-[#F0EDE8] transition-colors">{t['consent.privacyPolicy']}</Link>
                 {' '}·{' '}
-                <Link href="/terms" className="text-[#F0EDE8]/80 underline underline-offset-2 hover:text-[#F0EDE8] transition-colors">Terms</Link>
+                <Link href="/terms" className="text-[#F0EDE8]/80 underline underline-offset-2 hover:text-[#F0EDE8] transition-colors">{t.terms}</Link>
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-shrink-0">
               <button onClick={openPreferences}
                 className="h-10 px-4 text-[11px] font-light tracking-[0.1em] uppercase border border-[#F0EDE8]/20 text-[#F0EDE8]/60 hover:border-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
-                Preferences
+                {t['consent.preferences']}
               </button>
               <button onClick={denyNonEssential}
                 className="h-10 px-4 text-[11px] font-light tracking-[0.1em] uppercase border border-[#F0EDE8]/30 text-[#F0EDE8]/70 hover:border-[#F0EDE8]/60 hover:text-[#F0EDE8] transition-colors">
-                Deny non-essential
+                {t['consent.denyNonEssential']}
               </button>
               <button onClick={acceptAll}
                 className="h-10 px-6 text-[11px] font-light tracking-[0.1em] uppercase bg-[#F0EDE8] text-[#0E0E0E] hover:bg-white transition-colors">
-                Accept cookies
+                {t['consent.acceptCookies']}
               </button>
             </div>
           </div>
@@ -73,6 +76,7 @@ export function CookieBanner() {
 // ─── Preferences panel — rebuilt clean ───────────────────────────────────────
 function CookiePrefsPanel() {
   const { showPrefs, prefs, savePrefs, closePrefs, denyNonEssential } = useCookiePrefs()
+  const t = fillMessages(useI18n().t)
 
   const [local, setLocal] = useState<Omit<CookiePrefs, 'essential'>>({
     personalization: false,
@@ -118,28 +122,28 @@ function CookiePrefsPanel() {
     {
       key:    'essential',
       locked: true,
-      label:  'Essential',
-      desc:   'Required for the site to work. Includes cart, session, and security. Cannot be disabled.',
+      label:  t['consent.cat.essential'],
+      desc:   t['consent.cat.essential.desc'],
     },
     {
       key:   'personalization',
-      label: 'Personalization',
-      desc:  'Remembers your language, currency, and preferences across visits.',
+      label: t['consent.cat.personalization'],
+      desc:  t['consent.cat.personalization.desc'],
     },
     {
       key:   'analytics',
-      label: 'Analytics',
-      desc:  'Helps us understand how visitors use the site so we can improve it.',
+      label: t['consent.cat.analytics'],
+      desc:  t['consent.cat.analytics.desc'],
     },
     {
       key:   'advertising',
-      label: 'Targeted Advertising',
-      desc:  'Used to show relevant ads on external platforms. KVRN does not currently run targeted ad campaigns.',
+      label: t['consent.cat.advertising'],
+      desc:  t['consent.cat.advertising.desc'],
     },
     {
       key:   'doNotSell',
-      label: 'Do Not Sell or Share My Personal Information',
-      desc:  'Opt out of the sale or sharing of your personal information with third parties.',
+      label: t['consent.cat.doNotSell'],
+      desc:  t['consent.cat.doNotSell.desc'],
     },
   ]
 
@@ -159,7 +163,7 @@ function CookiePrefsPanel() {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Cookie preferences"
+        aria-label={t['consent.panelTitle']}
         className={cn(
           'fixed z-[500]',
           'bottom-0 left-0 right-0',                    // mobile: bottom sheet
@@ -173,8 +177,8 @@ function CookiePrefsPanel() {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/10 flex-shrink-0">
-          <h2 className="text-[15px] font-light text-white tracking-wide">Cookie preferences</h2>
-          <button onClick={closePrefs} aria-label="Close"
+          <h2 className="text-[15px] font-light text-white tracking-wide">{t['consent.panelTitle']}</h2>
+          <button onClick={closePrefs} aria-label={t['common.close']}
             className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white transition-colors">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -185,9 +189,9 @@ function CookiePrefsPanel() {
         {/* Intro */}
         <div className="px-6 py-4 border-b border-white/10 flex-shrink-0">
           <p className="text-[13px] text-white/60 leading-relaxed">
-            Choose which cookies you allow. Saved for 12 months.{' '}
+            {t['consent.panelIntro']}{' '}
             <Link href="/privacy" className="text-white/80 underline underline-offset-2 hover:text-white transition-colors">
-              Privacy Policy
+              {t['consent.privacyPolicy']}
             </Link>
           </p>
         </div>
@@ -213,7 +217,7 @@ function CookiePrefsPanel() {
                     </span>
                     {cat.locked && (
                       <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-light tracking-[0.08em] uppercase border border-white/40 text-white/90">
-                        Always on
+                        {t['consent.alwaysOn']}
                       </span>
                     )}
                   </div>
@@ -270,13 +274,13 @@ function CookiePrefsPanel() {
             onClick={denyNonEssential}
             className="text-[11px] font-light tracking-[0.1em] uppercase text-white/40 hover:text-white/70 transition-colors"
           >
-            Deny all
+            {t['consent.denyAll']}
           </button>
           <button
             onClick={handleSave}
             className="h-10 px-7 text-[11px] font-light tracking-[0.1em] uppercase bg-white text-[#111111] hover:bg-white/90 transition-colors"
           >
-            Save preferences
+            {t['consent.save']}
           </button>
         </div>
       </div>

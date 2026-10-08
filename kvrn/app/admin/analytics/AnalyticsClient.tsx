@@ -6,7 +6,11 @@
 // one before it. A rate with nothing to divide by is shown as "—", never as 0%.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FONT, BORDER, Metric, SectionTitle, pctOrDash, money } from '@/components/admin/FinancialUI'
+import { Metric, pctOrDash, money } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminSegmented, AdminStatGrid,
+  AdminTable, AdminTh, AdminTd, AdminLoading, AdminTag,
+} from '@/components/admin/ui/AdminUI'
 import type { GaAdminStatus } from '@/lib/ga-common'
 import { LineChart } from '@/components/admin/charts/LineChart'
 import { FunnelChart } from '@/components/admin/charts/FunnelChart'
@@ -35,51 +39,44 @@ interface Report {
   trend?: { granularity: 'day'; collectionStartedAt: string | null; buckets: FunnelTrendBucketView[] }
 }
 
-const th = { textAlign: 'left' as const, padding: '9px 10px', fontSize: 9, letterSpacing: '0.1em',
-             textTransform: 'uppercase' as const, color: '#9B9B9B', borderBottom: BORDER }
-
 const STATE_LABEL = { unset: 'Not set', malformed: 'Set but malformed (ignored)', ok: 'Configured' } as const
-const STATE_COLOR = { unset: '#6B6B6B', malformed: '#B91C1C', ok: '#166534' } as const
+const STATE_TONE = { unset: 'neutral', malformed: 'danger', ok: 'success' } as const
 
 /** GA4 configuration status. States only: the secret is never shown, and GA numbers are NOT shown here. */
 function GaStatusPanel({ ga }: { ga: GaAdminStatus }) {
   const row = (label: string, state: keyof typeof STATE_LABEL, extra?: string) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '5px 0', fontSize: 12 }}>
+    <div className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
       <span>{label}</span>
-      <span style={{ color: STATE_COLOR[state], textAlign: 'right' }}>{STATE_LABEL[state]}{extra ? ` — ${extra}` : ''}</span>
+      <AdminTag tone={STATE_TONE[state]}>{STATE_LABEL[state]}{extra ? ` — ${extra}` : ''}</AdminTag>
     </div>
   )
   const serverReady = ga.clientState === 'ok' && ga.secretState === 'ok'
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 12, marginBottom: 22 }}>
-      <div style={{ border: BORDER, background: '#fff', padding: '12px 16px' }}>
-        <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9B9B9B', marginBottom: 6 }}>
-          KVRN first-party funnel
-        </div>
-        <p style={{ fontSize: 12, color: '#6B6B6B', margin: 0, lineHeight: 1.5 }}>
-          Everything on this page: KVRN&rsquo;s own database, consenting visitors only, purchases from paid orders.
+    <div className="mb-5 grid gap-3 md:grid-cols-2">
+      <AdminCard>
+        <AdminSectionHeader title="KVRN first-party funnel" />
+        <p className="text-[12px] text-[#4A4A46]">
+          KVRN&rsquo;s own data: consenting visitors, paid orders.
         </p>
-      </div>
-      <div style={{ border: BORDER, background: '#fff', padding: '12px 16px' }}>
-        <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9B9B9B', marginBottom: 6 }}>
-          Google Analytics 4 (external system)
-        </div>
+      </AdminCard>
+      <AdminCard>
+        <AdminSectionHeader title="Google Analytics 4 (external system)"
+          info={<>GA is a separate system: its numbers will differ from the first-party figures (sampling, ad blockers,
+            processing delay, its own sessionisation). GA numbers are not shown here.</>} />
         {row('Measurement ID (browser)', ga.clientState, ga.measurementId ?? undefined)}
         {row('Server-side purchase secret', ga.secretState)}
-        <div style={{ fontSize: 11, color: '#6B6B6B', lineHeight: 1.5, margin: '6px 0 8px' }}>
+        <p className="my-2 text-[11px] text-[#6B6B66]">
           {ga.clientState !== 'ok'
             ? 'GA is off: no Google script is ever loaded.'
             : serverReady
               ? 'GA loads only after a visitor accepts analytics. Purchases are sent from the order webhook (transaction id = order number).'
               : 'GA loads after consent, but no server-side purchase is sent until the secret is configured.'}
-          {' '}GA is a separate system: its numbers will differ from the first-party figures above (sampling, ad blockers,
-          processing delay, its own sessionisation).
-        </div>
+        </p>
         <a href="https://analytics.google.com/analytics/web/" target="_blank" rel="noopener noreferrer"
-           style={{ fontSize: 11, color: '#1A1A1A' }}>
+           className="text-[11px] font-medium text-[#171717] underline underline-offset-2">
           Open Google Analytics ↗
         </a>
-      </div>
+      </AdminCard>
     </div>
   )
 }
@@ -119,43 +116,32 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
   const funnelState = funnelSummaryDataState(s?.visits ?? 0, Boolean(data?.trend) && trendHasCollection)
   const rankedProducts = useMemo(() => rankProducts(data?.products ?? [], rankMetric, 8), [data, rankMetric])
 
+  const rangeOptions = RANGES.map(o => ({ id: o, label: o.replace('d', ' days') }))
+  const trendOptions = [{ id: 'counts' as const, label: 'Sessions by stage' }, { id: 'conversion' as const, label: 'Step conversion' }]
+  const rankOptions = [{ id: 'views' as const, label: 'Views' }, { id: 'adds' as const, label: 'Added to cart' }, { id: 'purchases' as const, label: 'Purchases' }]
+
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1180, fontFamily: FONT }}>
-      <h1 style={{ fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>Analytics</h1>
-      <p style={{ fontSize: 12, color: '#6B6B6B', margin: '0 0 20px', maxWidth: 720, lineHeight: 1.5 }}>
-        First-party storefront funnel. Only visitors who accepted analytics cookies are counted
-        (no choice, decline, Do Not Track and Global Privacy Control are never tracked), so these
-        are the behaviour of consenting visitors, not total traffic.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Analytics"
+        description="Funnel for consenting visitors."
+        info={<>Only visitors who accepted analytics cookies are counted (no choice, decline, Do Not Track and Global
+          Privacy Control are never tracked), so these are the behaviour of consenting visitors, not total traffic.</>}
+      />
 
       <GaStatusPanel ga={ga} />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {RANGES.map(o => (
-          <button key={o} onClick={() => setRange(o)}
-            style={{ fontSize: 11, letterSpacing: '0.04em', padding: '7px 14px', cursor: 'pointer',
-                     border: range === o ? '1px solid #1A1A1A' : BORDER,
-                     background: range === o ? '#1A1A1A' : '#fff',
-                     color: range === o ? '#fff' : '#1A1A1A' }}>
-            {o.replace('d', ' days')}
-          </button>
-        ))}
-        {loading && data && (
-          <span role="status" style={{ fontSize: 11, color: '#6B6B6B', alignSelf: 'center' }}>Updating…</span>
-        )}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <AdminSegmented ariaLabel="Date range" options={rangeOptions} value={range} onChange={setRange} />
+        {loading && data && <span role="status" className="text-[11px] text-[#6B6B66]">Updating…</span>}
       </div>
 
-      {err && (
-        <div role="alert" style={{ fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                                   border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-      {loading && !data && <p style={{ fontSize: 12, color: '#6B6B6B' }}>Loading…</p>}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {loading && !data && <AdminLoading />}
 
       {data && s && r && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 10, marginBottom: 22 }}>
+          <AdminStatGrid min={180} className="mb-6">
             <Metric label="Visits / sessions" value={String(s.visits)} />
             <Metric label="Product views" value={String(data.events.productViews)} sub="unique per session and product" />
             <Metric label="Add-to-cart events" value={String(data.events.addToCarts)} />
@@ -164,12 +150,11 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
                     sub={data.events.purchaseValueCents === null ? 'order value unknown'
                          : `${money(data.events.purchaseValueCents)} charged (incl. shipping and tax; not revenue)`} />
             <Metric label="Visit → purchase" value={pctOrDash(r.visitToPurchase)} />
-          </div>
+          </AdminStatGrid>
 
-          <SectionTitle note="Sessions that reached each stage or any later one, so each step is never larger than the one before. The gap between two steps means no later event was recorded for those sessions — not proof they skipped or abandoned that step.">
-            Funnel
-          </SectionTitle>
-          <div style={{ marginBottom: 22 }}>
+          <AdminSectionHeader title="Funnel"
+            info="Sessions that reached each stage or any later one, so each step is never larger than the one before. The gap between two steps means no later event was recorded for those sessions — not proof they skipped or abandoned that step." />
+          <div className="mb-6">
             <ChartBoundary label="The funnel chart">
               <FunnelChart
                 rows={funnelRows}
@@ -181,21 +166,12 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
             </ChartBoundary>
           </div>
 
-          <SectionTitle note={`Daily, UTC, for the selected ${range.replace('d', '-day')} window. Each day groups sessions by the day they started and follows them to their furthest stage, so the days add up to the funnel above. Days before analytics collection began are shown as unknown, not zero; the first and last day of a rolling window can be partial.`}>
-            Funnel trend
-          </SectionTitle>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            {(['counts', 'conversion'] as const).map(m => (
-              <button key={m} onClick={() => setTrendMode(m)} aria-pressed={trendMode === m}
-                style={{ fontSize: 11, padding: '6px 12px', cursor: 'pointer',
-                         border: trendMode === m ? '1px solid #1A1A1A' : BORDER,
-                         background: trendMode === m ? '#1A1A1A' : '#fff',
-                         color: trendMode === m ? '#fff' : '#1A1A1A' }}>
-                {m === 'counts' ? 'Sessions by stage' : 'Step conversion'}
-              </button>
-            ))}
+          <AdminSectionHeader title="Funnel trend"
+            info={`Daily, UTC, for the selected ${range.replace('d', '-day')} window. Each day groups sessions by the day they started and follows them to their furthest stage, so the days add up to the funnel above. Days before analytics collection began are shown as unknown, not zero; the first and last day of a rolling window can be partial.`} />
+          <div className="mb-3">
+            <AdminSegmented ariaLabel="Trend view" options={trendOptions} value={trendMode} onChange={setTrendMode} />
           </div>
-          <div style={{ marginBottom: 22 }}>
+          <div className="mb-6">
             {!data.trend ? (
               <ChartError message="Trend data was not returned." />
             ) : (
@@ -217,7 +193,7 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
               </ChartBoundary>
             )}
             {data.trend && !trendHasData && (
-              <p style={{ fontSize: 11, color: '#6B6B6B', margin: '6px 0 0' }}>
+              <p className="mt-1.5 text-[11px] text-[#6B6B66]">
                 {data.trend.collectionStartedAt === null
                   ? 'No analytics sessions have been recorded yet.'
                   : 'No sessions were recorded in this window.'}
@@ -225,7 +201,7 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
             )}
           </div>
 
-          <p style={{ fontSize: 11, color: '#6B6B6B', margin: '0 0 22px', lineHeight: 1.5 }}>
+          <p className="mb-6 text-[11px] text-[#6B6B66]">
             {data.coverage.ordersPaid === 0
               ? 'No paid orders in this window, so tracked-purchase coverage is not available.'
               : `${data.coverage.trackedPurchases} of ${data.coverage.ordersPaid} paid orders in this window ` +
@@ -233,57 +209,44 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
                 'Untracked orders may reflect declined/no analytics consent or unavailable analytics data.'}
           </p>
 
-          <SectionTitle note="Distinct sessions per stage within the window. Rates use sessions that reached the product at any stage as the base.">
-            Products
-          </SectionTitle>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 11, color: '#6B6B6B' }}>Rank by</span>
-            {([['views', 'Views'], ['adds', 'Added to cart'], ['purchases', 'Purchases']] as const).map(([m, label]) => (
-              <button key={m} onClick={() => setRankMetric(m)} aria-pressed={rankMetric === m}
-                style={{ fontSize: 11, padding: '6px 12px', cursor: 'pointer',
-                         border: rankMetric === m ? '1px solid #1A1A1A' : BORDER,
-                         background: rankMetric === m ? '#1A1A1A' : '#fff',
-                         color: rankMetric === m ? '#fff' : '#1A1A1A' }}>
-                {label}
-              </button>
-            ))}
-            <span style={{ fontSize: 11, color: '#9B9B9B' }}>top 8 · distinct sessions</span>
+          <AdminSectionHeader title="Products"
+            info="Distinct sessions per stage within the window. Rates use sessions that reached the product at any stage as the base." />
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-[#6B6B66]">Rank by</span>
+            <AdminSegmented ariaLabel="Rank products by" options={rankOptions} value={rankMetric} onChange={setRankMetric} />
+            <span className="text-[11px] text-[#8A8A85]">top 8 · distinct sessions</span>
           </div>
-          <div style={{ marginBottom: 14 }}>
+          <div className="mb-4">
             <ChartBoundary label="The product chart">
               <ProductBarChart rows={rankedProducts}
                 emptyMessage={data.products.length === 0 ? 'No data for this period'
                   : `No ${rankMetric === 'adds' ? 'add-to-cart' : rankMetric === 'purchases' ? 'purchase' : 'view'} activity recorded for any product in this window`} />
             </ChartBoundary>
           </div>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Product', 'Views', 'Add to cart', 'Checkout starts', 'Purchases', 'Cart rate', 'Purchase rate'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {data.products.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No product activity recorded in this window yet.
-                  </td></tr>
-                )}
-                {data.products.map(p => (
-                  <tr key={p.productId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{p.name}</td>
-                    <td style={{ padding: '9px 10px' }}>{p.views}</td>
-                    <td style={{ padding: '9px 10px' }}>{p.adds}</td>
-                    <td style={{ padding: '9px 10px' }}>{p.checkouts}</td>
-                    <td style={{ padding: '9px 10px' }}>{p.purchases}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{pctOrDash(p.addRatePct)}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{pctOrDash(p.purchaseRatePct)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminTable caption="Product funnel">
+            <thead><tr>
+              {['Product', 'Views', 'Add to cart', 'Checkout starts', 'Purchases', 'Cart rate', 'Purchase rate'].map(h =>
+                <AdminTh key={h}>{h}</AdminTh>)}
+            </tr></thead>
+            <tbody>
+              {data.products.length === 0 && (
+                <tr><AdminTd colSpan={7} className="text-[#6B6B66]">No product activity recorded in this window yet.</AdminTd></tr>
+              )}
+              {data.products.map(p => (
+                <tr key={p.productId}>
+                  <AdminTd>{p.name}</AdminTd>
+                  <AdminTd>{p.views}</AdminTd>
+                  <AdminTd>{p.adds}</AdminTd>
+                  <AdminTd>{p.checkouts}</AdminTd>
+                  <AdminTd>{p.purchases}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{pctOrDash(p.addRatePct)}</AdminTd>
+                  <AdminTd className="text-[#6B6B66]">{pctOrDash(p.purchaseRatePct)}</AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </AdminTable>
         </>
       )}
-    </div>
+    </AdminPage>
   )
 }

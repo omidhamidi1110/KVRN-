@@ -1,9 +1,12 @@
+import { cmsContentEnabled, contentPublic } from '@/lib/content-public'
+import { FaqView } from '@/components/content/cms-views'
+import { pageMetadata } from '@/lib/content-seo'
 import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Accordion } from '@/components/ui/Accordion'
 
-export const metadata: Metadata = {
+const LEGACY_METADATA: Metadata = {
   title: 'FAQ — KVRN',
   description: 'Frequently asked questions about KVRN products, sizing, shipping and returns.',
 }
@@ -173,7 +176,7 @@ const FAQ_SECTIONS = [
   },
 ]
 
-export default function FAQPage() {
+function LegacyFAQPage() {
   return (
     <div>
       {/* Dark header band */}
@@ -202,4 +205,25 @@ export default function FAQPage() {
       </div>
     </div>
   )
+}
+
+// Flag off (default): the coded FAQ above, unchanged. Flag on: the published Admin FAQ
+// (inactive questions/categories hidden); no published FAQ -> the coded page.
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (!cmsContentEnabled()) return LEGACY_METADATA
+  const view = await contentPublic().getFaq()
+  if (!view) return LEGACY_METADATA
+  const seo = view.variants.en.data.seo
+  return pageMetadata({ title: LEGACY_METADATA.title as string, description: LEGACY_METADATA.description as string }, seo,
+    seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null)
+}
+
+export default async function FAQPage() {
+  if (cmsContentEnabled()) {
+    const view = await contentPublic().getFaq()
+    if (view) return <FaqView view={view} />
+  }
+  return <LegacyFAQPage />
 }

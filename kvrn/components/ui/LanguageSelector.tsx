@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useI18n, LANGUAGES, type Locale } from '@/context/I18nContext'
+import { useI18n, type Locale } from '@/context/I18nContext'
+import { format } from '@/lib/i18n/messages'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -11,10 +12,10 @@ interface Props {
 }
 
 export function LanguageSelector({ className, align = 'right', inDrawer = false }: Props) {
-  const { locale, setLocale } = useI18n()
+  const { locale, setLocale, languages, t } = useI18n()
   const [open, setOpen]       = useState(false)
   const ref                   = useRef<HTMLDivElement>(null)
-  const current = LANGUAGES.find(l => l.code === locale) ?? LANGUAGES[0]
+  const current = languages.find(l => l.code === locale) ?? languages[0]
 
   useEffect(() => {
     const close = (e: MouseEvent) => {
@@ -28,9 +29,9 @@ export function LanguageSelector({ className, align = 'right', inDrawer = false 
   if (inDrawer) {
     return (
       <div className={cn('space-y-1', className)}>
-        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">Language</p>
+        <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#9B9B9B] mb-2">{t['nav.language']}</p>
         <div className="flex flex-wrap gap-1.5">
-          {LANGUAGES.map(l => (
+          {languages.map(l => (
             <button
               key={l.code}
               onClick={() => setLocale(l.code as Locale)}
@@ -54,7 +55,7 @@ export function LanguageSelector({ className, align = 'right', inDrawer = false 
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        aria-label={`Language: ${current.label}`}
+        aria-label={format(t['nav.languageIs'], { name: current.label })}
         className="flex items-center gap-1 text-[11px] font-light tracking-[0.1em] hover:opacity-50 transition-opacity"
       >
         <span>{current.nativeLabel}</span>
@@ -66,22 +67,22 @@ export function LanguageSelector({ className, align = 'right', inDrawer = false 
 
       {open && (
         <div
-          role="listbox" aria-label="Select language"
+          role="listbox" aria-label={t['nav.selectLanguage']}
           className={cn(
             'absolute top-full mt-3 z-[350]',
             'bg-[#F9F8F6] border border-[#1A1A1A]/10',
             'py-1 min-w-[200px] max-h-[320px] overflow-y-auto shadow-xl',
-            align === 'right' ? 'right-0' : 'left-0'
+            align === 'right' ? 'end-0' : 'start-0'
           )}
         >
-          {LANGUAGES.map(l => (
+          {languages.map(l => (
             <button
               key={l.code}
               role="option"
               aria-selected={l.code === locale}
               onClick={() => { setLocale(l.code as Locale); setOpen(false) }}
               className={cn(
-                'w-full text-left px-4 py-2.5 flex items-center justify-between gap-4',
+                'w-full text-start px-4 py-2.5 flex items-center justify-between gap-4',
                 'transition-colors duration-100',
                 'hover:bg-[#F3F0EB]',
                 l.code === locale

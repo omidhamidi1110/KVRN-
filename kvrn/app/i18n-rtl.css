@@ -1,0 +1,52 @@
+/* app/i18n-rtl.css — right-to-left (Arabic) support that does not need markup changes.
+ *
+ * Components written for this batch use logical utilities (start-/end-, ms-/me-, ps-/pe-,
+ * text-start, rtl:) and need nothing here. These rules cover the older components whose markup is
+ * pinned byte-for-byte by golden tests (Nav, Footer, AnnouncementBar, content pages): the HTML does
+ * not change, only how it is laid out when <html dir="rtl">. Everything is scoped under
+ * [dir="rtl"], so the English / left-to-right storefront is unaffected.
+ *
+ * Deliberately NOT mirrored: prices, quantities, SKUs, e-mail addresses and phone numbers (they stay
+ * left-to-right, isolated from the surrounding text) and icons that are not directional.
+ */
+
+/* Physical text alignment utilities used by pinned components. */
+[dir="rtl"] .text-left  { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+
+/* Physical margins used by pinned components (hamburger spacing). */
+[dir="rtl"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+
+/* Arabic joins letters: tracking breaks the joins, and capitals do not exist. */
+[dir="rtl"] *,
+[dir="rtl"] *::before,
+[dir="rtl"] *::after {
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+
+/* A system Arabic-capable fallback after the site fonts (no extra font download). */
+html[lang="ar"] body {
+  font-family: var(--font-body, system-ui), "Segoe UI", Tahoma, "Geeza Pro", "Noto Sans Arabic", "Noto Naskh Arabic", sans-serif;
+}
+
+/* Numbers and prices keep their left-to-right shape inside right-to-left text. */
+[dir="rtl"] .tabular-nums,
+[dir="rtl"] [data-ltr],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="url"] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="url"] { text-align: right; }
+
+/* Directional arrows in text ("→") read the wrong way round; flip decorative arrow glyph spans. */
+[dir="rtl"] [data-flip-rtl] { display: inline-block; transform: scaleX(-1); }
+
+/* Fixed full-width bars stay full width; nothing else to mirror. */
+[dir="rtl"] select { background-position: left 0.75rem center; }

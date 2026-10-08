@@ -30,7 +30,9 @@ export async function verifyAdminRequest(
 
   // ── Cloudflare Access JWT ───────────────────────────────────────────────
   const token = req.headers.get('cf-access-jwt-assertion')
-  if (!token) return null
+  // Reject misconfiguration and oversized tokens before fetching verification keys.
+  if (!token || token.length > 16_384 || !TEAM_DOMAIN || !AUDIENCE || !ALLOWLIST.size) return null
+  if (!/^[a-z0-9.-]+\.cloudflareaccess\.com$/i.test(TEAM_DOMAIN) && IS_PROD) return null
 
   try {
     // Fetch the public JWKS from Cloudflare Access
@@ -40,11 +42,14 @@ export async function verifyAdminRequest(
     const certs: { keys: JsonWebKey[] } = await certsRes.json()
 
     // Decode header to get kid
-    const [rawHeader] = token.split('.')
+    const segments = token.split('.')
+    if (segments.length !== 3 || segments.some(part => !part)) return null
+    const [rawHeader] = segments
     const header: { kid?: string; alg?: string } = JSON.parse(
       Buffer.from(rawHeader, 'base64url').toString('utf8')
     )
-    const jwk = certs.keys.find((k: any) => k.kid === header.kid)
+    if (header.alg !== 'RS256' || !header.kid || !Array.isArray(certs.keys)) return null
+    const jwk = certs.keys.find((k: any) => k.kid === header.kid && k.kty === 'RSA')
     if (!jwk) return null
 
     // Import public key
@@ -62,11 +67,15 @@ export async function verifyAdminRequest(
     if (!valid) return null
 
     // Decode and validate claims
-    const payload: { iss?: string; aud?: string | string[]; email?: string; exp?: number } =
+    const payload: { iss?: string; aud?: string | string[]; email?: string; exp?: number; nbf?: number; iat?: number } =
       JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'))
 
-    if (!payload.email) return null
-    if (Date.now() / 1000 > (payload.exp ?? 0)) return null
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    if (typeof payload.email !== 'string' || !payload.email.trim()) return null
+    if (payload.iss !== `https://${TEAM_DOMAIN}`) return null
+    if (typeof payload.exp !== 'number' || !Number.isFinite(payload.exp) || nowSeconds >= payload.exp) return null
+    if (payload.nbf !== undefined && (typeof payload.nbf !== 'number' || !Number.isFinite(payload.nbf) || payload.nbf > nowSeconds + 60)) return null
+    if (payload.iat !== undefined && (typeof payload.iat !== 'number' || !Number.isFinite(payload.iat) || payload.iat > nowSeconds + 60)) return null
 
     const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud]
     if (!aud.includes(AUDIENCE)) return null

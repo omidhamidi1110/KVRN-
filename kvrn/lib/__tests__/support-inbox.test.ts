@@ -429,8 +429,15 @@ describe('B. source guards', () => {
     }
   })
 
-  test('migrations 001-025 are untouched: this batch adds only 026', () => {
-    expect(migFiles.filter(f => Number(f.slice(0, 3)) > 25)).toEqual(['026_support_inbox.sql'])
+  test('migrations 001-026 are untouched (content hash pinned); later batches only add 027+', () => {
+    // Updated by the admin-refresh batch: 027+ now exist by design, so the check is a pinned
+    // SHA-256 over the concatenated 001-026 files (sorted by name) instead of a file-count check.
+    const crypto = require('crypto')
+    const frozen = migFiles.filter(f => Number(f.slice(0, 3)) <= 26).sort()
+    expect(frozen).toContain('026_support_inbox.sql')
+    const h = crypto.createHash('sha256')
+    for (const f of frozen) h.update(fs.readFileSync(path.join(ROOT, 'db/migrations', f)))
+    expect(h.digest('hex')).toBe('f356bdf39003acbce589064c7319ae46fcfdb8a19b6a7586747d13e7a89492d4')
   })
 
   test('wrapper keeps fetch + scheduled and adds email()', () => {

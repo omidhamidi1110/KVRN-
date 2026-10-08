@@ -15,7 +15,7 @@ const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLen
 const jwk = { ...(publicKey.export({ format: 'jwk' }) as any), kid: 'k1', alg: 'RS256', use: 'sig' }
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
 function jwt(claims: Record<string, unknown>, key = privateKey) {
-  const head = b64({ alg: 'RS256', kid: 'k1', typ: 'JWT' }), body = b64(claims)
+  const head = b64({ alg: 'RS256', kid: 'k1', typ: 'JWT' }), body = b64({ iss: 'https://team.example.test', ...claims })
   const sig = crypto.sign('RSA-SHA256', Buffer.from(`${head}.${body}`), key).toString('base64url')
   return `${head}.${body}.${sig}`
 }
@@ -48,7 +48,9 @@ describe('requireAdmin + security push', () => {
     for (const t of [undefined, 'not.a.jwt',
       jwt({ email: 'stranger@example.com', aud: 'aud-123', exp: future() }, other),
       jwt({ email: 'stranger@example.com', aud: 'other', exp: future() }),
-      jwt({ email: 'stranger@example.com', aud: 'aud-123', exp: 1 })]) {
+      jwt({ email: 'stranger@example.com', aud: 'aud-123', exp: 1 }),
+      jwt({ email: 'owner@kvrn.test', aud: 'aud-123', iss: 'https://evil.example.test', exp: future() }),
+      jwt({ email: 'owner@kvrn.test', aud: 'aud-123', nbf: future() + 3600, exp: future() + 7200 })]) {
       const r = await requireAdmin(req(t))
       expect(r.error.status).toBe(401)
     }

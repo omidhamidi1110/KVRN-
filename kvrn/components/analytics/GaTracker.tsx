@@ -18,9 +18,13 @@ export function GaTracker() {
   // null = preferences not read yet (do nothing); otherwise the stored analytics preference.
   const pref: boolean | null = prefs === null ? null : prefs.analytics === true
 
+  // The affiliate portal (/affiliate, /affiliate/*) is a partner area, not the storefront: no GA there.
+  const inAffiliatePortal = pathname === '/affiliate' || (pathname ?? '').startsWith('/affiliate/')
+
   useEffect(() => {
+    if (inAffiliatePortal) { disableGa(); return }
     void syncGa(pref)      // idempotent; declines/opt-outs disable GA immediately
-  }, [pref, prefs, pathname])
+  }, [pref, prefs, pathname, inAffiliatePortal])
 
   // Consent changed in ANOTHER tab (or DNT/GPC now blocks): stop here too.
   useEffect(() => {

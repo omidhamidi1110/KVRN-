@@ -19,10 +19,14 @@
 // A provider may have several obligations and several billable metrics. Every one is
 // represented — the summary row aggregates, and the detail rows show each item.
 
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import {
-  FONT, BORDER, money, moneyOrUnknown, RangePicker, SectionTitle, buildQuery,
+  money, moneyOrUnknown, RangePicker, buildQuery,
 } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
+  AdminSegmented, AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, AdminTag, adminInputClass, adminSelectClass,
+} from '@/components/admin/ui/AdminUI'
 import { PROVIDER_PORTALS } from '@/lib/provider-portals'
 import { LineChart, type LineSeries } from '@/components/admin/charts/LineChart'
 
@@ -76,23 +80,10 @@ type Totals = {
   usageMetricCount: number
 }
 
-const INPUT_STYLE = { fontFamily: FONT, fontSize: 12, padding: '8px 10px', border: BORDER, background: '#fff', width: '100%', boxSizing: 'border-box' as const }
-
+const THRESHOLD_TONE = { ok: 'success', warning: 'warning', critical: 'danger' } as const
 function ThresholdPill({ status }: { status: string | null }) {
-  if (!status) return <span style={{ color: '#9B9B9B' }}>—</span>
-  const map: Record<string, { bg: string; bd: string; fg: string }> = {
-    ok:       { bg: '#F0FDF4', bd: '#BBF7D0', fg: '#166534' },
-    warning:  { bg: '#FFFBEB', bd: '#FDE68A', fg: '#92400E' },
-    critical: { bg: '#FEF2F2', bd: '#FECACA', fg: '#B91C1C' },
-  }
-  const c = map[status] ?? map.ok
-  return (
-    <span style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase',
-                   padding: '3px 8px', background: c.bg,
-                   border: `1px solid ${c.bd}`, color: c.fg }}>
-      {status}
-    </span>
-  )
+  if (!status) return <span className="text-[#8A8A85]">—</span>
+  return <AdminTag tone={THRESHOLD_TONE[status as keyof typeof THRESHOLD_TONE] ?? 'success'}>{status}</AdminTag>
 }
 
 export function InfrastructureClient() {
@@ -195,103 +186,64 @@ export function InfrastructureClient() {
 
   const t = data?.totals
 
-  const card = (label: string, value: string, note: string, tone: string) => (
-    <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-      <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                  textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>{label}</p>
-      <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, color: tone,
-                  margin: '6px 0 0' }}>{value}</p>
-      <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>{note}</p>
-    </div>
+  const recognitionInfo = (
+    <>
+      <p><strong className="font-medium">Actual paid</strong> is cash that left in this window. The Financial Overview shows <strong className="font-medium">recognized operating expense</strong>, which spreads a charge across the period it covers.</p>
+      <p className="mt-2">A $40 annual renewal paid this month appears as $40 here and about $3.33 in a one-month P&amp;L. Both are correct. Only real transactions affect profit.</p>
+    </>
   )
-
-  const th = {
-    textAlign: 'left' as const, padding: '9px 10px', fontSize: 9,
-    letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-    color: '#9B9B9B', borderBottom: BORDER, whiteSpace: 'nowrap' as const,
-  }
+  const providerOptions = [...new Set((usageTs?.availableMetrics ?? []).map(m => m.provider))]
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1240 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Infrastructure costs
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Actual paid, estimated accrued and projected month-end are tracked separately.
-        Only real transactions affect profit, and they are recognised over their service
-        period in the P&amp;L — so cash paid here can differ from expense recognised there.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Infrastructure"
+        description="Provider costs, usage, and forecasts."
+        info={recognitionInfo}
+      />
 
-      <div style={{ marginBottom: 22 }}>
+      <div className="mb-5">
         <RangePicker range={range} onRange={setRange} custom={custom} onCustom={setCustom} />
       </div>
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-      {loading && !data && (
-        <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B' }}>Loading…</p>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {loading && !data && <AdminLoading />}
 
       {t && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))',
-                        gap: 10, marginBottom: 20 }}>
-            {card('Actual paid', money(t.actualPaidCents),
-                  `Cash out · ${t.providerCount - t.providersWithoutActuals} of ${t.providerCount} providers invoiced`,
-                  '#1A1A1A')}
-            {card('Expected monthly', money(t.expectedMonthlyEquivalentCents),
-                  `${t.definitionCount} obligations · planning only`, '#6B6B6B')}
-            {card('Estimated accrued', money(t.estimatedAccruedCents),
-                  `${t.usageMetricCount} metrics · not billed`, '#92400E')}
-            {card('Projected month-end', money(t.projectedMonthEndCents),
-                  'Forecast if usage continues', '#92400E')}
-          </div>
+          <AdminStatGrid min={210} className="mb-4">
+            <AdminStat label="Actual paid" value={money(t.actualPaidCents)}
+              sub={`Cash out · ${t.providerCount - t.providersWithoutActuals} of ${t.providerCount} providers invoiced`}
+              info={recognitionInfo} />
+            <AdminStat label="Expected monthly" value={money(t.expectedMonthlyEquivalentCents)} tone="muted"
+              sub={`${t.definitionCount} obligations · planning only`} />
+            <AdminStat label="Estimated accrued" value={money(t.estimatedAccruedCents)} tone="warning"
+              sub={`${t.usageMetricCount} metrics · not billed`} />
+            <AdminStat label="Projected month-end" value={money(t.projectedMonthEndCents)} tone="warning"
+              sub="Forecast if usage continues" />
+          </AdminStatGrid>
 
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                        border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 12 }}>
-            Estimated and projected figures are forecasts, not invoices. They are excluded
-            from every profit figure — only real transactions count.
-          </div>
-
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#3730A3', background: '#EEF2FF',
-                        border: '1px solid #C7D2FE', padding: '10px 14px', marginBottom: 20 }}>
-            <strong>Actual paid</strong> is cash that left in this window.
-            The Financial Overview shows <strong>recognized operating expense</strong>, which
-            spreads a charge across the period it covers. A $40 annual renewal paid this month
-            appears as $40 here and about $3.33 in a one-month P&amp;L. Both are correct.
-          </div>
-
+          <AdminNotice tone="warning" className="mb-6">
+            Estimated and projected figures are forecasts, not invoices. They are excluded from every profit figure.
+          </AdminNotice>
 
           {/* ── Usage / spend over time ───────────────────────────────────── */}
-          <SectionTitle note="Separate from the Financial Overview chart: this answers how much has been used and how close a plan limit is, not what it did to profit.">
-            Usage and spend over time
-          </SectionTitle>
+          <AdminSectionHeader title="Usage and spend over time"
+            description="How much is used and how close a plan limit is."
+            info="Separate from the Financial Overview chart: this answers how much has been used and how close a plan limit is, not what it did to profit." />
 
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center',
-                        flexWrap: 'wrap', marginBottom: 10 }}>
-            {(['spend', 'usage'] as const).map(m => (
-              <button key={m} onClick={() => setChartMode(m)}
-                style={{ fontFamily: FONT, fontSize: 11, padding: '6px 12px', cursor: 'pointer',
-                         border: chartMode === m ? '1px solid #1A1A1A' : BORDER,
-                         background: chartMode === m ? '#1A1A1A' : '#fff',
-                         color: chartMode === m ? '#fff' : '#1A1A1A' }}>
-                {m === 'spend' ? 'Spend (billed)' : 'Usage'}
-              </button>
-            ))}
-            <span style={{ width: 1, height: 20, background: '#E8E5E0' }} />
-            <select value={chartProvider} onChange={e => { setChartProvider(e.target.value); setChartMetric('') }}
-              style={{ fontFamily: FONT, fontSize: 11, padding: '6px 10px', border: BORDER, background: '#fff' }}>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <AdminSegmented ariaLabel="Chart mode" value={chartMode}
+              options={[{ id: 'spend' as const, label: 'Spend (billed)' }, { id: 'usage' as const, label: 'Usage' }]}
+              onChange={setChartMode} />
+            <select aria-label="Provider" value={chartProvider} onChange={e => { setChartProvider(e.target.value); setChartMetric('') }}
+              className={`${adminSelectClass} !w-auto`}>
               <option value="">All providers</option>
-              {[...new Set((usageTs?.availableMetrics ?? []).map(m => m.provider))]
-                .map(pv => <option key={pv} value={pv}>{pv}</option>)}
+              {providerOptions.map(pv => <option key={pv} value={pv}>{pv}</option>)}
             </select>
             {chartMode === 'usage' && chartProvider && (
-              <select value={chartMetric} onChange={e => setChartMetric(e.target.value)}
-                style={{ fontFamily: FONT, fontSize: 11, padding: '6px 10px', border: BORDER, background: '#fff' }}>
+              <select aria-label="Metric" value={chartMetric} onChange={e => setChartMetric(e.target.value)}
+                className={`${adminSelectClass} !w-auto`}>
                 <option value="">All metrics</option>
                 {(usageTs?.availableMetrics ?? [])
                   .filter(m => m.provider === chartProvider)
@@ -303,14 +255,13 @@ export function InfrastructureClient() {
           </div>
 
           {chartMode === 'usage' && !chartMetric && chartProvider === '' && (
-            <p style={{ fontFamily: FONT, fontSize: 11, color: '#92400E', background: '#FFFBEB',
-                        border: '1px solid #FDE68A', padding: '8px 12px', marginBottom: 10 }}>
+            <AdminNotice tone="warning" className="mb-3">
               Usage units differ between providers (CU-hours, GB, messages, emails).
               Select a provider and metric to view a single comparable unit.
-            </p>
+            </AdminNotice>
           )}
 
-          <div style={{ marginBottom: 26 }}>
+          <div className="mb-7">
             <LineChart
               labels={usageTs?.labels ?? []}
               formatCents={money}
@@ -336,199 +287,175 @@ export function InfrastructureClient() {
               }
             />
             {chartMode === 'usage' && usageTs?.includedAllowance != null && (
-              <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', marginTop: 6 }}>
+              <p className="mt-1.5 text-[11px] text-[#6B6B66]">
                 Included allowance for the latest reading:{' '}
-                <strong>{usageTs.includedAllowance.toLocaleString()}
+                <strong className="font-medium">{usageTs.includedAllowance.toLocaleString()}
                 {usageTs.metricUnit ? ` ${usageTs.metricUnit}` : ''}</strong>
               </p>
             )}
             {chartMode === 'spend' && (
-              <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', marginTop: 6 }}>
-                Billed spend only — real invoices from expense transactions.
-                Estimated and projected figures are forecasts and are excluded here.
+              <p className="mt-1.5 text-[11px] text-[#6B6B66]">
+                Billed spend only — real invoices from expense transactions. Forecasts are excluded.
               </p>
             )}
           </div>
 
           {/* Manual usage entry — the only ingestion path until Batch 4 */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
-            <button onClick={() => setShowUsageForm(v => !v)}
-              style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-                       textTransform: 'uppercase', padding: '9px 16px',
-                       background: '#1A1A1A', color: '#fff', border: 'none', cursor: 'pointer' }}>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <AdminButton variant={showUsageForm ? 'secondary' : 'primary'} onClick={() => setShowUsageForm(v => !v)}>
               {showUsageForm ? 'Cancel' : 'Record usage reading'}
-            </button>
-            <span style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B' }}>
+            </AdminButton>
+            <span className="text-[11px] text-[#6B6B66]">
               Manual readings are stored as forecasts and never count as billed cost.
             </span>
           </div>
 
           {showUsageForm && (
-            <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12 }}>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Provider *
-                  <input list="kvrn-providers" value={usageForm.provider}
+            <AdminCard className="mb-6">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <AdminField label="Provider *" htmlFor="iu-provider">
+                  <input id="iu-provider" list="kvrn-providers" value={usageForm.provider}
                     onChange={e => setUsageForm({ ...usageForm, provider: e.target.value })}
-                    placeholder="Neon" style={INPUT_STYLE} />
+                    placeholder="Neon" className={adminInputClass} />
                   <datalist id="kvrn-providers">
                     {PROVIDER_PORTALS.map(p2 => <option key={p2.provider} value={p2.provider} />)}
                   </datalist>
-                </label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Metric name *
-                  <input value={usageForm.metricName}
+                </AdminField>
+                <AdminField label="Metric name *" htmlFor="iu-metric">
+                  <input id="iu-metric" value={usageForm.metricName}
                     onChange={e => setUsageForm({ ...usageForm, metricName: e.target.value })}
-                    placeholder="compute" style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Unit *
-                  <input value={usageForm.metricUnit}
+                    placeholder="compute" className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Unit *" htmlFor="iu-unit">
+                  <input id="iu-unit" value={usageForm.metricUnit}
                     onChange={e => setUsageForm({ ...usageForm, metricUnit: e.target.value })}
-                    placeholder="CU-hours" style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Used
-                  <input type="number" step="any" value={usageForm.usageValue}
+                    placeholder="CU-hours" className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Used" htmlFor="iu-used">
+                  <input id="iu-used" type="number" step="any" value={usageForm.usageValue}
                     onChange={e => setUsageForm({ ...usageForm, usageValue: e.target.value })}
-                    style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Included allowance
-                  <input type="number" step="any" value={usageForm.includedAllowance}
+                    className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Included allowance" htmlFor="iu-allow">
+                  <input id="iu-allow" type="number" step="any" value={usageForm.includedAllowance}
                     onChange={e => setUsageForm({ ...usageForm, includedAllowance: e.target.value })}
-                    style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Estimated accrued $
-                  <input type="number" step="0.01" min="0" value={usageForm.estimatedAccruedCents}
+                    className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Estimated accrued $" htmlFor="iu-acc">
+                  <input id="iu-acc" type="number" step="0.01" min="0" value={usageForm.estimatedAccruedCents}
                     onChange={e => setUsageForm({ ...usageForm, estimatedAccruedCents: e.target.value })}
-                    style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Projected month-end $
-                  <input type="number" step="0.01" min="0" value={usageForm.projectedMonthEndCents}
+                    className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Projected month-end $" htmlFor="iu-proj">
+                  <input id="iu-proj" type="number" step="0.01" min="0" value={usageForm.projectedMonthEndCents}
                     onChange={e => setUsageForm({ ...usageForm, projectedMonthEndCents: e.target.value })}
-                    style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Status
-                  <select value={usageForm.thresholdStatus}
+                    className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Status" htmlFor="iu-status">
+                  <select id="iu-status" value={usageForm.thresholdStatus}
                     onChange={e => setUsageForm({ ...usageForm, thresholdStatus: e.target.value })}
-                    style={INPUT_STYLE}>
+                    className={adminSelectClass}>
                     <option value="">—</option>
                     <option value="ok">ok</option>
                     <option value="warning">warning</option>
                     <option value="critical">critical</option>
-                  </select></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Billing period start
-                  <input type="date" value={usageForm.billingPeriodStart}
+                  </select>
+                </AdminField>
+                <AdminField label="Billing period start" htmlFor="iu-ps">
+                  <input id="iu-ps" type="date" value={usageForm.billingPeriodStart}
                     onChange={e => setUsageForm({ ...usageForm, billingPeriodStart: e.target.value })}
-                    style={INPUT_STYLE} /></label>
-                <label style={{ fontFamily: FONT, fontSize: 11 }}>Billing period end
-                  <input type="date" value={usageForm.billingPeriodEnd}
+                    className={adminInputClass} />
+                </AdminField>
+                <AdminField label="Billing period end" htmlFor="iu-pe">
+                  <input id="iu-pe" type="date" value={usageForm.billingPeriodEnd}
                     onChange={e => setUsageForm({ ...usageForm, billingPeriodEnd: e.target.value })}
-                    style={INPUT_STYLE} /></label>
+                    className={adminInputClass} />
+                </AdminField>
               </div>
-              <button onClick={() => void saveUsage()} disabled={savingUsage}
-                style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-                         textTransform: 'uppercase', padding: '9px 16px', marginTop: 14,
-                         background: '#1A1A1A', color: '#fff', border: 'none',
-                         cursor: 'pointer', opacity: savingUsage ? 0.45 : 1 }}>
-                {savingUsage ? 'Saving…' : 'Save reading'}
-              </button>
-            </div>
+              <AdminButton variant="primary" className="mt-4" onClick={() => void saveUsage()} loading={savingUsage}>
+                Save reading
+              </AdminButton>
+            </AdminCard>
           )}
 
-          <SectionTitle note="Every obligation and every billable metric is represented. Select a provider to expand its detail.">
-            By provider
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
+          <AdminSectionHeader title="By provider"
+            description="Select a provider to expand its detail."
+            info="Every obligation and every billable metric is represented. Monthly equivalents are planning arithmetic for comparing obligations. The actual charge stays a single transaction on its real cadence — no monthly rows are fabricated." />
+          {data!.providers.length === 0 ? (
+            <AdminEmpty title="No providers configured." description="Add expense definitions or transactions to populate this view." />
+          ) : (
+            <AdminTable minWidth={900} caption="Infrastructure cost by provider">
               <thead>
-                <tr style={{ background: '#FAF9F7' }}>
-                  {['', 'Provider', 'Category', 'Obligations', 'Expected /mo',
-                    'Actual paid', 'Est. accrued', 'Projected', 'Metrics', 'Status'].map((h, i) => (
-                    <th key={i} style={th}>{h}</th>
+                <tr>
+                  <AdminTh><span className="sr-only">Expand</span></AdminTh>
+                  {['Provider', 'Category', 'Obligations', 'Expected /mo',
+                    'Actual paid', 'Est. accrued', 'Projected', 'Metrics', 'Status'].map(h => (
+                    <AdminTh key={h}>{h}</AdminTh>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {data!.providers.length === 0 && (
-                  <tr><td colSpan={10} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No providers configured. Add expense definitions or transactions to populate this view.
-                  </td></tr>
-                )}
                 {data!.providers.map(p => {
                   const isOpen = expanded.has(p.provider)
                   const hasDetail = p.definitions.length > 0 || p.usageMetrics.length > 0
                   return (
-                    <>
-                      <tr key={p.provider} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                        <td style={{ padding: '9px 10px', width: 28 }}>
+                    <Fragment key={p.provider}>
+                      <tr>
+                        <AdminTd className="w-8 !px-1.5">
                           {hasDetail && (
                             <button onClick={() => toggle(p.provider)}
-                              aria-label={isOpen ? 'Collapse' : 'Expand'}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer',
-                                       color: '#6B6B6B', fontSize: 11, padding: 0 }}>
+                              aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${p.provider}`}
+                              aria-expanded={isOpen}
+                              className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[#6B6B66] hover:bg-black/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40">
                               {isOpen ? '▾' : '▸'}
                             </button>
                           )}
-                        </td>
-                        <td style={{ padding: '9px 10px', fontWeight: 500 }}>{p.provider}</td>
-                        <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                          {p.category.replace(/_/g, ' ')}
-                        </td>
-                        <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                          {p.definitions.length}
-                        </td>
-                        <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+                        </AdminTd>
+                        <AdminTd className="font-medium">{p.provider}</AdminTd>
+                        <AdminTd className="text-[#6B6B66]">{p.category.replace(/_/g, ' ')}</AdminTd>
+                        <AdminTd className="text-[#6B6B66]">{p.definitions.length}</AdminTd>
+                        <AdminTd className="text-[#6B6B66]">
                           {p.expectedMonthlyEquivalentCents === null
                             ? '—' : `${money(p.expectedMonthlyEquivalentCents)}/mo`}
-                        </td>
+                        </AdminTd>
                         {/* CASH OUT */}
-                        <td style={{ padding: '9px 10px', fontWeight: 500,
-                                     color: p.actualPaidCents === null ? '#92400E' : '#1A1A1A' }}>
+                        <AdminTd className={p.actualPaidCents === null ? 'font-medium text-[#92400E]' : 'font-medium'}>
                           {moneyOrUnknown(p.actualPaidCents, 'Not paid')}
-                        </td>
+                        </AdminTd>
                         {/* FORECASTS */}
-                        <td style={{ padding: '9px 10px', color: '#92400E' }}>
-                          {moneyOrUnknown(p.estimatedAccruedCents, '—')}
-                        </td>
-                        <td style={{ padding: '9px 10px', color: '#92400E' }}>
-                          {moneyOrUnknown(p.projectedMonthEndCents, '—')}
-                        </td>
-                        <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                          {p.usageMetrics.length}
-                        </td>
-                        <td style={{ padding: '9px 10px' }}>
-                          <ThresholdPill status={p.thresholdStatus} />
-                        </td>
+                        <AdminTd className="text-[#92400E]">{moneyOrUnknown(p.estimatedAccruedCents, '—')}</AdminTd>
+                        <AdminTd className="text-[#92400E]">{moneyOrUnknown(p.projectedMonthEndCents, '—')}</AdminTd>
+                        <AdminTd className="text-[#6B6B66]">{p.usageMetrics.length}</AdminTd>
+                        <AdminTd><ThresholdPill status={p.thresholdStatus} /></AdminTd>
                       </tr>
 
                       {isOpen && p.definitions.map(d => (
-                        <tr key={`${p.provider}-def-${d.id}`}
-                            style={{ borderBottom: '1px solid #F7F5F1', background: '#FCFBF9' }}>
-                          <td />
-                          <td style={{ padding: '7px 10px 7px 24px', color: '#6B6B6B' }}>
-                            obligation · {d.name}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#9B9B9B' }}>
-                            {d.category.replace(/_/g, ' ')}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#9B9B9B' }}>
-                            {d.cadence.replace(/_/g, ' ')}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#6B6B6B' }}>
+                        <tr key={`${p.provider}-def-${d.id}`} className="bg-[#FCFBF9]">
+                          <AdminTd />
+                          <AdminTd className="pl-6 text-[#6B6B66]">obligation · {d.name}</AdminTd>
+                          <AdminTd className="text-[#8A8A85]">{d.category.replace(/_/g, ' ')}</AdminTd>
+                          <AdminTd className="text-[#8A8A85]">{d.cadence.replace(/_/g, ' ')}</AdminTd>
+                          <AdminTd className="text-[#6B6B66]">
                             {d.monthlyEquivalentCents === null
                               ? (d.expectedAmountCents === null ? 'usage-based' : '—')
                               : `${money(d.monthlyEquivalentCents)}/mo`}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#9B9B9B' }}>
+                          </AdminTd>
+                          <AdminTd className="text-[#8A8A85]">
                             {d.expectedAmountCents === null
                               ? '—' : `${money(d.expectedAmountCents)} expected`}
-                          </td>
-                          <td colSpan={3} style={{ padding: '7px 10px', color: '#9B9B9B' }}>
+                          </AdminTd>
+                          <AdminTd colSpan={3} className="text-[#8A8A85]">
                             {d.renewalDate ? `renews ${d.renewalDate}` : ''}
-                          </td>
-                          <td />
+                          </AdminTd>
+                          <AdminTd />
                         </tr>
                       ))}
 
                       {isOpen && p.usageMetrics.map(m => (
-                        <tr key={`${p.provider}-metric-${m.metricName}`}
-                            style={{ borderBottom: '1px solid #F7F5F1', background: '#FCFBF9' }}>
-                          <td />
-                          <td style={{ padding: '7px 10px 7px 24px', color: '#6B6B6B' }}>
-                            metric · {m.metricName}
-                          </td>
-                          <td colSpan={3} style={{ padding: '7px 10px', color: '#9B9B9B' }}>
+                        <tr key={`${p.provider}-metric-${m.metricName}`} className="bg-[#FCFBF9]">
+                          <AdminTd />
+                          <AdminTd className="pl-6 text-[#6B6B66]">metric · {m.metricName}</AdminTd>
+                          <AdminTd colSpan={3} className="text-[#8A8A85]">
                             {m.usageValue === null ? '—' : (
                               <>
                                 {m.usageValue}
@@ -536,59 +463,39 @@ export function InfrastructureClient() {
                                 {` ${m.metricUnit}`}
                               </>
                             )}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#9B9B9B' }}>—</td>
-                          <td style={{ padding: '7px 10px', color: '#92400E' }}>
-                            {moneyOrUnknown(m.estimatedAccruedCents, '—')}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#92400E' }}>
-                            {moneyOrUnknown(m.projectedMonthEndCents, '—')}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: '#9B9B9B' }}>
-                            {m.source ?? '—'}
-                          </td>
-                          <td style={{ padding: '7px 10px' }}>
-                            <ThresholdPill status={m.thresholdStatus} />
-                          </td>
+                          </AdminTd>
+                          <AdminTd className="text-[#8A8A85]">—</AdminTd>
+                          <AdminTd className="text-[#92400E]">{moneyOrUnknown(m.estimatedAccruedCents, '—')}</AdminTd>
+                          <AdminTd className="text-[#92400E]">{moneyOrUnknown(m.projectedMonthEndCents, '—')}</AdminTd>
+                          <AdminTd className="text-[#8A8A85]">{m.source ?? '—'}</AdminTd>
+                          <AdminTd><ThresholdPill status={m.thresholdStatus} /></AdminTd>
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>
-            </table>
-          </div>
-
-          <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '12px 0 0' }}>
-            Monthly equivalents are planning arithmetic for comparing obligations. The actual
-            charge stays a single transaction on its real cadence — no monthly rows are fabricated.
-          </p>
+            </AdminTable>
+          )}
 
           {/* Provider portals — navigation shortcuts, no credentials involved */}
-          <div style={{ marginTop: 30 }}>
-            <SectionTitle note="Open the provider's own dashboard to verify a figure or retrieve an invoice. These are links only — no credentials are stored or transmitted by KVRN.">
-              Provider portals
-            </SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 10 }}>
+          <div className="mt-8">
+            <AdminSectionHeader title="Provider portals"
+              description="Open a provider's dashboard to verify a figure or get an invoice."
+              info="These are links only. KVRN does not store or send credentials." />
+            <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(min(210px,100%),1fr))' }}>
               {PROVIDER_PORTALS.map(p2 => (
                 <a key={p2.provider} href={p2.url}
                    target="_blank" rel="noopener noreferrer"
-                   style={{ border: BORDER, background: '#fff', padding: '12px 14px',
-                            textDecoration: 'none', display: 'block' }}>
-                  <span style={{ fontFamily: FONT, fontSize: 12, fontWeight: 500,
-                                 color: '#1A1A1A', display: 'block' }}>
-                    {p2.label} ↗
-                  </span>
-                  <span style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B',
-                                 display: 'block', marginTop: 3 }}>
-                    {p2.purpose}
-                  </span>
+                   className="block rounded-[12px] border border-black/[0.08] bg-white px-3.5 py-3 transition-colors hover:border-black/[0.18] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40">
+                  <span className="block text-[12px] font-medium text-[#171717]">{p2.label} ↗</span>
+                  <span className="mt-0.5 block text-[11px] text-[#6B6B66]">{p2.purpose}</span>
                 </a>
               ))}
             </div>
           </div>
         </>
       )}
-    </div>
+    </AdminPage>
   )
 }

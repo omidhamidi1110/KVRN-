@@ -6,10 +6,12 @@
 //
 // Idempotent (a redelivered email returns { duplicate: true } and changes nothing), POST only,
 // and it never logs an address, subject or body. Responses are generic.
-// A NEW (non-duplicate) message also triggers the fail-open owner push "KVRN SUPPORT" (lib/owner-notifications).
+// A NEW (non-duplicate) message is queued for Support Shadow triage and enters the owner-notification path.
+// With AI_CHIEF_NOTIFICATION_GATE=true that path is gated/deduplicated by the Chief Operator.
 import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { notifySupportEmail } from '@/lib/owner-notifications'
+import { enqueueAiEvent } from '@/lib/ai/repository'
 import {
   SupportError, SUPPORT_LIMITS, buildInboundEmailInput, constantTimeEqual, createSupportService,
 } from '@/lib/support-inbox'
@@ -19,7 +21,7 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
 
 export async function POST(req: NextRequest) {
   const secret = process.env.SUPPORT_EMAIL_INGEST_SECRET ?? ''
-  if (!secret) {
+  if (!secret || (process.env.NODE_ENV === 'production' && secret.trim().length < 32)) {
     return NextResponse.json({ error: 'Not configured.' }, { status: 503, headers: NO_STORE })
   }
   const auth = req.headers.get('authorization') ?? ''
@@ -47,6 +49,17 @@ export async function POST(req: NextRequest) {
     // duplicate=true and never notifies. The push can never change the outcome: the message is already
     // stored, notifySupportEmail is fail-open (never throws, 2s bound), and the .catch is belt and braces.
     if (!r.duplicate) {
+      // Queue only identifiers/low-risk metadata. The AI event processor reads canonical support data server-side,
+      // sanitizes it, and starts in Shadow Mode; a queue failure can never fail inbound email storage.
+      await enqueueAiEvent({
+        eventType: 'support.inbound',
+        source: 'support_email',
+        sourceAgentId: 'support',
+        severity: 'info',
+        subject: 'New inbound support message',
+        payload: { threadId: r.threadId, messageId: r.messageId, threadCreated: r.threadCreated },
+        idempotencyKey: `support.inbound:${r.messageId}`,
+      }).catch(() => {})
       await notifySupportEmail({ fromName: input.fromName, subject: input.subject }).catch(() => {})
     }
     return NextResponse.json(

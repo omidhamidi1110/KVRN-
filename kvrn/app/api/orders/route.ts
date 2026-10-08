@@ -5,6 +5,7 @@ import {
   createAdminOrderService,
   VALID_PAYMENT_STATUSES,
   VALID_FULFILLMENT_STATUSES,
+  UUID_RE,
 } from '@/lib/admin-orders'
 
 export const dynamic = 'force-dynamic'
@@ -46,13 +47,22 @@ export async function GET(req: NextRequest) {
 
   const search = p.get('search')?.trim().slice(0, 200) || undefined
 
+  // Optional internal-tag filter (tag id). Absent = the original queries, unchanged.
+  const tagRaw = p.get('tag')
+  const tagId  = tagRaw ? tagRaw : undefined
+  if (tagId && !UUID_RE.test(tagId)) {
+    return NextResponse.json({ error: 'Invalid tag.' }, { status: 400 })
+  }
+
   try {
     const svc    = createAdminOrderService(sql)
-    const params = { paymentStatus, fulfillmentStatus, search, limit: clampedLimit, offset }
-    const [data, total] = await Promise.all([
+    const params = { paymentStatus, fulfillmentStatus, search, tagId, limit: clampedLimit, offset }
+    const [rows, total] = await Promise.all([
       svc.listOrders(params),
-      svc.countOrders({ paymentStatus, fulfillmentStatus, search }),
+      svc.countOrders({ paymentStatus, fulfillmentStatus, search, tagId }),
     ])
+    // Internal tags + fraud-hold summary (admin-only; best-effort, never breaks the list).
+    const data = await svc.decorateRows(rows)
 
     return NextResponse.json({
       success: true,

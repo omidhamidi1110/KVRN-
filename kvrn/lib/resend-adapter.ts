@@ -8,7 +8,10 @@ export interface EmailMessage {
   subject:      string
   html:         string
   idempotencyKey?: string
-  // Deliberately no List-Unsubscribe — transactional confirmation only
+  // Transactional confirmations deliberately send NO List-Unsubscribe.
+  // Optional extra headers (e.g. List-Unsubscribe for the abandoned-checkout reminder).
+  // Omitted/empty => the request body is byte-for-byte what it was before.
+  headers?: Record<string, string>
 }
 
 export interface SendResult {
@@ -38,6 +41,7 @@ export function createResendAdapter(apiKey: string): EmailProvider {
         to:       [msg.to],
         subject:  msg.subject,
         html:     msg.html,
+        ...(msg.headers && Object.keys(msg.headers).length > 0 ? { headers: msg.headers } : {}),
       }
 
       const headers: Record<string, string> = {

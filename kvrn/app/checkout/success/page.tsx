@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCart } from '@/context/CartContext'
+import { useI18n } from '@/context/I18nContext'
+import { fillMessages, format } from '@/lib/i18n/messages'
 
 type Status = {
   reservationStatus?: string
@@ -13,6 +15,7 @@ function Content() {
   const params    = useSearchParams()
   const sessionId = params.get('session_id')
   const { clearCart } = useCart()
+  const t = fillMessages(useI18n().t)
 
   const [data,    setData]    = useState<Status | null>(null)
   const [polling, setPolling] = useState(Boolean(sessionId))
@@ -74,10 +77,10 @@ function Content() {
     return (
       <div style={{ textAlign: 'center' }}>
         <h1 style={{ fontSize: 26, marginBottom: 16, fontWeight: 400, color: '#1A1A1A' }}>
-          Session not found.
+          {t['checkout.success.notFoundTitle']}
         </h1>
         <p style={{ color: '#6b7280', lineHeight: 1.7, fontSize: 15, maxWidth: 420, margin: '0 auto' }}>
-          If you completed a checkout, your session reference may have expired. Contact support with your order details.
+          {t['checkout.success.notFoundBody']}
         </p>
       </div>
     )
@@ -93,18 +96,18 @@ function Content() {
     ? sessionId.replace('cs_test_', '').slice(0, 12) + '...'
     : null
 
-  const headline = isPaid   ? 'Payment confirmed.'
-                 : isFailed ? 'Payment not confirmed.'
-                 : isTimeout ? "We're still confirming your payment."
-                 :             'Processing payment.'
+  const headline = isPaid   ? t['checkout.success.confirmed']
+                 : isFailed ? t['checkout.success.notConfirmed']
+                 : isTimeout ? t['checkout.success.stillConfirming']
+                 :             t['checkout.success.processing']
 
   const message  = isPaid
-    ? 'Your order has been received.'
+    ? t['checkout.success.received']
     : isFailed
-    ? 'Payment was not confirmed. Check your payment method or contact support if you see a charge.'
+    ? t['checkout.success.failedBody']
     : isTimeout
-    ? 'We could not confirm your payment in the expected time. Please check back or contact support.'
-    : 'Payment verification is in progress. This page updates automatically.'
+    ? t['checkout.success.timeoutBody']
+    : t['checkout.success.inProgress']
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -113,30 +116,31 @@ function Content() {
       </h1>
       {data?.orderNumber && (
         <p style={{ fontSize: 13, color: '#9B9B9B', marginBottom: 12 }}>
-          {'Order ' + data.orderNumber}
+          {format(t['checkout.success.orderN'], { number: data.orderNumber })}
         </p>
       )}
       {!isPaid && sessionRef && (
         <p style={{ fontSize: 11, color: '#C8C4BF', marginBottom: 12, fontFamily: 'monospace' }}>
-          {'Ref: ' + sessionRef}
+          {format(t['checkout.success.ref'], { ref: sessionRef })}
         </p>
       )}
       <p style={{ color: '#6b7280', lineHeight: 1.7, fontSize: 15, maxWidth: 440, margin: '0 auto' }}>
         {message}
       </p>
       {polling && !isPaid && !isFailed && (
-        <p style={{ marginTop: 16, fontSize: 12, color: '#C8C4BF' }}>Checking status...</p>
+        <p style={{ marginTop: 16, fontSize: 12, color: '#C8C4BF' }}>{t['checkout.success.checking']}</p>
       )}
     </div>
   )
 }
 
 export default function CheckoutSuccessPage() {
+  const t = fillMessages(useI18n().t)
   return (
     <div data-nav-theme="light"
       style={{ minHeight: '100vh', background: '#F9F8F6', paddingTop: 'calc(36px + 56px + 48px)' }}>
       <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 24px' }}>
-        <Suspense fallback={<p style={{ textAlign: 'center', color: '#9B9B9B' }}>Loading...</p>}>
+        <Suspense fallback={<p style={{ textAlign: 'center', color: '#9B9B9B' }}>{t['common.loading']}</p>}>
           <Content />
         </Suspense>
       </div>

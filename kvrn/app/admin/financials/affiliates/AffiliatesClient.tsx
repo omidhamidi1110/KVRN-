@@ -1,7 +1,7 @@
 'use client'
 // app/admin/financials/affiliates/AffiliatesClient.tsx
 //
-// Four things kept deliberately distinct:
+// Tabbed Admin for the affiliate program. Four money concepts stay deliberately distinct:
 //
 //   CUSTOMER DISCOUNT     what the customer saved, from the existing discount engine
 //   AFFILIATE COMMISSION  what KVRN owes the affiliate — a separate cost
@@ -12,9 +12,20 @@
 // payable and payout figures all come from SQL.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, SectionTitle } from '@/components/admin/FinancialUI'
+import { money } from '@/components/admin/FinancialUI'
+import {
+  AdminButton, AdminCard, AdminField, AdminLoading, AdminNotice, AdminPageHeader,
+  AdminSectionHeader, AdminTable, AdminTabs, AdminTd, AdminTh, StatusBadge, adminInputClass, useConfirm,
+} from '@/components/admin/ui/AdminUI'
 import { collectionAttemptFingerprint, readOrCreateAttemptKey, clearAttemptKey }
   from '@/lib/recovery-attempt-key'
+import { affiliateTabs, isAffiliateTab, type AffiliateTabId } from '@/lib/affiliate-program-ui'
+import { AffiliateApplicationsTab } from './AffiliateApplicationsTab'
+import { AffiliateProfilesTab } from './AffiliateProfilesTab'
+import { AffiliateTermsTab } from './AffiliateTermsTab'
+import { AffiliateAuditTab } from './AffiliateAuditTab'
+import { AffiliateComplianceTab } from './AffiliateComplianceTab'
+import { AffiliatePayoutReadinessTab } from './AffiliatePayoutReadinessTab'
 
 type Affiliate = {
   id: string; code: string; name: string; status: string
@@ -61,11 +72,18 @@ type Period = {
   cashPaidCents: number; payoutCount: number
 }
 
-const inputStyle = { fontFamily: FONT, fontSize: 12, padding: '7px 9px',
-                     border: BORDER, background: '#fff', boxSizing: 'border-box' as const }
+const mono = 'font-mono'
+const muted = 'text-[#6B6B66]'
+
+function financialStatus(s: string) {
+  return s === 'active' ? { status: 'Active' as const, label: 'Active' }
+    : s === 'paused' ? { status: 'Held' as const, label: 'Paused' }
+    : s === 'terminated' ? { status: 'Terminated' as const, label: 'Terminated' }
+    : { status: 'Unknown' as const, label: s }
+}
 
 export function AffiliatesClient() {
-  const [tab, setTab] = useState<'overview' | 'commissions' | 'reconcile' | 'payouts'>('overview')
+  const [tab, setTabState] = useState<AffiliateTabId>('overview')
   const [affiliates, setAffiliates] = useState<Affiliate[]>([])
   const [commissions, setCommissions] = useState<Commission[]>([])
   const [incomplete, setIncomplete] = useState<Incomplete[]>([])
@@ -80,9 +98,28 @@ export function AffiliatesClient() {
   const [recoveries, setRecoveries] = useState<any[]>([])
   const [collect, setCollect] = useState<Record<string,
     { amount: string; date: string; method: string; reference: string }>>({})
+  const [voiding, setVoiding] = useState<{ id: string; reason: string } | null>(null)
+  const [counts, setCounts] = useState<{ openApplications: number; reacceptance: number }>({ openApplications: 0, reacceptance: 0 })
+  const { confirm, node: confirmNode } = useConfirm()
   // Idempotency key for an in-flight recovery-collection attempt, per
   // commission. Backed by sessionStorage (readOrCreateAttemptKey above) so it
   // survives an ordinary page reload, not just component state.
+
+  const setTab = (t: AffiliateTabId) => {
+    setTabState(t)
+    try { window.history.replaceState(null, '', `#${t}`) } catch { /* ignore */ }
+  }
+  useEffect(() => {
+    const h = typeof window !== 'undefined' ? window.location.hash.slice(1) : ''
+    if (isAffiliateTab(h)) setTabState(h)
+  }, [])
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/affiliates/applications?countsOnly=1', { cache: 'no-store' })
+      if (r.ok) setCounts((await r.json()).counts)
+    } catch { /* counts are a convenience */ }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -95,12 +132,13 @@ export function AffiliatesClient() {
       if (j.affiliates) {
         setAffiliates(j.affiliates); setCommissions(j.commissions ?? [])
         setIncomplete(j.incomplete ?? []); setPayouts(j.payouts ?? []); setPeriod(j.period)
+        setErr(null)
       } else setErr(j.error ?? 'Could not load affiliates.')
     } catch { setErr('Network error.') }
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); void loadCounts() }, [load, loadCounts])
 
   useEffect(() => {
     if (!selectedAff) { setPayable([]); return }
@@ -116,7 +154,7 @@ export function AffiliatesClient() {
 
   /** Record that a draft payout's money actually moved. */
   async function markPaid(payoutId: string) {
-    if (!confirm('Mark this payout as PAID? This records that money actually moved.')) return
+    if (!(await confirm('Mark this payout as PAID? This records that money actually moved. It cannot be undone.'))) return
     setSaving(true); setErr(null)
     try {
       const res = await fetch('/api/admin/affiliates/payouts', {
@@ -132,9 +170,7 @@ export function AffiliatesClient() {
   }
 
   /** Cancel a draft, releasing the payable it was reserving. */
-  async function voidPayout(payoutId: string) {
-    const reason = prompt('Reason for voiding this draft payout?')
-    if (reason === null) return
+  async function voidPayout(payoutId: string, reason: string) {
     setSaving(true); setErr(null)
     try {
       const res = await fetch('/api/admin/affiliates/payouts', {
@@ -143,6 +179,7 @@ export function AffiliatesClient() {
       })
       const j = await res.json()
       if (!res.ok) { setErr(j.error ?? 'Could not void payout.'); return }
+      setVoiding(null)
       await load()
     } catch { setErr('Network error.') }
     finally { setSaving(false) }
@@ -221,411 +258,328 @@ export function AffiliatesClient() {
     finally { setSaving(false) }
   }
 
-  const th = { textAlign: 'left' as const, padding: '9px 10px', fontSize: 9,
-               letterSpacing: '0.1em', textTransform: 'uppercase' as const,
-               color: '#9B9B9B', borderBottom: BORDER, whiteSpace: 'nowrap' as const }
-  const btn = { fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-                textTransform: 'uppercase' as const, padding: '9px 16px',
-                background: '#1A1A1A', color: '#fff', border: 'none', cursor: 'pointer' as const }
+  const moneyInput = 'h-8 w-24 rounded-[8px] border border-black/[0.14] bg-white px-2 text-[12px]'
+  const tabs = affiliateTabs({ openApplications: counts.openApplications, unresolved: incomplete.length, reacceptance: counts.reacceptance })
+  const financial = tab === 'overview' || tab === 'commissions' || tab === 'payouts' || tab === 'unresolved'
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1240 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Affiliates
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Commission is calculated on net merchandise after customer discounts, excluding
-        shipping and sales tax. A customer discount and an affiliate commission are separate
-        costs and both may apply to one order.
-      </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-6 sm:px-8">
+      <AdminPageHeader
+        title="Affiliates"
+        description="Applications, affiliates, commissions and payouts"
+        info={<>Commission is calculated on net merchandise after customer discounts, excluding shipping and sales tax. A customer discount and an affiliate commission are separate costs and both may apply to one order.</>}
+      />
+      <AdminTabs tabs={tabs} value={tab} onChange={setTab} ariaLabel="Affiliate sections" />
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {([['overview','Overview'],['commissions','Commissions'],
-           ['reconcile',`Unresolved${incomplete.length ? ` (${incomplete.length})` : ''}`],
-           ['payouts','Payouts']] as const).map(([k,l]) => (
-          <button key={k} onClick={() => setTab(k)}
-            style={{ fontFamily: FONT, fontSize: 11, padding: '7px 14px', cursor: 'pointer',
-                     border: tab === k ? '1px solid #1A1A1A' : BORDER,
-                     background: tab === k ? '#1A1A1A' : '#fff',
-                     color: tab === k ? '#fff' : '#1A1A1A' }}>{l}</button>
-        ))}
-      </div>
+      {err && financial && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
+      {loading && financial && <AdminLoading />}
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
-      {loading && <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B' }}>Loading…</p>}
+      {tab === 'applications' && <AffiliateApplicationsTab onChanged={() => { void loadCounts(); void load() }} />}
+      {tab === 'affiliates' && <AffiliateProfilesTab onChanged={() => { void load() }} />}
+      {tab === 'compliance' && <AffiliateComplianceTab />}
+      {tab === 'readiness' && <AffiliatePayoutReadinessTab />}
+      {tab === 'terms' && <AffiliateTermsTab onChanged={() => { void loadCounts() }} />}
+      {tab === 'audit' && <AffiliateAuditTab />}
 
       {tab === 'overview' && period && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))',
-                        gap: 10, marginBottom: 22 }}>
+          <div className="mb-5 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
             {[['Net commission (30d)', money(period.netCommissionCents), 'Accrual, from the ledger'],
               ['Accrued', money(period.accruedCents), 'New commissions earned'],
               ['Reversed', money(period.reversedCents), 'Refunds and lost disputes'],
-              ['Cash paid', money(period.cashPaidCents), `${period.payoutCount} payout(s) — separate from accrual`]
+              ['Cash paid', money(period.cashPaidCents), `${period.payoutCount} payout(s), separate from accrual`]
             ].map(([label, value, note]) => (
-              <div key={label} style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-                <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                            textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>{label}</p>
-                <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '6px 0 0' }}>{value}</p>
-                <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>{note}</p>
-              </div>
+              <AdminCard key={label}>
+                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8A85]">{label}</p>
+                <p className="mt-1.5 text-[22px] font-medium">{value}</p>
+                <p className={`mt-1 text-[11px] ${muted}`}>{note}</p>
+              </AdminCard>
             ))}
           </div>
 
           {period.incompleteCount > 0 && (
-            <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                          border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 18 }}>
+            <AdminNotice tone="warning" className="mb-4">
               <strong>{period.incompleteCount} commission(s) cannot be quantified yet.</strong> A
               refund breakdown or a partial dispute is unresolved. These are excluded from payout
               and are <strong>not</strong> treated as zero — resolve them under Unresolved.
-            </div>
+            </AdminNotice>
           )}
 
-          <SectionTitle note="Accrual is period economics from the append-only ledger; cash is what has actually been paid. They are never mixed.">
-            Affiliates
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Code','Name','Status','Terms','Window','Hold','Discount','Orders','Net commission','Paid'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {affiliates.length === 0 && !loading && (
-                  <tr><td colSpan={10} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No affiliates yet.
-                  </td></tr>
-                )}
-                {affiliates.map(a => (
-                  <tr key={a.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{a.code}</td>
-                    <td style={{ padding: '9px 10px' }}>{a.name}</td>
-                    <td style={{ padding: '9px 10px', color: a.status === 'active' ? '#047857' : '#92400E' }}>
-                      {a.status}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+          <AdminSectionHeader title="Affiliates" info="Accrual is period economics from the append-only ledger; cash is what has actually been paid. They are never mixed." />
+          <AdminTable caption="Affiliates and their commission terms">
+            <thead><tr>
+              {['Code', 'Name', 'Status', 'Terms', 'Window', 'Hold', 'Discount', 'Orders', 'Net commission', 'Paid'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+            </tr></thead>
+            <tbody>
+              {affiliates.length === 0 && !loading && (
+                <tr><AdminTd className={muted}>No affiliates yet.</AdminTd>{Array.from({ length: 9 }).map((_, i) => <AdminTd key={i} />)}</tr>
+              )}
+              {affiliates.map(a => {
+                const fs = financialStatus(a.status)
+                return (
+                  <tr key={a.id}>
+                    <AdminTd className={mono}>{a.code}</AdminTd>
+                    <AdminTd>{a.name}</AdminTd>
+                    <AdminTd><StatusBadge status={fs.status} label={fs.label} /></AdminTd>
+                    <AdminTd className={muted}>
                       {a.commissionType === 'percentage'
                         ? `${((a.commissionRateBps ?? 0) / 100).toFixed(2)}%`
                         : money(a.commissionFixedCents ?? 0)}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{a.attributionWindowDays}d</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{a.commissionHoldDays}d</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{a.discountCode ?? '—'}</td>
-                    <td style={{ padding: '9px 10px' }}>{a.orderCount}</td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(a.netCommissionCents)}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{money(a.paidCents)}</td>
+                    </AdminTd>
+                    <AdminTd className={muted}>{a.attributionWindowDays}d</AdminTd>
+                    <AdminTd className={muted}>{a.commissionHoldDays}d</AdminTd>
+                    <AdminTd className={muted}>{a.discountCode ?? '—'}</AdminTd>
+                    <AdminTd>{a.orderCount}</AdminTd>
+                    <AdminTd className="font-medium">{money(a.netCommissionCents)}</AdminTd>
+                    <AdminTd className={muted}>{money(a.paidCents)}</AdminTd>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                )
+              })}
+            </tbody>
+          </AdminTable>
         </>
       )}
 
       {tab === 'commissions' && (
         <>
-          <SectionTitle note="Net ledger is the authoritative figure: accrual plus every reversal and restoration. The status column only summarises it.">
-            Commissions
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Order','Affiliate','Via','Base','Commission','Net ledger','Payable','Overpaid','Status','Hold'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {commissions.length === 0 && !loading && (
-                  <tr><td colSpan={10} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No commissions recorded.
-                  </td></tr>
-                )}
-                {commissions.map(c => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{c.orderNumber}</td>
-                    <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{c.affiliateCode}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{c.attributionMethod}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{money(c.baseCents)}</td>
-                    <td style={{ padding: '9px 10px' }}>{money(c.commissionCents)}</td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(c.netLedgerCents)}</td>
-                    <td style={{ padding: '9px 10px' }}>{money(c.payableCents)}</td>
-                    <td style={{ padding: '9px 10px', color: c.overpaidCents > 0 ? '#B91C1C' : '#6B6B6B' }}>
-                      {c.overpaidCents > 0 ? money(c.overpaidCents) : '—'}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {c.status}
-                      {c.incomplete && (
-                        <span style={{ display: 'block', fontSize: 10, color: '#92400E' }}>
-                          incomplete
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{c.holdDaysSnapshot}d</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminSectionHeader title="Commissions" info="Net ledger is the figure to rely on: accrual plus every reversal and restoration. The status column only summarises it." />
+          <AdminTable caption="Commissions">
+            <thead><tr>
+              {['Order', 'Affiliate', 'Via', 'Base', 'Commission', 'Net ledger', 'Payable', 'Overpaid', 'Status', 'Hold'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+            </tr></thead>
+            <tbody>
+              {commissions.length === 0 && !loading && (
+                <tr><AdminTd className={muted}>No commissions recorded.</AdminTd>{Array.from({ length: 9 }).map((_, i) => <AdminTd key={i} />)}</tr>
+              )}
+              {commissions.map(c => (
+                <tr key={c.id}>
+                  <AdminTd>{c.orderNumber}</AdminTd>
+                  <AdminTd className={mono}>{c.affiliateCode}</AdminTd>
+                  <AdminTd className={muted}>{c.attributionMethod}</AdminTd>
+                  <AdminTd className={muted}>{money(c.baseCents)}</AdminTd>
+                  <AdminTd>{money(c.commissionCents)}</AdminTd>
+                  <AdminTd className="font-medium">{money(c.netLedgerCents)}</AdminTd>
+                  <AdminTd>{money(c.payableCents)}</AdminTd>
+                  <AdminTd className={c.overpaidCents > 0 ? 'text-[#B91C1C]' : muted}>
+                    {c.overpaidCents > 0 ? money(c.overpaidCents) : '—'}
+                  </AdminTd>
+                  <AdminTd className={muted}>
+                    {c.status}
+                    {c.incomplete && <span className="block"><StatusBadge status="Incomplete" /></span>}
+                  </AdminTd>
+                  <AdminTd className={muted}>{c.holdDaysSnapshot}d</AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </AdminTable>
         </>
       )}
 
-      {tab === 'reconcile' && (
+      {tab === 'unresolved' && (
         <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                        border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 18 }}>
+          <AdminNotice tone="warning" className="mb-4">
             Stripe reports a dispute as a single gross amount covering merchandise, shipping and
             tax. Affiliate commission is merchandise-only, so a <strong>partial</strong> dispute has
-            no deterministic merchandise share. Nothing is inferred — supply the verified split and
+            no known merchandise share. Nothing is inferred — supply the verified split and
             the commission adjustment fires exactly once.
-          </div>
+          </AdminNotice>
 
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Order','Affiliate','Blocked by','Amount','Merchandise $','Shipping $','Tax $','Total',''].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {incomplete.length === 0 && !loading && (
-                  <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    Nothing awaiting reconciliation.
-                  </td></tr>
-                )}
-                {incomplete.map(r => {
-                  const d = split[r.rowKey] ?? { m: '', s: '', t: '' }
-                  const sum = (toCents(d.m) ?? 0) + (toCents(d.s) ?? 0) + (toCents(d.t) ?? 0)
-                  const complete = d.m.trim() && d.s.trim() && d.t.trim()
-                  const balanced = complete && sum === (r.disputedAmountCents ?? -1)
-                  const isDispute = r.sourceKind === 'dispute'
-                  return (
-                    <tr key={r.rowKey} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                      <td style={{ padding: '9px 10px' }}>{r.orderNumber}</td>
-                      <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{r.affiliateCode}</td>
-                      <td style={{ padding: '9px 10px' }}>
-                        <span style={{ fontSize: 9, letterSpacing: '0.08em',
-                                       textTransform: 'uppercase', padding: '3px 8px',
-                                       border: BORDER,
-                                       background: isDispute ? '#FEF2F2' : '#FFFBEB',
-                                       color: isDispute ? '#B91C1C' : '#92400E' }}>
-                          {r.sourceKind}
-                        </span>
-                        <span style={{ display: 'block', fontSize: 10, color: '#6B6B6B',
-                                       marginTop: 3 }}>
-                          {r.reason?.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        {isDispute
-                          ? (r.disputedAmountCents === null ? '—' : money(r.disputedAmountCents))
-                          : (r.refundAmountCents === null ? '—' : money(r.refundAmountCents))}
-                      </td>
-                      {isDispute ? (['m','s','t'] as const).map(k => (
-                        <td key={k} style={{ padding: '9px 10px' }}>
-                          <input type="number" step="0.01" min="0" value={d[k]}
-                            onChange={e => setSplit(x => ({ ...x, [r.rowKey]: { ...d, [k]: e.target.value } }))}
-                            placeholder="0.00" style={{ ...inputStyle, width: 90 }} />
-                        </td>
-                      )) : (
-                        <td colSpan={3} style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                          This is a refund, not a dispute. Resolve its component breakdown
-                          under <strong>Returns</strong>; it is not decomposed here.
-                        </td>
+          <AdminTable caption="Unresolved commission sources">
+            <thead><tr>
+              {['Order', 'Affiliate', 'Blocked by', 'Amount', 'Merchandise $', 'Shipping $', 'Tax $', 'Total', ''].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+            </tr></thead>
+            <tbody>
+              {incomplete.length === 0 && !loading && (
+                <tr><AdminTd className={muted}>Nothing awaiting reconciliation.</AdminTd>{Array.from({ length: 8 }).map((_, i) => <AdminTd key={i} />)}</tr>
+              )}
+              {incomplete.map(r => {
+                const d = split[r.rowKey] ?? { m: '', s: '', t: '' }
+                const sum = (toCents(d.m) ?? 0) + (toCents(d.s) ?? 0) + (toCents(d.t) ?? 0)
+                const complete = d.m.trim() && d.s.trim() && d.t.trim()
+                const balanced = complete && sum === (r.disputedAmountCents ?? -1)
+                const isDispute = r.sourceKind === 'dispute'
+                return (
+                  <tr key={r.rowKey}>
+                    <AdminTd>{r.orderNumber}</AdminTd>
+                    <AdminTd className={mono}>{r.affiliateCode}</AdminTd>
+                    <AdminTd>
+                      <StatusBadge status={isDispute ? 'Unresolved' : 'Incomplete'} label={r.sourceKind} />
+                      <span className={`mt-1 block text-[11px] ${muted}`}>{r.reason?.replace(/_/g, ' ')}</span>
+                    </AdminTd>
+                    <AdminTd>
+                      {isDispute
+                        ? (r.disputedAmountCents === null ? '—' : money(r.disputedAmountCents))
+                        : (r.refundAmountCents === null ? '—' : money(r.refundAmountCents))}
+                    </AdminTd>
+                    {isDispute ? (['m', 's', 't'] as const).map(k => (
+                      <AdminTd key={k}>
+                        <input type="number" step="0.01" min="0" value={d[k]}
+                          aria-label={k === 'm' ? 'Merchandise amount' : k === 's' ? 'Shipping amount' : 'Tax amount'}
+                          onChange={e => setSplit(x => ({ ...x, [r.rowKey]: { ...d, [k]: e.target.value } }))}
+                          placeholder="0.00" className={moneyInput} />
+                      </AdminTd>
+                    )) : (
+                      <AdminTd className={muted}>
+                        <span className="block min-w-[240px]">This is a refund, not a dispute. Resolve its component breakdown under <strong>Returns</strong>; it is not decomposed here.</span>
+                      </AdminTd>
+                    )}
+                    {!isDispute && <><AdminTd /><AdminTd /></>}
+                    <AdminTd className={!isDispute || !complete ? muted : balanced ? 'text-[#047857]' : 'text-[#B91C1C]'}>
+                      {isDispute && complete ? money(sum) : '—'}
+                      {isDispute && complete && !balanced && <span className="block text-[11px]">must equal disputed</span>}
+                    </AdminTd>
+                    <AdminTd>
+                      {isDispute && r.canResolveHere && (
+                        <AdminButton size="sm" variant="primary" onClick={() => void resolveSplit(r)} disabled={saving || !balanced}>
+                          Resolve
+                        </AdminButton>
                       )}
-                      <td style={{ padding: '9px 10px',
-                                   color: !isDispute ? '#9B9B9B'
-                                        : !complete ? '#9B9B9B'
-                                        : balanced ? '#047857' : '#B91C1C' }}>
-                        {isDispute && complete ? money(sum) : '—'}
-                        {isDispute && complete && !balanced && (
-                          <span style={{ display: 'block', fontSize: 10 }}>must equal disputed</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        {isDispute && r.canResolveHere && (
-                          <button onClick={() => void resolveSplit(r)}
-                            disabled={saving || !balanced}
-                            style={{ ...btn, padding: '6px 10px', fontSize: 10,
-                                     opacity: balanced ? 1 : 0.4 }}>
-                            Resolve
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                    </AdminTd>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </AdminTable>
         </>
       )}
 
       {tab === 'payouts' && (
         <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#3730A3', background: '#EEF2FF',
-                        border: '1px solid #C7D2FE', padding: '10px 14px', marginBottom: 18 }}>
+          <AdminNotice className="mb-4">
             Commissions become <strong>eligible</strong> automatically after the hold window, which
             authorises nothing financial. Money moves only when you create a payout and record it
             as paid. Amounts are computed server-side under a lock, so two admins cannot pay the
             same commission twice.
-          </div>
+          </AdminNotice>
 
-          <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 22 }}>
-            <label style={{ fontFamily: FONT, fontSize: 11, display: 'block', marginBottom: 8 }}>
-              Affiliate
-              <select value={selectedAff} onChange={e => setSelectedAff(e.target.value)}
-                style={{ ...inputStyle, width: 280, marginTop: 4, display: 'block' }}>
+          <AdminCard className="mb-6">
+            <AdminField label="Affiliate" htmlFor="payout-aff">
+              <select id="payout-aff" value={selectedAff} onChange={e => setSelectedAff(e.target.value)} className={`${adminInputClass} max-w-[320px]`}>
                 <option value="">Select…</option>
                 {affiliates.map(a => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
               </select>
-            </label>
+            </AdminField>
             {selectedAff && (
-              <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '10px 0' }}>
+              <p className={`my-3 text-[12px] ${muted}`}>
                 {payable.length} commission(s) payable, totalling{' '}
                 <strong>{money(payable.reduce((s, p) => s + p.payableCents, 0))}</strong>
               </p>
             )}
-            <button onClick={createPayout} disabled={saving || payable.length === 0}
-              style={{ ...btn, opacity: saving || payable.length === 0 ? 0.45 : 1 }}>
-              {saving ? 'Creating…' : 'Create draft payout'}
-            </button>
-          </div>
+            <div className="mt-3">
+              <AdminButton variant="primary" onClick={createPayout} disabled={saving || payable.length === 0} loading={saving}>
+                Create draft payout
+              </AdminButton>
+            </div>
+          </AdminCard>
 
-          <SectionTitle note="Outstanding is DERIVED from cash paid minus what the ledger says was earned, so it cannot drift. 'Pursuit recorded' is an internal marker of a decision to chase the money — it is NOT cash and NOT an amount still owed. Collected is money actually received back.">
-            Recovery — overpaid commissions
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto', marginBottom: 26 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Order','Affiliate','Outstanding (derived)','Pursuit recorded','Collected (cash)',
-                  'Collect $','Date','Method','Reference',''].map(h => <th key={h} style={th}>{h}</th>)}
+          <AdminSectionHeader title="Recovery — overpaid commissions"
+            info="Outstanding is DERIVED from cash paid minus what the ledger says was earned, so it cannot drift. 'Pursuit recorded' is an internal marker of a decision to chase the money — it is NOT cash and NOT an amount still owed. Collected is money actually received back." />
+          <div className="mb-7">
+            <AdminTable caption="Overpaid commissions">
+              <thead><tr>
+                {['Order', 'Affiliate', 'Outstanding (derived)', 'Pursuit recorded', 'Collected (cash)', 'Collect $', 'Date', 'Method', 'Reference', ''].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
               <tbody>
                 {recoveries.length === 0 && !loading && (
-                  <tr><td colSpan={10} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No overpaid commissions.
-                  </td></tr>
+                  <tr><AdminTd className={muted}>No overpaid commissions.</AdminTd>{Array.from({ length: 9 }).map((_, i) => <AdminTd key={i} />)}</tr>
                 )}
                 {recoveries.map(r => {
                   const d = collect[r.commissionId] ?? { amount: '', date: '', method: '', reference: '' }
                   const cents = toCents(d.amount) ?? 0
                   const over = cents > r.outstandingCents
                   return (
-                    <tr key={r.commissionId} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                      <td style={{ padding: '9px 10px' }}>{r.orderNumber}</td>
-                      <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{r.affiliateCode}</td>
-                      <td style={{ padding: '9px 10px', fontWeight: 500,
-                                   color: r.outstandingCents > 0 ? '#B91C1C' : '#047857' }}>
+                    <tr key={r.commissionId}>
+                      <AdminTd>{r.orderNumber}</AdminTd>
+                      <AdminTd className={mono}>{r.affiliateCode}</AdminTd>
+                      <AdminTd className={`font-medium ${r.outstandingCents > 0 ? 'text-[#B91C1C]' : 'text-[#047857]'}`}>
                         {money(r.outstandingCents)}
-                      </td>
+                      </AdminTd>
                       {/* A marker is NOT cash; the two are shown apart so a
                           pending decision can never read as money received. */}
-                      <td style={{ padding: '9px 10px', color: '#92400E' }}>
-                        {money(r.recordedOwedCents)}
-                      </td>
-                      <td style={{ padding: '9px 10px', color: '#047857' }}>
-                        {money(r.collectedCents)}
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        <input type="number" step="0.01" min="0" value={d.amount}
+                      <AdminTd className="text-[#92400E]">{money(r.recordedOwedCents)}</AdminTd>
+                      <AdminTd className="text-[#047857]">{money(r.collectedCents)}</AdminTd>
+                      <AdminTd>
+                        <input type="number" step="0.01" min="0" value={d.amount} aria-label="Amount to collect"
                           onChange={e => setCollect(x => ({ ...x, [r.commissionId]: { ...d, amount: e.target.value } }))}
-                          placeholder="0.00" style={{ ...inputStyle, width: 90 }} />
-                        {over && (
-                          <span style={{ display: 'block', fontSize: 10, color: '#B91C1C' }}>
-                            exceeds outstanding
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        <input type="date" value={d.date}
+                          placeholder="0.00" className={moneyInput} />
+                        {over && <span className="block text-[11px] text-[#B91C1C]">exceeds outstanding</span>}
+                      </AdminTd>
+                      <AdminTd>
+                        <input type="date" value={d.date} aria-label="Date received"
                           onChange={e => setCollect(x => ({ ...x, [r.commissionId]: { ...d, date: e.target.value } }))}
-                          style={{ ...inputStyle, width: 130 }} />
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        <input value={d.method}
+                          className="h-8 w-36 rounded-[8px] border border-black/[0.14] bg-white px-2 text-[12px]" />
+                      </AdminTd>
+                      <AdminTd>
+                        <input value={d.method} aria-label="Method" placeholder="ach"
                           onChange={e => setCollect(x => ({ ...x, [r.commissionId]: { ...d, method: e.target.value } }))}
-                          placeholder="ach" style={{ ...inputStyle, width: 80 }} />
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        <input value={d.reference}
+                          className="h-8 w-20 rounded-[8px] border border-black/[0.14] bg-white px-2 text-[12px]" />
+                      </AdminTd>
+                      <AdminTd>
+                        <input value={d.reference} aria-label="Reference"
                           onChange={e => setCollect(x => ({ ...x, [r.commissionId]: { ...d, reference: e.target.value } }))}
-                          style={{ ...inputStyle, width: 100 }} />
-                      </td>
-                      <td style={{ padding: '9px 10px' }}>
-                        <button onClick={() => void collectRecovery(r.commissionId)}
-                          disabled={saving || cents <= 0 || over || r.outstandingCents === 0}
-                          style={{ ...btn, padding: '6px 10px', fontSize: 10,
-                                   opacity: (cents > 0 && !over && r.outstandingCents > 0) ? 1 : 0.4 }}>
+                          className="h-8 w-28 rounded-[8px] border border-black/[0.14] bg-white px-2 text-[12px]" />
+                      </AdminTd>
+                      <AdminTd>
+                        <AdminButton size="sm" variant="primary" onClick={() => void collectRecovery(r.commissionId)}
+                          disabled={saving || cents <= 0 || over || r.outstandingCents === 0}>
                           Collect
-                        </button>
-                      </td>
+                        </AdminButton>
+                      </AdminTd>
                     </tr>
                   )
                 })}
               </tbody>
-            </table>
+            </AdminTable>
           </div>
 
-          <SectionTitle note="Cash flow reads the paid date only. Accrual lives in the commission ledger and is never mixed in.">
-            Payout history
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Payout','Affiliate','Amount','Lines','Status','Paid on','Reference','Actions'].map(h =>
-                  <th key={h} style={th}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {payouts.length === 0 && !loading && (
-                  <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No payouts yet.
-                  </td></tr>
-                )}
-                {payouts.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px', fontFamily: 'monospace' }}>{p.payoutNumber}</td>
-                    <td style={{ padding: '9px 10px' }}>{p.affiliateCode}</td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(p.amountCents)}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{p.lineCount}</td>
-                    <td style={{ padding: '9px 10px', color: p.status === 'paid' ? '#047857' : '#6B6B6B' }}>
-                      {p.status}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {p.paidAt ? p.paidAt.slice(0, 10) : '—'}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{p.reference ?? '—'}</td>
-                    <td style={{ padding: '9px 10px' }}>
-                      {/* DRAFT is the only actionable state. A paid payout has
-                          moved real cash, so voiding it would misstate the cash
-                          record; a void payout has nothing left to do. */}
-                      {p.status === 'draft' && (
-                        <>
-                          <button onClick={() => void markPaid(p.id)} disabled={saving}
-                            style={{ ...btn, padding: '5px 9px', fontSize: 10, marginRight: 6 }}>
-                            Mark paid
-                          </button>
-                          <button onClick={() => void voidPayout(p.id)} disabled={saving}
-                            style={{ ...btn, padding: '5px 9px', fontSize: 10,
-                                     background: '#fff', color: '#B91C1C',
-                                     border: '1px solid #FECACA' }}>
-                            Void
-                          </button>
-                        </>
-                      )}
-                      {p.status !== 'draft' && (
-                        <span style={{ fontSize: 10, color: '#9B9B9B' }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminSectionHeader title="Payout history" info="Cash flow reads the paid date only. Accrual lives in the commission ledger and is never mixed in." />
+          <AdminTable caption="Payouts">
+            <thead><tr>
+              {['Payout', 'Affiliate', 'Amount', 'Lines', 'Status', 'Paid on', 'Reference', 'Actions'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
+            </tr></thead>
+            <tbody>
+              {payouts.length === 0 && !loading && (
+                <tr><AdminTd className={muted}>No payouts yet.</AdminTd>{Array.from({ length: 7 }).map((_, i) => <AdminTd key={i} />)}</tr>
+              )}
+              {payouts.map(p => (
+                <tr key={p.id}>
+                  <AdminTd className={mono}>{p.payoutNumber}</AdminTd>
+                  <AdminTd>{p.affiliateCode}</AdminTd>
+                  <AdminTd className="font-medium">{money(p.amountCents)}</AdminTd>
+                  <AdminTd className={muted}>{p.lineCount}</AdminTd>
+                  <AdminTd>
+                    <StatusBadge status={p.status === 'paid' ? 'Paid' : p.status === 'draft' ? 'Draft' : p.status === 'void' ? 'Archived' : 'Unknown'} label={p.status} />
+                  </AdminTd>
+                  <AdminTd className={muted}>{p.paidAt ? p.paidAt.slice(0, 10) : '—'}</AdminTd>
+                  <AdminTd className={muted}>{p.reference ?? '—'}</AdminTd>
+                  <AdminTd>
+                    {/* DRAFT is the only actionable state. A paid payout has
+                        moved real cash, so voiding it would misstate the cash
+                        record; a void payout has nothing left to do. */}
+                    {p.status === 'draft' && (voiding && voiding.id === p.id ? (
+                      <div className="flex min-w-[220px] flex-col gap-2">
+                        <input aria-label="Reason for voiding" placeholder="Reason for voiding" value={voiding.reason}
+                          onChange={e => setVoiding({ id: p.id, reason: e.target.value })} className={adminInputClass} />
+                        <div className="flex gap-2">
+                          <AdminButton size="sm" variant="danger" disabled={saving || !voiding.reason.trim()} onClick={() => void voidPayout(p.id, voiding.reason)}>Void payout</AdminButton>
+                          <AdminButton size="sm" variant="ghost" onClick={() => setVoiding(null)}>Cancel</AdminButton>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <AdminButton size="sm" variant="primary" onClick={() => void markPaid(p.id)} disabled={saving}>Mark paid</AdminButton>
+                        <AdminButton size="sm" variant="danger" onClick={() => setVoiding({ id: p.id, reason: '' })} disabled={saving}>Void</AdminButton>
+                      </div>
+                    ))}
+                    {p.status !== 'draft' && <span className="text-[11px] text-[#8A8A85]">—</span>}
+                  </AdminTd>
+                </tr>
+              ))}
+            </tbody>
+          </AdminTable>
         </>
       )}
+      {confirmNode}
     </div>
   )
 }

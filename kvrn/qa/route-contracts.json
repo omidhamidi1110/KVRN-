@@ -1,0 +1,2030 @@
+{
+  "version": 1,
+  "routes": [
+    {
+      "path": "app/about/page.tsx",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/abandoned-checkouts/page.tsx",
+      "feature": "abandoned_checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/ai/page.tsx",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/analytics/page.tsx",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/backups/page.tsx",
+      "feature": "admin_auth",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/content/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/discounts/page.tsx",
+      "feature": "discounts",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/advertising/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/affiliates/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/costs/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/disputes/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/expenses/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/infrastructure/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/integrity/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/inventory/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/returns/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/financials/shipping/page.tsx",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/inventory/page.tsx",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/media/page.tsx",
+      "feature": "media_library",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/orders/page.tsx",
+      "feature": "admin_auth",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/page.tsx",
+      "feature": "admin_ui_refresh",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/products/[id]/page.tsx",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/products/[id]/preview/page.tsx",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/products/defaults/page.tsx",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/products/new/page.tsx",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/products/page.tsx",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/sms/page.tsx",
+      "feature": "admin_auth",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/support/page.tsx",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/system/page.tsx",
+      "feature": "admin_ui_refresh",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/affiliate/login/page.tsx",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/affiliate/login/verify/page.tsx",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/affiliate/portal/page.tsx",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/affiliates/apply/page.tsx",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/affiliates/documents/[docType]/page.tsx",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/abandoned-checkouts/route.ts",
+      "feature": "abandoned_checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ad-spend/[id]/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ad-spend/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/applications/[id]/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/applications/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/audit/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/backfill/route.ts",
+      "feature": "affiliates",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/compliance/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/documents/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/emails/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/invites/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/payout-readiness/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/payout-readiness/statement/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/payouts/route.ts",
+      "feature": "affiliates",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/profiles/[id]/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/profiles/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/reconciliation/route.ts",
+      "feature": "affiliates",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/recoveries/route.ts",
+      "feature": "affiliates",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/route.ts",
+      "feature": "affiliates",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/settings/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/affiliates/ugc/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/actions/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/agents/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/alerts/[id]/resolve/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/alerts/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/approvals/[id]/decision/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/approvals/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/budget/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/daily-brief/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/evals/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/market-targets/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/overview/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/performance/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/qa/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/settings/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/supply-profiles/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/video-analysis/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/analytics/funnel/route.ts",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/backups/drills/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/backups/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/backups/verify/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/cache-invalidations/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/[kind]/[id]/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/[kind]/[id]/translations/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/[kind]/[id]/usage/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/[kind]/[id]/versions/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/[kind]/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/collections/[id]/products/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/collections/[id]/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/collections/[id]/translations/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/collections/product-search/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/collections/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/i18n/route.ts",
+      "feature": "localization_currency",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/preview-context/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/products/[productId]/size-guide/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/seo/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/dashboard/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/discounts/[id]/route.ts",
+      "feature": "discounts",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/discounts/route.ts",
+      "feature": "discounts",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/disputes/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/expenses/definitions/[id]/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/expenses/definitions/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/expenses/transactions/[id]/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/expenses/transactions/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/feature-flags/route.ts",
+      "feature": "admin_ui_refresh",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/exchanges/[id]/shipping-cost/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/infrastructure/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/infrastructure/timeseries/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/integrity/export/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/integrity/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/orders/[id]/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/products/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/shipping/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/summary/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/tax-export/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/financials/timeseries/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/active/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/movements/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/purchases/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/receipts/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/valuation/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/inventory/write-offs/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/media/[id]/route.ts",
+      "feature": "media_library",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/media/route.ts",
+      "feature": "media_library",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/[id]/fraud/confirm/route.ts",
+      "feature": "fraud_review",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/[id]/fraud/refresh/route.ts",
+      "feature": "fraud_review",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/[id]/fraud/release/route.ts",
+      "feature": "fraud_review",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/[id]/fraud/route.ts",
+      "feature": "fraud_review",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/[id]/tags/route.ts",
+      "feature": "order_tags",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/tags/[tagId]/route.ts",
+      "feature": "order_tags",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/orders/tags/route.ts",
+      "feature": "order_tags",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/payment-exceptions/[id]/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/payment-exceptions/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/product-costs/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/[id]/action/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/[id]/collections/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/[id]/history/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/[id]/preview-data/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/[id]/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/bulk/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/bundle-candidates/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/defaults/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/options/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/products/route.ts",
+      "feature": "product_cms",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/provider-usage/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/refunds/[id]/fee-returned/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/refunds/[id]/resolve-components/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/returns/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/shipments/[id]/cost/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/sms/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/support/threads/[id]/read/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/support/threads/[id]/reply/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/support/threads/[id]/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/support/threads/[id]/status/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/support/threads/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/auth/logout/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/auth/request/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/auth/verify/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/commissions/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/documents/[docType]/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/me/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/onboarding/accept/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/onboarding/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/overview/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/payout-setup/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/payouts/[ref]/statement/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/payouts/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliate/profile/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliates/apply/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/affiliates/invite/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/analytics/config/route.ts",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/analytics/event/route.ts",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/bundles/quote/route.ts",
+      "feature": "bundles",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/checkout/recover/route.ts",
+      "feature": "abandoned_checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/checkout/recover/unsubscribe/route.ts",
+      "feature": "abandoned_checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/checkout/route.ts",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/checkout/session/route.ts",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/checkout/status/route.ts",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/contact/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/discounts/validate/route.ts",
+      "feature": "discounts",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/abandoned-checkout-sweep/route.ts",
+      "feature": "abandoned_checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/affiliate-maintenance/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/affiliate-program-maintenance/route.ts",
+      "feature": "affiliate_program",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/ai-chief/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/cms-scheduler/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/marketing-sync/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/qa-report/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/stripe-fee-reconcile/route.ts",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/support-email-ingest/route.ts",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/internal/transactional-email-retry/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/inventory/route.ts",
+      "feature": "inventory_accounting",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/marketing/subscribe/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/notify-me/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/order-tracking/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/orders/[id]/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/orders/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/shipping-rates/route.ts",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/sms/claim/resolve/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/sms/claim/start/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/sms/offer/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/sms/subscribe/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/sms/unsubscribe/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/stripe/webhook/route.ts",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/twilio/incoming/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/twilio/status/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/unsubscribe/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/waitlist/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/checkout/page.tsx",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/checkout/recover/page.tsx",
+      "feature": "abandoned_checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/checkout/success/page.tsx",
+      "feature": "checkout",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/collections/[slug]/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/collections/project-kvrn/page.tsx",
+      "feature": "product_detail",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/contact/page.tsx",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/cookies/page.tsx",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/legal/[slug]/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/legal/privacy/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/legal/terms/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/media/[...key]/route.ts",
+      "feature": "media_library",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/page.tsx",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/pages/[slug]/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/privacy/page.tsx",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/products/[slug]/page.tsx",
+      "feature": "product_detail",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/r/[slug]/route.ts",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/shop/page.tsx",
+      "feature": "product_detail",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/support/faq/page.tsx",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/support/shipping-returns/page.tsx",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/support/size-guide/page.tsx",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/support/track/page.tsx",
+      "feature": "support_inbox",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/terms/page.tsx",
+      "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    }
+  ]
+}

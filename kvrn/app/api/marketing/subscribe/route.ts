@@ -5,15 +5,24 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { normaliseEmail, upsertSubscriber, updateSyncStatus, ALLOWED_CONSENT_SOURCES } from '@/lib/marketing-subscribers'
 import { syncSubscribeToResend } from '@/lib/resend-marketing'
+import { readLimitedJson } from '@/lib/limited-json-request'
+import { allowPublicApiRequest } from '@/lib/public-api-rate-limit'
+import { sql } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  let body: any
-  try { body = await req.json() } catch {
-    return NextResponse.json({ success: false, error: 'Invalid request.' }, { status: 400 })
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const allowed = await allowPublicApiRequest(sql, { bucket: 'marketing_subscribe', headers: req.headers, limit: 8, windowSeconds: 600 })
+      if (!allowed) return NextResponse.json({ success: false, error: 'Too many attempts.' }, { status: 429, headers: { 'Retry-After': '600' } })
+    } catch { return NextResponse.json({ success: false, error: 'Subscription temporarily unavailable.' }, { status: 503 }) }
   }
-
+  const read = await readLimitedJson(req, 2048)
+  if (!read.ok || !read.value || typeof read.value !== 'object' || Array.isArray(read.value)) {
+    return NextResponse.json({ success: false, error: 'Invalid request.' }, { status: read.ok ? 400 : read.status })
+  }
+  const body: any = read.value
   const rawEmail = body.email
   if (typeof rawEmail !== 'string' || !rawEmail.trim()) {
     return NextResponse.json({ success: false, error: 'Email is required.' }, { status: 400 })

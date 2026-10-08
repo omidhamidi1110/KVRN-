@@ -7,9 +7,11 @@
 // show a confident, wrong profit number. Every formatter below enforces that.
 
 import React from 'react'
+import { AdminStat, AdminSegmented, InfoTip, StatusBadge, adminInputClass, adminButtonClass } from '@/components/admin/ui/AdminUI'
 
 export const FONT   = '-apple-system, Helvetica Neue, Arial, sans-serif'
-export const BORDER = '1px solid #E8E5E0'
+// Hairline used by the inline-styled tables that remain; matches AdminCard's border.
+export const BORDER = '1px solid rgba(0,0,0,0.08)'
 
 /** Format integer cents as USD. */
 export function money(cents: number): string {
@@ -32,44 +34,24 @@ export function pctOrDash(v: number | null): string {
 // ── Metric card ──────────────────────────────────────────────────────────────
 
 export function Metric({
-  label, value, sub, tone = 'default', pending,
+  label, value, sub, tone = 'default', pending, info,
 }: {
   label: string
   value: string
   sub?: string
   tone?: 'default' | 'positive' | 'negative' | 'muted'
   pending?: boolean
+  /** Definition / method for this figure. Warnings never go here. */
+  info?: React.ReactNode
 }) {
-  const color =
-    tone === 'positive' ? '#047857' :
-    tone === 'negative' ? '#B91C1C' :
-    tone === 'muted'    ? '#6B6B6B' : '#1A1A1A'
-
   return (
-    <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-      <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                  textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>
-        {label}
-      </p>
-      <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, color,
-                  margin: '6px 0 0', letterSpacing: '-0.01em' }}>
-        {value}
-      </p>
-      {sub && (
-        <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>
-          {sub}
-        </p>
-      )}
-      {pending && (
-        <p style={{ fontFamily: FONT, fontSize: 10, color: '#92400E', margin: '4px 0 0' }}>
-          Partial — some costs not yet reconciled
-        </p>
-      )}
-    </div>
+    <AdminStat label={label} value={value} sub={sub} tone={tone} info={info}
+      flag={pending ? 'Partial — some costs not yet reconciled' : undefined} />
   )
 }
 
 // ── Reconciliation badge ─────────────────────────────────────────────────────
+// What is missing is printed under the badge (visible), never only in a title attribute.
 
 export function ReconciliationBadge({
   state, missing,
@@ -77,23 +59,17 @@ export function ReconciliationBadge({
   state: 'complete' | 'partial' | 'unknown'
   missing?: Array<{ field: string; label: string }>
 }) {
-  const map = {
-    complete: { bg: '#F0FDF4', border: '#BBF7D0', color: '#166534', text: 'Reconciled' },
-    partial:  { bg: '#FFFBEB', border: '#FDE68A', color: '#92400E', text: 'Partial' },
-    unknown:  { bg: '#F9FAFB', border: '#E5E7EB', color: '#6B7280', text: 'Unreconciled' },
-  }[state]
-
-  const title = missing && missing.length > 0
-    ? `Missing: ${missing.map(m => m.label).join(', ')}`
-    : undefined
-
+  const badge = state === 'complete'
+    ? <StatusBadge status="Reconciled" />
+    : state === 'partial'
+      ? <StatusBadge status="Partial" />
+      : <StatusBadge status="Unknown" label="Unreconciled" />
   return (
-    <span title={title}
-      style={{ display: 'inline-block', fontFamily: FONT, fontSize: 9,
-               letterSpacing: '0.08em', textTransform: 'uppercase',
-               padding: '3px 8px', background: map.bg,
-               border: `1px solid ${map.border}`, color: map.color }}>
-      {map.text}
+    <span className="inline-flex flex-col items-start gap-0.5">
+      {badge}
+      {missing && missing.length > 0 && (
+        <span className="text-[11px] text-[#92400E]">Missing: {missing.map(m => m.label).join(', ')}</span>
+      )}
     </span>
   )
 }
@@ -116,54 +92,44 @@ export function RangePicker({
   custom: { start: string; end: string }
   onCustom: (c: { start: string; end: string }) => void
 }) {
+  const canApply = Boolean(custom.start && custom.end)
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      {RANGE_OPTIONS.map(o => (
-        <button key={o.value} onClick={() => onRange(o.value)}
-          style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.04em',
-                   padding: '7px 12px', cursor: 'pointer',
-                   border: range === o.value ? '1px solid #1A1A1A' : BORDER,
-                   background: range === o.value ? '#1A1A1A' : '#fff',
-                   color: range === o.value ? '#fff' : '#1A1A1A' }}>
-          {o.label}
+    <div className="flex flex-wrap items-center gap-2">
+      <AdminSegmented ariaLabel="Date range" value={range}
+        options={RANGE_OPTIONS.map(o => ({ id: o.value as string, label: o.label }))}
+        onChange={onRange} />
+      <span className="flex flex-wrap items-center gap-1.5">
+        <input type="date" value={custom.start} aria-label="Start date"
+          onChange={e => onCustom({ ...custom, start: e.target.value })}
+          className={`${adminInputClass} !w-auto`} />
+        <span className="text-[11px] text-[#6B6B66]">to</span>
+        <input type="date" value={custom.end} aria-label="End date"
+          onChange={e => onCustom({ ...custom, end: e.target.value })}
+          className={`${adminInputClass} !w-auto`} />
+        <button type="button" onClick={() => onRange('custom')} disabled={!canApply}
+          aria-pressed={range === 'custom'}
+          className={adminButtonClass(range === 'custom' ? 'primary' : 'secondary', 'md')}>
+          Apply
         </button>
-      ))}
-      <span style={{ width: 1, height: 22, background: '#E8E5E0', margin: '0 4px' }} />
-      <input type="date" value={custom.start}
-        onChange={e => onCustom({ ...custom, start: e.target.value })}
-        style={{ fontFamily: FONT, fontSize: 11, padding: '6px 8px', border: BORDER }} />
-      <span style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B' }}>to</span>
-      <input type="date" value={custom.end}
-        onChange={e => onCustom({ ...custom, end: e.target.value })}
-        style={{ fontFamily: FONT, fontSize: 11, padding: '6px 8px', border: BORDER }} />
-      <button onClick={() => onRange('custom')}
-        disabled={!custom.start || !custom.end}
-        style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.04em',
-                 padding: '7px 12px',
-                 cursor: custom.start && custom.end ? 'pointer' : 'default',
-                 border: range === 'custom' ? '1px solid #1A1A1A' : BORDER,
-                 background: range === 'custom' ? '#1A1A1A' : '#fff',
-                 color: range === 'custom' ? '#fff' : '#1A1A1A',
-                 opacity: custom.start && custom.end ? 1 : 0.45 }}>
-        Apply
-      </button>
+      </span>
     </div>
   )
 }
 
-export function SectionTitle({ children, note }: { children: React.ReactNode; note?: string }) {
+export function SectionTitle({ children, note, info }: {
+  children: React.ReactNode
+  /** Short visible line — only when it changes what the reader should do. */
+  note?: string
+  /** Definition / method / accounting rule, shown on demand. */
+  info?: React.ReactNode
+}) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <h2 style={{ fontFamily: FONT, fontSize: 11, fontWeight: 600,
-                   letterSpacing: '0.12em', textTransform: 'uppercase',
-                   color: '#1A1A1A', margin: 0 }}>
+    <div className="mb-3">
+      <h2 className="flex items-center gap-0.5 text-[13px] font-medium text-[#171717]">
         {children}
+        {info && <InfoTip label={`About ${typeof children === 'string' ? children : 'this section'}`}>{info}</InfoTip>}
       </h2>
-      {note && (
-        <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>
-          {note}
-        </p>
-      )}
+      {note && <p className="mt-0.5 text-[11px] text-[#6B6B66]">{note}</p>}
     </div>
   )
 }
@@ -178,7 +144,8 @@ export function buildQuery(range: string, custom: { start: string; end: string }
 // ── Order integrity badge (REV2) ─────────────────────────────────────────────
 // Reflects the scan's per-order integrity state, which wins over the calculator's input
 // state. Green is reserved for a genuinely RECONCILED order; INCOMPLETE and EXCEPTION are
-// visibly different and (when not exact) link to the Reconciliation page.
+// visibly different and (when not exact) link to the Reconciliation page. The state word and
+// what is missing are always visible; the longer reason sits behind an InfoTip.
 
 export function OrderIntegrityBadge({
   text, tone, href, missing, reason,
@@ -189,21 +156,21 @@ export function OrderIntegrityBadge({
   missing?: Array<{ field: string; label: string }>
   reason?: string
 }) {
-  const map = {
-    ok:      { bg: '#F0FDF4', border: '#BBF7D0', color: '#166534' },
-    warn:    { bg: '#FFFBEB', border: '#FDE68A', color: '#92400E' },
-    bad:     { bg: '#FEF2F2', border: '#FECACA', color: '#991B1B' },
-    neutral: { bg: '#F9FAFB', border: '#E5E7EB', color: '#6B7280' },
+  const cls = {
+    ok:      'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]',
+    warn:    'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]',
+    bad:     'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]',
+    neutral: 'border-black/[0.10] bg-[#F5F5F3] text-[#4A4A46]',
   }[tone]
-  const parts = [
-    reason,
-    missing && missing.length > 0 ? `Missing: ${missing.map(m => m.label).join(', ')}` : undefined,
-  ].filter(Boolean)
-  const style = { display: 'inline-block', fontFamily: FONT, fontSize: 9, letterSpacing: '0.08em',
-                  textTransform: 'uppercase' as const, padding: '3px 8px', background: map.bg,
-                  border: `1px solid ${map.border}`, color: map.color, textDecoration: 'none' }
-  const title = parts.length ? parts.join(' · ') : undefined
-  return href
-    ? <a href={href} title={title} style={style}>{text}</a>
-    : <span title={title} style={style}>{text}</span>
+  const badgeCls = `inline-flex items-center rounded-full border px-2 py-[2px] text-[10px] font-medium uppercase tracking-[0.06em] ${cls}`
+  const hasMissing = Boolean(missing && missing.length > 0)
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <span className="inline-flex items-center">
+        {href ? <a href={href} className={`${badgeCls} underline-offset-2 hover:underline`}>{text}</a> : <span className={badgeCls}>{text}</span>}
+        {reason && <InfoTip label={`About ${text}`}>{reason}</InfoTip>}
+      </span>
+      {hasMissing && <span className="text-[11px] text-[#92400E]">Missing: {missing!.map(m => m.label).join(', ')}</span>}
+    </span>
+  )
 }

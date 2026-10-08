@@ -1,13 +1,16 @@
+import { cmsContentEnabled, contentPublic } from '@/lib/content-public'
+import { PolicyView } from '@/components/content/cms-views'
+import { policyMetadata } from '@/lib/content-storefront'
 import { PageHero } from '@/components/layout/PageHero'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-export const metadata: Metadata = {
+const LEGACY_METADATA: Metadata = {
   title: 'Shipping & Returns KVRN',
   description: 'KVRN shipping and returns policy. Store credit returns. Orders ship within 1–3 business days.',
 }
 
-export default function ShippingReturnsPage() {
+function LegacyShippingReturnsPage() {
   return (
     <div>
       {/* Dark header band */}
@@ -92,4 +95,23 @@ export default function ShippingReturnsPage() {
       </div>
     </div>
   )
+}
+
+// With KVRN_FLAG_CMS_PUBLIC_CONTENT off (the default) this page is exactly the coded page above.
+// With it on, the PUBLISHED Admin policy is shown; if there is none (or the database is
+// unreachable) the coded page is shown instead — a legal page never disappears.
+export const dynamic = 'force-dynamic'
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (!cmsContentEnabled()) return LEGACY_METADATA
+  const view = await contentPublic().getPolicyById('shipping-returns')
+  return view ? policyMetadata(view, LEGACY_METADATA) : LEGACY_METADATA
+}
+
+export default async function ShippingReturnsPage() {
+  if (cmsContentEnabled()) {
+    const view = await contentPublic().getPolicyById('shipping-returns')
+    if (view) return <PolicyView view={view} />
+  }
+  return <LegacyShippingReturnsPage />
 }

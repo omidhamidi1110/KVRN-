@@ -7,7 +7,9 @@
 // Every exported function is FAIL-OPEN. Callers must never depend on a push being
 // delivered for the underlying business operation to succeed.
 
+import { createHash } from 'crypto'
 import { sql } from './db'
+import { upsertAiAlert } from './ai/repository'
 import { isPushoverConfigured, sendPushoverNotification, type PushoverPriority } from './pushover'
 
 const SYSTEM_ACTOR = 'system@kvrn.internal'
@@ -33,6 +35,10 @@ let neonFallbackLastAlertAt = 0
 
 export type CriticalProvider = 'Stripe' | 'Shippo' | 'Resend' | 'Neon'
 
+function ownerNotificationPathEnabled(): boolean {
+  return process.env.AI_CHIEF_NOTIFICATION_GATE === 'true' || isPushoverConfigured()
+}
+
 function money(cents: number, currency = 'usd'): string {
   if ((currency || 'usd').toLowerCase() === 'usd') return `$${(Number(cents || 0) / 100).toFixed(2)}`
   return `${(Number(cents || 0) / 100).toFixed(2)} ${(currency || '').toUpperCase()}`
@@ -50,6 +56,21 @@ function adminUrl(path: string): string | null {
   }
 }
 
+function legacyChiefCategory(title: string): string {
+  const t = title.toUpperCase()
+  if (t.includes('SECURITY')) return 'security'
+  if (t.includes('PROVIDER')) return 'site_outage'
+  if (t.includes('FINANCIAL')) return 'financial_integrity'
+  if (t.includes('PAYMENT')) return 'payment'
+  if (t.includes('REFUND')) return 'refund'
+  if (t.includes('DISPUTE')) return 'chargeback'
+  if (t.includes('BACKUP')) return 'backup'
+  if (t.includes('SOLD OUT') || t.includes('STOCK')) return 'inventory'
+  if (t.includes('SUPPORT')) return 'support'
+  if (t.includes('SALE')) return 'sale'
+  return 'operations'
+}
+
 async function push(input: {
   title: string
   message: string
@@ -57,6 +78,29 @@ async function push(input: {
   path?: string
 }): Promise<boolean> {
   try {
+    // Rollout-safe Chief gate. Once enabled, legacy code can no longer contact
+    // Pushover directly. It creates a sanitized alert and the Chief decides whether
+    // that deserves log-only, digest, dashboard, normal push, or critical push.
+    if (process.env.AI_CHIEF_NOTIFICATION_GATE === 'true') {
+      const severity = input.priority === 1 ? 'high' : 'info'
+      const fingerprint = createHash('sha256')
+        .update(`${input.title}|${input.message}|${input.path ?? ''}`)
+        .digest('hex').slice(0, 24)
+      await upsertAiAlert({
+        sourceAgentId: input.title.toUpperCase().includes('SUPPORT') ? 'support' :
+          input.title.toUpperCase().match(/SALE|STOCK|SOLD OUT/) ? 'product_inventory' :
+          input.title.toUpperCase().match(/PAYMENT|REFUND|DISPUTE|FINANCIAL/) ? 'finance_risk' :
+          'engineering_qa',
+        severity,
+        category: legacyChiefCategory(input.title),
+        title: input.title,
+        summary: input.message,
+        dedupeKey: `legacy:${fingerprint}`,
+        metadata: { source: 'legacy_owner_notification', adminPath: input.path ?? null },
+      })
+      return true // accepted by the Chief gate, not necessarily pushed
+    }
+
     if (!isPushoverConfigured()) return false
     const result = await sendPushoverNotification({
       title: input.title,
@@ -138,7 +182,7 @@ export function isResendProviderFault(message: string): boolean {
 
 /** Paid order + low-stock/sold-out transitions. Called only for outcome=order_created. */
 export async function notifySaleAndInventory(orderId: string): Promise<void> {
-  if (!isPushoverConfigured() || !orderId) return
+  if (!ownerNotificationPathEnabled() || !orderId) return
   try {
     const orderRows = await sql`
       SELECT order_number AS "orderNumber", total_cents AS "totalCents", currency
@@ -217,7 +261,7 @@ export async function notifyPaymentIssue(input: {
   currency?: string
   reason?: string | null
 }): Promise<void> {
-  if (!isPushoverConfigured()) return
+  if (!ownerNotificationPathEnabled()) return
   const reason = input.reason === 'insufficient_stock'
     ? 'Paid checkout could not be finalized because inventory was no longer available.'
     : 'A paid checkout could not be finalized automatically.'
@@ -238,7 +282,7 @@ export async function notifyRefund(input: {
   currency?: string
   fullyRefunded?: boolean
 }): Promise<void> {
-  if (!isPushoverConfigured() || !input.orderId) return
+  if (!ownerNotificationPathEnabled() || !input.orderId) return
   try {
     if (input.stripeRefundId &&
         !(await claimOnce('PUSHOVER_REFUND_ALERT', 'refund', input.stripeRefundId, REFUND_ALERT_WINDOW_MINUTES))) return
@@ -265,7 +309,7 @@ export async function notifyDispute(input: {
   currency?: string
   status: string
 }): Promise<void> {
-  if (!isPushoverConfigured() || !input.stripeDisputeId) return
+  if (!ownerNotificationPathEnabled() || !input.stripeDisputeId) return
   try {
     const rows = await sql`
       SELECT o.order_number AS "orderNumber"
@@ -287,7 +331,7 @@ export async function notifyDispute(input: {
 
 /** Notify only for exception findings that were detected/changed in THIS recorded run. */
 export async function notifyFinancialIntegrityRun(runId: string): Promise<void> {
-  if (!isPushoverConfigured() || !runId) return
+  if (!ownerNotificationPathEnabled() || !runId) return
   try {
     const rows = await sql`
       SELECT issue_code AS "issueCode", entity_type AS "entityType"
@@ -312,7 +356,7 @@ export async function notifyFinancialIntegrityRun(runId: string): Promise<void> 
 }
 
 export async function notifyBackupFailure(kind: 'restore_verification' | 'dr_drill'): Promise<void> {
-  if (!isPushoverConfigured()) return
+  if (!ownerNotificationPathEnabled()) return
   const description = kind === 'restore_verification'
     ? 'A recorded backup restore verification FAILED.'
     : 'A recorded disaster-recovery drill FAILED.'
@@ -353,7 +397,7 @@ function lockScreenSafe(raw: string | null | undefined, max: number): string {
  * names, no headers, no order/payment data. Fail-open: never throws, bounded by the Pushover timeout.
  */
 export async function notifySupportEmail(input: { fromName?: string | null; subject?: string | null }): Promise<void> {
-  if (!isPushoverConfigured()) return
+  if (!ownerNotificationPathEnabled()) return
   try {
     const name = lockScreenSafe(input.fromName, SUPPORT_NAME_MAX).replace(/^\[(?:address|link|number)\]$/, '')
     const subject = lockScreenSafe(input.subject, SUPPORT_SUBJECT_MAX)
@@ -383,7 +427,7 @@ export async function notifySupportEmail(input: { fromName?: string | null; subj
  * response bodies are stored.
  */
 export async function recordProviderFailure(provider: CriticalProvider, source: string): Promise<void> {
-  if (!isPushoverConfigured()) return
+  if (!ownerNotificationPathEnabled()) return
   try {
     const cooling = await sql`
       SELECT 1 FROM admin_audit_logs
@@ -457,7 +501,7 @@ export async function recordProviderFailure(provider: CriticalProvider, source: 
  * Same bounded-write / claim-first design as recordProviderFailure.
  */
 export async function notifySecurityAlert(reason: string): Promise<void> {
-  if (!isPushoverConfigured()) return
+  if (!ownerNotificationPathEnabled()) return
   try {
     const cooling = await sql`
       SELECT 1 FROM admin_audit_logs

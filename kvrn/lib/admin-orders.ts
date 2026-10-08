@@ -1,8 +1,12 @@
 // lib/admin-orders.ts — Admin order management service
 // Injectable SQL for testability. No public API exposure.
 // V51.2: list, detail, count, and unfulfilled→processing transition only.
+// Orders refresh: internal order tags (list chips, tag filter, detail) and the server-enforced
+// Stripe Radar fulfillment hold (an early, friendly 409 on top of the database triggers in 031).
 
 import type { NeonQueryFunction } from '@neondatabase/serverless'
+import { createOrderTagService, type OrderTagChip } from './order-tags'
+import { createFraudReviewService, hasActiveFraudHold, isFraudHoldDbError, type HoldState } from './fraud-review'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,18 +61,47 @@ export interface OrderCancellationInfo {
   cogsCreditCents:  number | null
 }
 
+/** A set ("Complete the Set") bought on this order, from the immutable order snapshot. */
+export interface AdminOrderBundle {
+  bundleId: string
+  setQuantity: number
+  pricingMode: string
+  pricingValue: number
+  componentSubtotalCents: number
+  bundleDiscountCents: number
+  bundleNetCents: number
+  lines: Array<{
+    orderItemId: string; sku: string; productName: string; quantity: number
+    originalUnitPriceCents: number; allocatedDiscountCents: number; netLineCents: number
+  }>
+}
+
 export interface AdminOrderDetail extends AdminOrderRow {
   customerPhone:   string | null
   shippingAddress: Record<string, string | null> | null
   items:           AdminOrderItem[]
   shipment:        ShipmentInfo | null
   cancellation:    OrderCancellationInfo | null
+  /** INTERNAL labels (never customer-facing). Empty if none or if tags are unavailable. */
+  tags:            OrderTagChip[]
+  /** True while a server-enforced fraud fulfillment hold is active. Payment status is unaffected. */
+  fraudHoldActive: boolean
+  /** Present only when the order contains a set. Absent on every other order. */
+  bundle?: AdminOrderBundle | null
+}
+
+/** A list row decorated with internal tags and a compact fraud summary (see decorateRows). */
+export interface AdminOrderListItem extends AdminOrderRow {
+  tags:  OrderTagChip[]
+  fraud: { hold: HoldState; flagged: boolean; syncError: boolean } | null
 }
 
 export interface ListOrdersParams {
   paymentStatus?:     string
   fulfillmentStatus?: string
   search?:            string
+  /** Orders carrying this internal tag (uuid). Absent = the original, unchanged queries. */
+  tagId?:             string
   limit:              number
   offset:             number
 }
@@ -145,6 +178,30 @@ export function createAdminOrderService(sql: NeonQueryFunction<false, false>) {
 
     async listOrders(params: ListOrdersParams): Promise<AdminOrderRow[]> {
       const { paymentStatus, fulfillmentStatus, search, limit, offset } = params
+
+      // Tag filter: ONE dedicated query. Every request without a tag filter falls through to the
+      // original queries below, untouched.
+      if (params.tagId) {
+        const q = search ? `%${search.replace(/%/g,'\\%').replace(/_/g,'\\_')}%` : null
+        const pay = paymentStatus ?? null
+        const ful = fulfillmentStatus ?? null
+        return sql`
+          SELECT o.id, o.order_number AS "orderNumber",
+            o.payment_status AS "paymentStatus", o.fulfillment_status AS "fulfillmentStatus",
+            o.currency, o.subtotal_cents AS "subtotalCents", o.shipping_cents AS "shippingCents",
+            o.tax_cents AS "taxCents", o.discount_cents AS "discountCents", o.total_cents AS "totalCents",
+            o.shipping_method AS "shippingMethod", o.customer_email AS "customerEmail",
+            o.customer_name AS "customerName", o.paid_at AS "paidAt",
+            o.created_at AS "createdAt", o.updated_at AS "updatedAt",
+            COUNT(oi.id)::int AS "itemCount", COALESCE(SUM(oi.quantity),0)::int AS "quantityCount"
+          FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
+          WHERE EXISTS (SELECT 1 FROM order_tag_assignments a WHERE a.order_id = o.id AND a.tag_id = ${params.tagId}::uuid)
+            AND (${pay}::text IS NULL OR o.payment_status = ${pay})
+            AND (${ful}::text IS NULL OR o.fulfillment_status = ${ful})
+            AND (${q}::text IS NULL OR (o.order_number ILIKE ${q} OR o.customer_email ILIKE ${q} OR o.customer_name ILIKE ${q}))
+          GROUP BY o.id ORDER BY o.created_at DESC LIMIT ${limit} OFFSET ${offset}
+        ` as any
+      }
 
       // Build with positional params — no dynamic SQL from user input
       // Neon tagged template handles parameterization
@@ -276,6 +333,18 @@ export function createAdminOrderService(sql: NeonQueryFunction<false, false>) {
 
     async countOrders(params: Omit<ListOrdersParams, 'limit' | 'offset'>): Promise<number> {
       const { paymentStatus, fulfillmentStatus, search } = params
+      if (params.tagId) {
+        const q = search ? `%${search.replace(/%/g,'\\%').replace(/_/g,'\\_')}%` : null
+        const pay = paymentStatus ?? null
+        const ful = fulfillmentStatus ?? null
+        const r = await sql`
+          SELECT COUNT(*)::int AS n FROM orders o
+          WHERE EXISTS (SELECT 1 FROM order_tag_assignments a WHERE a.order_id = o.id AND a.tag_id = ${params.tagId}::uuid)
+            AND (${pay}::text IS NULL OR o.payment_status = ${pay})
+            AND (${ful}::text IS NULL OR o.fulfillment_status = ${ful})
+            AND (${q}::text IS NULL OR (o.order_number ILIKE ${q} OR o.customer_email ILIKE ${q} OR o.customer_name ILIKE ${q}))`
+        return Number((r[0] as any).n)
+      }
       if (search) {
         const q = `%${search.replace(/%/g,'\\%').replace(/_/g,'\\_')}%`
         if (paymentStatus && fulfillmentStatus) {
@@ -359,19 +428,51 @@ export function createAdminOrderService(sql: NeonQueryFunction<false, false>) {
           }
         : null
 
+      // Internal tags and the fraud-hold flag. Both are additive: if migration 031 is not applied yet they
+      // read as empty / false and the order detail loads exactly as before.
+      let tags: OrderTagChip[] = []
+      let fraudHoldActive = false
+      try { tags = await createOrderTagService(sql).tagsForOrder(id) } catch { tags = [] }
+      try { fraudHoldActive = await hasActiveFraudHold(sql, id) } catch { fraudHoldActive = false }
+
+      // Set snapshot (migration 029). Additive: missing table / no set = the detail is exactly as before.
+      let bundle: AdminOrderBundle | null = null
+      try { bundle = await loadOrderBundle(sql, id) } catch { bundle = null }
+
       return {
         ...o,
+        ...(bundle ? { bundle } : {}),
         itemCount:     (countRow as any).itemCount    ?? 0,
         quantityCount: (countRow as any).quantityCount ?? 0,
         items: items as AdminOrderItem[],
         shipment,
         cancellation,
+        tags,
+        fraudHoldActive,
       }
+    },
+
+    /**
+     * Attach internal tags and a compact fraud summary to list rows (two extra queries, regardless of page
+     * size). Best-effort by design: if either lookup fails the rows are returned undecorated rather than
+     * breaking the Orders list.
+     */
+    async decorateRows(rows: AdminOrderRow[]): Promise<AdminOrderListItem[]> {
+      const ids = rows.map(r => r.id)
+      let tagMap = new Map<string, OrderTagChip[]>()
+      let fraudMap = new Map<string, { hold: HoldState; flagged: boolean; syncError: boolean }>()
+      try { tagMap = await createOrderTagService(sql).tagsForOrders(ids) } catch (err: any) {
+        console.error('[admin-orders] tags unavailable (non-fatal):', String(err?.message ?? '').slice(0, 80))
+      }
+      try { fraudMap = await createFraudReviewService(sql).summariesForOrders(ids) } catch (err: any) {
+        console.error('[admin-orders] fraud summary unavailable (non-fatal):', String(err?.message ?? '').slice(0, 80))
+      }
+      return rows.map(r => ({ ...r, tags: tagMap.get(r.id) ?? [], fraud: fraudMap.get(r.id) ?? null }))
     },
 
     /** V51.2: only unfulfilled → processing. Returns outcome string. */
     async transitionToProcessing(id: string): Promise<
-      'updated' | 'already_processing' | 'not_found' | 'conflict'
+      'updated' | 'already_processing' | 'not_found' | 'conflict' | 'fraud_hold'
     > {
       const rows = await sql`SELECT fulfillment_status FROM orders WHERE id=${id}`
       if (rows.length === 0) return 'not_found'
@@ -380,11 +481,20 @@ export function createAdminOrderService(sql: NeonQueryFunction<false, false>) {
       if (current === 'processing') return 'already_processing'
       if (current !== 'unfulfilled') return 'conflict'
 
-      const updated = await sql`
-        UPDATE orders SET fulfillment_status='processing', updated_at=NOW()
-        WHERE id=${id} AND fulfillment_status='unfulfilled'
-        RETURNING id
-      `
+      // Early refusal; the database trigger (031) is the real enforcement and is mapped below too.
+      if (await hasActiveFraudHold(sql, id)) return 'fraud_hold'
+
+      let updated: any[]
+      try {
+        updated = await sql`
+          UPDATE orders SET fulfillment_status='processing', updated_at=NOW()
+          WHERE id=${id} AND fulfillment_status='unfulfilled'
+          RETURNING id
+        ` as any[]
+      } catch (err) {
+        if (isFraudHoldDbError(err)) return 'fraud_hold'
+        throw err
+      }
       if (updated.length === 0) return 'already_processing'
       return 'updated'
     },
@@ -426,16 +536,24 @@ export function createAdminOrderService(sql: NeonQueryFunction<false, false>) {
       carrier: string,
       trackingNumber: string
     ): Promise<{
-      outcome: 'shipped' | 'already_shipped' | 'not_found' | 'invalid_transition'
+      outcome: 'shipped' | 'already_shipped' | 'not_found' | 'invalid_transition' | 'fraud_hold'
       shipmentId?: string
     }> {
-      const rows = await sql`
-        SELECT mark_order_shipped(
-          ${id}::uuid,
-          ${carrier},
-          ${trackingNumber}
-        ) AS result
-      `
+      // Early refusal; the database triggers (031) refuse the shipment and the status change regardless.
+      if (await hasActiveFraudHold(sql, id)) return { outcome: 'fraud_hold' }
+      let rows: any[]
+      try {
+        rows = await sql`
+          SELECT mark_order_shipped(
+            ${id}::uuid,
+            ${carrier},
+            ${trackingNumber}
+          ) AS result
+        ` as any[]
+      } catch (err) {
+        if (isFraudHoldDbError(err)) return { outcome: 'fraud_hold' }
+        throw err
+      }
       const result = (rows[0] as any).result as {
         outcome:        string
         shipment_id?:   string
@@ -450,3 +568,30 @@ export function createAdminOrderService(sql: NeonQueryFunction<false, false>) {
 }
 
 export type AdminOrderService = ReturnType<typeof createAdminOrderService>
+
+
+/** Reads the immutable set snapshot of an order. Null when the order has no set. */
+export async function loadOrderBundle(sql: any, orderId: string): Promise<AdminOrderBundle | null> {
+  const heads = await sql`
+    SELECT id, bundle_id, set_quantity, pricing_mode, pricing_value,
+           component_subtotal_cents, bundle_discount_cents, bundle_net_cents
+      FROM order_bundles WHERE order_id = ${orderId} LIMIT 1` as any[]
+  if (!heads.length) return null
+  const h = heads[0]
+  const rows = await sql`
+    SELECT order_item_id, sku, product_name, quantity, original_unit_price_cents,
+           allocated_discount_cents, net_line_cents
+      FROM order_bundle_items WHERE order_bundle_id = ${h.id} ORDER BY created_at, sku` as any[]
+  return {
+    bundleId: String(h.bundle_id), setQuantity: Number(h.set_quantity),
+    pricingMode: String(h.pricing_mode), pricingValue: Number(h.pricing_value),
+    componentSubtotalCents: Number(h.component_subtotal_cents),
+    bundleDiscountCents: Number(h.bundle_discount_cents),
+    bundleNetCents: Number(h.bundle_net_cents),
+    lines: rows.map(r => ({
+      orderItemId: String(r.order_item_id), sku: String(r.sku), productName: String(r.product_name),
+      quantity: Number(r.quantity), originalUnitPriceCents: Number(r.original_unit_price_cents),
+      allocatedDiscountCents: Number(r.allocated_discount_cents), netLineCents: Number(r.net_line_cents),
+    })),
+  }
+}

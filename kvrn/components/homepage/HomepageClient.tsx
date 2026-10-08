@@ -79,7 +79,7 @@ export function HomepageClient() {
       }}
     >
       {/* Slide indicator */}
-      <SlideIndicator current={slide} total={TOTAL_SLIDES} dark={isDark} />
+      <SlideIndicator current={slide} total={TOTAL_SLIDES} dark={isDark} label={t['home.slidePosition']} />
 
       {/* Down cue — centered, fades after scroll. Mobile: bottom-3.5, Desktop: bottom-8 */}
       <div aria-hidden="true"
@@ -95,7 +95,7 @@ export function HomepageClient() {
       {/* Up arrow — right side, appears after scroll */}
       <button
         onClick={scrollToTop}
-        aria-label="Return to top"
+        aria-label={t['home.returnToTop']}
         style={{
           position: 'fixed', bottom: '28px', right: '24px', zIndex: 190,
           opacity: showUp ? 1 : 0,
@@ -120,7 +120,7 @@ export function HomepageClient() {
       <Slide bg="#0E0E0E">
         <Image
           src="/images/campaign/fabric-macro.webp"
-          alt="Project KVRN — available now"
+          alt={t['home.slide1Alt']}
           fill priority fetchPriority="high"
           className="object-cover object-center"
           sizes="100vw"
@@ -131,7 +131,7 @@ export function HomepageClient() {
         />
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[100px] px-6 text-center">
           <p className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/55 mb-6">
-            Available now
+            {t['home.availableNow']}
           </p>
           <h1
             className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] tracking-[-0.03em] text-[#F0EDE8] mb-8"
@@ -142,7 +142,7 @@ export function HomepageClient() {
           </h1>
           <Link href="/collections/project-kvrn"
             className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
-            Discover Project KVRN
+            {t['home.discover']}
           </Link>
         </div>
       </Slide>
@@ -154,7 +154,7 @@ export function HomepageClient() {
         <div className="absolute inset-0 bg-[#0E0E0E]/25" aria-hidden="true" />
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-16 md:pb-[100px] px-6 text-center">
           <p className="font-display font-light text-[20px] md:text-[28px] tracking-[0.06em] text-[#F0EDE8]/80 max-w-[560px] leading-snug">
-            One drop. One chance.
+            {t['home.oneDrop']}
           </p>
         </div>
       </Slide>
@@ -164,7 +164,7 @@ export function HomepageClient() {
       <Slide bg="#0E0E0E">
         <Image
           src="/images/campaign/hero-main.webp"
-          alt="Heavyweight Collection — coming soon"
+          alt={t['home.slide3Alt']}
           fill
           className="object-cover object-center"
           sizes="100vw"
@@ -178,27 +178,23 @@ export function HomepageClient() {
           <p
             className="text-[11px] font-light tracking-[0.22em] uppercase text-[#F0EDE8]/65 mb-4"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
-            Coming soon
+            {t['home.comingSoon']}
           </p>
           <h2
             className="font-display font-light text-[48px] sm:text-[62px] md:text-[78px] leading-[0.86] tracking-[-0.03em] text-[#F0EDE8] mb-5"
             style={{ textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
-            Heavyweight<br />Collection
+            {t['home.heavyweight']}<br />{t['home.collection']}
           </h2>
           <p
             className="text-[15px] font-light text-[#F0EDE8]/80 leading-relaxed max-w-[400px] mb-8"
             style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
-Built to become the perfect hoodie and sweatpants, the ones you wear more than anything else in your closet.
-
-            The fit people keep coming back for.
-            400 GSM brushed fleece.
-            100&nbsp;%&nbsp;cotton.
+{t['home.heavyBody']}
           </p>
           <ScrollToSlide
             targetSlide={3}
             containerRef={containerRef}
             className="inline-flex items-center h-11 px-8 border border-[#F0EDE8]/55 text-[11px] font-light tracking-[0.18em] uppercase text-[#F0EDE8] hover:bg-[#F0EDE8] hover:text-[#0E0E0E] hover:border-[#F0EDE8] transition-all duration-300">
-            Join the list
+            {t['home.joinList']}
           </ScrollToSlide>
         </div>
       </Slide>
@@ -235,6 +231,7 @@ function ScrollToSlide({
 
 // ── Video slide — mute button only here, play/pause based on active slide ──────
 function VideoSlide({ activeSlide, slideIndex }: { activeSlide: number; slideIndex: number }) {
+  const { t } = useI18n()
   const videoRef   = useRef<HTMLVideoElement>(null)
   const [muted, setMuted] = useState(true)
   const isActive   = activeSlide === slideIndex
@@ -302,7 +299,7 @@ function VideoSlide({ activeSlide, slideIndex }: { activeSlide: number; slideInd
       {isActive && (
         <button
           onClick={toggleMute}
-          aria-label={muted ? 'Unmute video' : 'Mute video'}
+          aria-label={muted ? t['home.unmuteVideo'] : t['home.muteVideo']}
           style={{
             position:       'fixed',
             bottom:         '72px',
@@ -369,12 +366,12 @@ function Slide({ children, bg, 'aria-label': label }: {
 }
 
 // ── Slide indicator ───────────────────────────────────────────────────────────
-function SlideIndicator({ current, total, dark }: {
-  current: number; total: number; dark: boolean
+function SlideIndicator({ current, total, dark, label }: {
+  current: number; total: number; dark: boolean; label: string
 }) {
   return (
     <div className="fixed left-4 md:left-7 top-1/2 -translate-y-1/2 z-[195] flex flex-col gap-[5px]"
-      role="tablist" aria-label="Slide position">
+      role="tablist" aria-label={label}>
       {Array.from({ length: total }, (_, i) => (
         <div key={i} role="tab" aria-selected={i === current}
           style={{
@@ -393,6 +390,7 @@ function SlideIndicator({ current, total, dark }: {
 
 // ── Compact homepage footer ───────────────────────────────────────────────────
 function HomepageFooter() {
+  const { t } = useI18n()
   const year = new Date().getFullYear()
   return (
     <div className="absolute inset-0 bg-[#F9F8F6] flex flex-col pt-[92px]">
@@ -406,16 +404,16 @@ function HomepageFooter() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-8 md:gap-x-14 text-center items-start">
           <div className="order-1 space-y-4">
             <div className="space-y-1">
-              <p className="text-[13px] font-light text-[#1A1A1A]">Quiet garments.</p>
-              <p className="text-[13px] font-light text-[#6B6B6B]">Built with intention.</p>
+              <p className="text-[13px] font-light text-[#1A1A1A]">{t['footer.tagline1']}</p>
+              <p className="text-[13px] font-light text-[#6B6B6B]">{t['footer.tagline2']}</p>
             </div>
             <div className="flex justify-center gap-5 pt-2">
               <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on Instagram" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                aria-label={t['nav.onInstagram']} className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" strokeWidth="1.4"/><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor"/></svg>
               </a>
               <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-                aria-label="KVRN on TikTok" className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
+                aria-label={t['nav.onTikTok']} className="text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors">
                 <svg width="15" height="17" viewBox="0 0 448 512" fill="currentColor"><path d="M448 209.9a210.1 210.1 0 0 1-122.8-39.3v178.8A162.6 162.6 0 1 1 185 188.3v89.3a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 381 102.4a121.4 121.4 0 0 0 67 20.1z"/></svg>
               </a>
             </div>
@@ -427,29 +425,29 @@ function HomepageFooter() {
             </Link>
           </div>
           <div>
-            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Shop</p>
-            {[['Shop All','/shop'],['Hoodies','/shop?type=hoodies'],['Sweatpants','/shop?type=sweatpants']].map(([l,h]) => (
+            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">{t.shop}</p>
+            {[[t.shopAll,'/shop'],[t.hoodies,'/shop?type=hoodies'],[t.sweatpants,'/shop?type=sweatpants']].map(([l,h]) => (
               <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
             ))}
           </div>
           <div>
-            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Support</p>
-            {[['Shipping & Returns','/support/shipping-returns'],['Track Order','/support/track'],['Contact','/contact']].map(([l,h]) => (
+            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">{t.support}</p>
+            {[[t.shippingReturns,'/support/shipping-returns'],[t.trackOrder,'/support/track'],[t.contact,'/contact']].map(([l,h]) => (
               <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
             ))}
           </div>
           <div>
-            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">Legal</p>
-            {[['Privacy','/privacy'],['Terms','/terms'],['Cookies','/cookies']].map(([l,h]) => (
+            <p className="text-[10px] font-light tracking-[0.16em] uppercase text-[#9B9B9B] mb-4">{t.legal}</p>
+            {[[t.privacy,'/privacy'],[t.terms,'/terms'],[t.cookies,'/cookies']].map(([l,h]) => (
               <Link key={h} href={h} className="block text-[13px] text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors mb-2.5">{l}</Link>
             ))}
           </div>
         </div>
         <div className="border-t border-[#E8E5E0] mt-5 pt-3 pb-0 flex items-center justify-between gap-4">
-          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. All rights reserved.</p>
+          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. {t.allRightsReserved}</p>
           <button onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))}
             className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors">
-            Cookie preferences
+            {t['nav.cookiePreferences']}
           </button>
         </div>
       </div>

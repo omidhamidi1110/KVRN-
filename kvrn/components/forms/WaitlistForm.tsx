@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { isValidEmail, cn } from '@/lib/utils'
+import { useI18n } from '@/context/I18nContext'
 
 interface WaitlistFormProps {
   variant?:    'light' | 'dark'
@@ -20,6 +21,7 @@ export function WaitlistForm({
   className,
   source = 'unknown',
 }: WaitlistFormProps) {
+  const { t }  = useI18n()
   const [email,  setEmail]  = useState('')
   const [state,  setState]  = useState<State>('idle')
   const [errMsg, setErrMsg] = useState('')
@@ -39,7 +41,7 @@ export function WaitlistForm({
     setErrMsg('')
 
     if (!email.trim() || !isValidEmail(email)) {
-      setErrMsg('Please enter a valid email address.')
+      setErrMsg(t['waitlist.pleaseEnterValidEmail'])
       return
     }
 
@@ -54,7 +56,7 @@ export function WaitlistForm({
       setState('success')
     } catch {
       setState('error')
-      setErrMsg('Something went wrong. Please try again.')
+      setErrMsg(t['common.tryAgain'])
     }
   }
 
@@ -63,7 +65,7 @@ export function WaitlistForm({
       <div className={cn(className)}>
         {heading && <p className={cn('text-[15px] font-light mb-1', txtColor)}>{heading}</p>}
         <p className={cn('text-[13px] font-light', mutColor)}>
-          You&apos;re on the list.
+          {t.onTheList}
         </p>
       </div>
     )
@@ -76,13 +78,13 @@ export function WaitlistForm({
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="flex gap-0">
-          <label htmlFor={`waitlist-email-${source}`} className="sr-only">Email address</label>
+          <label htmlFor={`waitlist-email-${source}`} className="sr-only">{t.emailPlaceholder}</label>
           <input
             id={`waitlist-email-${source}`}
             type="email"
             name="email"
             autoComplete="email"
-            placeholder="Email address"
+            placeholder={t.emailPlaceholder}
             value={email}
             onChange={e => { setEmail(e.target.value); setErrMsg('') }}
             required
@@ -105,7 +107,7 @@ export function WaitlistForm({
               btnCls
             )}
           >
-            {state === 'loading' ? '…' : 'Join'}
+            {state === 'loading' ? '…' : t.joinBtn}
           </button>
         </div>
 
@@ -116,7 +118,7 @@ export function WaitlistForm({
         )}
 
         <p className={cn('mt-3 text-[11px] font-light tracking-wide', mutColor)}>
-          Collection access only. Unsubscribe any time.
+          {t.collectionOnly}
         </p>
       </form>
     </div>

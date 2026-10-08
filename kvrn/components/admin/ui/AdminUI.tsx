@@ -1,0 +1,375 @@
+'use client'
+// components/admin/ui/AdminUI.tsx — shared Admin primitives for the refreshed Admin.
+//
+// Visual rules: warm off-white canvas (set by AdminShell), white cards, subtle borders,
+// 14px radius, 11–13px body text, 9–10px ONLY for short uppercase eyebrows, flat fills only.
+// Copy rules: short, decision-useful. Put background/method/units in <InfoTip>, but keep
+// warnings and Exception/Incomplete/Failed/Unresolved states visible (see StatusBadge, Notice).
+
+import { type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { InfoTip } from './InfoTip'
+
+export { InfoTip }
+
+const cx = (...a: Array<string | false | null | undefined>) => a.filter(Boolean).join(' ')
+
+// ── Page frame ────────────────────────────────────────────────────────────────
+// One max width and one padding scale for every Admin page.
+
+const PAGE_WIDTH = { narrow: 'max-w-[980px]', default: 'max-w-[1240px]', wide: 'max-w-[1500px]' } as const
+export function AdminPage({ children, width = 'default', className = '' }: {
+  children: ReactNode; width?: keyof typeof PAGE_WIDTH; className?: string
+}) {
+  return (
+    <div className={cx('mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8', PAGE_WIDTH[width], className)}>
+      {children}
+    </div>
+  )
+}
+
+// ── Page + section headers ────────────────────────────────────────────────────
+
+export function AdminPageHeader({
+  title, description, eyebrow, info, actions,
+}: {
+  title: string
+  /** Usually 3–8 words. */
+  description?: string
+  eyebrow?: string
+  info?: ReactNode
+  actions?: ReactNode
+}) {
+  return (
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        {eyebrow && <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[#8A8A85]">{eyebrow}</p>}
+        <h1 className="flex items-center gap-1 text-[20px] font-medium leading-tight tracking-[-0.01em] text-[#171717]">
+          {title}{info && <InfoTip label={`About ${title}`}>{info}</InfoTip>}
+        </h1>
+        {description && <p className="mt-1 text-[12px] text-[#6B6B66]">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </header>
+  )
+}
+
+export function AdminSectionHeader({
+  title, description, info, actions,
+}: { title: string; description?: string; info?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0">
+        <h2 className="flex items-center gap-1 text-[13px] font-medium text-[#171717]">
+          {title}{info && <InfoTip label={`About ${title}`}>{info}</InfoTip>}
+        </h2>
+        {description && <p className="mt-0.5 text-[11px] text-[#6B6B66]">{description}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
+    </div>
+  )
+}
+
+export function AdminCard({
+  children, className = '', padded = true,
+}: { children: ReactNode; className?: string; padded?: boolean }) {
+  return (
+    <section className={cx('rounded-[14px] border border-black/[0.08] bg-white', padded && 'p-4 sm:p-5', className)}>
+      {children}
+    </section>
+  )
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+
+type BtnVariant = 'primary' | 'secondary' | 'danger' | 'ghost'
+type BtnSize = 'sm' | 'md'
+const BTN_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-[9px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 disabled:cursor-not-allowed disabled:opacity-50'
+// 40px tall on touch screens, 32/36px from the sm breakpoint up.
+const BTN_SIZES: Record<BtnSize, string> = { sm: 'h-10 px-3 text-[11px] sm:h-8', md: 'h-10 px-4 text-[12px] sm:h-9' }
+const BTN_VARIANTS: Record<BtnVariant, string> = {
+  primary:   'bg-[#171717] text-white hover:bg-black',
+  secondary: 'border border-black/[0.12] bg-white text-[#171717] hover:bg-black/[0.03]',
+  danger:    'border border-[#B91C1C]/30 bg-white text-[#B91C1C] hover:bg-[#FEF2F2]',
+  ghost:     'text-[#4A4A46] hover:bg-black/[0.05]',
+}
+/** Class string for anchors/links that should look like an AdminButton. */
+export const adminButtonClass = (variant: BtnVariant = 'secondary', size: BtnSize = 'md', extra = '') =>
+  cx(BTN_BASE, BTN_SIZES[size], BTN_VARIANTS[variant], extra)
+
+export function AdminButton({
+  variant = 'secondary', size = 'md', loading, className = '', children, disabled, ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: BtnSize; loading?: boolean }) {
+  return (
+    <button type="button" {...rest} disabled={disabled || loading} aria-busy={loading || undefined}
+      className={adminButtonClass(variant, size, className)}>
+      {loading ? 'Working…' : children}
+    </button>
+  )
+}
+
+// ── Notices (always visible; never inside a tooltip) ──────────────────────────
+
+type Tone = 'info' | 'success' | 'warning' | 'danger'
+const NOTICE: Record<Tone, string> = {
+  info:    'border-black/[0.10] bg-[#FAFAF8] text-[#3A3A38]',
+  success: 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]',
+  warning: 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]',
+  danger:  'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]',
+}
+export function AdminNotice({ tone = 'info', title, children, className = '' }: {
+  tone?: Tone; title?: string; children?: ReactNode; className?: string
+}) {
+  return (
+    <div role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
+      className={cx('rounded-[10px] border px-3.5 py-2.5 text-[12px] leading-[1.5]', NOTICE[tone], className)}>
+      {title && <p className="font-medium">{title}</p>}
+      {children && <div className={title ? 'mt-0.5' : undefined}>{children}</div>}
+    </div>
+  )
+}
+
+// ── Fields ────────────────────────────────────────────────────────────────────
+
+export function AdminField({ label, htmlFor, info, hint, error, children, className = '' }: {
+  label: string; htmlFor?: string; info?: ReactNode; hint?: string; error?: string | null
+  children: ReactNode; className?: string
+}) {
+  return (
+    <div className={className}>
+      <label htmlFor={htmlFor} className="mb-1 flex items-center gap-0.5 text-[11px] font-medium text-[#4A4A46]">
+        {label}{info && <InfoTip label={`About ${label}`}>{info}</InfoTip>}
+      </label>
+      {children}
+      {error ? <p role="alert" className="mt-1 text-[11px] text-[#B91C1C]">{error}</p>
+             : hint ? <p className="mt-1 text-[11px] text-[#8A8A85]">{hint}</p> : null}
+    </div>
+  )
+}
+
+export const adminInputClass =
+  'h-10 w-full rounded-[9px] border border-black/[0.14] bg-white px-3 text-[12px] text-[#171717] placeholder:text-[#A5A5A0] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] disabled:bg-black/[0.03] disabled:text-[#8A8A85] sm:h-9'
+/** Native <select> — same height and border as inputs. */
+export const adminSelectClass = adminInputClass + ' pr-8'
+export const adminTextareaClass =
+  'w-full rounded-[9px] border border-black/[0.14] bg-white px-3 py-2 text-[12px] leading-[1.5] text-[#171717] placeholder:text-[#A5A5A0] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] disabled:bg-black/[0.03] disabled:text-[#8A8A85]'
+export const adminCheckboxClass = 'h-4 w-4 rounded border-black/[0.3] accent-[#171717] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40'
+
+// ── Status vocabulary ─────────────────────────────────────────────────────────
+// ONE vocabulary across the Admin. Text is always rendered (no color-only meaning).
+
+export const STATUS_TONES = {
+  Live: 'success', Active: 'success', Paid: 'success', Fulfilled: 'success', Reconciled: 'success',
+  Approved: 'success', Verified: 'success', Ready: 'success', Recovered: 'success', Released: 'success', Sent: 'success',
+  Draft: 'neutral', Inactive: 'neutral', Archived: 'neutral', Unfulfilled: 'neutral', Open: 'neutral', Cancelled: 'neutral',
+  Scheduled: 'info', Processing: 'info', Queued: 'info', Refunded: 'info', Resolved: 'info',
+  Pending: 'warning', Incomplete: 'warning', Unknown: 'warning', Held: 'warning', Review: 'warning', Partial: 'warning',
+  Exception: 'danger', Failed: 'danger', Unresolved: 'danger', Rejected: 'danger', Suspended: 'danger', Terminated: 'danger',
+} as const
+export type StatusLabel = keyof typeof STATUS_TONES
+
+const BADGE: Record<'success' | 'neutral' | 'info' | 'warning' | 'danger', string> = {
+  success: 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]',
+  neutral: 'border-black/[0.10] bg-[#F5F5F3] text-[#4A4A46]',
+  info:    'border-[#BFDBFE] bg-[#EFF6FF] text-[#1E40AF]',
+  warning: 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]',
+  danger:  'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]',
+}
+export function StatusBadge({ status, label }: { status: StatusLabel; label?: string }) {
+  return (
+    <span className={cx('inline-flex items-center rounded-full border px-2 py-[2px] text-[10px] font-medium uppercase tracking-[0.06em]', BADGE[STATUS_TONES[status]])}>
+      {label ?? status}
+    </span>
+  )
+}
+
+/** Small neutral/toned label for things that are NOT workflow states (e.g. "Contact form", "3 new"). */
+export function AdminTag({ tone = 'neutral', children, label }: {
+  tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'dark'; children: ReactNode; label?: string
+}) {
+  const cls = tone === 'dark' ? 'border-[#171717] bg-[#171717] text-white' : BADGE[tone]
+  return (
+    <span aria-label={label} className={cx('inline-flex items-center rounded-full border px-2 py-[1px] text-[10px] font-medium', cls)}>
+      {children}
+    </span>
+  )
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+// Label + value + optional sub-line. `flag` is a VISIBLE warning line (Partial / Unknown /
+// Incomplete); it is never tucked into the tooltip. `info` carries the definition.
+
+const STAT_TONE = { default: 'text-[#171717]', positive: 'text-[#047857]', negative: 'text-[#B91C1C]', muted: 'text-[#6B6B66]', warning: 'text-[#92400E]' } as const
+export function AdminStat({ label, value, sub, tone = 'default', info, flag, className = '' }: {
+  label: string; value: ReactNode; sub?: ReactNode; tone?: keyof typeof STAT_TONE
+  info?: ReactNode; flag?: ReactNode; className?: string
+}) {
+  return (
+    <div className={cx('min-w-0 rounded-[14px] border border-black/[0.08] bg-white px-4 py-3.5', className)}>
+      <p className="flex items-center gap-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8A8A85]">
+        <span className="min-w-0">{label}</span>{info && <InfoTip label={`About ${label}`}>{info}</InfoTip>}
+      </p>
+      <p className={cx('mt-1.5 break-words text-[20px] font-medium leading-tight tracking-[-0.01em]', STAT_TONE[tone])}>{value}</p>
+      {sub && <p className="mt-1 text-[11px] text-[#6B6B66]">{sub}</p>}
+      {flag && <p className="mt-1 text-[11px] font-medium text-[#92400E]">{flag}</p>}
+    </div>
+  )
+}
+/** Responsive grid for stat cards / small cards (no horizontal page overflow). */
+export function AdminStatGrid({ children, min = 180, className = '' }: { children: ReactNode; min?: number; className?: string }) {
+  return (
+    <div className={cx('grid gap-2.5', className)} style={{ gridTemplateColumns: `repeat(auto-fill,minmax(min(${min}px,100%),1fr))` }}>
+      {children}
+    </div>
+  )
+}
+
+// ── Segmented control (range pickers, view switches) ──────────────────────────
+
+export function AdminSegmented<T extends string>({ options, value, onChange, ariaLabel }: {
+  options: ReadonlyArray<{ id: T; label: string }>; value: T; onChange: (id: T) => void; ariaLabel: string
+}) {
+  return (
+    <div role="group" aria-label={ariaLabel} className="inline-flex flex-wrap gap-1 rounded-[10px] border border-black/[0.10] bg-white p-0.5">
+      {options.map(o => {
+        const active = o.id === value
+        return (
+          <button key={o.id} type="button" aria-pressed={active} onClick={() => onChange(o.id)}
+            className={cx('h-9 rounded-[8px] px-3 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:h-8',
+              active ? 'bg-[#171717] text-white' : 'text-[#4A4A46] hover:bg-black/[0.05]')}>
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Compact expandable help (for several related notes; warnings do NOT belong here) ──
+
+export function AdminDisclosure({ summary, children, className = '' }: { summary: string; children: ReactNode; className?: string }) {
+  return (
+    <details className={cx('group rounded-[10px] border border-black/[0.08] bg-white', className)}>
+      <summary className="flex min-h-[40px] cursor-pointer list-none items-center justify-between gap-2 px-3.5 py-2 text-[12px] font-medium text-[#171717] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 [&::-webkit-details-marker]:hidden">
+        {summary}
+        <span aria-hidden="true" className="text-[#8A8A85] transition-transform group-open:rotate-180">⌄</span>
+      </summary>
+      <div className="border-t border-black/[0.06] px-3.5 py-3 text-[12px] leading-[1.55] text-[#3A3A38]">{children}</div>
+    </details>
+  )
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }: {
+  tabs: Array<{ id: T; label: string; count?: number }>; value: T; onChange: (id: T) => void; ariaLabel: string
+}) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([])
+  const onKeyDown = (e: ReactKeyboardEvent, i: number) => {
+    const last = tabs.length - 1
+    const next = e.key === 'ArrowRight' ? (i === last ? 0 : i + 1)
+      : e.key === 'ArrowLeft' ? (i === 0 ? last : i - 1)
+      : e.key === 'Home' ? 0 : e.key === 'End' ? last : -1
+    if (next < 0) return
+    e.preventDefault()
+    refs.current[next]?.focus()
+    onChange(tabs[next].id)
+  }
+  return (
+    <div role="tablist" aria-label={ariaLabel} className="mb-4 flex gap-1 overflow-x-auto border-b border-black/[0.08]">
+      {tabs.map((t, i) => {
+        const active = t.id === value
+        return (
+          <button key={t.id} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+            ref={el => { refs.current[i] = el }} onKeyDown={e => onKeyDown(e, i)} onClick={() => onChange(t.id)}
+            className={cx('-mb-px min-h-[40px] whitespace-nowrap border-b-2 px-3 py-2 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40',
+              active ? 'border-[#171717] text-[#171717]' : 'border-transparent text-[#6B6B66] hover:text-[#171717]')}>
+            {t.label}{typeof t.count === 'number' && <span className="ml-1.5 text-[10px] text-[#8A8A85]">{t.count}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+
+export function AdminTable({ children, caption, minWidth = 560 }: { children: ReactNode; caption?: string; minWidth?: number }) {
+  return (
+    <div className="overflow-x-auto rounded-[12px] border border-black/[0.08] bg-white">
+      <table className="w-full border-collapse text-left text-[12px]" style={{ minWidth }}>
+        {caption && <caption className="sr-only">{caption}</caption>}
+        {children}
+      </table>
+    </div>
+  )
+}
+export const AdminTh = ({ children, className = '', info }: { children?: ReactNode; className?: string; info?: ReactNode }) => (
+  <th scope="col" className={cx('whitespace-nowrap border-b border-black/[0.08] bg-[#FAFAF8] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.08em] text-[#8A8A85]', className)}>
+    {children}{info && <InfoTip label={`About ${typeof children === 'string' ? children : 'this column'}`}>{info}</InfoTip>}
+  </th>
+)
+export const AdminTd = ({ children, className = '', colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) => (
+  <td colSpan={colSpan} className={cx('border-b border-black/[0.05] px-3 py-2.5 align-top text-[#171717]', className)}>{children}</td>
+)
+
+// ── Empty / loading / error ───────────────────────────────────────────────────
+
+export function AdminEmpty({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return (
+    <div className="rounded-[12px] border border-dashed border-black/[0.14] bg-white px-4 py-8 text-center">
+      <p className="text-[13px] font-medium text-[#171717]">{title}</p>
+      {description && <p className="mt-1 text-[12px] text-[#6B6B66]">{description}</p>}
+      {action && <div className="mt-3 flex justify-center">{action}</div>}
+    </div>
+  )
+}
+export function AdminLoading({ label = 'Loading…' }: { label?: string }) {
+  return <div role="status" aria-live="polite" className="px-1 py-6 text-[12px] text-[#8A8A85]">{label}</div>
+}
+export function AdminError({ message = 'Try again in a moment.', onRetry }: { message?: string; onRetry?: () => void }) {
+  return (
+    <AdminNotice tone="danger" title="Couldn’t load this data.">
+      <span>{message}</span>
+      {onRetry && <> <button type="button" onClick={onRetry} className="min-h-[24px] font-medium underline underline-offset-2">Retry</button></>}
+    </AdminNotice>
+  )
+}
+
+// ── Confirm (destructive actions: warning text stays VISIBLE in the dialog body) ──
+
+export interface ConfirmOptions { confirmLabel?: string; cancelLabel?: string; title?: string; tone?: 'danger' | 'primary' }
+
+export function useConfirm() {
+  const [state, setState] = useState<null | { message: string; opts: ConfirmOptions; resolve: (v: boolean) => void }>(null)
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  const confirm = (message: string, opts: ConfirmOptions = {}) =>
+    new Promise<boolean>(resolve => setState({ message, opts, resolve }))
+  const close = (v: boolean) => { state?.resolve(v); setState(null) }
+
+  useEffect(() => {
+    if (!state) return
+    cancelRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { state.resolve(false); setState(null) } }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [state])
+
+  const node = state ? (
+    <div role="alertdialog" aria-modal="true" aria-label={state.opts.title ?? 'Confirm action'}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-[380px] rounded-[14px] bg-white p-5 shadow-xl">
+        {state.opts.title && <p className="mb-1 text-[13px] font-medium text-[#171717]">{state.opts.title}</p>}
+        <p className="text-[13px] leading-[1.5] text-[#171717]">{state.message}</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button ref={cancelRef} type="button" onClick={() => close(false)} className={adminButtonClass('secondary', 'md')}>
+            {state.opts.cancelLabel ?? 'Cancel'}
+          </button>
+          <AdminButton variant={state.opts.tone === 'primary' ? 'primary' : 'danger'} onClick={() => close(true)}>
+            {state.opts.confirmLabel ?? 'Confirm'}
+          </AdminButton>
+        </div>
+      </div>
+    </div>
+  ) : null
+  return { confirm, node }
+}

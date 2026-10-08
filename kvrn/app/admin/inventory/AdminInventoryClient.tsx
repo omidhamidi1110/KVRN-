@@ -1,5 +1,10 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminButton, AdminNotice, AdminField, AdminStat, AdminStatGrid,
+  AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading, AdminError, StatusBadge, AdminTag,
+  adminInputClass, adminSelectClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Variant = {
   id: string; sku: string; size: string; color_name: string
@@ -68,23 +73,19 @@ export default function AdminInventoryClient() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-7 lg:px-10 lg:py-10">
-        <div className="animate-pulse">
-          <div className="h-8 w-48 rounded bg-black/10" />
-          <div className="mt-3 h-4 w-72 rounded bg-black/[0.06]" />
-          <div className="mt-8 h-[420px] rounded-xl border border-black/[0.06] bg-white" />
-        </div>
-      </div>
+      <AdminPage>
+        <AdminPageHeader title="Inventory" description="Stock, reservations, and availability." />
+        <AdminLoading />
+      </AdminPage>
     )
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-7 lg:px-10 lg:py-10">
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">
-          {error}
-        </div>
-      </div>
+      <AdminPage>
+        <AdminPageHeader title="Inventory" description="Stock, reservations, and availability." />
+        <AdminError message={error} onRetry={load} />
+      </AdminPage>
     )
   }
 
@@ -103,433 +104,250 @@ export default function AdminInventoryClient() {
     v => Number(v.available_quantity ?? 0) <= 0
   ).length
 
+  const onHandInfo = 'Units physically in stock.'
+  const reservedInfo = 'Units held for checkouts in progress. They are not sold yet and are released if the checkout expires.'
+  const availableInfo = 'On hand minus reserved. This is what can still be sold.'
+
   return (
-    <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-7 lg:px-10 lg:py-10">
-
-      {/* Page header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-black/35">
-            Operations
-          </p>
-          <h1 className="text-[30px] font-medium tracking-[-0.035em] text-[#171717] sm:text-[34px]">
-            Inventory
-          </h1>
-          <p className="mt-2 text-[13px] text-black/45">
-            Manage variant availability, stock levels, reservations, and inventory history.
-          </p>
-        </div>
-
-        <button
-          onClick={load}
-          className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg border border-black/[0.10] bg-white px-4 text-[11px] font-medium text-black/55 shadow-sm transition hover:border-black/20 hover:text-black sm:self-auto"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Refresh
-        </button>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Inventory"
+        description="Stock, reservations, and availability."
+        actions={<AdminButton onClick={load}>Refresh</AdminButton>}
+      />
 
       {/* Summary */}
-      <div className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="rounded-xl border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:p-5">
-          <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-black/30">
-            Variants
-          </p>
-          <p className="mt-3 text-[25px] font-medium tracking-[-0.04em]">
-            {variants.length}
-          </p>
-          <p className="mt-1 text-[10px] text-black/30">
-            {activeVariants.length} active
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:p-5">
-          <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-black/30">
-            Available units
-          </p>
-          <p className="mt-3 text-[25px] font-medium tracking-[-0.04em]">
-            {availableUnits}
-          </p>
-          <p className="mt-1 text-[10px] text-black/30">Ready to sell</p>
-        </div>
-
-        <div className="rounded-xl border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:p-5">
-          <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-black/30">
-            Reserved
-          </p>
-          <p className="mt-3 text-[25px] font-medium tracking-[-0.04em]">
-            {reservedUnits}
-          </p>
-          <p className="mt-1 text-[10px] text-black/30">Held for checkout</p>
-        </div>
-
-        <div className="rounded-xl border border-black/[0.07] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)] sm:p-5">
-          <p className="text-[9px] font-medium uppercase tracking-[0.14em] text-black/30">
-            Sold out
-          </p>
-          <p className={[
-            'mt-3 text-[25px] font-medium tracking-[-0.04em]',
-            soldOutVariants > 0 ? 'text-red-600' : 'text-[#171717]',
-          ].join(' ')}>
-            {soldOutVariants}
-          </p>
-          <p className="mt-1 text-[10px] text-black/30">Active variants</p>
-        </div>
-      </div>
+      <AdminStatGrid min={170} className="mb-6">
+        <AdminStat label="Variants" value={variants.length} sub={`${activeVariants.length} active`} />
+        <AdminStat label="Available units" value={availableUnits} sub="Ready to sell" info={availableInfo} />
+        <AdminStat label="Reserved" value={reservedUnits} sub="Held for checkout" info={reservedInfo} />
+        <AdminStat label="Sold out" value={soldOutVariants} tone={soldOutVariants > 0 ? 'negative' : 'default'} sub="Active variants" />
+      </AdminStatGrid>
 
       <div className="flex flex-col items-start gap-4 2xl:flex-row">
 
         {/* Inventory ledger */}
-        <section className="w-full min-w-0 flex-1 overflow-hidden rounded-xl border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-          <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-black/30">
-                Stock ledger
-              </p>
-              <p className="mt-1 text-[12px] text-black/40">
-                Select a variant to manage stock
-              </p>
-            </div>
-
-            <span className="rounded-full border border-black/[0.07] px-3 py-1 text-[10px] font-medium text-black/35">
-              {variants.length} variants
-            </span>
-          </div>
+        <section className="w-full min-w-0 flex-1">
+          <AdminSectionHeader title="Stock ledger" description="Select a variant to manage stock."
+            actions={<AdminTag>{variants.length} variants</AdminTag>} />
 
           {variants.length === 0 ? (
-            <div className="px-6 py-14 text-center">
-              <p className="text-[13px] font-medium text-black/55">No inventory variants</p>
-              <p className="mt-1 text-[11px] text-black/30">
-                Inventory will appear here once variants are created.
-              </p>
-            </div>
+            <AdminEmpty title="No inventory variants." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[960px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-black/[0.06] bg-[#FAFAF9]">
-                    {['Product','Size','SKU','On Hand','Reserved','Available','Status','Updated',''].map(h => (
-                      <th
-                        key={h}
-                        className="whitespace-nowrap px-4 py-3 text-[9px] font-medium uppercase tracking-[0.12em] text-black/30"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
+            <AdminTable minWidth={900} caption="Stock by variant">
+              <thead>
+                <tr>
+                  <AdminTh>Product</AdminTh>
+                  <AdminTh>Size</AdminTh>
+                  <AdminTh>SKU</AdminTh>
+                  <AdminTh info={onHandInfo}>On hand</AdminTh>
+                  <AdminTh info={reservedInfo}>Reserved</AdminTh>
+                  <AdminTh info={availableInfo}>Available</AdminTh>
+                  <AdminTh>Status</AdminTh>
+                  <AdminTh>Updated</AdminTh>
+                  <AdminTh><span className="sr-only">Manage</span></AdminTh>
+                </tr>
+              </thead>
+              <tbody>
+                {variants.map(v => {
+                  const available = Number(v.available_quantity)
+                  const isSoldOut = v.active && available <= 0
 
-                <tbody>
-                  {variants.map(v => {
-                    const available = Number(v.available_quantity)
-                    const isSoldOut = v.active && available <= 0
-
-                    return (
-                      <tr
-                        key={v.id}
-                        onClick={() => selectVariant(v.id)}
-                        className={[
-                          'cursor-pointer border-b border-black/[0.05] transition last:border-0 hover:bg-black/[0.018]',
-                          selected === v.id ? 'bg-black/[0.025]' : '',
-                        ].join(' ')}
-                      >
-                        <td className="px-4 py-4">
-                          <p className="max-w-[220px] truncate text-[12px] font-medium">
-                            {v.product_name}
-                          </p>
-                          {v.color_name && (
-                            <p className="mt-0.5 text-[10px] text-black/30">
-                              {v.color_name}
-                            </p>
-                          )}
-                        </td>
-
-                        <td className="whitespace-nowrap px-4 py-4 text-[12px] text-black/55">
-                          {v.size}
-                        </td>
-
-                        <td className="whitespace-nowrap px-4 py-4">
-                          <span className="font-mono text-[10px] text-black/45">
-                            {v.sku}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4 text-[12px] font-medium">
-                          {v.stock_on_hand}
-                        </td>
-
-                        <td className="px-4 py-4 text-[12px] text-black/45">
-                          {v.reserved_quantity}
-                        </td>
-
-                        <td className={[
-                          'px-4 py-4 text-[12px] font-semibold',
-                          available > 0 ? 'text-emerald-700' : 'text-red-600',
-                        ].join(' ')}>
-                          {available}
-                        </td>
-
-                        <td className="px-4 py-4">
-                          {!v.active ? (
-                            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.06em] text-neutral-500">
-                              Inactive
-                            </span>
-                          ) : isSoldOut ? (
-                            <span className="inline-flex whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.06em] text-red-700">
-                              Sold out
-                            </span>
-                          ) : (
-                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[9px] font-medium uppercase tracking-[0.06em] text-emerald-700">
-                              Active
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="whitespace-nowrap px-4 py-4 text-[10px] text-black/30">
-                          {new Date(v.updated_at).toLocaleString()}
-                        </td>
-
-                        <td className="whitespace-nowrap px-4 py-4 text-right">
-                          <span className="text-[10px] font-medium text-black/35">
-                            Manage →
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  return (
+                    <tr
+                      key={v.id}
+                      onClick={() => selectVariant(v.id)}
+                      className={[
+                        'cursor-pointer transition hover:bg-black/[0.018]',
+                        selected === v.id ? 'bg-black/[0.03]' : '',
+                      ].join(' ')}
+                    >
+                      <AdminTd>
+                        <p className="max-w-[220px] truncate font-medium">{v.product_name}</p>
+                        {v.color_name && <p className="mt-0.5 text-[11px] text-[#8A8A85]">{v.color_name}</p>}
+                      </AdminTd>
+                      <AdminTd className="whitespace-nowrap text-[#4A4A46]">{v.size}</AdminTd>
+                      <AdminTd className="whitespace-nowrap"><span className="font-mono text-[11px] text-[#4A4A46]">{v.sku}</span></AdminTd>
+                      <AdminTd className="font-medium">{v.stock_on_hand}</AdminTd>
+                      <AdminTd className="text-[#4A4A46]">{v.reserved_quantity}</AdminTd>
+                      <AdminTd className={['font-medium', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</AdminTd>
+                      <AdminTd>
+                        <span className="flex flex-wrap items-center gap-1">
+                          <StatusBadge status={v.active ? 'Active' : 'Inactive'} />
+                          {isSoldOut && <AdminTag tone="danger">Sold out</AdminTag>}
+                        </span>
+                      </AdminTd>
+                      <AdminTd className="whitespace-nowrap text-[11px] text-[#6B6B66]">{new Date(v.updated_at).toLocaleString()}</AdminTd>
+                      <AdminTd className="whitespace-nowrap text-right">
+                        <AdminButton size="sm" variant="ghost" aria-label={`Manage ${v.sku}`}
+                          onClick={e => { e.stopPropagation(); selectVariant(v.id) }}>Manage →</AdminButton>
+                      </AdminTd>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </AdminTable>
           )}
         </section>
 
         {/* Variant management */}
         {sel && (
-          <aside className="w-full flex-shrink-0 overflow-hidden rounded-xl border border-black/[0.07] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] 2xl:sticky 2xl:top-6 2xl:w-[410px]">
-            <div className="flex items-start justify-between border-b border-black/[0.06] px-5 py-4">
-              <div className="min-w-0">
-                <p className="text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
-                  Manage variant
-                </p>
-                <h2 className="mt-1.5 truncate font-mono text-[12px] font-medium">
-                  {sel.sku}
-                </h2>
+          <AdminCard padded={false} className="w-full flex-shrink-0 overflow-hidden 2xl:sticky 2xl:top-6 2xl:w-[410px]">
+            <aside aria-label="Manage variant">
+              <div className="flex items-start justify-between border-b border-black/[0.06] px-5 py-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8A85]">Manage variant</p>
+                  <h2 className="mt-1 truncate font-mono text-[12px] font-medium">{sel.sku}</h2>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setSelected(null)
+                    setMovements([])
+                    setFeedback(null)
+                  }}
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[9px] text-[#6B6B66] transition hover:bg-black/[0.05] hover:text-[#171717] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:h-8 sm:w-8"
+                  aria-label="Close variant"
+                >
+                  <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <path d="M3 3l12 12M15 3 3 15" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </button>
               </div>
 
-              <button
-                onClick={() => {
-                  setSelected(null)
-                  setMovements([])
-                  setFeedback(null)
-                }}
-                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-black/30 transition hover:bg-black/[0.04] hover:text-black"
-                aria-label="Close variant"
-              >
-                <svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M3 3l12 12M15 3 3 15"
-                    stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-5 py-5">
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg bg-[#F8F8F6] p-3">
-                  <p className="text-[8px] font-medium uppercase tracking-[0.12em] text-black/30">
-                    On hand
-                  </p>
-                  <p className="mt-2 text-[20px] font-medium">{sel.stock_on_hand}</p>
+              <div className="px-5 py-5">
+                <div className="grid grid-cols-3 gap-2">
+                  <AdminStat label="On hand" value={sel.stock_on_hand} info={onHandInfo} className="!px-3 !py-3" />
+                  <AdminStat label="Reserved" value={sel.reserved_quantity} info={reservedInfo} className="!px-3 !py-3" />
+                  <AdminStat label="Available" value={sel.available_quantity}
+                    tone={Number(sel.available_quantity) > 0 ? 'positive' : 'negative'} info={availableInfo} className="!px-3 !py-3" />
                 </div>
 
-                <div className="rounded-lg bg-[#F8F8F6] p-3">
-                  <p className="text-[8px] font-medium uppercase tracking-[0.12em] text-black/30">
-                    Reserved
-                  </p>
-                  <p className="mt-2 text-[20px] font-medium">{sel.reserved_quantity}</p>
-                </div>
+                <div className="mt-5">
+                  <p className="mb-3 text-[12px] font-medium">Adjust inventory</p>
 
-                <div className="rounded-lg bg-[#F8F8F6] p-3">
-                  <p className="text-[8px] font-medium uppercase tracking-[0.12em] text-black/30">
-                    Available
-                  </p>
-                  <p className={[
-                    'mt-2 text-[20px] font-medium',
-                    Number(sel.available_quantity) > 0 ? 'text-emerald-700' : 'text-red-600',
-                  ].join(' ')}>
-                    {sel.available_quantity}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5">
-                <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
-                  Adjust inventory
-                </p>
-
-                <div className="space-y-3">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[10px] font-medium text-black/45">
-                      Action
-                    </span>
-                    <select
-                      value={form.type}
-                      onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                      className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none focus:border-black/25"
-                    >
-                      <option value="ADD">Add stock</option>
-                      <option value="REMOVE">Remove stock</option>
-                      <option value="SET">Set absolute quantity</option>
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1.5 block text-[10px] font-medium text-black/45">
-                      Quantity *
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={form.quantity}
-                      onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
-                      className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none focus:border-black/25"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1.5 block text-[10px] font-medium text-black/45">
-                      Reason *
-                    </span>
-                    <input
-                      type="text"
-                      value={form.reason}
-                      onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-                      placeholder="e.g. Initial stock entry"
-                      className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none placeholder:text-black/25 focus:border-black/25"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1.5 block text-[10px] font-medium text-black/45">
-                      Note <span className="font-normal text-black/25">(optional)</span>
-                    </span>
-                    <input
-                      type="text"
-                      value={form.note}
-                      onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                      className="h-10 w-full rounded-lg border border-black/[0.09] bg-[#FAFAF9] px-3 text-[12px] outline-none focus:border-black/25"
-                    />
-                  </label>
-
-                  <button
-                    onClick={submit}
-                    disabled={submitting || !form.reason.trim() || form.quantity === ''}
-                    className="h-11 w-full rounded-lg bg-[#111111] text-[11px] font-medium tracking-[0.04em] text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-35"
-                  >
-                    {submitting ? 'Saving…' : 'Save adjustment'}
-                  </button>
-                </div>
-              </div>
-
-              {feedback && (
-                <div className={[
-                  'mt-4 rounded-lg border px-3 py-2.5 text-[11px]',
-                  feedback.ok
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-red-200 bg-red-50 text-red-700',
-                ].join(' ')}>
-                  {feedback.msg}
-                </div>
-              )}
-
-              <div className="mt-5 border-t border-black/[0.06] pt-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
-                      Availability
-                    </p>
-                    <p className="mt-1 text-[11px] text-black/40">
-                      {sel.active ? 'Variant is active' : 'Variant is inactive'}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (confirm(`${sel.active ? 'Deactivate' : 'Activate'} ${sel.sku}?`)) {
-                        toggleActive(sel.id, sel.active)
-                      }
-                    }}
-                    className={[
-                      'h-9 rounded-lg border px-3 text-[10px] font-medium transition',
-                      sel.active
-                        ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-                    ].join(' ')}
-                  >
-                    {sel.active ? 'Deactivate' : 'Activate'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-5 border-t border-black/[0.06] pt-5">
-                <p className="mb-3 text-[9px] font-medium uppercase tracking-[0.15em] text-black/30">
-                  Recent movements
-                </p>
-
-                {movements.length === 0 ? (
-                  <div className="rounded-lg bg-[#F8F8F6] px-3 py-5 text-center">
-                    <p className="text-[10px] text-black/30">No movements recorded.</p>
-                  </div>
-                ) : (
-                  <div className="max-h-[300px] space-y-2 overflow-y-auto">
-                    {movements.map(m => (
-                      <div
-                        key={m.id}
-                        className="rounded-lg border border-black/[0.06] bg-[#FAFAF9] p-3"
+                  <div className="space-y-3">
+                    <AdminField label="Action" htmlFor="inv-action">
+                      <select
+                        id="inv-action"
+                        value={form.type}
+                        onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                        className={adminSelectClass}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-[10px] font-medium text-black/60">
-                              {m.reason}
-                            </p>
-                            <p className="mt-1 text-[9px] text-black/30">
-                              {m.movement_type} · {new Date(m.created_at).toLocaleString()}
-                            </p>
+                        <option value="ADD">Add stock</option>
+                        <option value="REMOVE">Remove stock</option>
+                        <option value="SET">Set absolute quantity</option>
+                      </select>
+                    </AdminField>
+
+                    <AdminField label="Quantity *" htmlFor="inv-qty">
+                      <input
+                        id="inv-qty"
+                        type="number"
+                        min={0}
+                        value={form.quantity}
+                        onChange={e => setForm(f => ({ ...f, quantity: e.target.value }))}
+                        className={adminInputClass}
+                      />
+                    </AdminField>
+
+                    <AdminField label="Reason *" htmlFor="inv-reason">
+                      <input
+                        id="inv-reason"
+                        type="text"
+                        value={form.reason}
+                        onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+                        placeholder="e.g. Initial stock entry"
+                        className={adminInputClass}
+                      />
+                    </AdminField>
+
+                    <AdminField label="Note (optional)" htmlFor="inv-note">
+                      <input
+                        id="inv-note"
+                        type="text"
+                        value={form.note}
+                        onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                        className={adminInputClass}
+                      />
+                    </AdminField>
+
+                    <AdminButton
+                      variant="primary"
+                      className="w-full"
+                      onClick={submit}
+                      disabled={submitting || !form.reason.trim() || form.quantity === ''}
+                    >
+                      {submitting ? 'Saving…' : 'Save adjustment'}
+                    </AdminButton>
+                  </div>
+                </div>
+
+                {feedback && (
+                  <AdminNotice tone={feedback.ok ? 'success' : 'danger'} className="mt-4">{feedback.msg}</AdminNotice>
+                )}
+
+                <div className="mt-5 border-t border-black/[0.06] pt-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[12px] font-medium">Availability</p>
+                      <p className="mt-0.5 text-[11px] text-[#6B6B66]">
+                        {sel.active ? 'Variant is active.' : 'Variant is inactive.'}
+                      </p>
+                    </div>
+
+                    <AdminButton
+                      variant={sel.active ? 'danger' : 'secondary'}
+                      size="sm"
+                      onClick={() => {
+                        if (confirm(`${sel.active ? 'Deactivate' : 'Activate'} ${sel.sku}?`)) {
+                          toggleActive(sel.id, sel.active)
+                        }
+                      }}
+                    >
+                      {sel.active ? 'Deactivate' : 'Activate'}
+                    </AdminButton>
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-black/[0.06] pt-5">
+                  <p className="mb-3 text-[12px] font-medium">Recent movements</p>
+
+                  {movements.length === 0 ? (
+                    <p className="rounded-[10px] bg-[#F8F8F6] px-3 py-5 text-center text-[11px] text-[#6B6B66]">No movements yet.</p>
+                  ) : (
+                    <div className="max-h-[300px] space-y-2 overflow-y-auto">
+                      {movements.map(m => (
+                        <div key={m.id} className="rounded-[10px] border border-black/[0.06] bg-[#FAFAF8] p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-medium text-[#171717]">{m.reason}</p>
+                              <p className="mt-0.5 text-[11px] text-[#6B6B66]">
+                                {m.movement_type} · {new Date(m.created_at).toLocaleString()}
+                              </p>
+                            </div>
+
+                            <span className={[
+                              'flex-shrink-0 text-[12px] font-semibold',
+                              m.quantity_delta >= 0 ? 'text-[#047857]' : 'text-[#B91C1C]',
+                            ].join(' ')}>
+                              {m.quantity_delta >= 0 ? '+' : ''}{m.quantity_delta}
+                            </span>
                           </div>
 
-                          <span className={[
-                            'flex-shrink-0 text-[12px] font-semibold',
-                            m.quantity_delta >= 0 ? 'text-emerald-700' : 'text-red-600',
-                          ].join(' ')}>
-                            {m.quantity_delta >= 0 ? '+' : ''}{m.quantity_delta}
-                          </span>
+                          {m.note && <p className="mt-2 text-[11px] leading-4 text-[#4A4A46]">{m.note}</p>}
+
+                          <p className="mt-2 truncate text-[11px] text-[#8A8A85]">{m.actor_email}</p>
                         </div>
-
-                        {m.note && (
-                          <p className="mt-2 text-[10px] leading-4 text-black/40">
-                            {m.note}
-                          </p>
-                        )}
-
-                        <p className="mt-2 truncate text-[9px] text-black/25">
-                          {m.actor_email}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          </AdminCard>
         )}
       </div>
-    </div>
+    </AdminPage>
   )
 }

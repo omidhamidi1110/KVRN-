@@ -7,17 +7,21 @@ import { useCart }          from '@/context/CartContext'
 import { useWishlist }      from '@/context/WishlistContext'
 import { useCookiePrefs }   from '@/context/CookiePrefsContext'
 import { useCurrency }      from '@/context/CurrencyContext'
-import { useI18n, LANGUAGES, type Locale } from '@/context/I18nContext'
-import { CURRENCIES, type CurrencyCode } from '@/lib/currency'
+import { useI18n, type Locale } from '@/context/I18nContext'
+import { format } from '@/lib/i18n/messages'
+import type { CurrencyCode } from '@/lib/currency'
 import { CurrencySelector } from '@/components/ui/CurrencySelector'
 import { LanguageSelector } from '@/components/ui/LanguageSelector'
 import { cn } from '@/lib/utils'
+import type { ShellData } from '@/lib/content-shell'
+import { resolveLinkLabel } from '@/lib/content-shell'
 
-export function Nav() {
+/** `shell` is provided only when Admin-managed content is enabled; without it the coded links below are used. */
+export function Nav({ shell }: { shell?: ShellData | null } = {}) {
   const { itemCount, openCart }   = useCart()
   const { count: savedCount }     = useWishlist()
   const { openPreferences }       = useCookiePrefs()
-  const { t }                     = useI18n()
+  const { t, locale }             = useI18n()
   const pathname                  = usePathname()
   const isAdmin                   = pathname === '/admin' || pathname.startsWith('/admin/')
 
@@ -149,7 +153,10 @@ export function Nav() {
   const textCls  = isWhiteText ? 'text-[#F0EDE8]' : 'text-[#1A1A1A]'
   const linesCls = isWhiteText ? 'bg-[#F0EDE8]'   : 'bg-[#1A1A1A]'
 
-  const desktopLinks = [
+  const cmsLinks = (list: 'desktop' | 'mobile') =>
+    shell?.navigation ? shell.navigation[list].map(l => ({ label: resolveLinkLabel(l, locale, shell.tr.navigation, t), href: l.href, newTab: l.newTab })) : null
+
+  const desktopLinks: Array<{ label: string; href: string; newTab?: boolean }> = cmsLinks('desktop') ?? [
     { label: t.shopAll,    href: '/shop' },
     { label: t.hoodies,    href: '/shop?type=hoodies' },
     { label: t.sweatpants, href: '/shop?type=sweatpants' },
@@ -158,7 +165,7 @@ export function Nav() {
     { label: t.contact,    href: '/contact' },
   ]
 
-  const mobileLinks = [
+  const mobileLinks: Array<{ label: string; href: string; newTab?: boolean }> = cmsLinks('mobile') ?? [
     { label: t.shopAll,         href: '/shop' },
     { label: t.hoodies,         href: '/shop?type=hoodies' },
     { label: t.sweatpants,      href: '/shop?type=sweatpants' },
@@ -210,7 +217,7 @@ export function Nav() {
           transition:
             'background-color 220ms ease, border-color 220ms ease, backdrop-filter 220ms ease',
         }}
-        aria-label="Main navigation"
+        aria-label={t['nav.mainNavigation']}
       >
         <div className="container-kvrn flex items-center justify-between">
           <Link href="/"
@@ -220,9 +227,9 @@ export function Nav() {
           </Link>
 
           {/* Desktop links */}
-          <nav className="hidden lg:flex items-center gap-6 xl:gap-8" aria-label="Main">
+          <nav className="hidden lg:flex items-center gap-6 xl:gap-8" aria-label={t['nav.main']}>
             {desktopLinks.map(l => (
-              <Link key={l.href + l.label} href={l.href}
+              <Link key={l.href + l.label} href={l.href} {...(l.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 className="text-[11px] font-light tracking-[0.09em] uppercase hover:opacity-50 transition-opacity whitespace-nowrap">
                 {l.label}
               </Link>
@@ -261,7 +268,7 @@ export function Nav() {
             {/* Hamburger — mobile only, 3 lines */}
             <button
               onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu" aria-expanded={drawerOpen}
+              aria-label={t['nav.openMenu']} aria-expanded={drawerOpen}
               className="lg:hidden flex flex-col justify-center gap-[5px] w-5 h-6 ml-1"
             >
               {[0,1,2].map(i => (
@@ -290,7 +297,7 @@ export function Nav() {
       {/* Mobile drawer */}
       <div
         ref={drawerRef}
-        role="dialog" aria-modal="true" aria-label="Navigation menu"
+        role="dialog" aria-modal="true" aria-label={t['nav.menuDialog']}
         className={cn(
           'fixed inset-0 z-[400]',
           'bg-[#0E0E0E] flex flex-col',
@@ -302,7 +309,7 @@ export function Nav() {
         <div className="flex items-center justify-between px-6 pt-8 pb-6 border-b border-[#F0EDE8]/10">
           <Link href="/" onClick={() => setDrawerOpen(false)}
             className="text-[14px] font-light tracking-[0.18em] uppercase text-[#F0EDE8]">KVRN</Link>
-          <button onClick={() => setDrawerOpen(false)} aria-label="Close menu"
+          <button onClick={() => setDrawerOpen(false)} aria-label={t['nav.closeMenu']}
             className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors p-1">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -319,7 +326,7 @@ export function Nav() {
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto px-6 py-2">
           {mobileLinks.map(l => (
-            <Link key={l.href + l.label} href={l.href}
+            <Link key={l.href + l.label} href={l.href} {...(l.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               onClick={() => setDrawerOpen(false)}
               className="block py-3.5 text-[16px] font-light border-b border-[#F0EDE8]/10 last:border-0 text-[#F0EDE8] hover:text-[#F0EDE8]/50 transition-colors">
               {l.label}
@@ -331,11 +338,11 @@ export function Nav() {
         <div className="px-6 py-5 border-t border-[#F0EDE8]/10">
           <div className="flex items-center gap-4 mb-3">
             <a href="https://instagram.com/thekvrn" target="_blank" rel="noopener noreferrer"
-              aria-label="KVRN on Instagram" className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
+              aria-label={t['nav.onInstagram']} className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
               <InstagramIcon />
             </a>
             <a href="https://tiktok.com/@thekvrn" target="_blank" rel="noopener noreferrer"
-              aria-label="KVRN on TikTok" className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
+              aria-label={t['nav.onTikTok']} className="text-[#F0EDE8]/50 hover:text-[#F0EDE8] transition-colors">
               <TikTokIcon />
             </a>
           </div>
@@ -343,7 +350,7 @@ export function Nav() {
             onClick={() => { openPreferences(); setDrawerOpen(false) }}
             className="text-[11px] font-light text-[#F0EDE8]/35 hover:text-[#F0EDE8]/70 transition-colors tracking-wide"
           >
-            Cookie preferences
+            {t['nav.cookiePreferences']}
           </button>
         </div>
       </div>
@@ -354,9 +361,9 @@ export function Nav() {
 // ─── Collapsible drawer selectors ────────────────────────────────────────────
 
 function DrawerLangSelector() {
-  const { locale, setLocale } = useI18n()
+  const { locale, setLocale, languages, t } = useI18n()
   const [open, setOpen] = useState(false)
-  const current = LANGUAGES.find(l => l.code === locale) ?? LANGUAGES[0]
+  const current = languages.find(l => l.code === locale) ?? languages[0]
 
   return (
     <div>
@@ -366,7 +373,7 @@ function DrawerLangSelector() {
         aria-expanded={open}
       >
         <div className="text-left">
-          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">Language</p>
+          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">{t['nav.language']}</p>
           <p className="text-[13px] font-light text-[#F0EDE8] mt-0.5">{current.nativeLabel}</p>
         </div>
         <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
@@ -376,7 +383,7 @@ function DrawerLangSelector() {
       </button>
       {open && (
         <div className="px-6 pb-3 grid grid-cols-2 gap-1.5">
-          {LANGUAGES.map(l => (
+          {languages.map(l => (
             <button
               key={l.code}
               onClick={() => { setLocale(l.code as Locale); setOpen(false) }}
@@ -398,9 +405,10 @@ function DrawerLangSelector() {
 }
 
 function DrawerCurrencySelector() {
-  const { currencyCode, setCurrency } = useCurrency()
+  const { currencyCode, setCurrency, available } = useCurrency()
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const current = CURRENCIES.find(c => c.code === currencyCode) ?? CURRENCIES[0]
+  const current = available.find(c => c.code === currencyCode) ?? available[0]
 
   return (
     <div>
@@ -410,7 +418,7 @@ function DrawerCurrencySelector() {
         aria-expanded={open}
       >
         <div className="text-left">
-          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">Currency</p>
+          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">{t['nav.currency']}</p>
           <p className="text-[13px] font-light text-[#F0EDE8] mt-0.5">{currencyCode} — {current.label.split(' — ')[1]}</p>
         </div>
         <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
@@ -420,7 +428,7 @@ function DrawerCurrencySelector() {
       </button>
       {open && (
         <div className="px-6 pb-3 grid grid-cols-3 gap-1.5">
-          {CURRENCIES.map(c => (
+          {available.map(c => (
             <button
               key={c.code}
               onClick={() => { setCurrency(c.code as CurrencyCode); setOpen(false) }}

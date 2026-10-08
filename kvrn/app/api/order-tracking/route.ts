@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { isValidEmail } from '@/lib/us-states'
+import { readLimitedJson } from '@/lib/limited-json-request'
+import { allowPublicApiRequest } from '@/lib/public-api-rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,13 +17,15 @@ function json(body: unknown, status = 200) {
 }
 
 export async function POST(req: NextRequest) {
-  let body: unknown
-
-  try {
-    body = await req.json()
-  } catch {
-    return json({ error: 'Invalid request.' }, 400)
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const allowed = await allowPublicApiRequest(sql, { bucket: 'order_tracking', headers: req.headers, limit: 20, windowSeconds: 600 })
+      if (!allowed) return json({ error: 'Too many requests.' }, 429)
+    } catch { return json({ error: 'Order lookup temporarily unavailable.' }, 503) }
   }
+  const read = await readLimitedJson(req, 2048)
+  if (!read.ok) return json({ error: 'Invalid request.' }, read.status)
+  const body = read.value
 
   if (!body || typeof body !== 'object') {
     return json({ error: 'Invalid request.' }, 400)

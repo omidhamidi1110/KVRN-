@@ -6,22 +6,59 @@ import Link  from 'next/link'
 import { useCart }     from '@/context/CartContext'
 import { useCurrency } from '@/context/CurrencyContext'
 import { useI18n }     from '@/context/I18nContext'
+import { fillMessages, format, type Messages } from '@/lib/i18n/messages'
 import { cn }          from '@/lib/utils'
 import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
-import { PUBLIC_SLUG_TO_PRODUCT_CODE, buildSku } from '@/lib/catalog'
+import { formatProductPrice, sumPriceCents } from '@/lib/product-price'
+import { objectPositionFor } from '@/lib/product-images'
 import { useCookiePrefs } from '@/context/CookiePrefsContext'
 import { trackProductView } from '@/lib/funnel-client'
 import { gaViewItemWhenReady } from '@/lib/ga-client'
+import { CompleteTheSetBundle } from '@/components/product/CompleteTheSetBundle'
+import type { PublicBundle } from '@/lib/bundle-types'
 
 const NAV = 92 // announcement bar (36) + nav (56)
 
-interface Props { product: Product; relatedProduct: Product | null }
+// `preview` renders the DRAFT inside the admin editor: no analytics, no inventory fetch (all sizes
+// shown available), and adding to the bag is a no-op. It never reads or writes the real cart.
+// `bundle` is passed ONLY by the server page when the product has a published, enabled bundle (and CMS
+// product routing is on). It replaces the compat "Complete the Set" pairing below; absent => unchanged.
+interface Props { product: Product; relatedProduct: Product | null; preview?: boolean; bundle?: PublicBundle | null }
+
+// Availability is keyed by size label (single-colour / coded products) and, for Admin-managed
+// products, also by `<colorCode>:<size>` so each colour has its own stock.
+type AvailEntry = { sku: string; available: number; active: boolean; availableQty: number }
+type AvailMap = Record<string, AvailEntry>
+const availKey = (c: { code?: string } | undefined, size: string) => (c?.code ? `${c.code}:${size}` : size)
+
+/** Eyebrow: Admin-managed products use their own (possibly empty); the coded catalog keeps its legacy rule. */
+const eyebrowOf = (p: Product): string =>
+  p.sections ? (p.eyebrow ?? '') : (p.eyebrow ?? (p.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'))
+const showSection = (p: Product, k: 'description' | 'details' | 'shippingReturns' | 'sizeGuideLink' | 'stickyAddToBag') =>
+  !p.sections || p.sections[k] !== false
+
+// Coded (non-Admin) products' shipping/returns summary. Admin-managed products carry their own
+// (translatable) shippingReturns; this fallback is the coded wording, from the dictionary.
+const legacyShipping = (t: Messages) => ({
+  lines: [t['pdp.legacyShip1'], t['pdp.legacyShip2'], t['pdp.legacyShip3']],
+  linkLabel: t['pdp.fullPolicy'], href: '/support/shipping-returns',
+})
+const nounOf = (p: Product, t: Messages) =>
+  p.type === 'hoodie' ? t.hoodie : p.type === 'sweatpants' ? t.sweatpantsLabel : p.name
+
+/** Product price in the visitor's currency: exact USD format, or a labelled "≈" estimate. */
+function useMoney() {
+  const { formatPrice, isEstimate } = useCurrency()
+  return (cents: number | null | undefined) =>
+    isEstimate && typeof cents === 'number' && Number.isFinite(cents) && cents > 0
+      ? formatPrice(cents) : formatProductPrice(cents)
+}
 
 // ════════════════════════════════════════════════════════════════════════════
-export function PDPClient({ product, relatedProduct }: Props) {
+export function PDPClient({ product, relatedProduct, preview = false, bundle = null }: Props) {
   const { addItem, openCart } = useCart()
   const { formatPrice }       = useCurrency()
-  const { t }                 = useI18n()
+  const t                     = fillMessages(useI18n().t)
   const { prefs: cookiePrefs } = useCookiePrefs()
 
   // Funnel analytics: one product_viewed per product per session. Re-runs when analytics
@@ -29,16 +66,19 @@ export function PDPClient({ product, relatedProduct }: Props) {
   // re-render or a double effect harmless.
   const analyticsOn = cookiePrefs?.analytics === true
   useEffect(() => {
-    if (!analyticsOn) return
+    if (!analyticsOn || preview) return
     trackProductView(product.slug)
     // GA4 view_item: same moment and same once-per-product-per-session rule as the first-party
     // product_viewed. Consent-gated and deduped inside lib/ga-client; product-level (no variant yet).
     // "WhenReady": if the visitor accepted analytics a moment ago on this very page, GA is still
     // fetching its runtime config / initialising — the send waits for that (no pre-consent queue).
     gaViewItemWhenReady({ slug: product.slug, name: product.name, priceCents: product.price })
-  }, [analyticsOn, product.slug, product.name, product.price])
+  }, [analyticsOn, preview, product.slug, product.name, product.price])
 
-  const [color,   setColor]   = useState<ColorOption>(product.colors[0])
+  const [colorSel, setColor] = useState<ColorOption>(product.colors[0])
+  // Always the CURRENT colour object from `product` (matters for the live admin preview, where the
+  // product prop changes while the page is open; for the storefront it is the same object).
+  const color = product.colors.find(c => c.value === colorSel.value) ?? product.colors[0]
   const [size,    setSize]    = useState<SizeLabel | null>(null)
   const [sizeErr, setSizeErr] = useState(false)
   const [cta,     setCta]     = useState<'idle'|'busy'|'done'>('idle')
@@ -46,8 +86,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
   const [stage,   setStage]   = useState<0|1>(0)
   const [sticky,  setSticky]  = useState(false)
 
-  // Live Neon inventory — keyed by size label
-  type AvailMap = Record<string, { sku: string; available: number; active: boolean; availableQty: number }>
+  // Live Neon inventory — keyed by size label (and colour code for Admin-managed products)
   const [availability,        setAvailability]        = useState<AvailMap | null>(null)
   const [inventoryError,      setInventoryError]      = useState(false)
   const [inventoryLoading,    setInventoryLoading]    = useState(true)
@@ -63,14 +102,22 @@ export function PDPClient({ product, relatedProduct }: Props) {
     for (const v of variants ?? []) {
       const isAvailable = v.in_stock === true
       const qty = typeof v.available_qty === 'number' ? v.available_qty : (isAvailable ? 1 : 0)
-      map[v.size] = { sku: v.sku, available: isAvailable ? qty : 0, active: v.active !== false, availableQty: qty }
+      const entry = { sku: v.sku, available: isAvailable ? qty : 0, active: v.active !== false, availableQty: qty }
+      map[v.size] = entry
+      if (v.color_code) map[`${v.color_code}:${v.size}`] = entry
     }
     return map
   }
 
+  /** Preview only: every size of every colour shown as available (no network, no stock claims). */
+  const previewVariants = (p: Product) => p.colors.flatMap(c => p.sizes.map(s => ({
+    sku: `PREVIEW-${c.code ?? c.value}-${s.label}`, size: s.label, color_code: c.code, in_stock: true, available_qty: 9, active: true,
+  })))
+
   // Fetch live inventory for this product
   useEffect(() => {
     let cancelled = false
+    if (preview) { setAvailability(parseAvailMap(previewVariants(product))); setInventoryLoading(false); return }
     setInventoryLoading(true)
     setInventoryError(false)
     fetch(`/api/inventory?slug=${product.slug}`, { cache: 'no-store' })
@@ -78,11 +125,12 @@ export function PDPClient({ product, relatedProduct }: Props) {
       .then(data => { if (!cancelled) { setAvailability(parseAvailMap(data.variants)); setInventoryLoading(false) } })
       .catch(() => { if (!cancelled) { setInventoryError(true); setInventoryLoading(false) } })
     return () => { cancelled = true }
-  }, [product.slug])
+  }, [product.slug, preview])
 
   // Fetch live inventory for the related product (used only by Complete the Set)
   useEffect(() => {
     if (!relatedProduct) { setRelatedInvLoading(false); return }
+    if (preview) { setRelatedAvailability(parseAvailMap(previewVariants(relatedProduct))); setRelatedInvLoading(false); return }
     let cancelled = false
     setRelatedInvLoading(true)
     setRelatedInvError(false)
@@ -91,7 +139,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
       .then(data => { if (!cancelled) { setRelatedAvailability(parseAvailMap(data.variants)); setRelatedInvLoading(false) } })
       .catch(() => { if (!cancelled) { setRelatedInvError(true); setRelatedInvLoading(false) } })
     return () => { cancelled = true }
-  }, [relatedProduct?.slug])
+  }, [relatedProduct?.slug, preview])
 
   // Compute effective sizes merged with live availability
   // If inventory is loading or errored, block all sizes (fail safely)
@@ -99,7 +147,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
     if (inventoryLoading || inventoryError || availability === null) {
       return { ...s, inStock: false }
     }
-    const av = availability[s.label]
+    const av = availability[availKey(color, s.label)]
     if (!av) return { ...s, inStock: false }
     return { ...s, inStock: av.active && av.available > 0 }
   })
@@ -107,7 +155,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
   // Derive SKU for selected size
   const selectedSku: string | undefined = (() => {
     if (!size || availability === null) return undefined
-    return availability[size]?.sku
+    return availability[availKey(color, size)]?.sku
   })()
 
   const snapRef   = useRef<HTMLDivElement>(null)
@@ -178,45 +226,45 @@ export function PDPClient({ product, relatedProduct }: Props) {
     const chosen = s ?? size
     if (!chosen) { setSizeErr(true); return }
     if (inventoryLoading || inventoryError) return  // block if inventory unverified
+    if (preview) { setSizeErr(false); setCta('done'); setTimeout(() => setCta('idle'), 700); return }
+    // Admin-managed products: the chosen size must be available in THIS colour (the size list is
+    // shared across colours, so a selection can go stale when the colour changes).
+    const chosenAv = availability?.[availKey(color, chosen)]
+    if (color.code && (!chosenAv || !chosenAv.active || chosenAv.available <= 0)) { setSizeErr(true); return }
     setSizeErr(false); setCta('busy')
     // Derive SKU from live availability map
-    const itemSku = availability?.[chosen]?.sku
+    const itemSku = availability?.[availKey(color, chosen)]?.sku
     addItem({ productId: product.id, productName: product.name, slug: product.slug,
       color: color.value, colorName: color.name, colorHex: color.hex, size: chosen,
       sku: itemSku,
       price: product.price, quantity: 1,
-      availableQuantity: availability?.[chosen]?.availableQty ?? undefined,
+      availableQuantity: availability?.[availKey(color, chosen)]?.availableQty ?? undefined,
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     setCta('done')
     setTimeout(() => { setCta('idle'); openCart() }, 700)
   }, [size, color, product, addItem, openCart, availability, inventoryLoading, inventoryError])
 
-  // addBoth — verifies BOTH products' live inventory before adding either
-  const addBoth = useCallback((bundleHoodieSize: string, bundlePantsSize: string) => {
+  // addBoth — verifies BOTH products' live inventory before adding either.
+  // Sizes are passed in this product's / the paired product's own order (no name or slug inference).
+  const addBoth = useCallback((productSize: string, relatedSize: string) => {
     if (!relatedProduct) return
+    if (preview) return
     // Fail closed: block if either inventory is loading or errored
     if (inventoryLoading || inventoryError || relatedInvLoading || relatedInvError) return
     if (availability === null || relatedAvailability === null) return
 
-    // Use catalog mapping — not name string matching — to identify each product
-    const productCode  = PUBLIC_SLUG_TO_PRODUCT_CODE[product.slug]
-    const relatedCode  = PUBLIC_SLUG_TO_PRODUCT_CODE[relatedProduct.slug]
-    if (!productCode || !relatedCode) return  // unrecognised slug — block
-
-    const productIsHoodie = productCode === 'PKHH'
-    const productSize     = productIsHoodie ? bundleHoodieSize : bundlePantsSize
-    const relatedSize     = productIsHoodie ? bundlePantsSize  : bundleHoodieSize
+    const relatedColor = relatedProduct.colors[0]
 
     // Verify current product variant from its own availability map
-    const productAvail = availability[productSize]
+    const productAvail = availability[availKey(color, productSize)]
     if (!productAvail || !productAvail.active || productAvail.available <= 0) return
 
     // Verify related product variant from the RELATED inventory map (not the same map)
-    const relatedAvail = relatedAvailability[relatedSize]
+    const relatedAvail = relatedAvailability[availKey(relatedColor, relatedSize)]
     if (!relatedAvail || !relatedAvail.active || relatedAvail.available <= 0) return
 
     // Both variants verified — get permanent SKUs from the live inventory responses
-    // (not from buildSku alone, which cannot confirm existence or availability)
+    // (the SKU is never constructed here: it cannot confirm existence or availability)
     const productSku = productAvail.sku
     const relatedSku = relatedAvail.sku
     if (!productSku || !relatedSku) return  // no SKU in response — block
@@ -228,13 +276,13 @@ export function PDPClient({ product, relatedProduct }: Props) {
       image: color.images.find(i => i.type === 'front')?.src ?? '' })
     addItem({ productId: relatedProduct.id, productName: relatedProduct.name,
       slug: relatedProduct.slug,
-      color: relatedProduct.colors[0].value, colorName: relatedProduct.colors[0].name,
-      colorHex: relatedProduct.colors[0].hex, size: relatedSize as any,
+      color: relatedColor.value, colorName: relatedColor.name,
+      colorHex: relatedColor.hex, size: relatedSize as any,
       sku: relatedSku, price: relatedProduct.price, quantity: 1,
       availableQuantity: relatedAvail.availableQty ?? undefined,
-      image: relatedProduct.colors[0].images.find(i => i.type === 'front')?.src ?? '' })
+      image: relatedColor.images.find(i => i.type === 'front')?.src ?? '' })
     openCart()
-  }, [color, product, relatedProduct, addItem, openCart,
+  }, [color, product, relatedProduct, addItem, openCart, preview,
       availability, inventoryLoading, inventoryError,
       relatedAvailability, relatedInvLoading, relatedInvError])
 
@@ -266,7 +314,7 @@ export function PDPClient({ product, relatedProduct }: Props) {
           {/* STAGE 1 — HERO */}
           <HeroStage
             product={{ ...product, sizes: effectiveSizes }}
-            heroImage={imgs[0]}
+            heroImage={color.hero ?? product.heroImage ?? imgs[0]}
             mobileImages={imgs}
             color={color} setColor={setColor}
             size={size} setSize={setSize}
@@ -295,14 +343,17 @@ export function PDPClient({ product, relatedProduct }: Props) {
         cta={cta} ctaLabel={ctaLabel} soldOut={soldOut}
         onAdd={() => addOne()} onAddBoth={addBoth}
         formatPrice={formatPrice} t={t}
+        bundle={bundle} preview={preview}
       />
 
       {/* ── Sticky ATC: Stage 3 only ─────────────────────────────────────── */}
-      <StickyATC
-        product={product} color={color} size={size}
-        cta={cta} ctaLabel={ctaLabel} soldOut={soldOut}
-        onAdd={() => addOne()} t={t} visible={sticky}
-      />
+      {showSection(product, 'stickyAddToBag') && (
+        <StickyATC
+          product={product} color={color} size={size}
+          cta={cta} ctaLabel={ctaLabel} soldOut={soldOut}
+          onAdd={() => addOne()} t={t} visible={sticky}
+        />
+      )}
     </div>
   )
 }
@@ -336,6 +387,8 @@ function SnapIndicator({ stage }: { stage: 0|1 }) {
 // ════════════════════════════════════════════════════════════════════════════
 function HeroStage({ product, heroImage, mobileImages, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
+  const money = useMoney()
+  const t = fillMessages(useI18n().t)
   // Stage 1: single hero image only — no swipe, no carousel
   // All images shown in Stage 2 (GalleryStage)
   return (
@@ -358,7 +411,8 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
               alt={heroImage.alt || product.name}
               fill priority fetchPriority="high"
               sizes="62vw"
-              className="object-cover object-[center_30%]"
+              className={heroImage.focalDesktop ? 'object-cover' : 'object-cover object-[center_30%]'}
+              style={heroImage.focalDesktop ? { objectPosition: objectPositionFor(heroImage.focalDesktop, 'center 30%') } : undefined}
               quality={92}
               onError={() => {}}
             />
@@ -382,7 +436,8 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
             alt={heroImage.alt || product.name}
             fill priority fetchPriority="high"
             sizes="100vw"
-            className="object-cover object-[center_15%] pointer-events-none"
+            className={heroImage.focalMobile ? 'object-cover pointer-events-none' : 'object-cover object-[center_15%] pointer-events-none'}
+            style={heroImage.focalMobile ? { objectPosition: objectPositionFor(heroImage.focalMobile, 'center 15%') } : undefined}
             quality={92}
             onError={() => {}}
           />
@@ -430,9 +485,11 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
 
           {/* TOP: identity + details */}
           <div className="space-y-4 lg:space-y-5">
-            <p className="text-[10px] font-light tracking-[0.22em] uppercase text-[#9B9B9B]">
-              {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
-            </p>
+            {eyebrowOf(product) && (
+              <p className="text-[10px] font-light tracking-[0.22em] uppercase text-[#9B9B9B]">
+                {eyebrowOf(product)}
+              </p>
+            )}
 
             <div>
               <h1 className="font-display font-light leading-[0.9] tracking-[-0.025em] text-[#1A1A1A] mb-2.5
@@ -440,7 +497,7 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
                 {product.name}
               </h1>
               <div className="flex items-baseline gap-2">
-                <span className="text-[19px] lg:text-[22px] font-light tabular-nums text-[#1A1A1A]">$80</span>
+                <span className="text-[19px] lg:text-[22px] font-light tabular-nums text-[#1A1A1A]">{money(product.price)}</span>
                 {product.founderNote && (
                   <span className="text-[11px] text-[#9B9B9B] font-light">{product.founderNote}</span>
                 )}
@@ -472,7 +529,7 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
             <div>
               <p className={cn('text-[10px] font-light tracking-[0.1em] uppercase mb-2',
                 sizeErr ? 'text-[#B91C1C]' : 'text-[#9B9B9B]')}>
-                {sizeErr ? 'Select a size' : 'Size'}
+                {sizeErr ? t['pdp.selectASize'] : t.size}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {product.sizes.map((s: SizeOption) => (
@@ -502,7 +559,7 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
               <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                 <path d="M5.5 2v5M3 5.5l2.5 2.5L8 5.5" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
               </svg>
-              <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">Explore</span>
+              <span className="text-[10px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">{t['pdp.explore']}</span>
             </div>
           </div>
         </div>
@@ -514,14 +571,18 @@ function HeroStage({ product, heroImage, mobileImages, color, setColor, size, se
 // ─── Mobile hero info overlay ─────────────────────────────────────────────────
 function MobileHeroInfo({ product, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
+  const money = useMoney()
+  const t = fillMessages(useI18n().t)
   const shadow = '0 1px 8px rgba(0,0,0,0.5)'
   return (
     <div className="space-y-3">
       {/* Eyebrow */}
-      <p className="text-[10px] font-light tracking-[0.2em] uppercase text-white/60"
-        style={{ textShadow: shadow }}>
-        {product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'}
-      </p>
+      {eyebrowOf(product) && (
+        <p className="text-[10px] font-light tracking-[0.2em] uppercase text-white/60"
+          style={{ textShadow: shadow }}>
+          {eyebrowOf(product)}
+        </p>
+      )}
       {/* Title + price */}
       <div>
         <h1 className="font-display font-light text-[24px] leading-[0.92] tracking-[-0.025em] text-white mb-1.5"
@@ -529,7 +590,7 @@ function MobileHeroInfo({ product, color, setColor, size, setSize,
           {product.name}
         </h1>
         <p className="text-[18px] font-light tabular-nums text-white"
-          style={{ textShadow: shadow }}>$80</p>
+          style={{ textShadow: shadow }}>{money(product.price)}</p>
       </div>
       {/* Specs — 2 lines max on mobile */}
       <div className="space-y-0.5">
@@ -557,7 +618,7 @@ function MobileHeroInfo({ product, color, setColor, size, setSize,
       <div>
         <p className={`text-[10px] font-light tracking-[0.1em] uppercase mb-1.5 ${sizeErr ? 'text-[#FF8080]' : 'text-white/60'}`}
           style={{ textShadow: shadow }}>
-          {sizeErr ? 'Select a size' : 'Size'}
+          {sizeErr ? t['pdp.selectASize'] : t.size}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {product.sizes.map((s: any) => (
@@ -607,9 +668,10 @@ function MobileHeroInfo({ product, color, setColor, size, setSize,
 function GalleryStage({ images, productName, onShop }: {
   images: any[]; productName: string; onShop: () => void
 }) {
+  const t = fillMessages(useI18n().t)
   return (
     <section
-      aria-label={`${productName} — gallery`}
+      aria-label={format(t['pdp.galleryOf'], { name: productName })}
       className="flex flex-col"
       style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always',
                height: '100svh', minHeight: '100svh', overflow: 'hidden',
@@ -647,6 +709,7 @@ function GalleryStage({ images, productName, onShop }: {
 // Scroll events are throttled: a new one is only accepted after the current
 // transition completes (450ms lock). This prevents any image skipping.
 function DesktopGallery({ images, productName }: any) {
+  const t = fillMessages(useI18n().t)
   const [active,       setActive]       = useState(0)
   const [transitioning, setTransitioning] = useState(false)  // scroll lock
   const total = images.length
@@ -728,7 +791,7 @@ function DesktopGallery({ images, productName }: any) {
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       role="region"
-      aria-label={`${productName} gallery`}
+      aria-label={format(t['pdp.galleryOfShort'], { name: productName })}
     >
       {/* ── Image panels ── */}
       {images.map((img: any, i: number) => {
@@ -739,7 +802,7 @@ function DesktopGallery({ images, productName }: any) {
             key={i}
             role="button"
             tabIndex={0}
-            aria-label={`Image ${i + 1}${isActive ? ' (current)' : ' — click to view'}`}
+            aria-label={format(isActive ? t['pdp.imageCurrent'] : t['pdp.imageClickToView'], { n: i + 1 })}
             onClick={() => {
               if (!isActive && !transitioning) {
                 const dir = i > active ? 1 : -1
@@ -775,7 +838,7 @@ function DesktopGallery({ images, productName }: any) {
                 className="pointer-events-none"
                 style={{
                   objectFit:      'cover',
-                  objectPosition: 'center 30%',  // torso/artwork focus, not face
+                  objectPosition: objectPositionFor(img.focalDesktop, 'center 30%'),  // torso/artwork focus, not face
                   transition:     `filter ${DURATION_MS}ms ease`,
                   filter:         isActive ? 'none' : 'brightness(0.7)',
                 }}
@@ -816,7 +879,7 @@ function DesktopGallery({ images, productName }: any) {
       <div
         className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-10"
         role="tablist"
-        aria-label="Gallery position">
+        aria-label={t['pdp.galleryPosition']}>
         {images.map((_: any, i: number) => (
           <button
             key={i}
@@ -851,7 +914,7 @@ function DesktopGallery({ images, productName }: any) {
           className="absolute bottom-5 left-[35%] -translate-x-1/2 flex items-center gap-2 pointer-events-none"
           style={{ opacity: 0.45 }}
           aria-hidden="true">
-          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">Scroll</span>
+          <span className="text-[10px] font-light tracking-[0.14em] uppercase text-white">{t['pdp.scroll']}</span>
           <svg width="14" height="9" viewBox="0 0 14 9" fill="none">
             <path d="M1 4.5h12M8 1l4 3.5-4 3.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
@@ -866,6 +929,7 @@ function DesktopGallery({ images, productName }: any) {
 // Moving the track with transform: translate3d() is instant — no image src changes,
 // no remounting, no decode delay. All images are eagerly loaded on mount.
 function MobileGallery({ images, productName, onShop }: any) {
+  const t = fillMessages(useI18n().t)
   const [active, setActive] = useState(0)
   const [drag,   setDrag]   = useState(0)   // px offset during active swipe
   const txX = useRef<number|null>(null)
@@ -967,7 +1031,7 @@ function MobileGallery({ images, productName, onShop }: any) {
                   width:         '100%',
                   height:        '100%',
                   objectFit:     'cover',
-                  objectPosition:'center 15%',
+                  objectPosition: objectPositionFor(img.focalMobile, 'center 15%'),
                   pointerEvents: 'none',
                   // Pre-paint next/prev for GPU — prevents decode stutter
                   willChange:    Math.abs(i - active) <= 1 ? 'transform' : 'auto',
@@ -1005,10 +1069,10 @@ function MobileGallery({ images, productName, onShop }: any) {
         <button onClick={onShop}
           className="flex items-center gap-1.5"
           style={{ pointerEvents: 'auto' }}
-          aria-label="View purchase details">
+          aria-label={t['pdp.viewPurchaseDetails']}>
           <span className="text-[10px] font-light tracking-[0.18em] uppercase"
             style={{ color: 'rgba(255,255,255,0.65)', textShadow: '0 1px 3px rgba(0,0,0,0.35)' }}>
-            Shop
+            {t.shop}
           </span>
           <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
             <path d="M4.5 1.5v5M2 4.5l2.5 2.5L7 4.5"
@@ -1042,6 +1106,7 @@ function useCarousel(images: any[]) {
 
 // ─── Desktop gallery (thumbnail + main + chevrons) ────────────────────────────
 function DesktopGallery3({ images, productName }: { images: any[]; productName: string }) {
+  const t = fillMessages(useI18n().t)
   const { idx, setIdx, go } = useCarousel(images)
   const total = images.length
 
@@ -1066,7 +1131,7 @@ function DesktopGallery3({ images, productName }: { images: any[]; productName: 
                     gap: 8, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
         {images.map((img: any, i: number) => (
           <button key={i} onClick={() => setIdx(i)}
-            aria-label={`Image ${i+1}`}
+            aria-label={format(t['pdp.imageN'], { n: i + 1 })}
             style={{ width: '100%', aspectRatio: '3/4', position: 'relative',
                      overflow: 'hidden', background: '#EDEAE4', border: 'none', padding: 0,
                      cursor: 'pointer', flexShrink: 0,
@@ -1097,7 +1162,7 @@ function DesktopGallery3({ images, productName }: { images: any[]; productName: 
               alt={i===idx ? (img.alt||productName) : ''}
               loading={i<2?'eager':'lazy'}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
-                       objectFit: 'cover', objectPosition: 'center top',
+                       objectFit: 'cover', objectPosition: objectPositionFor(img.focalDesktop, 'center top'),
                        pointerEvents: 'none',
                        opacity: i===idx ? 1 : 0, transition: 'opacity 220ms ease' }}
               onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />
@@ -1105,7 +1170,7 @@ function DesktopGallery3({ images, productName }: { images: any[]; productName: 
 
           {/* Chevrons */}
           {idx > 0 && (
-            <button type="button" aria-label="Previous" onClick={()=>go(-1)}
+            <button type="button" aria-label={t['pdp.previous']} onClick={()=>go(-1)}
               style={{ position:'absolute', top:0, bottom:0, left:0, width:'22%',
                        background:'transparent', border:0, cursor:'pointer', zIndex:2,
                        display:'flex', alignItems:'center', paddingLeft:20 }}>
@@ -1118,7 +1183,7 @@ function DesktopGallery3({ images, productName }: { images: any[]; productName: 
             </button>
           )}
           {idx < total-1 && (
-            <button type="button" aria-label="Next" onClick={()=>go(1)}
+            <button type="button" aria-label={t['pdp.next']} onClick={()=>go(1)}
               style={{ position:'absolute', top:0, bottom:0, right:0, width:'22%',
                        background:'transparent', border:0, cursor:'pointer', zIndex:2,
                        display:'flex', alignItems:'center', justifyContent:'flex-end', paddingRight:20 }}>
@@ -1174,7 +1239,7 @@ function MobileCarousel3({ images, productName }: { images: any[]; productName: 
             alt={i===idx ? (img.alt||productName) : ''}
             loading={i<2?'eager':'lazy'}
             style={{ position:'absolute', inset:0, width:'100%', height:'100%',
-                     objectFit:'cover', objectPosition:'center top',
+                     objectFit:'cover', objectPosition: objectPositionFor(img.focalMobile, 'center top'),
                      pointerEvents:'none',
                      opacity: i===idx ? 1 : 0, transition:'opacity 220ms ease' }}
             onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />
@@ -1193,9 +1258,16 @@ function MobileCarousel3({ images, productName }: { images: any[]; productName: 
 // ─── Shared purchase controls (color, size, ATC, accordions) ─────────────────
 function PurchasePanel({ product, color, setColor, size, setSize,
   sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd }: any) {
+  const t = fillMessages(useI18n().t)
+  const [guideOpen, setGuideOpen] = useState(false)
+  // Admin-managed products hide the colour selector when there is a single colour; the coded
+  // catalog (no `sections`) renders exactly as before.
+  const hideColor = !!product.sections && product.colors.length <= 1
+  const sr = product.shippingReturns ?? legacyShipping(t)
   return (
     <>
       {/* Color */}
+      {!hideColor && (<>
       <div style={{ marginBottom: 24 }}>
         <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em',
                     textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
@@ -1218,21 +1290,36 @@ function PurchasePanel({ product, color, setColor, size, setSize,
       </div>
 
       <div style={{ borderTop:'1px solid #E8E5E0', marginBottom:24 }} />
+      </>)}
 
       {/* Size */}
       <div style={{ marginBottom:24 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
           <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em',
                       textTransform:'uppercase', color: sizeErr ? '#B91C1C' : '#9B9B9B', margin:0 }}>
-            {sizeErr ? 'Select a size' : 'Size'}
+            {sizeErr ? t['pdp.selectASize'] : t.size}
           </p>
-          <Link href="/support/size-guide"
-            style={{ fontSize:11, fontWeight:300, color:'#9B9B9B', textDecoration:'underline',
-                     textUnderlineOffset:2 }}
-            className="hover:text-[#1A1A1A] transition-colors">
-            Size guide
-          </Link>
+          {showSection(product, 'sizeGuideLink') && (product.sizeGuide?.body ? (
+            <button type="button" onClick={() => setGuideOpen(o => !o)} aria-expanded={guideOpen}
+              style={{ fontSize:11, fontWeight:300, color:'#9B9B9B', textDecoration:'underline',
+                       textUnderlineOffset:2, background:'none', border:'none', padding:0, cursor:'pointer' }}
+              className="hover:text-[#1A1A1A] transition-colors">
+              {t.sizeGuideLink}
+            </button>
+          ) : (
+            <Link href="/support/size-guide"
+              style={{ fontSize:11, fontWeight:300, color:'#9B9B9B', textDecoration:'underline',
+                       textUnderlineOffset:2 }}
+              className="hover:text-[#1A1A1A] transition-colors">
+              {t.sizeGuideLink}
+            </Link>
+          ))}
         </div>
+        {guideOpen && product.sizeGuide?.body && (
+          <div style={{ marginBottom:12, fontSize:12, color:'#6B6B6B', lineHeight:1.6, whiteSpace:'pre-line' }}>
+            {product.sizeGuide.body}
+          </div>
+        )}
         <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
           {product.sizes.map((s: SizeOption) => (
             <button key={s.value} disabled={!s.inStock}
@@ -1269,10 +1356,10 @@ function PurchasePanel({ product, color, setColor, size, setSize,
 
       {/* Accordions */}
       {[
-        { label: 'Description', content: product.description },
-        { label: 'Details', content: (product.constructionDetails ?? []).join('\n') },
-      ].map(({ label, content }) => content ? (
-        <div key={label} style={{ borderTop:'1px solid #E8E5E0' }}>
+        { id: 'description', label: t['pdp.description'], content: showSection(product, 'description') ? product.description : '' },
+        { id: 'details', label: t['pdp.detailsTab'], content: showSection(product, 'details') ? (product.constructionDetails ?? []).join('\n') : '' },
+      ].map(({ id, label, content }) => content ? (
+        <div key={id} style={{ borderTop:'1px solid #E8E5E0' }}>
           <details className="group">
             <summary className="flex items-center justify-between py-4 cursor-pointer list-none select-none"
               style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em', textTransform:'uppercase' }}>
@@ -1289,37 +1376,36 @@ function PurchasePanel({ product, color, setColor, size, setSize,
         </div>
       ) : null)}
 
-      <div style={{ borderTop:'1px solid #E8E5E0' }}>
+      {showSection(product, 'shippingReturns') && (<div style={{ borderTop:'1px solid #E8E5E0' }}>
         <details className="group">
           <summary className="flex items-center justify-between py-4 cursor-pointer list-none select-none"
             style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em', textTransform:'uppercase' }}>
-            Shipping & Returns
+            {t.shippingReturns}
             <svg width="11" height="7" viewBox="0 0 11 7" fill="none"
               className="transition-transform duration-200 group-open:rotate-180 flex-shrink-0">
               <path d="M1 1l4.5 4.5L10 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
           </summary>
           <div style={{ paddingBottom:20, fontSize:13, color:'#6B6B6B', lineHeight:1.7 }}>
-            <p>Orders processed within 1–3 business days.</p>
-            <p>US: 2–7 days. International: 5–14+ days.</p>
-            <p>Returns within 14 days, unworn and in original condition.</p>
-            <Link href="/support/shipping-returns"
+            {sr.lines.map((l: string, i: number) => <p key={i}>{l}</p>)}
+            <Link href={sr.href}
               style={{ display:'block', marginTop:8, fontSize:12, color:'#1A1A1A',
                        textDecoration:'underline', textUnderlineOffset:2 }}>
-              Full policy →
+              {sr.linkLabel}
             </Link>
           </div>
         </details>
-      </div>
+      </div>)}
     </>
   )
 }
 
 // ─── DetailsStage ─────────────────────────────────────────────────────────────
 function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
-  sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t }: any) {
+  sizeErr, setSizeErr, cta, ctaLabel, soldOut, onAdd, onAddBoth, formatPrice, t, bundle, preview }: any) {
+  const money = useMoney()
 
-  const eyebrow = product.slug.includes('phantom') ? 'Project KVRN' : 'KVRN'
+  const eyebrow = eyebrowOf(product)
 
   return (
     <div className="bg-[#F9F8F6]">
@@ -1331,10 +1417,12 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
         {/* Title + price below carousel */}
         <div style={{ padding:'24px 20px 0' }}>
+        {eyebrow && (
         <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.26em',
                     textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
           {eyebrow}
         </p>
+        )}
         <h2 style={{ fontFamily:'var(--font-display)', fontWeight:300, lineHeight:1.06,
                      letterSpacing:'-0.03em', color:'#1A1A1A', marginBottom:12,
                      fontSize:'clamp(26px, 7.5vw, 34px)' }}>
@@ -1342,7 +1430,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
         </h2>
         <p style={{ fontSize:24, fontWeight:300, fontVariantNumeric:'tabular-nums',
                     color:'#1A1A1A', marginBottom: product.founderNote ? 6 : 0 }}>
-          $80
+          {money(product.price)}
         </p>
         {product.founderNote && (
           <p style={{ fontSize:12, color:'#9B9B9B', lineHeight:1.5, marginBottom:0 }}>
@@ -1382,10 +1470,12 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
           {/* Purchase panel col 3 */}
           <div style={{ marginTop:0, alignSelf:'start', position:'sticky', top:'calc(36px + 56px + 24px)' }}>
+            {eyebrow && (
             <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.22em',
                         textTransform:'uppercase', color:'#9B9B9B', marginBottom:14 }}>
               {eyebrow}
             </p>
+            )}
             <h2 style={{ fontFamily:'var(--font-display)', fontWeight:300,
                          fontSize:'clamp(28px,2.2vw,38px)', lineHeight:1.08,
                          letterSpacing:'-0.03em', color:'#1A1A1A', marginBottom:14 }}>
@@ -1393,7 +1483,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
             </h2>
             <p style={{ fontSize:22, fontWeight:300, fontVariantNumeric:'tabular-nums',
                         marginBottom: product.founderNote ? 6 : 24 }}>
-              $80
+              {money(product.price)}
             </p>
             {product.founderNote && (
               <p style={{ fontSize:12, color:'#9B9B9B', marginBottom:24, lineHeight:1.55 }}>
@@ -1413,7 +1503,9 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
       </div>
 
       {/* ══ COMPLETE THE SET ══ */}
-      {relatedProduct && (
+      {bundle && bundle.presentation?.sectionVisible !== false ? (
+        <CompleteTheSetBundle bundle={bundle} preview={preview} />
+      ) : relatedProduct && (
         <CompleteSet product={product} related={relatedProduct} onAddBoth={onAddBoth} />
       )}
     </div>
@@ -1422,12 +1514,24 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
 
 // ─── Complete the Set ─────────────────────────────────────────────────────────
 function CompleteSet({ product, related, onAddBoth }: any) {
-  const [hSize, setHSize] = useState<string|null>(null)
-  const [pSize, setPSize] = useState<string|null>(null)
+  const money = useMoney()
+  const t = fillMessages(useI18n().t)
+  // Compat "Complete the Set" (the bundle module replaces this later). Roles come from the product
+  // `type`, never from names. Cards are always (this product, paired product); sizes are tracked
+  // per product and handed to onAddBoth in that same order. Only the prompt wording prefers to
+  // ask for the hoodie size before the sweatpants size (the coded behaviour).
+  const [mySize, setMySize]   = useState<string|null>(null)
+  const [relSize, setRelSize] = useState<string|null>(null)
 
-  const isHoodie = (p: any) => p.name.toLowerCase().includes('hoodie')
   const img1 = product.colors[0]?.images.find((i: any) => i.type === 'front') ?? product.colors[0]?.images[0]
   const img2  = related.colors[0]?.images.find((i: any) => i.type === 'front') ?? related.colors[0]?.images[0]
+
+  const askRelatedFirst = product.type === 'sweatpants' && related.type === 'hoodie'
+  const askA = askRelatedFirst ? { p: related, size: relSize } : { p: product, size: mySize }
+  const askB = askRelatedFirst ? { p: product, size: mySize } : { p: related, size: relSize }
+
+  const totalCents = sumPriceCents(product.price, related.price)
+  const totalLabel = money(totalCents)
 
   return (
     <section style={{ background:'#F3F0EA' }}>
@@ -1454,15 +1558,15 @@ function CompleteSet({ product, related, onAddBoth }: any) {
             </p>
           </div>
 
-          {/* 2. Hoodie card */}
+          {/* 2. This product's card */}
           <BundleCard product={product} img={img1}
-            selectedSize={isHoodie(product)?hSize:pSize}
-            onSize={isHoodie(product)?setHSize:setPSize} />
+            selectedSize={mySize}
+            onSize={setMySize} />
 
-          {/* 3. Sweatpants card */}
+          {/* 3. Paired product's card */}
           <BundleCard product={related} img={img2}
-            selectedSize={isHoodie(related)?hSize:pSize}
-            onSize={isHoodie(related)?setHSize:setPSize} />
+            selectedSize={relSize}
+            onSize={setRelSize} />
 
           {/* 4. Bundle CTA */}
           <div style={{ display:'flex', flexDirection:'column' }}>
@@ -1472,27 +1576,27 @@ function CompleteSet({ product, related, onAddBoth }: any) {
               <path d="M12 10V7a5 5 0 0 1 10 0v3" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
               <path d="M13 15v3h8v-3" stroke="#1A1A1A" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
-            <p style={{ fontSize:14, fontWeight:300, color:'#1A1A1A', marginBottom:4 }}>Complete the set.</p>
-            <p style={{ fontSize:14, fontWeight:300, color:'#6B6B6B', marginBottom:24 }}>Save when you add both.</p>
+            <p style={{ fontSize:14, fontWeight:300, color:'#1A1A1A', marginBottom:4 }}>{t['pdp.setHeading']}</p>
+            <p style={{ fontSize:14, fontWeight:300, color:'#6B6B6B', marginBottom:24 }}>{t['pdp.setSave']}</p>
             <div style={{ borderTop:'1px solid #C8C4BC', paddingTop:20, marginBottom:20 }}>
               <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between' }}>
                 <span style={{ fontSize:10, fontWeight:300, letterSpacing:'0.1em',
-                               textTransform:'uppercase', color:'#9B9B9B' }}>Total</span>
-                <span style={{ fontSize:22, fontWeight:300, fontVariantNumeric:'tabular-nums' }}>$160</span>
+                               textTransform:'uppercase', color:'#9B9B9B' }}>{t['common.total']}</span>
+                <span style={{ fontSize:22, fontWeight:300, fontVariantNumeric:'tabular-nums' }}>{totalLabel}</span>
               </div>
             </div>
             {/* Button label guides user to select missing sizes */}
             {(() => {
-              const bundleReady = Boolean(hSize) && Boolean(pSize)
-              const label = !hSize && !pSize
-                ? 'Select Both Sizes'
-                : !hSize ? 'Select Hoodie Size'
-                : !pSize ? 'Select Sweatpants Size'
-                : 'Add the Complete Set — $160'
+              const bundleReady = Boolean(mySize) && Boolean(relSize) && totalCents !== null
+              const label = !mySize && !relSize
+                ? t['pdp.selectBothSizes']
+                : !askA.size ? format(t['pdp.selectNounSize'], { noun: nounOf(askA.p, t) })
+                : !askB.size ? format(t['pdp.selectNounSize'], { noun: nounOf(askB.p, t) })
+                : format(t['pdp.addCompleteSet'], { total: totalLabel })
               return (
                 <button
                   disabled={!bundleReady}
-                  onClick={() => bundleReady && onAddBoth(hSize!, pSize!)}
+                  onClick={() => bundleReady && onAddBoth(mySize!, relSize!)}
                   style={{ width:'100%', minWidth:0, minHeight:60, fontSize:11, fontWeight:300,
                            letterSpacing:'0.08em', textTransform:'uppercase',
                            background: bundleReady ? '#1A1A1A' : '#E8E5E0',
@@ -1510,7 +1614,7 @@ function CompleteSet({ product, related, onAddBoth }: any) {
               style={{ display:'block', textAlign:'center', fontSize:11, color:'#9B9B9B',
                        textDecoration:'underline', textUnderlineOffset:2 }}
               className="hover:text-[#1A1A1A] transition-colors">
-              View {related.name.includes('Hoodie')?'Hoodie':'Sweatpants'} separately
+              {format(t['pdp.viewNounSeparately'], { noun: nounOf(related, t) })}
             </Link>
           </div>
         </div>
@@ -1522,6 +1626,8 @@ function CompleteSet({ product, related, onAddBoth }: any) {
 function BundleCard({ product, img, selectedSize, onSize }: {
   product:any; img:any; selectedSize:string|null; onSize:(s:string)=>void
 }) {
+  const money = useMoney()
+  const t = fillMessages(useI18n().t)
   return (
     <div style={{ background:'transparent' }}>
       <div style={{ position:'relative', width:'100%', aspectRatio:'3/4',
@@ -1536,10 +1642,10 @@ function BundleCard({ product, img, selectedSize, onSize }: {
           {product.name}
         </p>
         <p style={{ fontSize:13, fontWeight:300, color:'#9B9B9B', marginBottom:14, fontVariantNumeric:'tabular-nums' }}>
-          $80
+          {money(product.price)}
         </p>
         <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.1em',
-                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:8 }}>Size</p>
+                    textTransform:'uppercase', color:'#9B9B9B', marginBottom:8 }}>{t.size}</p>
         <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
           {product.sizes.filter((s:any)=>s.inStock).map((s:any)=>(
             <button key={s.value} onClick={()=>onSize(s.label)}
@@ -1560,6 +1666,7 @@ function BundleCard({ product, img, selectedSize, onSize }: {
 
 // ─── Sticky ATC ───────────────────────────────────────────────────────────────
 function StickyATC({ product, color, size, cta, ctaLabel, soldOut, onAdd, t, visible }: any) {
+  const money = useMoney()
   return (
       <div
         id="kvrn-sticky-atc"
@@ -1579,7 +1686,7 @@ function StickyATC({ product, color, size, cta, ctaLabel, soldOut, onAdd, t, vis
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="text-[13px] font-light tabular-nums hidden sm:block">$80</span>
+          <span className="text-[13px] font-light tabular-nums hidden sm:block">{money(product.price)}</span>
           <button disabled={soldOut || cta === 'busy'} onClick={onAdd}
             className={cn('h-10 px-6 text-[11px] font-light tracking-[0.1em] uppercase transition-all',
               soldOut         ? 'bg-[#E8E5E0] text-[#9B9B9B] cursor-not-allowed'

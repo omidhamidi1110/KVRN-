@@ -10,7 +10,12 @@
 // entered as a transaction, realised operating profit is untouched.
 
 import { useEffect, useState, useCallback } from 'react'
-import { FONT, BORDER, money, moneyOrUnknown, SectionTitle } from '@/components/admin/FinancialUI'
+import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
+import {
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField,
+  AdminStat, AdminStatGrid, AdminTabs, AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading,
+  StatusBadge, AdminTag, useConfirm, adminInputClass, adminSelectClass,
+} from '@/components/admin/ui/AdminUI'
 
 type Definition = {
   id: string; provider: string; category: string; name: string
@@ -60,15 +65,6 @@ const CADENCE_LABELS: Record<string, string> = {
   one_time: 'one-time (manual)', usage_based: 'variable bill (enter actual when billed)',
 }
 
-const inputStyle = { fontFamily: FONT, fontSize: 12, padding: '8px 10px',
-                     border: BORDER, background: '#fff', width: '100%',
-                     boxSizing: 'border-box' as const }
-const btn = {
-  fontFamily: FONT, fontSize: 11, letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const, padding: '9px 16px',
-  background: '#1A1A1A', color: '#fff', border: 'none', cursor: 'pointer' as const,
-}
-
 export function ExpensesClient() {
   const [tab, setTab] = useState<'actual' | 'expected'>('actual')
   const [defs, setDefs] = useState<Definition[]>([])
@@ -76,6 +72,7 @@ export function ExpensesClient() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [err, setErr]         = useState<string | null>(null)
+  const { confirm, node: confirmNode } = useConfirm()
 
   const [defForm, setDefForm] = useState({
     provider: '', category: 'infrastructure', name: '', cadence: 'monthly',
@@ -154,6 +151,8 @@ export function ExpensesClient() {
   // Expected obligations (definitions) are plans, not booked money: they may be deleted.
   async function remove(kind: 'definitions', id: string) {
     setErr(null)
+    if (!(await confirm('Delete this expected obligation? Billed invoices are not affected.',
+      { title: 'Delete obligation', confirmLabel: 'Delete' }))) return
     try {
       const res = await fetch(`/api/admin/expenses/${kind}/${id}`, { method: 'DELETE' })
       if (!res.ok) { const j = await res.json(); setErr(j.error ?? 'Could not delete.'); return }
@@ -196,298 +195,255 @@ export function ExpensesClient() {
   const devTotal    = activeTxns.filter(t => t.category === 'development')
                           .reduce((s, t) => s + t.amountCents, 0)
 
+  const disabledTx  = saving || !txForm.provider || !txForm.name || !txForm.amount
+  const disabledDef = saving || !defForm.provider || !defForm.name
+
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1180 }}>
-      <h1 style={{ fontFamily: FONT, fontSize: 20, fontWeight: 500, margin: '0 0 4px' }}>
-        Operating expenses
-      </h1>
-      <p style={{ fontFamily: FONT, fontSize: 12, color: '#6B6B6B', margin: '0 0 20px' }}>
-        Expected obligations and actual invoices are tracked separately. Only actual billed
-        transactions reduce realised operating profit.
-      </p>
+    <AdminPage>
+      <AdminPageHeader
+        title="Expenses"
+        description="Billed invoices and expected costs."
+        info={<>
+          Expected obligations and actual invoices are tracked separately. Only actual billed
+          transactions reduce realised operating profit. An expected obligation is a plan, not a bill.
+        </>}
+      />
+      {confirmNode}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {([['actual', 'Actual billed'], ['expected', 'Expected obligations']] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
-            style={{ fontFamily: FONT, fontSize: 11, letterSpacing: '0.04em',
-                     padding: '7px 14px', cursor: 'pointer',
-                     border: tab === k ? '1px solid #1A1A1A' : BORDER,
-                     background: tab === k ? '#1A1A1A' : '#fff',
-                     color: tab === k ? '#fff' : '#1A1A1A' }}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <AdminTabs
+        ariaLabel="Expense views"
+        value={tab}
+        onChange={setTab}
+        tabs={[{ id: 'actual', label: 'Actual billed' }, { id: 'expected', label: 'Expected obligations' }]}
+      />
 
-      {err && (
-        <div style={{ fontFamily: FONT, fontSize: 12, color: '#B91C1C', background: '#FEF2F2',
-                      border: '1px solid #FECACA', padding: '10px 14px', marginBottom: 16 }}>
-          {err}
-        </div>
-      )}
+      {err && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
 
       {tab === 'actual' ? (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))',
-                        gap: 10, marginBottom: 22 }}>
-            <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-              <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                          textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>
-                Total billed (all time)</p>
-              <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '6px 0 0' }}>
-                {money(actualTotal)}</p>
-            </div>
-            <div style={{ border: BORDER, background: '#fff', padding: '14px 16px' }}>
-              <p style={{ fontFamily: FONT, fontSize: 9, letterSpacing: '0.12em',
-                          textTransform: 'uppercase', color: '#9B9B9B', margin: 0 }}>
-                Of which development</p>
-              <p style={{ fontFamily: FONT, fontSize: 22, fontWeight: 500, margin: '6px 0 0' }}>
-                {money(devTotal)}</p>
-              <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '4px 0 0' }}>
-                Reported after operating profit</p>
-            </div>
-          </div>
+        <div className="space-y-6">
+          <AdminStatGrid min={200}>
+            <AdminStat label="Total billed" value={money(actualTotal)} sub="All time, voided excluded" />
+            <AdminStat label="Of which development" value={money(devTotal)} sub="Reported after operating profit" />
+          </AdminStatGrid>
 
-          <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 24 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12 }}>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Settles obligation
-                <select value={txForm.expenseDefinitionId}
-                        onChange={e => {
-                          const d = defs.find(x => x.id === e.target.value)
-                          setTxForm({
-                            ...txForm, expenseDefinitionId: e.target.value,
-                            provider: d?.provider ?? txForm.provider,
-                            category: d?.category ?? txForm.category,
-                            name:     d?.name ?? txForm.name,
-                          })
-                        }}
-                        style={{ ...inputStyle, marginTop: 4 }}>
-                  <option value="">— none —</option>
+          <AdminCard>
+            <AdminSectionHeader title="Record an invoice" />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <AdminField label="Settles obligation" htmlFor="tx-def">
+                <select id="tx-def" value={txForm.expenseDefinitionId} className={adminSelectClass}
+                  onChange={e => {
+                    const d = defs.find(x => x.id === e.target.value)
+                    setTxForm({
+                      ...txForm, expenseDefinitionId: e.target.value,
+                      provider: d?.provider ?? txForm.provider,
+                      category: d?.category ?? txForm.category,
+                      name:     d?.name ?? txForm.name,
+                    })
+                  }}>
+                  <option value="">None</option>
                   {defs.map(d => <option key={d.id} value={d.id}>{d.provider} · {d.name}</option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Provider *
-                <input value={txForm.provider} onChange={e => setTxForm({ ...txForm, provider: e.target.value })}
-                       placeholder="Twilio" style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Description *
-                <input value={txForm.name} onChange={e => setTxForm({ ...txForm, name: e.target.value })}
-                       placeholder="August invoice" style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Category
-                <select value={txForm.category} onChange={e => setTxForm({ ...txForm, category: e.target.value })}
-                        style={{ ...inputStyle, marginTop: 4 }}>
+                </select>
+              </AdminField>
+              <AdminField label="Provider *" htmlFor="tx-provider">
+                <input id="tx-provider" className={adminInputClass} value={txForm.provider}
+                  onChange={e => setTxForm({ ...txForm, provider: e.target.value })} placeholder="Twilio" />
+              </AdminField>
+              <AdminField label="Description *" htmlFor="tx-name">
+                <input id="tx-name" className={adminInputClass} value={txForm.name}
+                  onChange={e => setTxForm({ ...txForm, name: e.target.value })} placeholder="August invoice" />
+              </AdminField>
+              <AdminField label="Category" htmlFor="tx-category">
+                <select id="tx-category" className={adminSelectClass} value={txForm.category}
+                  onChange={e => setTxForm({ ...txForm, category: e.target.value })}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{catLabel(c)}</option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Amount $ *
-                <input type="number" step="0.01" min="0" value={txForm.amount}
-                       onChange={e => setTxForm({ ...txForm, amount: e.target.value })}
-                       placeholder="3.15" style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Paid on
-                <input type="date" value={txForm.paidAt}
-                       onChange={e => setTxForm({ ...txForm, paidAt: e.target.value })}
-                       style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Service period start
-                <input type="date" value={txForm.periodStart}
-                       onChange={e => setTxForm({ ...txForm, periodStart: e.target.value })}
-                       style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Service period end
-                <input type="date" value={txForm.periodEnd}
-                       onChange={e => setTxForm({ ...txForm, periodEnd: e.target.value })}
-                       style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Invoice ID
-                <input value={txForm.invoiceId} onChange={e => setTxForm({ ...txForm, invoiceId: e.target.value })}
-                       style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Source
-                <select value={txForm.source} onChange={e => setTxForm({ ...txForm, source: e.target.value })}
-                        style={{ ...inputStyle, marginTop: 4 }}>
+                </select>
+              </AdminField>
+              <AdminField label="Amount ($) *" htmlFor="tx-amount">
+                <input id="tx-amount" type="number" step="0.01" min="0" className={adminInputClass} value={txForm.amount}
+                  onChange={e => setTxForm({ ...txForm, amount: e.target.value })} placeholder="3.15" />
+              </AdminField>
+              <AdminField label="Paid on" htmlFor="tx-paid">
+                <input id="tx-paid" type="date" className={adminInputClass} value={txForm.paidAt}
+                  onChange={e => setTxForm({ ...txForm, paidAt: e.target.value })} />
+              </AdminField>
+              <AdminField label="Service period start" htmlFor="tx-pstart"
+                info={<>
+                  A service period spanning several months is recognised across reporting windows —
+                  an annual renewal is one transaction, never twelve. The full amount still counts as
+                  cash paid on the Infrastructure page.
+                </>}>
+                <input id="tx-pstart" type="date" className={adminInputClass} value={txForm.periodStart}
+                  onChange={e => setTxForm({ ...txForm, periodStart: e.target.value })} />
+              </AdminField>
+              <AdminField label="Service period end" htmlFor="tx-pend">
+                <input id="tx-pend" type="date" className={adminInputClass} value={txForm.periodEnd}
+                  onChange={e => setTxForm({ ...txForm, periodEnd: e.target.value })} />
+              </AdminField>
+              <AdminField label="Invoice ID" htmlFor="tx-invoice">
+                <input id="tx-invoice" className={adminInputClass} value={txForm.invoiceId}
+                  onChange={e => setTxForm({ ...txForm, invoiceId: e.target.value })} />
+              </AdminField>
+              <AdminField label="Source" htmlFor="tx-source">
+                <select id="tx-source" className={adminSelectClass} value={txForm.source}
+                  onChange={e => setTxForm({ ...txForm, source: e.target.value })}>
                   {SOURCES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-                </select></label>
+                </select>
+              </AdminField>
             </div>
             {txForm.category === 'packaging' && (
-              <p style={{ fontFamily: FONT, fontSize: 11, color: '#92400E',
-                          background: '#FFFBEB', border: '1px solid #FDE68A',
-                          padding: '8px 12px', margin: '12px 0 0' }}>
-                {PACKAGING_WARNING}
-              </p>
+              <AdminNotice tone="warning" className="mt-3">{PACKAGING_WARNING}</AdminNotice>
             )}
-            <p style={{ fontFamily: FONT, fontSize: 11, color: '#6B6B6B', margin: '12px 0 0' }}>
-              A service period spanning several months is recognised across reporting windows —
-              an annual renewal is one transaction, never twelve. The full amount still counts as
-              cash paid on the Infrastructure page.
-            </p>
-            <button onClick={saveTransaction}
-              disabled={saving || !txForm.provider || !txForm.name || !txForm.amount}
-              style={{ ...btn, marginTop: 14,
-                       opacity: saving || !txForm.provider || !txForm.name || !txForm.amount ? 0.45 : 1 }}>
-              {saving ? 'Saving…' : 'Record invoice'}
-            </button>
-          </div>
+            <div className="mt-4">
+              <AdminButton variant="primary" onClick={saveTransaction} disabled={disabledTx} loading={saving}>
+                Record invoice
+              </AdminButton>
+            </div>
+          </AdminCard>
 
-          <SectionTitle note="Real invoices. These are the only expenses that reduce realised profit.">
-            Billed transactions
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Provider','Description','Category','Amount','Paid','Service period','Source',''].map((h,i) => (
-                  <th key={i} style={{ textAlign: 'left', padding: '9px 10px', fontSize: 9,
-                                       letterSpacing: '0.1em', textTransform: 'uppercase',
-                                       color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>))}
+          <section>
+            <AdminSectionHeader
+              title="Billed invoices"
+              info="Real invoices. These are the only expenses that reduce realised profit. Voided invoices stay in the history but count nowhere."
+            />
+            <AdminTable caption="Billed invoices" minWidth={820}>
+              <thead><tr>
+                {['Provider', 'Description', 'Category', 'Amount', 'Paid', 'Service period', 'Source', ''].map((h, i) => (
+                  <AdminTh key={i}>{h}</AdminTh>
+                ))}
               </tr></thead>
               <tbody>
-                {loading && <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>}
+                {loading && <tr><AdminTd colSpan={8}><AdminLoading /></AdminTd></tr>}
                 {!loading && txns.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No invoices recorded. Realised operating profit is unaffected by expected
-                    obligations until an invoice is entered here.
-                  </td></tr>
+                  <tr><AdminTd colSpan={8}>
+                    <AdminEmpty title="No invoices recorded."
+                      description="Expected obligations don’t affect profit until an invoice is entered here." />
+                  </AdminTd></tr>
                 )}
                 {txns.map(t => (
-                  <tr key={t.id} style={{ borderBottom: '1px solid #F1EEE8',
-                                           opacity: t.voidedAt ? 0.55 : 1,
-                                           textDecoration: t.voidedAt ? 'line-through' : 'none' }}>
-                    <td style={{ padding: '9px 10px' }}>{t.provider}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{t.name}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {catLabel(t.category)}
-                    </td>
-                    <td style={{ padding: '9px 10px', fontWeight: 500 }}>{money(t.amountCents)}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{t.paidAt ?? 'unpaid'}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
+                  <tr key={t.id} className={t.voidedAt ? 'bg-black/[0.02] text-[#8A8A85]' : undefined}>
+                    <AdminTd>{t.provider}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{t.name}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{catLabel(t.category)}</AdminTd>
+                    <AdminTd className={`font-medium ${t.voidedAt ? 'line-through' : ''}`}>{money(t.amountCents)}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{t.paidAt ?? 'Unpaid'}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">
                       {t.periodStart ? `${t.periodStart} → ${t.periodEnd ?? t.periodStart}` : '—'}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{t.source.replace(/_/g, ' ')}</td>
-                    <td style={{ padding: '9px 10px' }}>
+                    </AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{t.source.replace(/_/g, ' ')}</AdminTd>
+                    <AdminTd>
                       {t.voidedAt ? (
-                        <span style={{ fontSize: 11, color: '#6B6B6B', textDecoration: 'none', display: 'inline-block' }}
-                              title={`Voided ${t.voidedAt} by ${t.voidedBy ?? 'unknown'}: ${t.voidReason ?? ''}`}>
-                          Voided{t.voidReason ? ` — ${t.voidReason}` : ''}
-                        </span>
+                        <div className="text-[11px]">
+                          <AdminTag tone="neutral">Voided</AdminTag>
+                          <p className="mt-1 text-[#6B6B66]">
+                            {t.voidedAt.slice(0, 10)} by {t.voidedBy ?? 'unknown'}
+                            {t.voidReason ? ` — ${t.voidReason}` : ''}
+                          </p>
+                        </div>
                       ) : (
-                        <button onClick={() => voidTransaction(t.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer',
-                                   color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
-                          Void
-                        </button>
+                        <AdminButton variant="ghost" size="sm" onClick={() => voidTransaction(t.id)}>Void</AdminButton>
                       )}
-                    </td>
+                    </AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </>
+            </AdminTable>
+          </section>
+        </div>
       ) : (
-        <>
-          <div style={{ fontFamily: FONT, fontSize: 12, color: '#92400E', background: '#FFFBEB',
-                        border: '1px solid #FDE68A', padding: '10px 14px', marginBottom: 20 }}>
-            These are expectations, not bills. Nothing here reduces realised profit — record the
-            matching invoice under &ldquo;Actual billed&rdquo; when it arrives.
-          </div>
+        <div className="space-y-6">
+          <AdminNotice tone="warning">
+            Expectations, not bills. Nothing here reduces realised profit — record the matching
+            invoice under &ldquo;Actual billed&rdquo; when it arrives.
+          </AdminNotice>
 
-          <div style={{ border: BORDER, background: '#fff', padding: 18, marginBottom: 24 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12 }}>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Provider *
-                <input value={defForm.provider} onChange={e => setDefForm({ ...defForm, provider: e.target.value })}
-                       placeholder="Neon" style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Name *
-                <input value={defForm.name} onChange={e => setDefForm({ ...defForm, name: e.target.value })}
-                       placeholder="Postgres plan" style={{ ...inputStyle, marginTop: 4 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Category
-                <select value={defForm.category} onChange={e => setDefForm({ ...defForm, category: e.target.value })}
-                        style={{ ...inputStyle, marginTop: 4 }}>
+          <AdminCard>
+            <AdminSectionHeader title="Add an obligation" />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <AdminField label="Provider *" htmlFor="def-provider">
+                <input id="def-provider" className={adminInputClass} value={defForm.provider}
+                  onChange={e => setDefForm({ ...defForm, provider: e.target.value })} placeholder="Neon" />
+              </AdminField>
+              <AdminField label="Name *" htmlFor="def-name">
+                <input id="def-name" className={adminInputClass} value={defForm.name}
+                  onChange={e => setDefForm({ ...defForm, name: e.target.value })} placeholder="Postgres plan" />
+              </AdminField>
+              <AdminField label="Category" htmlFor="def-category">
+                <select id="def-category" className={adminSelectClass} value={defForm.category}
+                  onChange={e => setDefForm({ ...defForm, category: e.target.value })}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{catLabel(c)}</option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Cadence
-                <select value={defForm.cadence} onChange={e => setDefForm({ ...defForm, cadence: e.target.value })}
-                        style={{ ...inputStyle, marginTop: 4 }}>
+                </select>
+              </AdminField>
+              <AdminField label="Cadence" htmlFor="def-cadence">
+                <select id="def-cadence" className={adminSelectClass} value={defForm.cadence}
+                  onChange={e => setDefForm({ ...defForm, cadence: e.target.value })}>
                   {CADENCES.map(c => <option key={c} value={c}>{CADENCE_LABELS[c] ?? c.replace(/_/g, ' ')}</option>)}
-                </select></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>
-                Expected amount $ {defForm.cadence === 'usage_based' ? '(n/a)' : '*'}
-                <input type="number" step="0.01" min="0" value={defForm.expectedAmount}
-                       disabled={defForm.cadence === 'usage_based'}
-                       onChange={e => setDefForm({ ...defForm, expectedAmount: e.target.value })}
-                       placeholder="19.00"
-                       style={{ ...inputStyle, marginTop: 4,
-                                opacity: defForm.cadence === 'usage_based' ? 0.5 : 1 }} /></label>
-              <label style={{ fontFamily: FONT, fontSize: 11 }}>Start / next renewal date
-                <input type="date" value={defForm.renewalDate}
-                       onChange={e => setDefForm({ ...defForm, renewalDate: e.target.value })}
-                       style={{ ...inputStyle, marginTop: 4 }} /></label>
+                </select>
+              </AdminField>
+              <AdminField label={`Expected amount ($) ${defForm.cadence === 'usage_based' ? '(n/a)' : '*'}`} htmlFor="def-amount">
+                <input id="def-amount" type="number" step="0.01" min="0" className={adminInputClass}
+                  value={defForm.expectedAmount} disabled={defForm.cadence === 'usage_based'}
+                  onChange={e => setDefForm({ ...defForm, expectedAmount: e.target.value })} placeholder="19.00" />
+              </AdminField>
+              <AdminField label="Start / next renewal date" htmlFor="def-renewal">
+                <input id="def-renewal" type="date" className={adminInputClass} value={defForm.renewalDate}
+                  onChange={e => setDefForm({ ...defForm, renewalDate: e.target.value })} />
+              </AdminField>
             </div>
             {defForm.category === 'packaging' && (
-              <p style={{ fontFamily: FONT, fontSize: 11, color: '#92400E',
-                          background: '#FFFBEB', border: '1px solid #FDE68A',
-                          padding: '8px 12px', margin: '12px 0 0' }}>
-                {PACKAGING_WARNING}
-              </p>
+              <AdminNotice tone="warning" className="mt-3">{PACKAGING_WARNING}</AdminNotice>
             )}
-            <button onClick={saveDefinition}
-              disabled={saving || !defForm.provider || !defForm.name}
-              style={{ ...btn, marginTop: 14,
-                       opacity: saving || !defForm.provider || !defForm.name ? 0.45 : 1 }}>
-              {saving ? 'Saving…' : 'Add obligation'}
-            </button>
-          </div>
+            <div className="mt-4">
+              <AdminButton variant="primary" onClick={saveDefinition} disabled={disabledDef} loading={saving}>
+                Add obligation
+              </AdminButton>
+            </div>
+          </AdminCard>
 
-          <SectionTitle note="Monthly equivalent is for planning comparison only — it never creates billed rows.">
-            Expected obligations
-          </SectionTitle>
-          <div style={{ border: BORDER, background: '#fff', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: FONT, fontSize: 12 }}>
-              <thead><tr style={{ background: '#FAF9F7' }}>
-                {['Provider','Name','Category','Cadence','Expected','Monthly equiv.','Start / renews','Status',''].map((h,i) => (
-                  <th key={i} style={{ textAlign: 'left', padding: '9px 10px', fontSize: 9,
-                                       letterSpacing: '0.1em', textTransform: 'uppercase',
-                                       color: '#9B9B9B', borderBottom: BORDER }}>{h}</th>))}
+          <section>
+            <AdminSectionHeader
+              title="Expected obligations"
+              info="Monthly equivalent is for planning comparison only — it never creates billed rows."
+            />
+            <AdminTable caption="Expected obligations" minWidth={900}>
+              <thead><tr>
+                {['Provider', 'Name', 'Category', 'Cadence', 'Expected', 'Monthly equiv.', 'Start / renews', 'Status', ''].map((h, i) => (
+                  <AdminTh key={i}>{h}</AdminTh>
+                ))}
               </tr></thead>
               <tbody>
-                {loading && <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>Loading…</td></tr>}
+                {loading && <tr><AdminTd colSpan={9}><AdminLoading /></AdminTd></tr>}
                 {!loading && defs.length === 0 && (
-                  <tr><td colSpan={9} style={{ padding: '18px 12px', color: '#6B6B6B' }}>
-                    No obligations recorded.
-                  </td></tr>
+                  <tr><AdminTd colSpan={9}><AdminEmpty title="No obligations recorded." /></AdminTd></tr>
                 )}
                 {defs.map(d => (
-                  <tr key={d.id} style={{ borderBottom: '1px solid #F1EEE8' }}>
-                    <td style={{ padding: '9px 10px' }}>{d.provider}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{d.name}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {catLabel(d.category)}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {d.cadence.replace(/_/g, ' ')}
-                    </td>
-                    <td style={{ padding: '9px 10px' }}>
-                      {moneyOrUnknown(d.expectedAmountCents, 'usage-based')}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {d.monthlyEquivalentCents === null
-                        ? '—' : `${money(d.monthlyEquivalentCents)}/mo`}
-                    </td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>{d.renewalDate ?? '—'}</td>
-                    <td style={{ padding: '9px 10px', color: '#6B6B6B' }}>
-                      {d.active ? 'active' : 'ended'}
-                    </td>
-                    <td style={{ padding: '9px 10px' }}>
-                      <button onClick={() => setActive(d.id, !d.active)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer',
-                                 color: '#6b7280', fontSize: 11, textDecoration: 'underline',
-                                 marginRight: 10 }}>
-                        {d.active ? 'End' : 'Reactivate'}
-                      </button>
-                      <button onClick={() => remove('definitions', d.id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer',
-                                 color: '#6b7280', fontSize: 11, textDecoration: 'underline' }}>
-                        Delete
-                      </button>
-                    </td>
+                  <tr key={d.id}>
+                    <AdminTd>{d.provider}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{d.name}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{catLabel(d.category)}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{d.cadence.replace(/_/g, ' ')}</AdminTd>
+                    <AdminTd>{moneyOrUnknown(d.expectedAmountCents, 'usage-based')}</AdminTd>
+                    <AdminTd className="text-[#6B6B66]">
+                      {d.monthlyEquivalentCents === null ? '—' : `${money(d.monthlyEquivalentCents)}/mo`}
+                    </AdminTd>
+                    <AdminTd className="text-[#6B6B66]">{d.renewalDate ?? '—'}</AdminTd>
+                    <AdminTd>
+                      {d.active ? <StatusBadge status="Active" /> : <StatusBadge status="Inactive" label="Ended" />}
+                    </AdminTd>
+                    <AdminTd>
+                      <div className="flex gap-1">
+                        <AdminButton variant="ghost" size="sm" onClick={() => setActive(d.id, !d.active)}>
+                          {d.active ? 'End' : 'Reactivate'}
+                        </AdminButton>
+                        <AdminButton variant="ghost" size="sm" onClick={() => remove('definitions', d.id)}>Delete</AdminButton>
+                      </div>
+                    </AdminTd>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </>
+            </AdminTable>
+          </section>
+        </div>
       )}
-    </div>
+    </AdminPage>
   )
 }
