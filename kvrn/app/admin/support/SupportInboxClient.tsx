@@ -71,6 +71,14 @@ export function SupportInboxClient() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [listErr, setListErr] = useState<string | null>(null)
   const [loadingList, setLoadingList] = useState(true)
+  const [lastListRefresh, setLastListRefresh] = useState<Date | null>(null)
+  const [supportReadiness, setSupportReadiness] = useState<{ forwardingDestinationConfigured: boolean; resendApiKeyConfigured: boolean; inboundEmailIngestConfigured: boolean } | null>(null)
+  useEffect(() => {
+    fetch('/api/admin/support/readiness', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.config) setSupportReadiness(j.config) })
+      .catch(() => {})
+  }, [])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [thread, setThread] = useState<ThreadDetail | null>(null)
@@ -113,6 +121,7 @@ export function SupportInboxClient() {
       setCounts(data.counts)
       setNextCursor(data.nextCursor ?? null)
       setListErr(null)
+      if (!opts.append) setLastListRefresh(new Date())
     } catch (e: any) {
       setListErr(e?.message ?? 'Could not load threads.')
     } finally {
@@ -227,8 +236,25 @@ export function SupportInboxClient() {
           contact-form messages appear here too. Attachments are listed only; the original file is in the
           forwarded mailbox.
         </>}
-        actions={<AdminButton size="sm" onClick={() => loadList()}>Refresh</AdminButton>}
+        actions={<>
+          <span aria-live="polite" className="text-[11px] text-[#6B6B66]">
+            {loadingList ? 'Refreshing…' : lastListRefresh ? `Checked ${lastListRefresh.toLocaleTimeString()}` : 'Not refreshed yet'}
+          </span>
+          <AdminButton size="sm" disabled={loadingList} onClick={() => void loadList()}>
+            {loadingList ? 'Refreshing…' : 'Refresh'}
+          </AdminButton>
+        </>}
       />
+
+      {supportReadiness && (
+        <div className="mb-4 rounded-xl border border-black/10 bg-white p-3 text-xs leading-relaxed text-[#666660]">
+          <strong className="text-[#22221F]">Support routing configuration:</strong>{' '}
+          Owner forwarding {supportReadiness.forwardingDestinationConfigured ? 'configured' : 'NOT configured'} ·{' '}
+          Resend {supportReadiness.resendApiKeyConfigured ? 'configured' : 'NOT configured'} ·{' '}
+          Inbound worker {supportReadiness.inboundEmailIngestConfigured ? 'configured' : 'NOT configured'}.
+          <span className="block mt-1">These are configuration checks, not proof that Cloudflare routing or the sending domain is verified. Contact messages are still saved to Admin Support first.</span>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
         {/* ── list ─────────────────────────────────────────── */}

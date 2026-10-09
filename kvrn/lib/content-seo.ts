@@ -51,7 +51,10 @@ export function mergeGlobalSeo(stored: unknown, locale = 'en'): GlobalSeo {
 
 /** The root layout metadata. With DEFAULT_GLOBAL_SEO this equals the old hardcoded object. */
 export function siteMetadata(g: GlobalSeo = DEFAULT_GLOBAL_SEO): Metadata {
-  const img = g.shareImageUrl ? [{ url: g.shareImageUrl }] : undefined
+  // Real first-party campaign asset; a share card remains available before the
+  // owner publishes a custom CMS OG image. No AI/generated imagery or fake reviews.
+  const img = [{ url: g.shareImageUrl || '/images-r/1536/campaign/hero-main.webp',
+    width: 1536, alt: 'KVRN clothing collection' }]
   return {
     title: { default: g.titleDefault, template: g.titleTemplate },
     description: g.description,

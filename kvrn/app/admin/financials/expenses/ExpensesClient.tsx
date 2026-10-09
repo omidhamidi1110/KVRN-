@@ -11,6 +11,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
+import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import {
   AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField,
   AdminStat, AdminStatGrid, AdminTabs, AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading,
@@ -74,11 +75,11 @@ export function ExpensesClient() {
   const [err, setErr]         = useState<string | null>(null)
   const { confirm, node: confirmNode } = useConfirm()
 
-  const [defForm, setDefForm] = useState({
+  const { value: defForm, set: setDefForm, replace: replaceDef, undo: undoDef, redo: redoDef, canUndo: canUndoDef, canRedo: canRedoDef } = useDraftHistory({
     provider: '', category: 'infrastructure', name: '', cadence: 'monthly',
     expectedAmount: '', renewalDate: '', notes: '',
   })
-  const [txForm, setTxForm] = useState({
+  const { value: txForm, set: setTxForm, replace: replaceTx, undo: undoTx, redo: redoTx, canUndo: canUndoTx, canRedo: canRedoTx } = useDraftHistory({
     expenseDefinitionId: '', provider: '', category: 'infrastructure', name: '',
     amount: '', periodStart: '', periodEnd: '',
     paidAt: new Date().toISOString().slice(0, 10), invoiceId: '', source: 'manual',
@@ -120,7 +121,7 @@ export function ExpensesClient() {
       })
       const json = await res.json()
       if (!res.ok) { setErr(json.error ?? 'Could not save.'); return }
-      setDefForm({ ...defForm, provider: '', name: '', expectedAmount: '', notes: '' })
+      replaceDef({ ...defForm, provider: '', name: '', expectedAmount: '', notes: '' })
       await load()
     } catch { setErr('Network error.') }
     finally { setSaving(false) }
@@ -142,7 +143,7 @@ export function ExpensesClient() {
       })
       const json = await res.json()
       if (!res.ok) { setErr(json.error ?? 'Could not save.'); return }
-      setTxForm({ ...txForm, provider: '', name: '', amount: '', invoiceId: '' })
+      replaceTx({ ...txForm, provider: '', name: '', amount: '', invoiceId: '' })
       await load()
     } catch { setErr('Network error.') }
     finally { setSaving(false) }
@@ -228,6 +229,11 @@ export function ExpensesClient() {
 
           <AdminCard>
             <AdminSectionHeader title="Record an invoice" />
+            <div className="flex items-center justify-end gap-2 pb-3">
+              <span className="mr-auto text-xs text-[#777770]">Unsaved edits only</span>
+              <AdminButton variant="ghost" size="sm" onClick={undoTx} disabled={!canUndoTx || saving}>↶ Undo</AdminButton>
+              <AdminButton variant="ghost" size="sm" onClick={redoTx} disabled={!canRedoTx || saving}>↷ Redo</AdminButton>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <AdminField label="Settles obligation" htmlFor="tx-def">
                 <select id="tx-def" value={txForm.expenseDefinitionId} className={adminSelectClass}
@@ -358,6 +364,11 @@ export function ExpensesClient() {
 
           <AdminCard>
             <AdminSectionHeader title="Add an obligation" />
+            <div className="flex items-center justify-end gap-2 pb-3">
+              <span className="mr-auto text-xs text-[#777770]">Unsaved edits only</span>
+              <AdminButton variant="ghost" size="sm" onClick={undoDef} disabled={!canUndoDef || saving}>↶ Undo</AdminButton>
+              <AdminButton variant="ghost" size="sm" onClick={redoDef} disabled={!canRedoDef || saving}>↷ Redo</AdminButton>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <AdminField label="Provider *" htmlFor="def-provider">
                 <input id="def-provider" className={adminInputClass} value={defForm.provider}

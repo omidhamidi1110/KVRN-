@@ -117,11 +117,6 @@ const navGroups: NavGroup[] = [
     label: 'Content',
     items: [
       {
-        label: 'Marketing Suite',
-        href: '/admin/marketing',
-        icon: icon(<><path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></>),
-      },
-      {
         label: 'Content',
         href: '/admin/content',
         icon: icon(<>
@@ -237,6 +232,11 @@ const navGroups: NavGroup[] = [
   {
     label: 'Marketing',
     items: [
+      {
+        label: 'Marketing Suite',
+        href: '/admin/marketing',
+        icon: icon(<><path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></>),
+      },
       {
         label: 'SMS',
         href: '/admin/sms',

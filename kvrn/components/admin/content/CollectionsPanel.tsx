@@ -4,6 +4,7 @@
 // Collections have no draft: saving changes the live page, so Save is explicit and every save
 // carries the version the editor loaded (a stale save is a visible conflict, never an overwrite).
 
+import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import { useCallback, useEffect, useState } from 'react'
 import {
   AdminButton, AdminCard, AdminEmpty, AdminError, AdminLoading, AdminNotice, AdminSectionHeader, AdminTabs, AdminTable, AdminTh, AdminTd,
@@ -81,7 +82,7 @@ type Tab = 'details' | 'products' | 'translations'
 function CollectionEditor({ id, onClose, onCreated }: { id: string; onClose: () => void; onCreated: (id: string) => void }) {
   const isNew = id === 'new'
   const { confirm, node } = useConfirm()
-  const [d, setD] = useState<Detail | null>(null)
+  const { value: d, set: setD, replace: replaceD, undo, redo, canUndo, canRedo } = useDraftHistory<Detail | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -97,12 +98,12 @@ function CollectionEditor({ id, onClose, onCreated }: { id: string; onClose: () 
 
   const load = useCallback(async () => {
     if (isNew) {
-      setD({ id: 'new', slug: '', name: '', description: '', heroMediaId: null, isActive: true, sortOrder: 0, seo: {}, archived: false, version: 0, products: [] })
+      replaceD({ id: 'new', slug: '', name: '', description: '', heroMediaId: null, isActive: true, sortOrder: 0, seo: {}, archived: false, version: 0, products: [] })
       return
     }
     const r = await api<Detail>('GET', `${BASE}/collections/${id}`)
     if (!r.ok) { setErr(r.error ?? 'Could not load.'); return }
-    setErr(null); setD(r.data!); setOrigSlug(r.data!.slug); setDirty(false); setProductsDirty(false)
+    setErr(null); replaceD(r.data!); setOrigSlug(r.data!.slug); setDirty(false); setProductsDirty(false)
   }, [id, isNew])
   useEffect(() => { load() }, [load])
 
@@ -145,7 +146,7 @@ function CollectionEditor({ id, onClose, onCreated }: { id: string; onClose: () 
     const r = await api<{ version: number; redirectCreated: boolean }>('PUT', `${BASE}/collections/${id}`, { collection: payload(), version: d!.version })
     setBusy(null)
     if (await done(r, r.ok && r.data?.redirectCreated ? 'Saved. The old address now redirects to the new one.' : 'Saved. The collection page is updated.')) {
-      setD(x => x && ({ ...x, version: r.data!.version })); setOrigSlug(d!.slug); setDirty(false)
+      replaceD({ ...d!, version: r.data!.version }); setOrigSlug(d!.slug); setDirty(false)
     }
   }
 
@@ -160,7 +161,7 @@ function CollectionEditor({ id, onClose, onCreated }: { id: string; onClose: () 
     }
     const r = await api<{ version: number }>('PUT', `${BASE}/collections/${id}/products`, { productIds: d!.products.map(p => p.id), version })
     setBusy(null)
-    if (await done(r, 'Products saved. The collection page shows them in this order.')) { setD(x => x && ({ ...x, version: r.data!.version })); setProductsDirty(false) }
+    if (await done(r, 'Products saved. The collection page shows them in this order.')) { replaceD({ ...d!, version: r.data!.version }); setProductsDirty(false) }
   }
 
   async function setArchived(archive: boolean) {
@@ -192,6 +193,10 @@ function CollectionEditor({ id, onClose, onCreated }: { id: string; onClose: () 
             {(dirty || productsDirty) && <span className="text-[11px] text-[#92400E]">Unsaved changes</span>}
           </div>
           <div className="flex flex-wrap gap-2">
+            {!archived && <>
+              <AdminButton size="sm" variant="ghost" disabled={!!busy || !canUndo} onClick={() => { undo(); setDirty(true); setProductsDirty(true) }}>Undo</AdminButton>
+              <AdminButton size="sm" variant="ghost" disabled={!!busy || !canRedo} onClick={() => { redo(); setDirty(true); setProductsDirty(true) }}>Redo</AdminButton>
+            </>}
             {isNew
               ? <AdminButton variant="primary" loading={busy === 'create'} onClick={create}>Create collection</AdminButton>
               : archived

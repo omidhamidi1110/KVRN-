@@ -1277,7 +1277,7 @@ function PurchasePanel({ product, color, setColor, size, setSize,
       <div style={{ marginBottom: 24 }}>
         <p style={{ fontSize:10, fontWeight:300, letterSpacing:'0.12em',
                     textTransform:'uppercase', color:'#9B9B9B', marginBottom:10 }}>
-          Color
+          {t.color}
         </p>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           {product.colors.map((c: ColorOption) => (
@@ -1344,7 +1344,14 @@ function PurchasePanel({ product, color, setColor, size, setSize,
           ))}
         </div>
         {product.fitNote && (
-          <p style={{ fontSize:12, color:'#9B9B9B', marginTop:8, lineHeight:1.5 }}>{product.fitNote}</p>
+          <p style={{ fontSize:12, color:'#9B9B9B', marginTop:8, lineHeight:1.5 }}>
+            {({
+              'Cropped oversized fit. Size up for more length.': t['pdp.fit.phantomHoodie'],
+              'Relaxed oversized fit. True to size.': t['pdp.fit.phantomSweatpants'],
+              'Runs oversized. If between sizes, size down for a cleaner fit.': t['pdp.fit.standardHoodie'],
+              'Wide-leg. Sits at natural waist. True to size.': t['pdp.fit.standardSweatpants'],
+            } as Record<string, string>)[product.fitNote] ?? product.fitNote}
+          </p>
         )}
       </div>
 
@@ -1541,7 +1548,7 @@ function CompleteSet({ product, related, onAddBoth }: any) {
 
   return (
     <section style={{ background:'#F3F0EA' }}>
-      <div style={{ maxWidth:1380, margin:'0 auto', padding:'64px 28px' }}>
+      <div className="mx-auto w-full max-w-[1380px] px-6 py-12 sm:px-7 sm:py-16">
 
         {/* Responsive: stacked on mobile, 4-col grid on desktop */}
         <div className="flex flex-col lg:grid gap-8 lg:gap-10"

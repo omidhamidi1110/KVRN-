@@ -112,6 +112,7 @@ export const fr: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'Fermer le menu',
   'nav.menuDialog': 'Menu de navigation',
   'nav.cookiePreferences': 'Préférences de cookies',
+  'nav.affiliateLogin': 'Connexion affilié',
   'nav.language': 'Langue',
   'nav.currency': 'Devise',
   'nav.selectLanguage': 'Choisir la langue',
@@ -221,7 +222,7 @@ export const fr: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': 'Image {n} — cliquez pour l’afficher',
   'pdp.legacyShip1': 'Commandes traitées sous 1 à 3 jours ouvrés.',
   'pdp.legacyShip2': 'États-Unis : 2 à 7 jours. International : 5 à 14 jours et plus.',
-  'pdp.legacyShip3': 'Retours sous 14 jours, article non porté et dans son état d’origine.',
+  'pdp.legacyShip3': 'Les articles admissibles, non portés, non lavés et munis de leurs étiquettes d’origine peuvent être retournés sous 14 jours après la livraison contre un avoir KVRN. Les frais de retour volontaire sont à la charge du client, sauf exceptions pour les articles endommagés, défectueux ou incorrects.',
   'pdp.fullPolicy': 'Politique complète →',
   'pdp.setHeading': 'Complétez l’ensemble.',
   'pdp.setSave': 'Économisez en ajoutant les deux.',
@@ -422,5 +423,11 @@ export const fr: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': 'Cette page',
   'notfound.line2': 'n’existe pas.',
   'notfound.body': 'Elle a peut-être été déplacée, ou le lien est incorrect.',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "Coupe ample et courte. Prenez une taille au-dessus pour plus de longueur.",
+  "pdp.fit.phantomSweatpants": "Coupe ample et décontractée. Taille habituelle.",
+  "pdp.fit.standardHoodie": "Silhouette oversize et coupe ample.",
+  "pdp.fit.standardSweatpants": "Jambe large. Se porte à la taille naturelle. Taille habituelle.",
+
   'notfound.backHome': 'Retour à l’accueil',
 }

@@ -21,6 +21,7 @@ export interface LiveAnalyticsSummary {
   devices: { device: string; sessions: number }[]
   products: { name: string; views: number }[]
   sources: { source: string; sessions: number }[]
+  purchaserRegions90d: { region: string; paidOrders: number }[]
   /** Same consenting session, actual event ordering, all stages in this window.
    * Not an all-traffic conversion rate; window edges and blocked analytics undercount.
    */
@@ -72,7 +73,7 @@ export async function getLiveAnalyticsSummary(): Promise<LiveAnalyticsSummary> {
     : sql`SELECT COUNT(*)::int AS orders, COALESCE(SUM(total_cents),0)::bigint AS gross
         FROM orders WHERE paid_at >= date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles') AT TIME ZONE 'America/Los_Angeles'
           AND paid_at < (date_trunc('day', NOW() AT TIME ZONE 'America/Los_Angeles') + INTERVAL '1 day') AT TIME ZONE 'America/Los_Angeles'`
-  const [counts, today, devices, products, sources, active, funnel, sequential] = await Promise.all([
+  const [counts, today, devices, products, sources, active, funnel, sequential, purchasers] = await Promise.all([
     sql`
       SELECT COUNT(DISTINCT session_id) FILTER (WHERE created_at > NOW() - INTERVAL '5 minutes')::int AS recent,
              COUNT(DISTINCT session_id) FILTER (WHERE event_name='product_viewed' AND created_at > NOW() - INTERVAL '5 minutes')::int AS products,
@@ -145,6 +146,18 @@ export async function getLiveAnalyticsSummary(): Promise<LiveAnalyticsSummary> {
              (SELECT COUNT(*)::text FROM carted) AS carted,
              (SELECT COUNT(*)::text FROM checked_out) AS checked_out,
              (SELECT COUNT(*)::text FROM purchased) AS purchased`,
+    sql`WITH destinations AS (
+      SELECT CASE
+        WHEN UPPER(TRIM(shipping_address->>'country')) ~ '^[A-Z]{2}$'
+        THEN UPPER(TRIM(shipping_address->>'country'))
+        ELSE 'Unknown' END AS country,
+        CASE WHEN UPPER(TRIM(shipping_address->>'state')) ~ '^[A-Z]{2}$'
+        THEN UPPER(TRIM(shipping_address->>'state')) ELSE NULL END AS state
+      FROM orders WHERE paid_at >= NOW() - INTERVAL '90 days' AND paid_at IS NOT NULL
+    )
+    SELECT CASE WHEN country='US' AND state IS NOT NULL THEN 'US · '||state
+                ELSE country END AS region, COUNT(*)::int AS paid_orders
+    FROM destinations GROUP BY 1 ORDER BY paid_orders DESC, region ASC LIMIT 10`,
   ])
   const a=counts[0] as Record<string, unknown> | undefined
   const b=today[0] as Record<string, unknown> | undefined
@@ -157,6 +170,7 @@ export async function getLiveAnalyticsSummary(): Promise<LiveAnalyticsSummary> {
       'Analytics includes only consenting sessions. Some browsers and blockers are excluded.',
       'Today uses America/Los_Angeles business time. Gross paid includes verified cash plus captured store credit where applicable, before refunds and expenses.',
       'No IP addresses, exact locations, customer details, or browser identifiers are returned.',
+      'Purchaser regions use PAID orders in the last 90 days, grouped by shipping country and (for US orders) state. They are not live visitors or attributed marketing sources.',
       'The original funnel stages are independent unique-event counts, not a proven step-by-step conversion cohort.',
       'Sequential funnel counts are a same-session cohort, but require all stages to occur in the 30-minute window; truncated journeys and nonconsenting customers are excluded.',
       'Visitor-provided UTM labels with identifiers or malformed content are withheld.',
@@ -166,6 +180,7 @@ export async function getLiveAnalyticsSummary(): Promise<LiveAnalyticsSummary> {
     purchasesLast30Minutes:safeCount(a?.purchases),grossPaidTodayCents:safeGrossCents(b?.gross),ordersPaidToday:safeCount(b?.orders),
     devices:devices.map(r=>({device:String(r.device),sessions:safeCount(r.sessions)})),
     products:products.map(r=>({name:String(r.name).slice(0,100),views:safeCount(r.views)})),
+    purchaserRegions90d:purchasers.map(r=>({region:String(r.region),paidOrders:safeCount(r.paid_orders)})),
     sources:sources.map(r=>({source:coarseCampaignLabel(r.source),sessions:safeCount(r.sessions)})),
     observedSequentialFunnel30m:{viewedProductSessions:safeCount(seq?.viewed),
       thenAddedToCartSessions:safeCount(seq?.carted),thenStartedCheckoutSessions:safeCount(seq?.checked_out),

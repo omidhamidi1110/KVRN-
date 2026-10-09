@@ -26,7 +26,8 @@ export function NewProductClient() {
   const ok = name.trim() && /^[A-Z0-9]{2,12}$/.test(code) && !/^D\d{3}$/.test(code)
 
   return (
-    <div className="max-w-[640px]">
+    <AdminPage width="narrow">
+      <div className="max-w-[640px]">
       <AdminPageHeader title="New product" description="Starts as a draft. Nothing goes live yet." />
       <AdminCard>
         <div className="space-y-3">
@@ -52,6 +53,7 @@ export function NewProductClient() {
           </div>
         </div>
       </AdminCard>
-    </div>
+      </div>
+    </AdminPage>
   )
 }

@@ -275,7 +275,8 @@ function VideoSlide({ activeSlide, slideIndex }: { activeSlide: number; slideInd
         muted          // start muted (required for autoplay)
         loop
         playsInline
-        preload="auto"
+        preload="metadata"
+        poster="/images-r/1536/campaign/hero-main.webp"
         onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none' }}
         style={{
           position:  'absolute',

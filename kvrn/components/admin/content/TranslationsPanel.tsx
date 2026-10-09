@@ -6,6 +6,7 @@
 //   * Machine-generated text can never be published until a person rewrites it.
 //   * Legal pages publish a language only after an explicit acknowledgement.
 
+import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminButton, AdminLoading, AdminNotice, AdminError, StatusBadge, adminInputClass, useConfirm } from '@/components/admin/ui/AdminUI'
 import { api, type ApiResult } from './api'
@@ -40,7 +41,7 @@ export function TranslationsPanel({ base, perFieldPublish }: { base: string; per
   const [ov, setOv] = useState<Overview | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [locale, setLocale] = useState<string>('')
-  const [drafts, setDrafts] = useState<Record<string, string>>({})   // `${locale}|${field}` -> value being edited
+  const { value: drafts, set: setDrafts, replace: replaceDrafts, undo, redo, canUndo, canRedo } = useDraftHistory<Record<string, string>>({})   // unsaved translation edits
   const [busy, setBusy] = useState<string | null>(null)
   const [last, setLast] = useState<ApiResult | null>(null)
   const [ack, setAck] = useState(false)
@@ -75,7 +76,7 @@ export function TranslationsPanel({ base, perFieldPublish }: { base: string; per
       ? await api('DELETE', `${base}?locale=${locale}&field=${encodeURIComponent(field)}`)
       : await api('PUT', base, { locale, field, value, status })
     setBusy(null); setLast(r)
-    if (r.ok) { setDrafts(d => { const n = { ...d }; delete n[key(field)]; return n }); load() }
+    if (r.ok) { const next = { ...drafts }; delete next[key(field)]; replaceDrafts(next); load() }
   }
   async function langAction(action: 'publish-locale' | 'unpublish-locale') {
     if (action === 'publish-locale' && ov!.legal && !ack) return
@@ -89,6 +90,10 @@ export function TranslationsPanel({ base, perFieldPublish }: { base: string; per
   return (
     <div className="space-y-4">
       {confirmNode}
+      <div className="flex justify-end gap-2" aria-label="Unsaved translation history">
+        <AdminButton size="sm" variant="ghost" disabled={!!busy || !canUndo} onClick={undo}>Undo</AdminButton>
+        <AdminButton size="sm" variant="ghost" disabled={!!busy || !canRedo} onClick={redo}>Redo</AdminButton>
+      </div>
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Languages">
         {ov.locales.map(l => {
           const c = ov.completeness.find(x => x.locale === l)

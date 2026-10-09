@@ -112,6 +112,7 @@ export const zh: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': '关闭菜单',
   'nav.menuDialog': '导航菜单',
   'nav.cookiePreferences': 'Cookie 偏好设置',
+  'nav.affiliateLogin': '联盟伙伴登录',
   'nav.language': '语言',
   'nav.currency': '货币',
   'nav.selectLanguage': '选择语言',
@@ -221,7 +222,7 @@ export const zh: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': '图片 {n}——点击查看',
   'pdp.legacyShip1': '订单将在 1–3 个工作日内处理。',
   'pdp.legacyShip2': '美国境内：2–7 天。国际：5–14+ 天。',
-  'pdp.legacyShip3': '14 天内可退货，须未穿着且保持原状。',
+  'pdp.legacyShip3': '符合条件、未穿着、未洗涤且保留原始吊牌的商品，可在送达后 14 天内退回并获得 KVRN 店铺抵用金。非质量问题的自愿退货运费由顾客承担；损坏、瑕疵或发错商品的情况除外。',
   'pdp.fullPolicy': '查看完整政策 →',
   'pdp.setHeading': '凑齐整套。',
   'pdp.setSave': '两件一起购买更划算。',
@@ -422,5 +423,11 @@ export const zh: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': '此页面',
   'notfound.line2': '不存在。',
   'notfound.body': '它可能已被移动，或链接有误。',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "短款宽松版型。想要更长的衣长，请选大一码。",
+  "pdp.fit.phantomSweatpants": "休闲宽松版型。按正常尺码选择。",
+  "pdp.fit.standardHoodie": "宽松廓形，穿着舒适。",
+  "pdp.fit.standardSweatpants": "阔腿版型。自然腰位。按正常尺码选择。",
+
   'notfound.backHome': '返回首页',
 }

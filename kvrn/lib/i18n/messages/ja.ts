@@ -112,6 +112,7 @@ export const ja: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'メニューを閉じる',
   'nav.menuDialog': 'ナビゲーションメニュー',
   'nav.cookiePreferences': 'Cookie設定',
+  'nav.affiliateLogin': 'アフィリエイトログイン',
   'nav.language': '言語',
   'nav.currency': '通貨',
   'nav.selectLanguage': '言語を選択',
@@ -221,7 +222,7 @@ export const ja: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': '画像 {n} – クリックして表示',
   'pdp.legacyShip1': 'ご注文は営業日1〜3日以内に処理されます。',
   'pdp.legacyShip2': '米国：2〜7日。海外：5〜14日以上。',
-  'pdp.legacyShip3': '未着用で元の状態のものに限り、14日以内の返品を承ります。',
+  'pdp.legacyShip3': '未着用・未洗濯で元のタグが付いた対象商品は、配達後14日以内であればKVRNストアクレジットで返品できます。お客様都合の返品送料はお客様負担です。破損・不良品・誤配送の場合は例外が適用されます。',
   'pdp.fullPolicy': 'ポリシー全文 →',
   'pdp.setHeading': 'セットを揃える。',
   'pdp.setSave': '両方追加するとおトクです。',
@@ -422,5 +423,11 @@ export const ja: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': 'このページは',
   'notfound.line2': '存在しません。',
   'notfound.body': '移動されたか、リンクが間違っている可能性があります。',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "丈が短めのオーバーサイズフィット。着丈を長くしたい場合はワンサイズ上をお選びください。",
+  "pdp.fit.phantomSweatpants": "ゆったりしたオーバーサイズフィット。通常のサイズをお選びください。",
+  "pdp.fit.standardHoodie": "ゆとりのあるオーバーサイズシルエット。",
+  "pdp.fit.standardSweatpants": "ワイドレッグ。自然なウエスト位置で着用。通常のサイズをお選びください。",
+
   'notfound.backHome': 'ホームに戻る',
 }

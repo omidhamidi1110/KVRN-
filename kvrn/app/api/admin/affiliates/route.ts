@@ -6,6 +6,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
+import { getAffiliatePayoutReminder } from '@/lib/affiliate-payout-reminders'
 import {
   createAffiliatesService, validateCreateAffiliate,
   AFFILIATE_STATUSES, type AffiliateStatus,
@@ -39,7 +40,10 @@ export async function GET(req: NextRequest) {
       service.getPeriodEffect(range.start, range.end),
       service.listIncomplete(),
     ])
-    return NextResponse.json({ affiliates, commissions, payouts, period, incomplete, range })
+    // Reminder summary is best-effort: a temporary reporting issue must not
+    // prevent the owner from reaching the affiliate ledger and payouts.
+    const payoutReminder = await getAffiliatePayoutReminder().catch(() => null)
+    return NextResponse.json({ affiliates, commissions, payouts, period, incomplete, range, payoutReminder })
   } catch (err: any) {
     console.error('[admin/affiliates GET]', err?.message?.slice(0, 120))
     return NextResponse.json({ error: 'Could not load affiliates.' }, { status: 500 })

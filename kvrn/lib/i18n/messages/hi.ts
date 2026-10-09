@@ -112,6 +112,7 @@ export const hi: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'मेनू बंद करें',
   'nav.menuDialog': 'नेविगेशन मेनू',
   'nav.cookiePreferences': 'कुकी प्राथमिकताएँ',
+  'nav.affiliateLogin': 'एफ़िलिएट लॉगिन',
   'nav.language': 'भाषा',
   'nav.currency': 'मुद्रा',
   'nav.selectLanguage': 'भाषा चुनें',
@@ -221,7 +222,7 @@ export const hi: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': 'छवि {n} – देखने के लिए क्लिक करें',
   'pdp.legacyShip1': 'ऑर्डर 1–3 कार्य दिवसों में प्रोसेस किए जाते हैं।',
   'pdp.legacyShip2': 'अमेरिका: 2–7 दिन। अंतरराष्ट्रीय: 5–14+ दिन।',
-  'pdp.legacyShip3': '14 दिनों के भीतर रिटर्न, बिना पहने और मूल स्थिति में।',
+  'pdp.legacyShip3': 'योग्य, बिना पहने और बिना धोए गए उत्पाद, मूल टैग सहित, डिलीवरी के 14 दिनों के भीतर KVRN स्टोर क्रेडिट के लिए लौटाए जा सकते हैं। स्वैच्छिक रिटर्न की शिपिंग लागत ग्राहक वहन करता है; क्षतिग्रस्त, दोषपूर्ण या गलत वस्तुओं पर अपवाद लागू हैं।',
   'pdp.fullPolicy': 'पूरी नीति →',
   'pdp.setHeading': 'सेट पूरा करें।',
   'pdp.setSave': 'दोनों जोड़ने पर बचत करें।',
@@ -422,5 +423,11 @@ export const hi: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': 'यह पेज',
   'notfound.line2': 'मौजूद नहीं है।',
   'notfound.body': 'हो सकता है इसे हटा दिया गया हो, या लिंक गलत हो।',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "क्रॉप्ड ओवरसाइज़्ड फ़िट। अधिक लंबाई के लिए एक साइज़ बड़ा चुनें।",
+  "pdp.fit.phantomSweatpants": "आरामदायक ओवरसाइज़्ड फ़िट। सामान्य साइज़ लें।",
+  "pdp.fit.standardHoodie": "खुली और आरामदायक ओवरसाइज़्ड बनावट।",
+  "pdp.fit.standardSweatpants": "वाइड-लेग फ़िट। प्राकृतिक कमर पर बैठता है। सामान्य साइज़ लें।",
+
   'notfound.backHome': 'होम पर वापस जाएँ',
 }

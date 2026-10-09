@@ -6,18 +6,15 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useCart }          from '@/context/CartContext'
 import { useWishlist }      from '@/context/WishlistContext'
 import { useCookiePrefs }   from '@/context/CookiePrefsContext'
-import { useCurrency }      from '@/context/CurrencyContext'
 import { useI18n, type Locale } from '@/context/I18nContext'
 import { format } from '@/lib/i18n/messages'
-import type { CurrencyCode } from '@/lib/currency'
-import { CurrencySelector } from '@/components/ui/CurrencySelector'
 import { LanguageSelector } from '@/components/ui/LanguageSelector'
 import { cn } from '@/lib/utils'
 import type { ShellData } from '@/lib/content-shell'
 import { resolveLinkLabel } from '@/lib/content-shell'
 
 /** `shell` is provided only when Admin-managed content is enabled; without it the coded links below are used. */
-export function Nav({ shell }: { shell?: ShellData | null } = {}) {
+export function Nav({ shell, affiliatePortalEnabled = false }: { shell?: ShellData | null; affiliatePortalEnabled?: boolean } = {}) {
   const { itemCount, openCart }   = useCart()
   const { count: savedCount }     = useWishlist()
   const { openPreferences }       = useCookiePrefs()
@@ -237,16 +234,14 @@ export function Nav({ shell }: { shell?: ShellData | null } = {}) {
           </nav>
 
           <div className="flex items-center gap-3 lg:gap-4">
-            {/* Language + Currency — desktop only, inherit nav text color */}
-            <div className="hidden lg:flex items-center gap-3">
-              <div className={cn(textCls)}>
-                <LanguageSelector align="right" />
-              </div>
-              <span className="text-[11px] opacity-20 select-none">|</span>
-              <div className={cn(textCls)}>
-                <CurrencySelector align="right" />
-              </div>
+            {/* USD-only checkout: keep language preference, hide currency picker. */}
+            <div className={cn('hidden lg:flex items-center', textCls)}>
+              <LanguageSelector align="right" />
             </div>
+            {affiliatePortalEnabled && <Link href="/affiliate/login"
+              className="hidden lg:inline-flex text-[10px] font-light tracking-[0.09em] uppercase opacity-70 hover:opacity-100 transition-opacity whitespace-nowrap">
+              {t['nav.affiliateLogin']}
+            </Link>}
 
             {/* Bag */}
             <button
@@ -317,10 +312,9 @@ export function Nav({ shell }: { shell?: ShellData | null } = {}) {
           </button>
         </div>
 
-        {/* Collapsible Language + Currency at top of drawer */}
+        {/* Collapsible language picker — USD-only checkout */}
         <div className="border-b border-[#F0EDE8]/10">
           <DrawerLangSelector />
-          <DrawerCurrencySelector />
         </div>
 
         {/* Nav links */}
@@ -346,12 +340,18 @@ export function Nav({ shell }: { shell?: ShellData | null } = {}) {
               <TikTokIcon />
             </a>
           </div>
-          <button
-            onClick={() => { openPreferences(); setDrawerOpen(false) }}
-            className="text-[11px] font-light text-[#F0EDE8]/35 hover:text-[#F0EDE8]/70 transition-colors tracking-wide"
-          >
-            {t['nav.cookiePreferences']}
-          </button>
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={() => { openPreferences(); setDrawerOpen(false) }}
+              className="text-left text-[11px] font-light text-[#F0EDE8]/45 hover:text-[#F0EDE8]/80 transition-colors tracking-wide"
+            >
+              {t['nav.cookiePreferences']}
+            </button>
+            {affiliatePortalEnabled && <Link href="/affiliate/login" onClick={() => setDrawerOpen(false)}
+              className="text-right text-[11px] font-light text-[#F0EDE8]/65 hover:text-[#F0EDE8] transition-colors tracking-wide">
+              {t['nav.affiliateLogin']}
+            </Link>}
+          </div>
         </div>
       </div>
     </>
@@ -396,50 +396,6 @@ function DrawerLangSelector() {
             >
               <span className="block">{l.nativeLabel}</span>
               <span className="block text-[10px] opacity-60">{l.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DrawerCurrencySelector() {
-  const { currencyCode, setCurrency, available } = useCurrency()
-  const { t } = useI18n()
-  const [open, setOpen] = useState(false)
-  const current = available.find(c => c.code === currencyCode) ?? available[0]
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-6 py-3.5 hover:bg-[#F0EDE8]/5 transition-colors"
-        aria-expanded={open}
-      >
-        <div className="text-left">
-          <p className="text-[10px] font-light tracking-[0.1em] uppercase text-[#F0EDE8]/40">{t['nav.currency']}</p>
-          <p className="text-[13px] font-light text-[#F0EDE8] mt-0.5">{currencyCode} — {current.label.split(' — ')[1]}</p>
-        </div>
-        <svg width="12" height="7" viewBox="0 0 12 7" fill="none"
-          className={cn('text-[#F0EDE8]/40 transition-transform duration-200', open && 'rotate-180')}>
-          <path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="px-6 pb-3 grid grid-cols-3 gap-1.5">
-          {available.map(c => (
-            <button
-              key={c.code}
-              onClick={() => { setCurrency(c.code as CurrencyCode); setOpen(false) }}
-              className={cn(
-                'px-2 py-2 text-[12px] font-light border transition-all duration-150',
-                c.code === currencyCode
-                  ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                  : 'border-[#F0EDE8]/20 text-[#F0EDE8]/70 hover:border-[#F0EDE8]/60'
-              )}
-            >
-              {c.code}
             </button>
           ))}
         </div>

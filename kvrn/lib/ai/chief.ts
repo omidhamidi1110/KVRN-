@@ -3,6 +3,7 @@ import { createFinancialService } from '@/lib/financials'
 import { createFunnelService } from '@/lib/funnel-analytics'
 import { getAllVariantsForAdmin } from '@/lib/inventory'
 import { sendPushoverNotification } from '@/lib/pushover'
+import { getAffiliatePayoutReminder } from '@/lib/affiliate-payout-reminders'
 import { getAiBudgetSnapshot, formatUsdMicros } from './budget'
 import { processApprovedAiActions } from './executors'
 import { enforceAgentAutonomySafety } from './governance'
@@ -299,6 +300,10 @@ export type DailyBriefSnapshot = {
   aiActionsToday: number
   creatorRepliesWaiting: number
   affiliateApplicationsWaiting: number
+  manualPayoutDrafts: number
+  manualPayoutDraftCents: number | null
+  manualPayoutReviewCommissions: number
+  manualPayoutReviewCents: number | null
   topAttentionTitles: string[]
   aiSpendTodayMicros: number
   aiSpendMonthMicros: number
@@ -351,6 +356,7 @@ export async function collectDailyBriefSnapshot(
       ORDER BY CASE severity WHEN 'critical' THEN 3 WHEN 'high' THEN 2 ELSE 1 END DESC, last_seen_at DESC
       LIMIT 3
     `,
+    getAffiliatePayoutReminder(),
   ])
 
   const dataWarnings: string[] = []
@@ -378,6 +384,10 @@ export async function collectDailyBriefSnapshot(
   const spendTodayRows: any[] = pick(7, 'ai_spend', [{ n: 0 }])
   const operationsRows: any[] = pick(8, 'ai_operations', [{ qa_failing: 0, qa_never_verified: 0, ai_actions_today: 0, creator_replies_waiting: 0, affiliate_applications_waiting: 0 }])
   const attentionRows: any[] = pick(9, 'attention', [])
+  const manualPayout: any = pick(10, 'affiliate_payouts', {
+    draftPayouts: 0, draftAmountCents: null,
+    reviewCommissions: 0, reviewAmountCents: null,
+  })
 
   const activeVariants = variants.filter(v => v.active)
   const lowStockVariants = activeVariants.filter(v => {
@@ -411,6 +421,10 @@ export async function collectDailyBriefSnapshot(
     aiActionsToday: Number(operationsRows[0]?.ai_actions_today ?? 0),
     creatorRepliesWaiting: Number(operationsRows[0]?.creator_replies_waiting ?? 0),
     affiliateApplicationsWaiting: Number(operationsRows[0]?.affiliate_applications_waiting ?? 0),
+    manualPayoutDrafts: Number(manualPayout.draftPayouts ?? 0),
+    manualPayoutDraftCents: manualPayout.draftAmountCents ?? null,
+    manualPayoutReviewCommissions: Number(manualPayout.reviewCommissions ?? 0),
+    manualPayoutReviewCents: manualPayout.reviewAmountCents ?? null,
     topAttentionTitles: attentionRows.map(r => String(r.title)).filter(Boolean).slice(0, 3),
     aiSpendTodayMicros: Number(spendTodayRows[0]?.n ?? 0),
     aiSpendMonthMicros: Number(budget.monthSpendMicros ?? 0),
@@ -433,6 +447,10 @@ export function formatDailyBrief(snapshot: DailyBriefSnapshot): string {
   if (snapshot.unresolvedSupport > 0) attention.push(`${snapshot.unresolvedSupport} open support thread${snapshot.unresolvedSupport === 1 ? '' : 's'}`)
   if (snapshot.creatorRepliesWaiting > 0) attention.push(`${snapshot.creatorRepliesWaiting} creator repl${snapshot.creatorRepliesWaiting === 1 ? 'y' : 'ies'} waiting`)
   if (snapshot.affiliateApplicationsWaiting > 0) attention.push(`${snapshot.affiliateApplicationsWaiting} affiliate application${snapshot.affiliateApplicationsWaiting === 1 ? '' : 's'} waiting`)
+  if (!snapshot.dataWarnings.includes('affiliate_payouts')) {
+    if (snapshot.manualPayoutDrafts > 0) attention.push(`${snapshot.manualPayoutDrafts} unpaid affiliate payout draft${snapshot.manualPayoutDrafts === 1 ? '' : 's'} (${money(snapshot.manualPayoutDraftCents)})`)
+    if (snapshot.manualPayoutReviewCommissions > 0) attention.push(`${snapshot.manualPayoutReviewCommissions} commission balance${snapshot.manualPayoutReviewCommissions === 1 ? '' : 's'} for manual payout review (${money(snapshot.manualPayoutReviewCents)}; subject to readiness checks)`)
+  }
   if (snapshot.soldOutVariants > 0) attention.push(`${snapshot.soldOutVariants} sold-out variant${snapshot.soldOutVariants === 1 ? '' : 's'}`)
   else if (snapshot.lowStockVariants > 0) attention.push(`${snapshot.lowStockVariants} low-stock variant${snapshot.lowStockVariants === 1 ? '' : 's'}`)
 
@@ -566,6 +584,31 @@ export async function sendDailyChiefBriefIfDue(): Promise<{
   return { due: true, sent: false, businessDate: snapshot.businessDate, reason: result.outcome === 'failed' ? result.reason : result.reason }
 }
 
+/** When enabled, a newly pending MANUAL payout can generate one owner alert.
+ * Existing Chief dedupe, quiet-hours and rate controls own notification delivery.
+ * Nothing here can create a payout, transfer money, or contact affiliates.
+ */
+export async function emitManualAffiliatePayoutAlert(): Promise<void> {
+  // Do not generate a notification that would be permanently suppressed while off.
+  if (process.env.AI_CHIEF_NOTIFICATION_GATE !== 'true') return
+  const summary = await getAffiliatePayoutReminder()
+  if (summary.draftPayouts === 0) {
+    await resolveAiAlertsByDedupePrefix({
+      sourceAgentId: 'chief', prefix: 'manual-affiliate-payout:',
+      note: 'No unpaid affiliate payout drafts remain.',
+    })
+    return
+  }
+  if (summary.draftAmountCents === null) throw new Error('AFFILIATE_PAYOUT_REMINDER_AMOUNT_UNKNOWN')
+  await upsertAiAlert({
+    sourceAgentId: 'chief', severity: 'medium', category: 'approval',
+    title: 'Manual affiliate payout needs review',
+    summary: `${summary.draftPayouts} affiliate payout draft(s) for ${summary.draftAffiliates} affiliate(s), totalling ${money(summary.draftAmountCents)}, remain unpaid. Review readiness and pay externally before recording payment in Admin > Financials > Affiliates. No automatic funds transfer is enabled.`,
+    dedupeKey: 'manual-affiliate-payout:unpaid-drafts',
+    metadata: { requiresOwner: true, manualOnly: true },
+  })
+}
+
 /** Create deduplicated budget warnings; Chief decides whether they actually push. */
 export async function emitBudgetThresholdAlert(): Promise<void> {
   const b = await getAiBudgetSnapshot()
@@ -654,6 +697,12 @@ export async function runChiefCycle(): Promise<{
   } catch (error) {
     maintenanceErrors.push('budget_alert')
     console.error('[ai-chief] budget threshold alert failed:', String(error instanceof Error ? error.message : error).slice(0, 120))
+  }
+  try {
+    await emitManualAffiliatePayoutAlert()
+  } catch (error) {
+    maintenanceErrors.push('affiliate_payout_alert')
+    console.error('[ai-chief] payout reminder alert failed:', String(error instanceof Error ? error.message : error).slice(0, 120))
   }
   const alerts = await processChiefAlerts()
   try {

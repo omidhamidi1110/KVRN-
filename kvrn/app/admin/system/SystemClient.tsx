@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import {
   AdminPageHeader, AdminSectionHeader, AdminCard, AdminButton, AdminNotice, AdminTable, AdminTh, AdminTd,
@@ -14,11 +15,24 @@ export function SystemClient() {
   const [err, setErr] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [retryMsg, setRetryMsg] = useState<string | null>(null)
+  const [showFeatureDetails, setShowFeatureDetails] = useState(false)
+  const [showActivation, setShowActivation] = useState(false)
+  const [readiness, setReadiness] = useState<{ name: string; blockers: string[]; readyToActivate: boolean }[] | null>(null)
+  const [otherControls, setOtherControls] = useState<{ label: string; env: string; enabled: boolean; note: string }[]>([])
+  const [showOtherControls, setShowOtherControls] = useState(false)
 
   const load = useCallback(async () => {
     setErr(null)
     try {
-      const [f, i] = await Promise.all([fetch('/api/admin/feature-flags'), fetch('/api/admin/cache-invalidations')])
+      const [f, i, r] = await Promise.all([
+        fetch('/api/admin/feature-flags'), fetch('/api/admin/cache-invalidations'),
+        fetch('/api/admin/feature-readiness', { cache: 'no-store' }),
+      ])
+      if (r.ok) {
+        const json = await r.json()
+        setReadiness(json.items ?? null)
+        setOtherControls(json.otherControls ?? [])
+      }
       if (!f.ok || !i.ok) throw new Error('Request failed')
       setFlags((await f.json()).data)
       const ij = await i.json()
@@ -47,6 +61,13 @@ export function SystemClient() {
         <div className="mb-8">
           <AdminSectionHeader title="Feature switches"
             info={<>Switches are Cloudflare Worker variables named <code>KVRN_FLAG_…</code>. They default to off and are changed only in Cloudflare, so a switch still works if the database is down.</>} />
+          <button type="button" onClick={()=>setShowFeatureDetails(v=>!v)}
+            className="mb-3 inline-flex items-center gap-2 rounded border border-neutral-300 px-3 py-2 text-xs"
+            aria-expanded={showFeatureDetails} aria-controls="kvrn-system-switches">
+            <span aria-hidden="true">{showFeatureDetails ? '◉' : '◎'}</span>
+            {showFeatureDetails ? 'Hide feature explanations' : 'Show feature explanations'}
+          </button>
+          <div id="kvrn-system-switches">
           <AdminTable caption="Feature switches" stack>
             <thead><tr><AdminTh>Feature</AdminTh><AdminTh>State</AdminTh><AdminTh>Variable</AdminTh></tr></thead>
             <tbody>
@@ -54,7 +75,7 @@ export function SystemClient() {
                 <tr key={f.name}>
                   <AdminTd>
                     <span className="font-medium">{f.label}</span>
-                    <span className="block text-[11px] text-[#6B6B66]">{f.description}</span>
+                    {showFeatureDetails && <span className="block text-[11px] text-[#6B6B66]">{f.description}</span>}
                   </AdminTd>
                   <AdminTd>
                     <StatusBadge status={f.enabled ? 'Active' : 'Inactive'} label={f.enabled ? 'On' : 'Off'} />
@@ -65,6 +86,53 @@ export function SystemClient() {
               ))}
             </tbody>
           </AdminTable>
+          </div>
+          {readiness && (
+            <div className="mt-3 rounded-xl border border-black/10 bg-white p-3 sm:p-4">
+              <button type="button" className="text-left text-xs font-medium underline underline-offset-2"
+                aria-expanded={showActivation} onClick={() => setShowActivation(v => !v)}>
+                {showActivation ? 'Hide' : 'Show'} activation requirements
+              </button>
+              {showActivation && (
+                <div className="mt-3 space-y-3">
+                  {readiness.filter(r => r.blockers.length > 0).map(r => (
+                    <div key={r.name} className="rounded-lg bg-[#F8F7F4] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <strong className="text-xs">{flags.find(f => f.name === r.name)?.label ?? r.name}</strong>
+                        {({ CMS_PRODUCT_ROUTING: '/admin/products', CMS_PUBLIC_CONTENT: '/admin/content', AFFILIATE_APPLICATIONS: '/admin/financials/affiliates', AFFILIATE_PORTAL: '/admin/financials/affiliates', ABANDONED_CHECKOUT_EMAILS: '/admin/abandoned-checkouts', RADAR_FULFILLMENT_HOLDS: '/admin/orders' } as Record<string,string>)[r.name] &&
+                        <Link className="text-[11px] underline underline-offset-2" href={({ CMS_PRODUCT_ROUTING: '/admin/products', CMS_PUBLIC_CONTENT: '/admin/content', AFFILIATE_APPLICATIONS: '/admin/financials/affiliates', AFFILIATE_PORTAL: '/admin/financials/affiliates', ABANDONED_CHECKOUT_EMAILS: '/admin/abandoned-checkouts', RADAR_FULFILLMENT_HOLDS: '/admin/orders' } as Record<string,string>)[r.name]}>Open in Admin</Link>}
+                      </div>
+                      <ul className="mt-1 list-disc pl-5 text-xs text-[#666660] space-y-1">
+                        {r.blockers.map((b, i) => <li key={i}>{b}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <AdminNotice tone="info" className="mt-3">
+            USD checkout and manual affiliate payouts are intentional. "On" is a deployed Worker setting, not proof of production readiness. Public CMS, transactional email and fraud holds need their prerequisites confirmed.
+          </AdminNotice>
+          {otherControls.length > 0 && (
+            <div className="mt-4 rounded-xl border border-black/10 bg-white p-3 sm:p-4">
+              <button type="button" onClick={() => setShowOtherControls(v => !v)}
+                aria-expanded={showOtherControls} aria-controls="kvrn-other-production-gates"
+                className="text-left text-xs font-medium underline underline-offset-2">
+                {showOtherControls ? 'Hide' : 'Show'} other production controls ({otherControls.filter(c => !c.enabled).length} inactive)
+              </button>
+              {showOtherControls && <div id="kvrn-other-production-gates" className="mt-3 divide-y divide-black/10">
+                {otherControls.map(c => <div key={c.env} className="flex items-start justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium">{c.label}</p>
+                    <p className="mt-0.5 text-[11px] text-[#777771]">{c.note}</p>
+                    <code className="mt-1 block break-all text-[10px] text-[#777771]">{c.env}</code>
+                  </div>
+                  <StatusBadge status={c.enabled ? 'Active' : 'Inactive'} label={c.enabled ? 'On' : 'Off'} />
+                </div>)}
+              </div>}
+            </div>
+          )}
         </div>
       )}
 

@@ -141,6 +141,7 @@ export const en = {
   'nav.closeMenu':      'Close menu',
   'nav.menuDialog':     'Navigation menu',
   'nav.cookiePreferences': 'Cookie preferences',
+  'nav.affiliateLogin': 'Affiliate Login',
   'nav.language':       'Language',
   'nav.currency':       'Currency',
   'nav.selectLanguage': 'Select language',
@@ -264,7 +265,7 @@ export const en = {
   'pdp.imageClickToView':  'Image {n} — click to view',
   'pdp.legacyShip1':       'Orders processed within 1–3 business days.',
   'pdp.legacyShip2':       'US: 2–7 days. International: 5–14+ days.',
-  'pdp.legacyShip3':       'Returns within 14 days, unworn and in original condition.',
+  'pdp.legacyShip3':       'Eligible unworn, unwashed items with original tags may be returned for KVRN store credit within 14 days of delivery. Discretionary return shipping is paid by the customer; exceptions apply for damaged, defective or incorrect items.',
   'pdp.fullPolicy':        'Full policy →',
   'pdp.setHeading':        'Complete the set.',
   'pdp.setSave':           'Save when you add both.',
@@ -472,6 +473,12 @@ export const en = {
   'about.restraint':    'Restraint',
   'about.restraint.desc': 'Nothing added that should not be there.',
   'about.shopCollection': 'Shop the collection',
+
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "Cropped oversized fit. Size up for more length.",
+  "pdp.fit.phantomSweatpants": "Relaxed oversized fit. True to size.",
+  "pdp.fit.standardHoodie": "Runs oversized. If between sizes, size down for a cleaner fit.",
+  "pdp.fit.standardSweatpants": "Wide-leg. Sits at natural waist. True to size.",
 
   // ── Not found ───────────────────────────────────────────────────────────────
   'notfound.line1':    'This page',

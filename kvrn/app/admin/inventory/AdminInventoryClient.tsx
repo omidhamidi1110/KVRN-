@@ -134,7 +134,7 @@ export default function AdminInventoryClient() {
           {variants.length === 0 ? (
             <AdminEmpty title="No inventory variants." />
           ) : (
-            <AdminTable stack minWidth={900} caption="Stock by variant">
+            <div className="kv-inventory-table"><AdminTable stack minWidth={900} caption="Stock by variant">
               <thead>
                 <AdminTr>
                   <AdminTh>Product</AdminTh>
@@ -186,7 +186,7 @@ export default function AdminInventoryClient() {
                   )
                 })}
               </tbody>
-            </AdminTable>
+            </AdminTable></div>
           )}
         </section>
 

@@ -279,6 +279,33 @@ export function createReturnsService(sql: NeonQueryFunction<false, false>) {
       return (rows as any[]).length > 0
     },
 
+    /** Recent full refund history, including resolved, failed and pending records.
+     * The presence of a refund does not imply the merchandise was returned.
+     */
+    async listRecentRefunds() {
+      const rows = await sql`
+        SELECT f.id, o.order_number AS "orderNumber", f.stripe_refund_id AS "stripeRefundId",
+               f.amount_cents AS "amountCents", f.currency, f.status,
+               f.reason, f.refunded_at AS "refundedAt", f.created_at AS "createdAt",
+               f.merchandise_refund_cents AS "merchandiseCents",
+               f.shipping_refund_cents AS "shippingCents", f.tax_refund_cents AS "taxCents",
+               f.fee_refunded_cents AS "feeReturnedCents"
+        FROM order_refunds f JOIN orders o ON o.id=f.order_id
+        ORDER BY COALESCE(f.refunded_at, f.created_at) DESC, f.id DESC LIMIT 200
+      ` as any[]
+      return rows.map(r => ({
+        id: String(r.id), orderNumber: String(r.orderNumber), stripeRefundId: String(r.stripeRefundId),
+        amountCents: Number(r.amountCents), currency: String(r.currency), status: String(r.status),
+        reason: r.reason ? String(r.reason) : null,
+        refundedAt: r.refundedAt ? new Date(r.refundedAt).toISOString() : null,
+        createdAt: new Date(r.createdAt).toISOString(),
+        merchandiseCents: r.merchandiseCents === null ? null : Number(r.merchandiseCents),
+        shippingCents: r.shippingCents === null ? null : Number(r.shippingCents),
+        taxCents: r.taxCents === null ? null : Number(r.taxCents),
+        feeReturnedCents: r.feeReturnedCents === null ? null : Number(r.feeReturnedCents),
+      }))
+    },
+
     /** Refunds whose component split is still unknown — the admin worklist. */
     async listRefundsAwaitingBreakdown() {
       const rows = await sql`

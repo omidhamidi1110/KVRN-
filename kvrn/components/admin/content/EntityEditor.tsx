@@ -62,17 +62,43 @@ export function EntityEditor({ kind, id, onClose, onCreated, onChanged }: {
   // Always-current values for async callbacks.
   const ref = useRef({ draft, revision, dirty })
   ref.current = { draft, revision, dirty }
+  const undoHistory = useRef<any[]>([])
+  const redoHistory = useRef<any[]>([])
+  const [historyVersion, setHistoryVersion] = useState(0)
+  const rememberDraft = useCallback((value: any) => {
+    if (ref.current.draft !== null && JSON.stringify(value) !== JSON.stringify(ref.current.draft)) {
+      undoHistory.current = [...undoHistory.current, structuredClone(ref.current.draft)].slice(-30)
+      redoHistory.current = []
+      setHistoryVersion(n => n + 1)
+    }
+    setDraft(value)
+    setDirty(true)
+    setSaveState('idle')
+    setNotice(null)
+  }, [])
+  const travel = useCallback((direction: 'undo' | 'redo') => {
+    if (saveState === 'conflict' || busy || ref.current.draft === null) return
+    const from = direction === 'undo' ? undoHistory : redoHistory
+    const to = direction === 'undo' ? redoHistory : undoHistory
+    const next = from.current.pop()
+    if (next === undefined) return
+    to.current = [...to.current, structuredClone(ref.current.draft)].slice(-30)
+    setDraft(next); setDirty(true); setSaveState('idle'); setNotice(null)
+    setHistoryVersion(n => n + 1)
+  }, [busy, saveState])
   const inFlight = useRef<Promise<boolean> | null>(null)
 
   const load = useCallback(async () => {
     if (isNew) {
       const make = NEW_SNAPSHOT[kind]
       setLoaded({ id: 'new', exists: false, revision: 0, status: 'draft', hasDraft: false, isLive: false, snapshot: make ? make() : {}, published: null, path: null })
-      setDraft(make ? make() : {}); setRevision(0); setDirty(false); return
+      setDraft(make ? make() : {}); setRevision(0); setDirty(false)
+      undoHistory.current = []; redoHistory.current = []; setHistoryVersion(n => n + 1); return
     }
     const r = await api<Loaded>('GET', url)
     if (!r.ok) { setLoadErr(r.error ?? 'Could not load this.'); return }
     setLoadErr(null); setLoaded(r.data!); setDraft(r.data!.snapshot); setRevision(r.data!.revision); setDirty(false); setSaveState('idle')
+    undoHistory.current = []; redoHistory.current = []; setHistoryVersion(n => n + 1)
   }, [isNew, kind, url])
   useEffect(() => { load() }, [load])
 
@@ -123,7 +149,7 @@ export function EntityEditor({ kind, id, onClose, onCreated, onChanged }: {
     return () => window.removeEventListener('beforeunload', h)
   }, [])
 
-  const edit = (v: any) => { setDraft(v); setDirty(true); if (saveState === 'saved' || saveState === 'error') setSaveState('idle'); setNotice(null) }
+  const edit = rememberDraft
 
   async function create() {
     setBusy('create'); setResult(null)
@@ -201,7 +227,11 @@ export function EntityEditor({ kind, id, onClose, onCreated, onChanged }: {
               {live && loaded.path && <> · <a href={loaded.path} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">View live page</a></>}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-draft-history={historyVersion}>
+            {!archived && <>
+              <AdminButton size="sm" variant="ghost" disabled={!!busy || saveState === 'conflict' || undoHistory.current.length === 0} onClick={() => travel('undo')}>Undo</AdminButton>
+              <AdminButton size="sm" variant="ghost" disabled={!!busy || saveState === 'conflict' || redoHistory.current.length === 0} onClick={() => travel('redo')}>Redo</AdminButton>
+            </>}
             {isNew
               ? <AdminButton variant="primary" loading={busy === 'create'} onClick={create}>Create draft</AdminButton>
               : <>

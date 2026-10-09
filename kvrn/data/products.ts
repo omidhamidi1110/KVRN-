@@ -75,8 +75,8 @@ export const products: Product[] = [
     ],
     relatedProductSlug: 'kvrn-heavyweight-sweatpants',
     seo: {
-      title: 'KVRN Heavyweight Hoodie | 400 GSM Brushed Fleece | Founder Price $80',
-      description: 'KVRN Heavyweight Hoodie. 400 GSM brushed fleece, 100% cotton. Double-layered structured hood, no drawstring. Two hidden zipper pockets. Five colorways. Founder price $80.',
+      title: 'KVRN Heavyweight Hoodie | 400 GSM Brushed Fleece',
+      description: 'KVRN Heavyweight Hoodie. 400 GSM brushed fleece, 100% cotton. Double-layered structured hood, no drawstring. Two hidden zipper pockets. Five colorways.',
     },
   },
 
@@ -112,8 +112,8 @@ export const products: Product[] = [
     ],
     relatedProductSlug: 'kvrn-heavyweight-hoodie',
     seo: {
-      title: 'KVRN Heavyweight Sweatpants | 400 GSM Wide-Leg | Founder Price $80',
-      description: 'KVRN Heavyweight Sweatpants. 400 GSM brushed fleece. Wide-leg silhouette. Concealed elastic waistband. Five colorways. Founder price $80.',
+      title: 'KVRN Heavyweight Sweatpants | 400 GSM Wide-Leg',
+      description: 'KVRN Heavyweight Sweatpants. 400 GSM brushed fleece. Wide-leg silhouette. Concealed elastic waistband. Five colorways.',
     },
   },
 
@@ -147,8 +147,8 @@ export const products: Product[] = [
     ],
     relatedProductSlug: 'kvrn-phantom-sweatpants',
     seo: {
-      title: 'Project KVRN Heavyweight Hoodie | 500 GSM French Terry | Founder Price $80',
-      description: 'Project KVRN Heavyweight Hoodie. 500 GSM French terry blend, enzyme washed, pre-shrunk. Cropped oversized fit. Black. Founder price $80.',
+      title: 'Project KVRN Heavyweight Hoodie | 500 GSM French Terry',
+      description: 'Project KVRN Heavyweight Hoodie. 500 GSM French terry blend, enzyme washed, pre-shrunk. Cropped oversized fit. Black.',
     },
   },
 
@@ -183,8 +183,8 @@ export const products: Product[] = [
     ],
     relatedProductSlug: 'kvrn-phantom-hoodie',
     seo: {
-      title: 'Project KVRN Heavyweight Sweatpants | 500 GSM French Terry | Founder Price $80',
-      description: 'Project KVRN Heavyweight Sweatpants. 500 GSM French terry blend. Enzyme washed, pre-shrunk. Relaxed oversized fit. Black. Founder price $80.',
+      title: 'Project KVRN Heavyweight Sweatpants | 500 GSM French Terry',
+      description: 'Project KVRN Heavyweight Sweatpants. 500 GSM French terry blend. Enzyme washed, pre-shrunk. Relaxed oversized fit. Black.',
     },
   },
 ]

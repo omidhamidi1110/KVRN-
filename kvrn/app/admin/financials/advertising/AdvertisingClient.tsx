@@ -12,6 +12,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { money } from '@/components/admin/FinancialUI'
+import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import {
   AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
   AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, StatusBadge, adminInputClass, adminSelectClass,
@@ -44,7 +45,7 @@ export function AdvertisingClient() {
   const [saving, setSaving]   = useState(false)
   const [err, setErr]         = useState<string | null>(null)
 
-  const [form, setForm] = useState({
+  const { value: form, set: setForm, replace: replaceForm, undo, redo, canUndo, canRedo } = useDraftHistory({
     platform: 'meta', campaignName: '', spend: '',
     periodStart: new Date().toISOString().slice(0, 10),
     periodEnd:   new Date().toISOString().slice(0, 10),
@@ -89,7 +90,7 @@ export function AdvertisingClient() {
       })
       const json = await res.json()
       if (!res.ok) { setErr(json.error ?? 'Could not save.'); return }
-      setForm({ ...form, campaignName: '', spend: '', reportedRevenue: '', reportedOrders: '', notes: '' })
+      replaceForm({ ...form, campaignName: '', spend: '', reportedRevenue: '', reportedOrders: '', notes: '' })
       await load()
     } catch { setErr('Network error.') }
     finally { setSaving(false) }
@@ -134,6 +135,13 @@ export function AdvertisingClient() {
       </AdminStatGrid>
 
       <AdminCard className="mb-7">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+          <span className="text-xs text-[#777770]">Unsaved form changes only</span>
+          <div className="flex gap-2">
+            <AdminButton variant="ghost" size="sm" onClick={undo} disabled={!canUndo || saving}>↶ Undo</AdminButton>
+            <AdminButton variant="ghost" size="sm" onClick={redo} disabled={!canRedo || saving}>↷ Redo</AdminButton>
+          </div>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <AdminField label="Platform" htmlFor="ad-platform">
             <select id="ad-platform" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}

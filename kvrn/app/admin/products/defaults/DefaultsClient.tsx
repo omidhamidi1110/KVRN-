@@ -35,7 +35,8 @@ export function DefaultsClient() {
   if (!d) return <AdminLoading />
   const sr = d.shippingReturns
   return (
-    <div className="max-w-[720px]">
+    <AdminPage width="narrow">
+      <div className="max-w-[720px]">
       <Link href="/admin/products" className="text-[11px] text-[#6B6B66] underline underline-offset-2">← Products</Link>
       <div className="mt-2"><AdminPageHeader title="Product defaults" description="Used by every product that doesn’t override it." /></div>
       {msg && <AdminNotice tone={msg.tone} className="mb-3">{msg.text}</AdminNotice>}
@@ -52,6 +53,7 @@ export function DefaultsClient() {
           <AdminButton variant="primary" loading={busy} onClick={() => void save()}>Save</AdminButton>
         </div>
       </AdminCard>
-    </div>
+      </div>
+    </AdminPage>
   )
 }

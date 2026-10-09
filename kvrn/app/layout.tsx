@@ -17,6 +17,7 @@ import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { ConditionalSmsPopup } from '@/components/sms/ConditionalSmsPopup'
 import { CartDrawer }       from '@/components/cart/CartDrawer'
 import { cmsContentEnabled, contentPublic } from '@/lib/content-public'
+import { isFeatureEnabled } from '@/lib/feature-flags'
 import { siteMetadata, orgSchema, jsonLd } from '@/lib/content-seo'
 import { DEFAULT_GLOBAL_SEO } from '@/lib/content-defaults'
 import { sql } from '@/lib/db'
@@ -81,7 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <CartProvider>
               <ToastProvider>
                 <AnnouncementBar shell={shell} />
-                <Nav shell={shell} />
+                <Nav shell={shell} affiliatePortalEnabled={isFeatureEnabled('AFFILIATE_PORTAL')} />
                 <CartDrawer />
         <ConditionalSmsPopup />
                 <WishlistDrawer />

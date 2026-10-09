@@ -136,7 +136,7 @@ export function AdminField({ label, htmlFor, info, hint, error, children, classN
   children: ReactNode; className?: string
 }) {
   return (
-    <div className={className}>
+    <div className={cx("w-full min-w-0 max-w-full", className)}>
       <label htmlFor={htmlFor} className="mb-1 flex items-center gap-0.5 text-[11px] font-medium text-[#4A4A46]">
         {label}{info && <InfoTip label={`About ${label}`}>{info}</InfoTip>}
       </label>
@@ -148,11 +148,11 @@ export function AdminField({ label, htmlFor, info, hint, error, children, classN
 }
 
 export const adminInputClass =
-  'h-10 w-full rounded-[9px] border border-black/[0.14] bg-white px-3 text-[12px] text-[#171717] placeholder:text-[#A5A5A0] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] disabled:bg-black/[0.03] disabled:text-[#8A8A85] sm:h-9'
+  'box-border h-10 w-full min-w-0 max-w-full rounded-[9px] border border-black/[0.14] bg-white px-3 text-[12px] text-[#171717] placeholder:text-[#A5A5A0] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] disabled:bg-black/[0.03] disabled:text-[#8A8A85] sm:h-9'
 /** Native <select> — same height and border as inputs. */
 export const adminSelectClass = adminInputClass + ' pr-8'
 export const adminTextareaClass =
-  'w-full rounded-[9px] border border-black/[0.14] bg-white px-3 py-2 text-[12px] leading-[1.5] text-[#171717] placeholder:text-[#A5A5A0] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] disabled:bg-black/[0.03] disabled:text-[#8A8A85]'
+  'box-border w-full min-w-0 max-w-full rounded-[9px] border border-black/[0.14] bg-white px-3 py-2 text-[12px] leading-[1.5] text-[#171717] placeholder:text-[#A5A5A0] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717] disabled:bg-black/[0.03] disabled:text-[#8A8A85]'
 export const adminCheckboxClass = 'h-4 w-4 rounded border-black/[0.3] accent-[#171717] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40'
 
 // ── Status vocabulary ─────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ export function AdminStat({ label, value, sub, tone = 'default', info, flag, cla
 /** Responsive grid for stat cards / small cards (no horizontal page overflow). */
 export function AdminStatGrid({ children, min = 180, className = '' }: { children: ReactNode; min?: number; className?: string }) {
   return (
-    <div className={cx('grid gap-2.5', className)} style={{ gridTemplateColumns: `repeat(auto-fill,minmax(min(${min}px,100%),1fr))` }}>
+    <div className={cx('grid gap-2.5', className)} style={{ gridTemplateColumns: `repeat(auto-fit,minmax(min(${min}px,100%),1fr))` }}>
       {children}
     </div>
   )
@@ -230,14 +230,15 @@ export function AdminSegmented<T extends string>({ options, value, onChange, ari
   options: ReadonlyArray<{ id: T; label: string }>; value: T; onChange: (id: T) => void; ariaLabel: string
 }) {
   return (
-    <div role="group" aria-label={ariaLabel} className="inline-flex flex-wrap gap-1 rounded-[10px] border border-black/[0.10] bg-white p-0.5">
+    <div role="group" aria-label={ariaLabel} className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-0.5 rounded-[10px] border border-black/[0.10] bg-white p-0.5 sm:inline-flex sm:w-auto sm:flex-wrap sm:justify-start sm:gap-1">
       {options.map(o => {
         const active = o.id === value
         return (
-          <button key={o.id} type="button" aria-pressed={active} onClick={() => onChange(o.id)}
-            className={cx('h-9 rounded-[8px] px-3 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:h-8',
+          <button key={o.id} type="button" aria-pressed={active} onClick={() => onChange(o.id)} aria-label={o.label}
+            className={cx('h-9 min-w-0 flex-1 whitespace-nowrap rounded-[8px] px-1.5 text-[10px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:h-8 sm:flex-none sm:px-3 sm:text-[12px]',
               active ? 'bg-[#171717] text-white' : 'text-[#4A4A46] hover:bg-black/[0.05]')}>
-            {o.label}
+            <span className="sm:hidden">{ariaLabel === 'Date range' ? ({ Today: 'Today', '7 days': '7d', '30 days': '30d', 'Month to date': 'MTD', 'Year to date': 'YTD' } as Record<string,string>)[o.label] ?? o.label : o.label}</span>
+            <span className="hidden sm:inline">{o.label}</span>
           </button>
         )
       })}

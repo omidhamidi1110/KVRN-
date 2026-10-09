@@ -32,6 +32,14 @@ type AwaitingRow = {
   canDeriveFullRefund: boolean
 }
 
+type RefundHistoryRow = {
+  id: string; orderNumber: string; stripeRefundId: string
+  amountCents: number; currency: string; status: string; reason: string | null
+  refundedAt: string | null; createdAt: string
+  merchandiseCents: number | null; shippingCents: number | null
+  taxCents: number | null; feeReturnedCents: number | null
+}
+
 type AwaitingFeeRow = {
   id: string; stripeRefundId: string | null; orderId: string; orderNumber: string
   amountCents: number; orderStripeFeeCents: number | null
@@ -42,6 +50,8 @@ export function ReturnsClient() {
   const [returns, setReturns]   = useState<ReturnRow[]>([])
   const [awaiting, setAwaiting] = useState<AwaitingRow[]>([])
   const [awaitingFee, setAwaitingFee] = useState<AwaitingFeeRow[]>([])
+  const [refundHistory, setRefundHistory] = useState<RefundHistoryRow[]>([])
+  const [refundQuery, setRefundQuery] = useState('')
   const [feeDraft, setFeeDraft] = useState<Record<string, string>>({})
   const [note, setNote] = useState<string | null>(null)
   const [loading, setLoading]   = useState(true)
@@ -58,6 +68,7 @@ export function ReturnsClient() {
       setReturns(json.returns ?? [])
       setAwaiting(json.awaitingBreakdown ?? [])
       setAwaitingFee(json.awaitingFee ?? [])
+      setRefundHistory(json.refundHistory ?? [])
     } catch { setErr('Network error.') }
     finally { setLoading(false) }
   }, [])
@@ -268,6 +279,35 @@ export function ReturnsClient() {
           </AdminTable>
         </div>
       )}
+
+      {/* ── Full refund history, independent from physical returns ─────────── */}
+      <div className="mb-8">
+        <AdminSectionHeader title={`Recent refunds (${refundHistory.length})`}
+          info="Latest 200 recorded refund events across all statuses. A refund is financial and does not itself prove that merchandise was returned." />
+        <label htmlFor="refund-history-search" className="mb-3 block text-xs text-neutral-600">Find by order, Stripe reference, status or reason</label>
+        <input id="refund-history-search" type="search" value={refundQuery}
+          onChange={e=>setRefundQuery(e.target.value)} placeholder="Search refunds…"
+          className={`${adminInputClass} mb-4 max-w-md`} />
+        {loading ? <AdminLoading /> : refundHistory.length === 0
+          ? <AdminEmpty title="No refunds recorded." />
+          : <AdminTable minWidth={850} caption="Recent refund history" stack>
+            <thead><tr>{['Date','Order','Status','Amount','Merchandise','Shipping','Tax','Fee returned','Provider reference'].map(h=><AdminTh key={h}>{h}</AdminTh>)}</tr></thead>
+            <tbody>{refundHistory.filter(r=>{
+              const q=refundQuery.trim().toLowerCase()
+              return !q || [r.orderNumber,r.stripeRefundId,r.status,r.reason??''].some(v=>v.toLowerCase().includes(q))
+            }).map(r=><tr key={r.id}>
+              <AdminTd>{new Date(r.refundedAt??r.createdAt).toLocaleDateString()}</AdminTd>
+              <AdminTd className="font-medium">{r.orderNumber}</AdminTd>
+              <AdminTd>{r.status}</AdminTd>
+              <AdminTd>{r.currency.toUpperCase()} {money(r.amountCents)}</AdminTd>
+              <AdminTd>{moneyOrUnknown(r.merchandiseCents, 'Unknown')}</AdminTd>
+              <AdminTd>{moneyOrUnknown(r.shippingCents, 'Unknown')}</AdminTd>
+              <AdminTd>{moneyOrUnknown(r.taxCents, 'Unknown')}</AdminTd>
+              <AdminTd>{moneyOrUnknown(r.feeReturnedCents, 'Unknown')}</AdminTd>
+              <AdminTd><span className="break-all text-xs" title={r.reason??undefined}>{r.stripeRefundId}</span></AdminTd>
+            </tr>)}</tbody>
+          </AdminTable>}
+      </div>
 
       {/* ── Returns ───────────────────────────────────────────────────────── */}
       <AdminSectionHeader title="Returns"

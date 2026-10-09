@@ -5,12 +5,13 @@
 import { useEffect, useState } from 'react'
 import { AdminButton, AdminCard, AdminError, AdminLoading, AdminNotice, AdminSectionHeader } from '@/components/admin/ui/AdminUI'
 import { api, BASE, type ApiResult } from './api'
+import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import { ErrorNotice, InvalidationNotice, MediaField, Select, TextInput } from './ui'
 import { ListEditor } from './ui'
 import type { GlobalSeo } from '@/lib/content-schemas'
 
 export function SeoPanel() {
-  const [val, setVal] = useState<GlobalSeo | null>(null)
+  const { value: val, set: setVal, replace: replaceVal, undo, redo, canUndo, canRedo } = useDraftHistory<GlobalSeo | null>(null)
   const [revision, setRevision] = useState(0)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -21,7 +22,7 @@ export function SeoPanel() {
   async function load() {
     const r = await api<{ value: GlobalSeo; revision: number }>('GET', `${BASE}/seo`)
     if (!r.ok) { setErr(r.error ?? 'Could not load.'); return }
-    setErr(null); setVal(r.data!.value); setRevision(r.data!.revision); setDirty(false)
+    setErr(null); replaceVal(r.data!.value); setRevision(r.data!.revision); setDirty(false)
   }
   useEffect(() => { load() }, [])
   useEffect(() => {
@@ -38,7 +39,7 @@ export function SeoPanel() {
     setBusy(true); setSaved(false)
     const r = await api<{ revision: number }>('PUT', `${BASE}/seo`, { value: val, revision })
     setBusy(false); setResult(r)
-    if (r.ok) { setRevision(r.data!.revision); setDirty(false); setSaved(true) }
+    if (r.ok) { setRevision(r.data!.revision); setDirty(false); setSaved(true); replaceVal(val) }
   }
 
   return (
@@ -89,6 +90,8 @@ export function SeoPanel() {
       </AdminCard>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 rounded-[12px] border border-black/[0.08] bg-white p-3">
+        <AdminButton size="sm" variant="ghost" disabled={busy || !canUndo} onClick={() => { undo(); setDirty(true); setSaved(false) }}>Undo</AdminButton>
+        <AdminButton size="sm" variant="ghost" disabled={busy || !canRedo} onClick={() => { redo(); setDirty(true); setSaved(false) }}>Redo</AdminButton>
         <AdminButton variant="primary" loading={busy} disabled={!dirty} onClick={save}>Save and apply</AdminButton>
         <span className="text-[11px] text-[#8A8A85]" aria-live="polite">{saved ? 'Saved.' : dirty ? 'Unsaved changes' : ''}</span>
       </div>

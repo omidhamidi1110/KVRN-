@@ -112,6 +112,7 @@ export const ar: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'إغلاق القائمة',
   'nav.menuDialog': 'قائمة التنقل',
   'nav.cookiePreferences': 'تفضيلات ملفات تعريف الارتباط',
+  'nav.affiliateLogin': 'تسجيل دخول الشركاء',
   'nav.language': 'اللغة',
   'nav.currency': 'العملة',
   'nav.selectLanguage': 'اختر اللغة',
@@ -221,7 +222,7 @@ export const ar: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': 'صورة {n} – انقر للعرض',
   'pdp.legacyShip1': 'تُجهّز الطلبات خلال 1–3 أيام عمل.',
   'pdp.legacyShip2': 'الولايات المتحدة: 2–7 أيام. دوليًا: 5–14+ يومًا.',
-  'pdp.legacyShip3': 'إرجاع خلال 14 يومًا، غير ملبوس وبحالته الأصلية.',
+  'pdp.legacyShip3': 'يمكن إرجاع المنتجات المؤهلة غير الملبوسة وغير المغسولة مع بطاقاتها الأصلية مقابل رصيد لدى KVRN خلال 14 يومًا من التسليم. يتحمل العميل شحن الإرجاع الاختياري، مع استثناءات للمنتجات التالفة أو المعيبة أو غير الصحيحة.',
   'pdp.fullPolicy': 'السياسة الكاملة ←',
   'pdp.setHeading': 'أكمل الطقم.',
   'pdp.setSave': 'وفّر عند إضافة القطعتين.',
@@ -422,5 +423,11 @@ export const ar: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': 'هذه الصفحة',
   'notfound.line2': 'غير موجودة.',
   'notfound.body': 'ربما نُقلت، أو أن الرابط غير صحيح.',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "قصة واسعة وقصيرة. اختر مقاسًا أكبر لطول إضافي.",
+  "pdp.fit.phantomSweatpants": "قصة واسعة ومريحة. اختر مقاسك المعتاد.",
+  "pdp.fit.standardHoodie": "قصة واسعة بمساحة مريحة.",
+  "pdp.fit.standardSweatpants": "ساق واسعة. يُلبس عند الخصر الطبيعي. اختر مقاسك المعتاد.",
+
   'notfound.backHome': 'العودة إلى الرئيسية',
 }

@@ -95,9 +95,21 @@ export function RangePicker({
   const canApply = Boolean(custom.start && custom.end)
   return (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
-      <AdminSegmented ariaLabel="Date range" value={range}
-        options={RANGE_OPTIONS.map(o => ({ id: o.value as string, label: o.label }))}
-        onChange={onRange} />
+      {/* Compact 5-column selector: no wrap and no wasted second row on mobile. */}
+      <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-5 gap-1 sm:hidden">
+        {RANGE_OPTIONS.map(o => (
+          <button key={o.value} type="button" aria-label={o.label} aria-pressed={range === o.value}
+            onClick={() => onRange(o.value)}
+            className={`min-w-0 rounded-md border px-1 py-2 text-[11px] font-medium tabular-nums ${range === o.value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700'}`}>
+            {({ today: 'Today', '7d': '7D', '30d': '30D', mtd: 'MTD', ytd: 'YTD' } as Record<string, string>)[o.value]}
+          </button>
+        ))}
+      </div>
+      <div className="hidden min-w-0 sm:block">
+        <AdminSegmented ariaLabel="Date range" value={range}
+          options={RANGE_OPTIONS.map(o => ({ id: o.value as string, label: o.label }))}
+          onChange={onRange} />
+      </div>
       <span className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
         <input type="date" value={custom.start} aria-label="Start date"
           onChange={e => onCustom({ ...custom, start: e.target.value })}

@@ -112,6 +112,7 @@ export const ko: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': '메뉴 닫기',
   'nav.menuDialog': '내비게이션 메뉴',
   'nav.cookiePreferences': '쿠키 설정',
+  'nav.affiliateLogin': '제휴 파트너 로그인',
   'nav.language': '언어',
   'nav.currency': '통화',
   'nav.selectLanguage': '언어 선택',
@@ -221,7 +222,7 @@ export const ko: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': '이미지 {n} – 클릭하여 보기',
   'pdp.legacyShip1': '주문은 영업일 기준 1–3일 이내에 처리됩니다.',
   'pdp.legacyShip2': '미국: 2–7일. 해외: 5–14일 이상.',
-  'pdp.legacyShip3': '착용하지 않은 원래 상태의 상품은 14일 이내 반품 가능합니다.',
+  'pdp.legacyShip3': '착용하거나 세탁하지 않고 원래 태그가 부착된 대상 상품은 배송 후 14일 이내에 KVRN 스토어 크레딧으로 반품할 수 있습니다. 단순 변심 반품 배송비는 고객 부담이며, 파손·불량·오배송 상품은 예외가 적용됩니다.',
   'pdp.fullPolicy': '전체 정책 보기 →',
   'pdp.setHeading': '세트 완성하기.',
   'pdp.setSave': '두 상품을 함께 담으면 더 저렴합니다.',
@@ -422,5 +423,11 @@ export const ko: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': '이 페이지는',
   'notfound.line2': '존재하지 않습니다.',
   'notfound.body': '페이지가 이동되었거나 링크가 잘못되었을 수 있습니다.',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "짧은 기장의 오버사이즈 핏. 더 긴 기장을 원하면 한 사이즈 크게 선택하세요.",
+  "pdp.fit.phantomSweatpants": "편안한 오버사이즈 핏. 정사이즈를 선택하세요.",
+  "pdp.fit.standardHoodie": "여유로운 오버사이즈 실루엣.",
+  "pdp.fit.standardSweatpants": "와이드 레그. 자연스러운 허리 위치에 맞습니다. 정사이즈를 선택하세요.",
+
   'notfound.backHome': '홈으로 돌아가기',
 }

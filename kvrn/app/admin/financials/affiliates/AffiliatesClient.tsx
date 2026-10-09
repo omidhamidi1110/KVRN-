@@ -88,6 +88,10 @@ export function AffiliatesClient() {
   const [commissions, setCommissions] = useState<Commission[]>([])
   const [incomplete, setIncomplete] = useState<Incomplete[]>([])
   const [payouts, setPayouts] = useState<any[]>([])
+  const [payoutReminder, setPayoutReminder] = useState<{
+    draftPayouts: number; draftAmountCents: number | null;
+    reviewCommissions: number; reviewAmountCents: number | null;
+  } | null>(null)
   const [period, setPeriod] = useState<Period | null>(null)
   const [payable, setPayable] = useState<any[]>([])
   const [selectedAff, setSelectedAff] = useState('')
@@ -99,6 +103,7 @@ export function AffiliatesClient() {
   const [collect, setCollect] = useState<Record<string,
     { amount: string; date: string; method: string; reference: string }>>({})
   const [voiding, setVoiding] = useState<{ id: string; reason: string } | null>(null)
+  const [recordingPaid, setRecordingPaid] = useState<{ id: string; paidAt: string; method: string; reference: string } | null>(null)
   const [counts, setCounts] = useState<{ openApplications: number; reacceptance: number }>({ openApplications: 0, reacceptance: 0 })
   const { confirm, node: confirmNode } = useConfirm()
   // Idempotency key for an in-flight recovery-collection attempt, per
@@ -132,6 +137,7 @@ export function AffiliatesClient() {
       if (j.affiliates) {
         setAffiliates(j.affiliates); setCommissions(j.commissions ?? [])
         setIncomplete(j.incomplete ?? []); setPayouts(j.payouts ?? []); setPeriod(j.period)
+        setPayoutReminder(j.payoutReminder ?? null)
         setErr(null)
       } else setErr(j.error ?? 'Could not load affiliates.')
     } catch { setErr('Network error.') }
@@ -154,16 +160,22 @@ export function AffiliatesClient() {
 
   /** Record that a draft payout's money actually moved. */
   async function markPaid(payoutId: string) {
-    if (!(await confirm('Mark this payout as PAID? This records that money actually moved. It cannot be undone.'))) return
+    if (!recordingPaid || recordingPaid.id !== payoutId || !recordingPaid.method.trim() || !recordingPaid.reference.trim()) {
+      setErr('Enter the external payment method and transaction reference before recording cash as paid.')
+      return
+    }
+    const d = recordingPaid
+    if (!(await confirm(`Confirm ${d.method} payment with reference ${d.reference} was actually completed outside KVRN? Marking paid records a permanent cash-flow event.`))) return
     setSaving(true); setErr(null)
     try {
       const res = await fetch('/api/admin/affiliates/payouts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind: 'mark_paid', payoutId,
-                               paidAt: new Date().toISOString().slice(0, 10) }),
+                               paidAt: d.paidAt, method: d.method.trim(), reference: d.reference.trim() }),
       })
       const j = await res.json()
       if (!res.ok) { setErr(j.error ?? 'Could not mark paid.'); return }
+      setRecordingPaid(null)
       await load()
     } catch { setErr('Network error.') }
     finally { setSaving(false) }
@@ -445,6 +457,15 @@ export function AffiliatesClient() {
 
       {tab === 'payouts' && (
         <>
+          <AdminCard className="mb-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div><p className="text-xs text-neutral-500">Draft payouts awaiting your manual payment</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">{payoutReminder ? `${payoutReminder.draftPayouts} · ${payoutReminder.draftAmountCents === null ? 'Amount unavailable' : money(payoutReminder.draftAmountCents)}` : 'Unavailable'}</p></div>
+              <div><p className="text-xs text-neutral-500">Unreserved commission balances for review</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums">{payoutReminder ? `${payoutReminder.reviewCommissions} · ${payoutReminder.reviewAmountCents === null ? 'Amount unavailable' : money(payoutReminder.reviewAmountCents)}` : 'Unavailable'}</p></div>
+            </div>
+            <p className="mt-3 text-xs text-neutral-500">Review payout readiness, refund/dispute holds, identity and tax requirements before paying. Draft balances are not automatically transferred. The Chief daily brief includes these totals; Pushover alerts require your existing notification gate and credentials.</p>
+          </AdminCard>
           <AdminNotice className="mb-4">
             Commissions become <strong>eligible</strong> automatically after the hold window, which
             authorises nothing financial. Money moves only when you create a payout and record it
@@ -565,9 +586,27 @@ export function AffiliatesClient() {
                           <AdminButton size="sm" variant="ghost" onClick={() => setVoiding(null)}>Cancel</AdminButton>
                         </div>
                       </div>
+                    ) : recordingPaid?.id === p.id ? (
+                      <div className="flex min-w-[220px] flex-col gap-2">
+                        <label className="text-xs">Paid date
+                          <input type="date" className={adminInputClass} value={recordingPaid.paidAt}
+                            onChange={e=>setRecordingPaid({ ...recordingPaid, paidAt:e.target.value })} /></label>
+                        <label className="text-xs">External payment method
+                          <input className={adminInputClass} placeholder="Bank transfer, PayPal, etc."
+                            value={recordingPaid.method} maxLength={120}
+                            onChange={e=>setRecordingPaid({ ...recordingPaid, method:e.target.value })} /></label>
+                        <label className="text-xs">Provider transaction reference
+                          <input className={adminInputClass} placeholder="Actual payment confirmation/reference"
+                            value={recordingPaid.reference} maxLength={200}
+                            onChange={e=>setRecordingPaid({ ...recordingPaid, reference:e.target.value })} /></label>
+                        <div className="flex flex-wrap gap-2">
+                          <AdminButton size="sm" variant="primary" disabled={saving||!recordingPaid.method.trim()||!recordingPaid.reference.trim()||!recordingPaid.paidAt} onClick={()=>void markPaid(p.id)}>Confirm paid</AdminButton>
+                          <AdminButton size="sm" variant="ghost" onClick={()=>setRecordingPaid(null)}>Cancel</AdminButton>
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex gap-2">
-                        <AdminButton size="sm" variant="primary" onClick={() => void markPaid(p.id)} disabled={saving}>Mark paid</AdminButton>
+                        <AdminButton size="sm" variant="primary" onClick={() => setRecordingPaid({ id: p.id, paidAt: new Date().toISOString().slice(0, 10), method:'', reference:'' })} disabled={saving}>Record external payment</AdminButton>
                         <AdminButton size="sm" variant="danger" onClick={() => setVoiding({ id: p.id, reason: '' })} disabled={saving}>Void</AdminButton>
                       </div>
                     ))}

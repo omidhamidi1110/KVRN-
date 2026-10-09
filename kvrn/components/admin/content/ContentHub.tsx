@@ -6,7 +6,7 @@
 // the same place. Nothing edited here is public until it is published (collections and SEO apply on save).
 
 import { useCallback, useEffect, useState } from 'react'
-import { AdminPageHeader, AdminTabs, AdminNotice } from '@/components/admin/ui/AdminUI'
+import { AdminPage, AdminPageHeader, AdminTabs, AdminNotice } from '@/components/admin/ui/AdminUI'
 import { SINGLETON, type Kind } from './api'
 import { ListPanel } from './ListPanel'
 import { EntityEditor } from './EntityEditor'
@@ -90,7 +90,7 @@ export function ContentHub() {
   const singleKind = SINGLE_KIND[tab]
 
   return (
-    <div>
+    <AdminPage width="wide">
       <AdminPageHeader title="Site content" description="Edit the storefront’s text without code." eyebrow="Content" />
       <AdminTabs<HubTab> ariaLabel="Content sections" value={tab} onChange={t => go(t, null)} tabs={HUB_TABS} />
       <p className="-mt-2 mb-4 text-[12px] text-[#6B6B66]">{DESCRIPTION[tab]}</p>
@@ -121,7 +121,7 @@ export function ContentHub() {
       {tab === 'navigation' && (
         <AdminNotice tone="info" className="mt-4">The header and footer must keep links to Shop and Contact. The footer must also keep Shipping & Returns, Privacy, Terms and Cookies. Publishing is blocked if one is missing.</AdminNotice>
       )}
-    </div>
+    </AdminPage>
   )
 }
 

@@ -42,6 +42,8 @@ export function inspectPublishedContent(rows:readonly PublishedContentAuditRow[]
     publishedAt[id]=r.published_at ? ms(r.published_at) : null
     const text=JSON.stringify(r.snapshot??'').slice(0,200000)
     for(const rule of staleRules) if(rule.pattern.test(text))issues.push({entityId:id,code:rule.code,message:rule.message})
+    if (id === 'shipping-returns' && !/14(?:-|\s+)day/i.test(text)) issues.push({entityId:id,code:'missing_return_window',message:'Confirm the 14-day discretionary store-credit return window is clearly stated.'})
+    if (id === 'shipping-returns' && !/store credit/i.test(text)) issues.push({entityId:id,code:'missing_store_credit',message:'Return policy must clearly state eligible discretionary returns are for KVRN store credit.'})
   }
   for(const id of mandatory) if(!(id in publishedAt))issues.push({entityId:id,code:'no_cms_published_version',severity:'info',message:placeholders.includes(id)
     ?'Only the migration placeholder exists; the public page shows the coded copy. This is expected until a person publishes a reviewed version.'

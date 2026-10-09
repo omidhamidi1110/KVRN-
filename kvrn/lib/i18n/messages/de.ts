@@ -112,6 +112,7 @@ export const de: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'Menü schließen',
   'nav.menuDialog': 'Navigationsmenü',
   'nav.cookiePreferences': 'Cookie-Einstellungen',
+  'nav.affiliateLogin': 'Affiliate-Login',
   'nav.language': 'Sprache',
   'nav.currency': 'Währung',
   'nav.selectLanguage': 'Sprache wählen',
@@ -221,7 +222,7 @@ export const de: { readonly [K in keyof typeof en]: string } = {
   'pdp.imageClickToView': 'Bild {n} – zum Ansehen klicken',
   'pdp.legacyShip1': 'Bestellungen werden innerhalb von 1–3 Werktagen bearbeitet.',
   'pdp.legacyShip2': 'USA: 2–7 Tage. International: 5–14+ Tage.',
-  'pdp.legacyShip3': 'Rückgabe innerhalb von 14 Tagen, ungetragen und im Originalzustand.',
+  'pdp.legacyShip3': 'Geeignete, ungetragene und ungewaschene Artikel mit Originaletiketten können innerhalb von 14 Tagen nach Lieferung gegen KVRN-Guthaben zurückgegeben werden. Bei freiwilligen Rückgaben trägt der Kunde die Rücksendekosten; für beschädigte, fehlerhafte oder falsche Artikel gelten Ausnahmen.',
   'pdp.fullPolicy': 'Vollständige Richtlinie →',
   'pdp.setHeading': 'Set komplettieren.',
   'pdp.setSave': 'Spare, wenn du beides hinzufügst.',
@@ -422,5 +423,11 @@ export const de: { readonly [K in keyof typeof en]: string } = {
   'notfound.line1': 'Diese Seite',
   'notfound.line2': 'gibt es nicht.',
   'notfound.body': 'Sie wurde möglicherweise verschoben, oder der Link ist falsch.',
+  // Product fit guidance (visitor language, including coded catalogue).
+  "pdp.fit.phantomHoodie": "Kurzer Oversize-Schnitt. Für mehr Länge eine Nummer größer wählen.",
+  "pdp.fit.phantomSweatpants": "Lockerer Oversize-Schnitt. Fällt größengerecht aus.",
+  "pdp.fit.standardHoodie": "Oversize-Silhouette mit bequemer Passform.",
+  "pdp.fit.standardSweatpants": "Weites Bein. Sitzt auf der natürlichen Taille. Fällt größengerecht aus.",
+
   'notfound.backHome': 'Zurück zur Startseite',
 }

@@ -294,7 +294,7 @@ export function MarketingClient() {
   return <AdminPage>
     <AdminPageHeader title="Marketing Suite" description="Draft and review KVRN campaigns. All broadcasts and autonomous AI sends are disabled." actions={<Link href="/admin/marketing/templates" className={adminButtonClass('secondary')}>Copy templates</Link>} />
     <AdminNotice tone="warning" title="No marketing sends enabled">
-      Review only checks copy. It does not authorize SMS/email delivery, verify opt-in, reserve budget, or enable AI autonomy. Migrations 038–047 require independent staging verification and owner approval before production.
+      Review and planning do not send messages, verify opt-in, reserve budget, or enable AI autonomy. SMS and email delivery remain disabled until consent, provider, opt-out, budget, and owner release checks pass.
     </AdminNotice>
     {readiness && <AdminCard>
       <h2 className="text-sm font-semibold">Marketing release checklist</h2>
@@ -508,13 +508,13 @@ export function MarketingClient() {
     </AdminCard>}
     <AdminCard>
       <h2 className="text-sm font-semibold">Campaign copy preview — no sending</h2>
-      <div className="mt-3 flex min-w-0 flex-wrap gap-4">
-        <section className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-neutral-50 p-4" aria-label="Desktop copy preview">
+      <div className="mt-3 flex min-w-0 flex-col gap-4 md:flex-row">
+        <section className="w-full min-w-0 rounded-lg border border-neutral-200 bg-neutral-50 p-4 md:flex-1" aria-label="Desktop copy preview">
           <p className="mb-3 text-[11px] uppercase tracking-widest text-neutral-500">{form.channel === 'email' ? 'Email text preview' : 'SMS text preview'}</p>
           {form.channel === 'email' && <p className="mb-2 font-semibold break-words">{form.subject || '(No subject)'}</p>}
           <p className="whitespace-pre-wrap break-words text-sm">{form.channel==='sms'?composedSms?.body||'(No message text)':form.body||'(No message text)'}</p>
         </section>
-        <section className="w-full max-w-[300px] shrink-0 rounded-2xl border-4 border-neutral-300 p-4" aria-label="Narrow-screen copy preview">
+        <section className="w-full min-w-0 rounded-2xl border-4 border-neutral-300 p-4 md:max-w-[300px] md:shrink-0" aria-label="Narrow-screen copy preview">
           <p className="mb-3 text-[11px] uppercase tracking-widest text-neutral-500">Mobile-width preview</p>
           <p className="whitespace-pre-wrap break-words text-xs">{form.channel==='sms'?composedSms?.body||'(No message text)':form.body||'(No message text)'}</p>
         </section>

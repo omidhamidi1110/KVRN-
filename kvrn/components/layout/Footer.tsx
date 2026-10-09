@@ -59,20 +59,20 @@ export function Footer({ shell }: { shell?: ShellData | null } = {}) {
       <div className="container-kvrn">
 
         {/* ── Main columns ─────────────────────────────────────────── */}
-        <div className={`py-10 md:py-12 grid ${view.groups.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'} md:grid-cols-4 gap-6 md:gap-8 text-center`}>
+        <div className={`py-10 md:py-12 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10 md:gap-8 text-center items-start`}>
 
-          {/* Brand block — desktop only */}
-          <div className="hidden md:block space-y-3">
-            <p className="text-[12px] font-light tracking-[0.14em] uppercase text-[#1A1A1A]">{view.brandName}</p>
-            <div className="space-y-0.5">
-              {view.taglines.map(line => <p key={line} className="text-[12px] font-light text-[#6B6B6B]">{line}</p>)}
+          {/* Same two-by-two mobile hierarchy as the homepage footer. */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              {view.taglines.map((line, i) => <p key={`${i}:${line}`} className={`text-[13px] font-light ${i ? 'text-[#6B6B6B]' : 'text-[#1A1A1A]'}`}>{line}</p>)}
             </div>
-            <div className="flex justify-center gap-4 pt-1">
-              {socialLinks('text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors')}
+            <div className="flex justify-center gap-5 pt-2">
+              {socialLinks('text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors')}
             </div>
+            <Link href="/admin" className="inline-block text-[9px] uppercase tracking-[0.16em] text-[#9B9B9B] hover:text-[#1A1A1A]">Admin Login</Link>
           </div>
 
-          {view.groups.map((g, gi) => (
+          {view.groups.map(g => (
             <div key={g.id}>
               <p className="text-[10px] font-light tracking-[0.14em] uppercase text-[#9B9B9B] mb-4">{g.heading}</p>
               <ul className="space-y-2.5">
@@ -83,12 +83,6 @@ export function Footer({ shell }: { shell?: ShellData | null } = {}) {
                   </li>
                 ))}
               </ul>
-              {/* Social icons — mobile only (desktop shows in brand block) */}
-              {gi === view.groups.length - 1 && (
-                <div className="flex md:hidden justify-center gap-4 mt-5">
-                  {socialLinks('text-[#9B9B9B] hover:text-[#1A1A1A] transition-colors')}
-                </div>
-              )}
             </div>
           ))}
         </div>

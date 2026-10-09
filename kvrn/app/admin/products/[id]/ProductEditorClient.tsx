@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AdminButton, AdminError, AdminLoading, AdminNotice, AdminTabs, StatusBadge, useConfirm } from '@/components/admin/ui/AdminUI'
+import { AdminPage, AdminButton, AdminError, AdminLoading, AdminNotice, AdminTabs, StatusBadge, useConfirm } from '@/components/admin/ui/AdminUI'
 import type { PickedMedia } from '@/components/admin/media/MediaPicker'
 import type { ProductSnapshot } from '@/lib/product-model'
 import { contentGuidance } from '@/lib/product-model'
@@ -50,6 +50,9 @@ export function ProductEditorClient({ id }: { id: string }) {
   const inFlight = useRef<Promise<boolean> | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const conflictRef = useRef(false)
+  const undoHistory = useRef<ProductSnapshot[]>([])
+  const redoHistory = useRef<ProductSnapshot[]>([])
+  const [historyVersion, setHistoryVersion] = useState(0)
 
   const load = useCallback(async () => {
     const r = await api(`/api/admin/products/${id}`)
@@ -58,6 +61,7 @@ export function ProductEditorClient({ id }: { id: string }) {
     setState(d); setSnap(d.snapshot); snapRef.current = d.snapshot; revRef.current = d.revision
     setAssets(d.assets); setBlockers(d.blockers); setWarnings(d.warnings)
     dirtyRef.current = false; conflictRef.current = false; setSave('idle'); setSaveErrors([]); setLoadErr(null)
+    undoHistory.current = []; redoHistory.current = []; setHistoryVersion(n => n + 1)
   }, [id])
 
   useEffect(() => { void load() }, [load])
@@ -96,8 +100,29 @@ export function ProductEditorClient({ id }: { id: string }) {
   const update = useCallback((fn: (s: ProductSnapshot) => void) => {
     const prev = snapRef.current; if (!prev) return
     const next = structuredClone(prev); fn(next)
+    undoHistory.current = [...undoHistory.current, prev].slice(-30)
+    redoHistory.current = []
+    setHistoryVersion(n => n + 1)
     snapRef.current = next; dirtyRef.current = true
     setSnap(next); setSave(s => (s === 'saving' || s === 'conflict' ? s : 'dirty'))
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => { void flush() }, AUTOSAVE_MS)
+  }, [flush])
+
+  // Undo/Redo edits the VERSIONED PRODUCT DRAFT only; it never reverses inventory,
+  // orders, payments, publication actions or previously committed finance events.
+  const travel = useCallback((direction: 'undo' | 'redo') => {
+    if (conflictRef.current || !snapRef.current) return
+    const from = direction === 'undo' ? undoHistory : redoHistory
+    const to = direction === 'undo' ? redoHistory : undoHistory
+    const next = from.current.pop()
+    if (!next) return
+    to.current = [...to.current, snapRef.current].slice(-30)
+    snapRef.current = next
+    dirtyRef.current = true
+    setSnap(next)
+    setSave('dirty')
+    setHistoryVersion(n => n + 1)
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => { void flush() }, AUTOSAVE_MS)
   }, [flush])
@@ -185,7 +210,7 @@ export function ProductEditorClient({ id }: { id: string }) {
   const section = { snap, update, state, options, assets, addAsset, issues: [...issues, ...guidance], locked }
 
   return (
-    <div>
+    <AdminPage width="wide">
       {confirmNode}
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -195,6 +220,10 @@ export function ProductEditorClient({ id }: { id: string }) {
         </div>
         <div className="flex items-center gap-3">
           <span role="status" aria-live="polite" className={`text-[11px] ${save === 'error' || save === 'conflict' ? 'text-[#B91C1C]' : 'text-[#8A8A85]'}`}>{saveLabel}</span>
+          <div className="flex items-center gap-1" aria-label="Product draft editing history" data-history-version={historyVersion}>
+            <AdminButton size="sm" variant="ghost" disabled={locked || busy || undoHistory.current.length === 0} onClick={() => travel('undo')}>Undo</AdminButton>
+            <AdminButton size="sm" variant="ghost" disabled={locked || busy || redoHistory.current.length === 0} onClick={() => travel('redo')}>Redo</AdminButton>
+          </div>
           {!locked && save !== 'idle' && save !== 'saved' && <AdminButton size="sm" onClick={() => void flush()} disabled={save === 'saving'}>Save now</AdminButton>}
           <AdminButton variant="primary" disabled={busy || save === 'conflict'} onClick={() => setTab('publish')}>{state.status === 'published' ? 'Publish changes' : 'Publish'}</AdminButton>
         </div>
@@ -236,6 +265,6 @@ export function ProductEditorClient({ id }: { id: string }) {
             variants={state.canonical.variants.map(v => ({ sku: v.sku, size: v.size, sizeSort: v.sizeSort, colorCode: v.colorCode, active: v.active }))} />
         </aside>
       </div>
-    </div>
+    </AdminPage>
   )
 }

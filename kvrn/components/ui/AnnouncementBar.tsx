@@ -62,12 +62,12 @@ export function AnnouncementBar({ shell }: { shell?: ShellData | null } = {}) {
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-[250] h-[36px] flex items-center justify-center bg-[#0E0E0E] overflow-hidden"
+      className="fixed inset-x-0 top-0 z-[250] h-[36px] min-h-[36px] max-h-[36px] flex items-center justify-center bg-[#0E0E0E] overflow-hidden"
       aria-live="polite"
       aria-label={t['announce.label']}
     >
       <p
-        className={`text-[11px] font-light tracking-[0.12em] text-[#F0EDE8] text-center px-4 ${current.href ? '' : 'select-none '}transition-opacity duration-500`}
+        className={`m-0 max-w-full px-4 text-center text-[11px] font-light leading-none tracking-[0.12em] text-[#F0EDE8] ${current.href ? '' : 'select-none '}transition-opacity duration-500`}
         style={{ opacity: fading ? 0 : 1 }}
       >
         {current.href

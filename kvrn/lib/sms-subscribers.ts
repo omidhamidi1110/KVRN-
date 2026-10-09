@@ -101,6 +101,7 @@ export async function getSmsStats(): Promise<{
   subscribed: number
   unsubscribed: number
   recent: SmsSubscriber[]
+  legacy: { total: number; reviewRequired: number; suppressed: number; keywordReported: number } | null
 }> {
   const [stats] = await sql`
     SELECT
@@ -118,12 +119,28 @@ export async function getSmsStats(): Promise<{
     ORDER BY created_at DESC
     LIMIT 50
   `
+  let legacy: { total: number; reviewRequired: number; suppressed: number; keywordReported: number } | null = null
+  try {
+    const [r] = await sql`
+      SELECT COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE record_state='review_required') AS review_required,
+        COUNT(*) FILTER (WHERE record_state='suppressed') AS suppressed,
+        COUNT(*) FILTER (WHERE reported_keyword IS NOT NULL AND reported_keyword <> '') AS keyword_reported
+      FROM legacy_sms_import_contacts
+    `
+    legacy = { total: Number(r.total), reviewRequired: Number(r.review_required),
+      suppressed: Number(r.suppressed), keywordReported: Number(r.keyword_reported) }
+  } catch (e) {
+    // Additive migration 066 may not be installed yet. Never report reviewed opt-in eligibility.
+    console.warn('[sms] legacy subscriber quarantine is not available')
+  }
   const s = stats as any
   return {
     total:        Number(s.total),
     subscribed:   Number(s.subscribed),
     unsubscribed: Number(s.unsubscribed),
     recent:       recent as SmsSubscriber[],
+    legacy,
   }
 }
 

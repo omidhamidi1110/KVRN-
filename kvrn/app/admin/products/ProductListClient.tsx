@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, AdminTable, AdminTr, AdminTabs, AdminTd, AdminTh,
+  AdminPage, AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, AdminTable, AdminTr, AdminTabs, AdminTd, AdminTh,
   StatusBadge, adminInputClass, useConfirm, InfoTip,
 } from '@/components/admin/ui/AdminUI'
 import { formatProductPrice } from '@/lib/product-price'
@@ -93,7 +93,7 @@ export function ProductListClient() {
   const nameOf = (id: string) => items?.find(i => i.id === id)?.name ?? id
 
   return (
-    <div>
+    <AdminPage width="wide">
       {confirmNode}
       <AdminPageHeader title="Products" description="Create, edit and publish products."
         actions={<><Link href="/admin/products/defaults" className="text-[12px] underline underline-offset-2 text-[#4A4A46]">Defaults</Link><Link href="/admin/products/new" className="inline-flex h-9 items-center rounded-[9px] bg-[#171717] px-4 text-[12px] font-medium text-white hover:bg-black">New product</Link></>} />
@@ -114,7 +114,7 @@ export function ProductListClient() {
       ]} />
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
-        <AdminField label="Search" htmlFor="pl-q" className="min-w-[200px] flex-1"><input id="pl-q" className={adminInputClass} placeholder="Name, URL or code" value={q} onChange={e => setQ(e.target.value)} /></AdminField>
+        <AdminField label="Search" htmlFor="pl-q" className="min-w-0 basis-[200px] flex-1"><input id="pl-q" className={adminInputClass} placeholder="Name, URL or code" value={q} onChange={e => setQ(e.target.value)} /></AdminField>
         <AdminField label="Sort" htmlFor="pl-sort">
           <select id="pl-sort" className={adminInputClass} value={sort} onChange={e => setSort(e.target.value as typeof sort)}>
             <option value="updated">Recently edited</option><option value="name">Name</option><option value="price">Price</option><option value="status">Status</option>
@@ -157,7 +157,7 @@ export function ProductListClient() {
                     {i.thumb ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={i.thumb} alt="" className="h-12 w-10 rounded-[6px] border border-black/10 object-cover" /> : <span className="h-12 w-10 rounded-[6px] border border-dashed border-black/20" aria-hidden="true" />}
                     <div className="min-w-0">
                       <Link href={`/admin/products/${i.id}`} className="font-medium underline-offset-2 hover:underline">{i.name}</Link>
-                      <p className="text-[11px] text-[#8A8A85]">{i.productCode ?? '—'} · /products/{i.slug || '…'}</p>
+                      <p className="break-all text-[11px] text-[#8A8A85]">{i.productCode ?? '—'} · /products/{i.slug || '…'}</p>
                     </div>
                   </div>
                 </AdminTd>
@@ -190,6 +190,6 @@ export function ProductListClient() {
           </tbody>
         </AdminTable>
       )}
-    </div>
+    </AdminPage>
   )
 }

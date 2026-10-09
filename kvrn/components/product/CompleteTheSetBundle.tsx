@@ -10,6 +10,8 @@ import { useMemo, useState } from 'react'
 import { imageSrcSet } from '@/lib/responsive-image'
 import Link from 'next/link'
 import { useCart } from '@/context/CartContext'
+import { useI18n } from '@/context/I18nContext'
+import { fillMessages } from '@/lib/i18n/messages'
 import { formatProductPrice } from '@/lib/product-price'
 import { BUNDLE_COPY_DEFAULTS } from '@/lib/bundle-model'
 import { buildBundleCartLines, priceSelection } from '@/lib/bundle-cart'
@@ -21,6 +23,7 @@ function ComponentCard({ c, colorCode, sku, onColor, onSku }: {
   c: PublicBundleComponent; colorCode: string; sku: string | null
   onColor: (code: string) => void; onSku: (sku: string) => void
 }) {
+  const t = fillMessages(useI18n().t)
   const color = c.colors.find(x => x.code === colorCode) ?? c.colors[0]
   const img = color?.image ?? c.image
   const sizes = c.variants.filter(v => v.colorCode === (color?.code ?? ''))
@@ -33,7 +36,7 @@ function ComponentCard({ c, colorCode, sku, onColor, onSku }: {
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
         )}
         {!c.available && (
-          <span style={{ position: 'absolute', top: 10, left: 10, background: '#fff', padding: '4px 8px', ...LABEL }}>Sold out</span>
+          <span style={{ position: 'absolute', top: 10, left: 10, background: '#fff', padding: '4px 8px', ...LABEL }}>{t.soldOut}</span>
         )}
       </div>
       <div style={{ padding: '0 4px 12px' }}>
@@ -43,7 +46,7 @@ function ComponentCard({ c, colorCode, sku, onColor, onSku }: {
         </p>
         {c.colors.length > 1 && (
           <div style={{ marginBottom: 12 }}>
-            <p style={{ ...LABEL, marginBottom: 8 }}>Colour{color ? ` · ${color.name}` : ''}</p>
+            <p style={{ ...LABEL, marginBottom: 8 }}>{t.color}{color ? ` · ${color.name}` : ''}</p>
             <div style={{ display: 'flex', gap: 8 }}>
               {c.colors.map(col => (
                 <button key={col.code} onClick={() => onColor(col.code)} aria-label={col.name} aria-pressed={col.code === color?.code}
@@ -53,7 +56,7 @@ function ComponentCard({ c, colorCode, sku, onColor, onSku }: {
             </div>
           </div>
         )}
-        <p style={{ ...LABEL, marginBottom: 8 }}>Size</p>
+        <p style={{ ...LABEL, marginBottom: 8 }}>{t.size}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {sizes.map(v => {
             const out = v.available <= 0
@@ -76,6 +79,7 @@ function ComponentCard({ c, colorCode, sku, onColor, onSku }: {
 
 export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: PublicBundle; preview?: boolean }) {
   const { addBundle, openCart } = useCart()
+  const t = fillMessages(useI18n().t)
   const comps = bundle.components
   const [colorCodes, setColorCodes] = useState<Record<string, string>>({})
   const [skus, setSkus] = useState<Record<string, string | null>>({})
@@ -121,15 +125,15 @@ export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: Publ
     }
   }
 
-  const label = anyUnavailable ? 'Currently unavailable'
-    : busy === 'done' ? 'Added'
+  const label = anyUnavailable ? t['bundle.unavailable']
+    : busy === 'done' ? t.addedToBag
     : busy === 'busy' ? '...'
-    : !allChosen ? (nextMissing ? `Select ${nextMissing.isOwner ? 'your' : 'a'} size · ${nextMissing.name}` : 'Select sizes')
+    : !allChosen ? (nextMissing ? `${t['bundle.chooseSize']} · ${nextMissing.name}` : t['bundle.chooseSize'])
     : cta
 
   return (
     <section style={{ background: '#F3F0EA' }} data-bundle-section={bundle.bundleId}>
-      <div style={{ maxWidth: 1380, margin: '0 auto', padding: '64px 28px' }}>
+      <div className="mx-auto w-full max-w-[1380px] px-6 py-12 sm:px-7 sm:py-16">
         <div className="flex flex-col lg:grid gap-8 lg:gap-12"
           style={{ gridTemplateColumns: 'minmax(240px,0.8fr) minmax(0,2.2fr)', alignItems: 'start' } as React.CSSProperties}>
 
@@ -144,15 +148,15 @@ export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: Publ
             <div style={{ borderTop: '1px solid #C8C4BC', paddingTop: 20, marginBottom: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {priced.ok ? (
                 <>
-                  <Row label="Separately" value={formatProductPrice(priced.setSubtotalCents)} />
-                  {priced.setDiscountCents > 0 && <Row label="Set savings" value={`−${formatProductPrice(priced.setDiscountCents)}`} />}
+                  <Row label={t['bundle.subtotal']} value={formatProductPrice(priced.setSubtotalCents)} />
+                  {priced.setDiscountCents > 0 && <Row label={t['bundle.discount']} value={`−${formatProductPrice(priced.setDiscountCents)}`} />}
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 6 }}>
-                    <span style={LABEL}>Set price</span>
+                    <span style={LABEL}>{t['bundle.total']}</span>
                     <span style={{ fontSize: 22, fontWeight: 300, fontVariantNumeric: 'tabular-nums' }}>{formatProductPrice(priced.setNetCents)}</span>
                   </div>
                 </>
               ) : (
-                <p style={{ fontSize: 12, color: '#9B9B9B' }}>The set price is not available right now.</p>
+                <p style={{ fontSize: 12, color: '#9B9B9B' }}>{t['bundle.unavailable']}</p>
               )}
             </div>
 
@@ -167,7 +171,7 @@ export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: Publ
               <Link key={c.productId} href={c.href}
                 style={{ display: 'block', textAlign: 'center', fontSize: 11, color: '#9B9B9B', textDecoration: 'underline', textUnderlineOffset: 2, marginBottom: 6 }}
                 className="hover:text-[#1A1A1A] transition-colors">
-                View {c.name} separately
+                {t['bundle.viewSeparately']} · {c.name}
               </Link>
             ))}
           </div>
