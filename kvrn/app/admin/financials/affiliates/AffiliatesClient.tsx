@@ -586,7 +586,7 @@ export function AffiliatesClient() {
                           <AdminButton size="sm" variant="ghost" onClick={() => setVoiding(null)}>Cancel</AdminButton>
                         </div>
                       </div>
-                    ) : recordingPaid?.id === p.id ? (
+                    ) : recordingPaid !== null && recordingPaid.id === p.id ? (
                       <div className="flex min-w-[220px] flex-col gap-2">
                         <label className="text-xs">Paid date
                           <input type="date" className={adminInputClass} value={recordingPaid.paidAt}
