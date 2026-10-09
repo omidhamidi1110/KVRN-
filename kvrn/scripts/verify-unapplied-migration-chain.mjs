@@ -51,13 +51,13 @@ export function inspectDraftChain(manifest,files){
   if(typeof files[filename]!=='string'){errors.push(`missing_file:${filename}`);continue}
   for(const err of validateDraftMigration(filename,files[filename],manifest.files[filename]))errors.push(`${filename}:${err}`)
  }
- const unmanaged=Object.keys(files).filter(k=>/^0(?:3[89]|[456][0-9]|6[0-4])_/.test(k)&&!Object.hasOwn(manifest.files,k))
+ const unmanaged=Object.keys(files).filter(k=>/^0(?:3[89]|[45][0-9]|6[0-4])_/.test(k)&&!Object.hasOwn(manifest.files,k))
  if(unmanaged.length)errors.push('unexpected_unreviewed_migration_drafts')
  return errors
 }
 if(process.argv[1] && path.resolve(process.argv[1])===path.resolve(new URL(import.meta.url).pathname)){
  const manifest=JSON.parse(fs.readFileSync(EXPECTED,'utf8'))
- const files=Object.fromEntries(fs.readdirSync(CHAIN).filter(x=>/^0(?:3[89]|[456][0-9]|6[0-4])_.*\.sql$/.test(x)).map(x=>[x,fs.readFileSync(path.join(CHAIN,x),'utf8')]))
+ const files=Object.fromEntries(fs.readdirSync(CHAIN).filter(x=>/^0(?:3[89]|[45][0-9]|6[0-4])_.*\.sql$/.test(x)).map(x=>[x,fs.readFileSync(path.join(CHAIN,x),'utf8')]))
  const problems=inspectDraftChain(manifest,files)
  if(problems.length){console.error('MIGRATION DRAFT PREFLIGHT FAIL:',problems.join(', '));process.exitCode=1}
  else console.log('PASS 27/27 locked migration draft hashes, ordering, outer transactions and high-risk statement preflight. NO database connection made.')

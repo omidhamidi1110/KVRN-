@@ -102,6 +102,15 @@ AI_DAILY_BRIEF_HOUR_LOCAL         = "19"
 [env.production]
 name = "kvrn"
 
+
+[[env.production.routes]]
+pattern = "kvrn.shop"
+custom_domain = true
+
+[[env.production.r2_buckets]]
+binding = "KVRN_MEDIA"
+bucket_name = "kvrn-media"
+
 [env.production.vars]
 NEXT_PUBLIC_SITE_URL              = "https://kvrn.shop"
 SITE_URL                          = "https://kvrn.shop"
