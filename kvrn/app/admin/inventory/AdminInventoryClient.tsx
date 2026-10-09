@@ -124,7 +124,7 @@ export default function AdminInventoryClient() {
         <AdminStat label="Sold out" value={soldOutVariants} tone={soldOutVariants > 0 ? 'negative' : 'default'} sub="Active variants" />
       </AdminStatGrid>
 
-      <div className="flex flex-col items-start gap-4 2xl:flex-row">
+      <div className="flex flex-col items-start gap-4 2xl:flex-col">
 
         {/* Inventory ledger */}
         <section className="w-full min-w-0 flex-1">
@@ -134,7 +134,7 @@ export default function AdminInventoryClient() {
           {variants.length === 0 ? (
             <AdminEmpty title="No inventory variants." />
           ) : (
-            <div className="kv-inventory-table"><AdminTable stack minWidth={900} caption="Stock by variant">
+            <div className="kv-inventory-table"><AdminTable stack minWidth={0} caption="Stock by variant">
               <thead>
                 <AdminTr>
                   <AdminTh>Product</AdminTh>
@@ -163,11 +163,11 @@ export default function AdminInventoryClient() {
                       ].join(' ')}
                     >
                       <AdminTd label="Product" className="max-sm:!block max-sm:!text-left">
-                        <p className="max-w-[220px] truncate font-medium max-sm:max-w-none">{v.product_name}</p>
+                        <p className="max-w-full break-words font-medium">{v.product_name}</p>
                         {v.color_name && <p className="mt-0.5 text-[11px] text-[#8A8A85]">{v.color_name}</p>}
                       </AdminTd>
                       <AdminTd label="Size" className="whitespace-nowrap text-[#4A4A46]">{v.size}</AdminTd>
-                      <AdminTd label="SKU" className="whitespace-nowrap"><span className="font-mono text-[11px] text-[#4A4A46]">{v.sku}</span></AdminTd>
+                      <AdminTd label="SKU" className="min-w-0"><span className="break-all font-mono text-[10px] text-[#4A4A46]">{v.sku}</span></AdminTd>
                       <AdminTd label="On hand" className="font-medium">{v.stock_on_hand}</AdminTd>
                       <AdminTd label="Reserved" className="text-[#4A4A46]">{v.reserved_quantity}</AdminTd>
                       <AdminTd label="Available" className={['font-medium', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</AdminTd>
@@ -177,7 +177,7 @@ export default function AdminInventoryClient() {
                           {isSoldOut && <AdminTag tone="danger">Sold out</AdminTag>}
                         </span>
                       </AdminTd>
-                      <AdminTd label="Updated" className="whitespace-nowrap text-[11px] text-[#6B6B66]">{new Date(v.updated_at).toLocaleString()}</AdminTd>
+                      <AdminTd label="Updated" className="text-[10px] text-[#6B6B66]">{new Date(v.updated_at).toLocaleString()}</AdminTd>
                       <AdminTd className="whitespace-nowrap text-right max-sm:!justify-end">
                         <AdminButton size="sm" variant="ghost" aria-label={`Manage ${v.sku}`}
                           onClick={e => { e.stopPropagation(); selectVariant(v.id) }}>Manage →</AdminButton>

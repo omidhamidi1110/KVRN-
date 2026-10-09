@@ -74,7 +74,7 @@ export function AdminCard({
   children, className = '', padded = true,
 }: { children: ReactNode; className?: string; padded?: boolean }) {
   return (
-    <section className={cx('rounded-[14px] border border-black/[0.08] bg-white', padded && 'p-4 sm:p-5', className)}>
+    <section className={cx('min-w-0 max-w-full rounded-[14px] border border-black/[0.08] bg-white', padded && 'p-4 sm:p-5', className)}>
       {children}
     </section>
   )

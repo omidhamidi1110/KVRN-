@@ -14,7 +14,7 @@ import type { ShellData } from '@/lib/content-shell'
 import { resolveLinkLabel } from '@/lib/content-shell'
 
 /** `shell` is provided only when Admin-managed content is enabled; without it the coded links below are used. */
-export function Nav({ shell, affiliatePortalEnabled = false }: { shell?: ShellData | null; affiliatePortalEnabled?: boolean } = {}) {
+export function Nav({ shell }: { shell?: ShellData | null; affiliatePortalEnabled?: boolean } = {}) {
   const { itemCount, openCart }   = useCart()
   const { count: savedCount }     = useWishlist()
   const { openPreferences }       = useCookiePrefs()
@@ -198,7 +198,7 @@ export function Nav({ shell, affiliatePortalEnabled = false }: { shell?: ShellDa
           textCls
         )}
         style={{
-          top: '36px',
+          top: 'var(--bar-height)',
           backgroundColor:
             effectiveMode === 'collection-scrolled'
               ? 'rgba(8,8,8,0.72)'
@@ -238,10 +238,10 @@ export function Nav({ shell, affiliatePortalEnabled = false }: { shell?: ShellDa
             <div className={cn('hidden lg:flex items-center', textCls)}>
               <LanguageSelector align="right" />
             </div>
-            {affiliatePortalEnabled && <Link href="/affiliate/login"
+            <Link href="/affiliate-sign-in"
               className="hidden lg:inline-flex text-[10px] font-light tracking-[0.09em] uppercase opacity-70 hover:opacity-100 transition-opacity whitespace-nowrap">
               {t['nav.affiliateLogin']}
-            </Link>}
+            </Link>
 
             {/* Bag */}
             <button
@@ -347,10 +347,10 @@ export function Nav({ shell, affiliatePortalEnabled = false }: { shell?: ShellDa
             >
               {t['nav.cookiePreferences']}
             </button>
-            {affiliatePortalEnabled && <Link href="/affiliate/login" onClick={() => setDrawerOpen(false)}
+            <Link href="/affiliate-sign-in" onClick={() => setDrawerOpen(false)}
               className="text-right text-[11px] font-light text-[#F0EDE8]/65 hover:text-[#F0EDE8] transition-colors tracking-wide">
               {t['nav.affiliateLogin']}
-            </Link>}
+            </Link>
           </div>
         </div>
       </div>

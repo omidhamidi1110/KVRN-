@@ -16,7 +16,7 @@ interface PageHeroProps {
 export function PageHero({ title, breadcrumb }: PageHeroProps) {
   const t = fillMessages(useI18n().t)
   return (
-    <div className="bg-[#0E0E0E] pt-[calc(36px+56px+20px)] pb-8" data-nav-theme="dark">
+    <div className="bg-[#0E0E0E] pt-[calc(var(--header-total)+20px)] pb-8" data-nav-theme="dark">
       <div className="container-kvrn max-w-3xl">
         {breadcrumb && (
           <nav aria-label={t['common.breadcrumb']} className="mb-4">

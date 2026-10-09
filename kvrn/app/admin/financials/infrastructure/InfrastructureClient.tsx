@@ -312,7 +312,7 @@ export function InfrastructureClient() {
 
           {showUsageForm && (
             <AdminCard className="mb-6">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                 <AdminField label="Provider *" htmlFor="iu-provider">
                   <input id="iu-provider" list="kvrn-providers" value={usageForm.provider}
                     onChange={e => setUsageForm({ ...usageForm, provider: e.target.value })}

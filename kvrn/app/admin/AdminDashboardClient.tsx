@@ -115,7 +115,7 @@ export function AdminDashboardClient() {
   }, [data])
 
   return (
-    <AdminPage>
+    <AdminPage width="wide">
       <AdminPageHeader
         title="Overview"
         description="Orders, fulfillment, and stock."

@@ -14,7 +14,7 @@
 }
 
 /* Inventory remains usable without horizontal scrolling on mid-width screens. */
-@media (min-width: 640px) and (max-width: 1199px) {
+@media (min-width: 640px) and (max-width: 1550px) {
   .kv-inventory-table .kv-stack { display: block; min-width: 0 !important; }
   .kv-inventory-table .kv-stack thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .kv-inventory-table .kv-stack tbody, .kv-inventory-table .kv-stack tbody tr { display: block; }
@@ -30,3 +30,67 @@
 #admin-main input[type="date"] { display: block; width: 100%; min-height: 40px; }
 #admin-main input[type="date"]::-webkit-date-and-time-value { text-align: left; min-width: 0; }
 #admin-main .grid > *, #admin-main .flex > * { min-width: 0; }
+
+/* CP67: Safari tablet date fields must not paint over adjacent grid columns. */
+#admin-main .grid { min-width: 0; }
+#admin-main input[type="date"], #admin-main input[type="datetime-local"] {
+  box-sizing: border-box !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  inline-size: 100% !important;
+  overflow: hidden;
+}
+#admin-main input[type="date"]::-webkit-datetime-edit,
+#admin-main input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0 !important;
+  max-width: 100%;
+}
+/* No inventory ledger sideways scrolling at standard desktop/tablet widths. */
+.kv-inventory-table { min-width: 0; max-width: 100%; overflow-x: hidden; }
+.kv-inventory-table table { table-layout: fixed; min-width: 0 !important; }
+.kv-inventory-table th, .kv-inventory-table td { overflow-wrap: anywhere; }
+@media (max-width:1550px) {
+  .kv-inventory-table table { table-layout: auto; }
+  .kv-inventory-table tbody tr { border-bottom: 1px solid #e8e5e0; }
+  .kv-inventory-table tbody td:last-child button { font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+}
+
+/* CP68: Control containment for all financial/admin forms, including Safari native picker internals. */
+#admin-main { overflow-x: clip; }
+#admin-main .grid > *, #admin-main .flex > * { min-width: 0; }
+#admin-main label, #admin-main fieldset { min-width: 0; max-width: 100%; }
+#admin-main input:not([type="checkbox"]):not([type="radio"]),
+#admin-main select, #admin-main textarea {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+#admin-main input[type="date"], #admin-main input[type="datetime-local"] {
+  display: block;
+  width: 100% !important;
+  font-size: 12px;
+  -webkit-min-logical-width: 0;
+}
+#admin-main input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+#admin-main input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
+  min-width: 0;
+  padding: 0;
+}
+/* Product tabs wrap at natural word boundaries rather than colliding in a narrow preview split. */
+.kv-product-tabs [role="tablist"], .kv-content-tabs [role="tablist"] {
+  display: flex;
+  flex-wrap: wrap;
+  overflow: visible;
+  column-gap: 6px;
+  row-gap: 3px;
+  border-bottom: 1px solid rgba(0,0,0,.09);
+}
+.kv-product-tabs [role="tab"], .kv-content-tabs [role="tab"] {
+  white-space: nowrap;
+  max-width: 100%;
+  padding-inline: 9px;
+}
+.kv-inventory-table table { width: 100%; }
+.kv-inventory-table td:last-child, .kv-inventory-table th:last-child {
+  white-space: nowrap;
+}

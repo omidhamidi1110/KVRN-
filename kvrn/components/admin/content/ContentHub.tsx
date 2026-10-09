@@ -92,8 +92,8 @@ export function ContentHub() {
   return (
     <AdminPage width="wide">
       <AdminPageHeader title="Site content" description="Edit the storefront’s text without code." eyebrow="Content" />
-      <AdminTabs<HubTab> ariaLabel="Content sections" value={tab} onChange={t => go(t, null)} tabs={HUB_TABS} />
-      <p className="-mt-2 mb-4 text-[12px] text-[#6B6B66]">{DESCRIPTION[tab]}</p>
+      <div className="kv-content-tabs"><AdminTabs<HubTab> ariaLabel="Content sections" value={tab} onChange={t => go(t, null)} tabs={HUB_TABS} /></div>
+      <p className="mt-0 mb-4 text-[12px] text-[#6B6B66]">{DESCRIPTION[tab]}</p>
 
       {(tab === 'policies' || tab === 'faq') && !id && <PolicyAuditPanel />}
       {tab === 'policies' && !id && <MessagingPoliciesCard onOpen={nid => go('policies', nid)} />}

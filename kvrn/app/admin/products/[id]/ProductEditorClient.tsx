@@ -242,14 +242,14 @@ export function ProductEditorClient({ id }: { id: string }) {
       {state.status === 'archived' && <AdminNotice tone="info" className="mb-3">This product is archived. Restore it to edit.</AdminNotice>}
       {notice && <AdminNotice tone={notice.tone} className="mb-3">{notice.text}</AdminNotice>}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(460px,42%)]">
         <div className="min-w-0">
-          <AdminTabs<TabId> ariaLabel="Product sections" value={tab} onChange={setTab} tabs={[
+          <div className="kv-product-tabs"><AdminTabs<TabId> ariaLabel="Product sections" value={tab} onChange={setTab} tabs={[
             { id: 'basics', label: 'Basics', count: tabCounts.basics }, { id: 'media', label: 'Images', count: tabCounts.media },
             { id: 'variants', label: 'Colours & sizes', count: tabCounts.variants }, { id: 'content', label: 'Content', count: tabCounts.content },
             { id: 'pairing', label: 'Complete the Set', count: tabCounts.pairing }, { id: 'price', label: 'Price & shipping', count: tabCounts.price },
             { id: 'seo', label: 'SEO', count: tabCounts.seo }, { id: 'publish', label: 'Publish', count: blockers.length || undefined }, { id: 'history', label: 'History' },
-          ]} />
+          ]} /></div>
           {tab === 'basics' && <BasicsSection {...section} />}
           {tab === 'media' && <MediaSection {...section} />}
           {tab === 'variants' && <VariantsSection {...section} />}
@@ -260,7 +260,7 @@ export function ProductEditorClient({ id }: { id: string }) {
           {tab === 'publish' && <PublishingSection state={state} blockers={blockers} warnings={warnings} busy={busy} saving={save === 'saving' || save === 'dirty'} onAct={(a, x) => void act(a, x)} onJump={setTab} publishedSlug={state.published?.slug ?? state.slug} />}
           {tab === 'history' && <HistorySection state={state} busy={busy} onRollback={v => void rollback(v)} />}
         </div>
-        <aside className="min-w-0 xl:sticky xl:top-4 xl:h-[calc(100vh-120px)]" aria-label="Preview">
+        <aside className="min-w-0 2xl:sticky 2xl:top-4 2xl:h-[calc(100vh-120px)]" aria-label="Preview">
           <PreviewPane productId={id} snapshot={snap} assets={assets} canonicalPriceCents={state.canonical.priceCents}
             variants={state.canonical.variants.map(v => ({ sku: v.sku, size: v.size, sizeSort: v.sizeSort, colorCode: v.colorCode, active: v.active }))} />
         </aside>

@@ -17,7 +17,7 @@ export function PreviewPane({ productId, snapshot, assets, canonicalPriceCents, 
   productId: string; snapshot: ProductSnapshot; assets: Assets; canonicalPriceCents: number
   variants: Array<{ sku: string; size: string; sizeSort: number; colorCode: string; active: boolean }>
 }) {
-  const [mode, setMode] = useState<PreviewMode>('desktop')
+  const [mode, setMode] = useState<PreviewMode>('mobile')
   const [desktopWidth, setDesktopWidth] = useState<number>(DEFAULT_DESKTOP_WIDTH)
   const [mobileWidth, setMobileWidth] = useState<number>(DEFAULT_MOBILE_WIDTH)
   const [full, setFull] = useState(false)

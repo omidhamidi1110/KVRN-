@@ -68,11 +68,13 @@ export function ListPanel({ kind, onOpen, refreshKey }: { kind: Kind; onOpen: (i
           <tbody>
             {rows.map(r => (
               <AdminTr key={r.id} className="hover:bg-black/[0.02]">
-                <AdminTd className="max-sm:!block max-sm:!text-left">
-                  <button type="button" onClick={() => onOpen(r.id)} className="text-left font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40">
-                    {r.title || '(untitled)'}
-                  </button>
-                  {r.slug && <div className="text-[11px] text-[#8A8A85]">/{r.slug}</div>}
+                <AdminTd label="Name" className="max-sm:!items-start">
+                  <div className="min-w-0 max-w-full text-right sm:text-left">
+                    <button type="button" onClick={() => onOpen(r.id)} className="max-w-full break-words text-right font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:text-left">
+                      {r.title || '(untitled)'}
+                    </button>
+                    {r.slug && <div className="break-all text-[11px] text-[#8A8A85]">/{r.slug}</div>}
+                  </div>
                 </AdminTd>
                 <AdminTd label="Status">{entityStatusBadge(r.status, r.hasDraft, r.isLive)}</AdminTd>
                 {kind === 'size-guides' && <AdminTd label="Products">{r.extra?.productCount ?? 0}</AdminTd>}

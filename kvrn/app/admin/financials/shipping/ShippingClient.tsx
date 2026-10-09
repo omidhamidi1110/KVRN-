@@ -178,7 +178,7 @@ export function ShippingClient() {
                           onKeyDown={e => { if (e.key === 'Enter') void saveLabelCost(p2.shipmentId) }}
                           placeholder="0.00"
                           aria-label={`Actual label cost for ${p2.orderNumber}`}
-                          className={`${adminInputClass} !w-[96px]`}
+                          className={`${adminInputClass} !w-full sm:!w-[100px]`}
                         />
                       </AdminTd>
                       <AdminTd className="max-sm:!justify-end">

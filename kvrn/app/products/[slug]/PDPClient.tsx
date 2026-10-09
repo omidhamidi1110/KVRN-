@@ -16,9 +16,10 @@ import { useCookiePrefs } from '@/context/CookiePrefsContext'
 import { trackProductView } from '@/lib/funnel-client'
 import { gaViewItemWhenReady } from '@/lib/ga-client'
 import { CompleteTheSetBundle } from '@/components/product/CompleteTheSetBundle'
+import { SharedKvrnReviews } from '@/components/reviews/SharedKvrnReviews'
 import type { PublicBundle } from '@/lib/bundle-types'
 
-const NAV = 92 // announcement bar (36) + nav (56)
+const NAV = 84 // announcement bar (28) + nav (56)
 
 // `preview` renders the DRAFT inside the admin editor: no analytics, no inventory fetch (all sizes
 // shown available), and adding to the bag is a no-op. It never reads or writes the real cart.
@@ -1452,6 +1453,8 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
         )}
         </div>
 
+        <div className="px-5 pt-3"><SharedKvrnReviews compact preview={preview} reviewedItem={product.type === 'sweatpants' ? 'Sweatpants' : 'Hoodie'} /></div>
+
         {/* Purchase controls */}
         <div style={{ padding:'0 20px' }}>
         <PurchasePanel
@@ -1504,6 +1507,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
               </p>
             )}
 
+            <SharedKvrnReviews compact preview={preview} reviewedItem={product.type === 'sweatpants' ? 'Sweatpants' : 'Hoodie'} />
             <div style={{ borderTop:'1px solid #E8E5E0', marginBottom:24 }} />
 
             <PurchasePanel
@@ -1521,6 +1525,7 @@ function DetailsStage({ product, relatedProduct, color, setColor, size, setSize,
       ) : relatedProduct && (
         <CompleteSet product={product} related={relatedProduct} onAddBoth={onAddBoth} />
       )}
+      {!preview && <SharedKvrnReviews reviewedItem={product.type === 'sweatpants' ? 'Sweatpants' : 'Hoodie'} />}
     </div>
   )
 }

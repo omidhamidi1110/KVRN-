@@ -234,7 +234,7 @@ export function ExpensesClient() {
               <AdminButton variant="ghost" size="sm" onClick={undoTx} disabled={!canUndoTx || saving}>↶ Undo</AdminButton>
               <AdminButton variant="ghost" size="sm" onClick={redoTx} disabled={!canRedoTx || saving}>↷ Redo</AdminButton>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               <AdminField label="Settles obligation" htmlFor="tx-def">
                 <select id="tx-def" value={txForm.expenseDefinitionId} className={adminSelectClass}
                   onChange={e => {
@@ -369,7 +369,7 @@ export function ExpensesClient() {
               <AdminButton variant="ghost" size="sm" onClick={undoDef} disabled={!canUndoDef || saving}>↶ Undo</AdminButton>
               <AdminButton variant="ghost" size="sm" onClick={redoDef} disabled={!canRedoDef || saving}>↷ Redo</AdminButton>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
               <AdminField label="Provider *" htmlFor="def-provider">
                 <input id="def-provider" className={adminInputClass} value={defForm.provider}
                   onChange={e => setDefForm({ ...defForm, provider: e.target.value })} placeholder="Neon" />

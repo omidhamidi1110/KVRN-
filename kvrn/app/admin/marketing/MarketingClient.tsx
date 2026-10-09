@@ -303,14 +303,15 @@ export function MarketingClient() {
         AI-autonomous delivery: <strong>{readiness.autonomousAiEnabled ? 'Requires owner verification' : 'Disabled'}</strong>.
         Copy review never changes either status.
       </p>
-      <ul className="mt-3 grid gap-3 sm:grid-cols-2" aria-label="Marketing launch gates">
+      <details className="mt-3 rounded-lg border border-neutral-200 p-3"><summary className="cursor-pointer text-xs font-semibold">Show {readiness.releaseGates.length} delivery readiness checks</summary>
+      <ul className="mt-3 grid gap-3 md:grid-cols-2" aria-label="Marketing launch gates">
         {readiness.releaseGates.map(g => <li key={g.id} className="rounded border border-neutral-200 p-3">
           <p className="text-xs font-semibold">{g.label} — {g.codeStatus === 'blocked' ? 'Blocked' : 'Code present, verification required'}</p>
           <p className="mt-1 text-xs text-neutral-600">{g.reason}</p>
         </li>)}
-      </ul>
+      </ul></details>
     </AdminCard>}
-    {overview && <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {overview && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       {([
         ['Email locally subscribed', overview.email.subscribed],
         ['Email checkbox assertions', overview.email.affirmativeCheckboxRecords],
@@ -322,15 +323,15 @@ export function MarketingClient() {
         <p className="mt-1 text-2xl font-medium tabular-nums">{count == null ? 'Unknown' : count.toLocaleString()}</p>
       </AdminCard>)}
     </div>}
-    <p className="mt-3 text-xs text-neutral-500">
-      Subscriber counts are local records, NOT proof of mailbox ownership, deliverability, or valid migrated consent. An email checkbox assertion does not prove inbox control or permission for a broadcast. Draft budget assumptions: SMS $15/month, $3/day; email $10/month, $2/day. Actual dispatch remains disabled until price and atomic reservation gates pass.
+    <details className="mt-3 rounded border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-500"><summary className="cursor-pointer font-medium text-neutral-700">How subscriber counts and marketing budgets work</summary>
+    <p className="mt-2">Subscriber counts are local records, NOT proof of mailbox ownership, deliverability, or valid migrated consent. An email checkbox assertion does not prove inbox control or permission for a broadcast. Draft budget assumptions: SMS $15/month, $3/day; email $10/month, $2/day. Actual dispatch remains disabled until price and atomic reservation gates pass.
     </p>
     {overview && <p className="mt-2 text-xs text-neutral-500" role="status">
       Resend: {overview.provider.emailConfigured ? 'provider configuration detected' : 'configuration incomplete'};
       contact sync {overview.provider.contactSyncEnabled ? 'enabled' : 'disabled'};
       subscription sync {overview.provider.optInSyncEnabled ? 'requires evidence and is enabled' : 'disabled'}.
       Provider setup is not authorization to send.
-    </p>}
+    </p>}</details>
     {error && <div role="alert" className="mt-4"><AdminNotice tone="danger">{error}</AdminNotice></div>}
     {staleDraftId && <p className="mt-3 text-xs">The list below has been refreshed. Select <strong>Edit</strong> on the current draft to load the latest copy. You may copy any unsaved text from this editor before doing so.</p>}
     {notice && <p className="mt-4 text-sm" role="status">{notice}</p>}
@@ -430,6 +431,7 @@ export function MarketingClient() {
           </li>)}</ul>}
       </AdminCard>
     </div>
+    <div className="mt-4 grid min-w-0 items-start gap-4 xl:grid-cols-2">
     <AdminCard>
       <h2 className="text-sm font-semibold">Frozen audience references (no dispatch)</h2>
       <p className="mt-2 text-xs text-neutral-600">Preparing a snapshot stores only eligible subscriber IDs in the private database. Revoked consent, provider suppression, geography and costs must be rechecked before any actual delivery. Nothing here sends or queues messages.</p>
@@ -495,10 +497,11 @@ export function MarketingClient() {
         {c.state==='planned'&&<AdminButton variant="secondary" disabled={calendarBusy} onClick={()=>void calendarAction('DELETE',{id:c.id})}>Cancel plan</AdminButton>}
       </li>):<li>No editorial plans recorded.</li>}</ul>}
       <label className="mt-3 block text-xs">Planned local time (reviewed campaign required)
-        <input type="datetime-local" className="mt-1 block w-full max-w-xs rounded border p-2" value={planFor} onChange={e=>setPlanFor(e.target.value)}/>
+        <input type="datetime-local" className="mt-1 block w-full min-w-0 max-w-full rounded border p-2" value={planFor} onChange={e=>setPlanFor(e.target.value)}/>
       </label>
       <p className="mt-2 text-xs text-neutral-500">Select a reviewed campaign below to add its copy to this editorial calendar. The time must be at least 15 minutes ahead and within one year.</p>
     </AdminCard>
+    </div>
     {preview && <AdminCard>
       <h2 className="text-sm font-semibold">Audience evidence — advisory only</h2>
       <p className="mt-2 text-sm">Locally evidenced records: <strong>{preview.locallyEvidenceMatched.toLocaleString()}</strong>

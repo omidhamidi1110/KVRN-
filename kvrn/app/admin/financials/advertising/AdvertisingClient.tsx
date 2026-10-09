@@ -142,7 +142,7 @@ export function AdvertisingClient() {
             <AdminButton variant="ghost" size="sm" onClick={redo} disabled={!canRedo || saving}>↷ Redo</AdminButton>
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <AdminField label="Platform" htmlFor="ad-platform">
             <select id="ad-platform" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}
                     className={adminSelectClass}>

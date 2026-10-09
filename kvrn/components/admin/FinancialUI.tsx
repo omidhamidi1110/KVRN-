@@ -94,7 +94,7 @@ export function RangePicker({
 }) {
   const canApply = Boolean(custom.start && custom.end)
   return (
-    <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
       {/* Compact 5-column selector: no wrap and no wasted second row on mobile. */}
       <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-5 gap-1 sm:hidden">
         {RANGE_OPTIONS.map(o => (
@@ -110,17 +110,17 @@ export function RangePicker({
           options={RANGE_OPTIONS.map(o => ({ id: o.value as string, label: o.label }))}
           onChange={onRange} />
       </div>
-      <span className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+      <span className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
         <input type="date" value={custom.start} aria-label="Start date"
           onChange={e => onCustom({ ...custom, start: e.target.value })}
-          className={`${adminInputClass} !w-auto max-w-full min-w-0`} />
+          className={`${adminInputClass} !w-full min-w-0 sm:!w-[155px]`} />
         <span className="text-[11px] text-[#6B6B66]">to</span>
         <input type="date" value={custom.end} aria-label="End date"
           onChange={e => onCustom({ ...custom, end: e.target.value })}
-          className={`${adminInputClass} !w-auto max-w-full min-w-0`} />
+          className={`${adminInputClass} !w-full min-w-0 sm:!w-[155px]`} />
         <button type="button" onClick={() => onRange('custom')} disabled={!canApply}
           aria-pressed={range === 'custom'}
-          className={adminButtonClass(range === 'custom' ? 'primary' : 'secondary', 'md')}>
+          className={adminButtonClass(range === 'custom' ? 'primary' : 'secondary', 'md', 'col-span-3 justify-self-start sm:col-span-1')}>
           Apply
         </button>
       </span>
