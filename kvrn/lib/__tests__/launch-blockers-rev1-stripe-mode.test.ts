@@ -203,9 +203,20 @@ describe('6. no client bundle receives secret keys', () => {
     for (const name of used) expect(name).not.toMatch(/SECRET|STRIPE|TOKEN|PRIVATE|PASSWORD|API_KEY|LIVE/)
     expect(fs.readFileSync(path.join(ROOT, 'next.config.js'), 'utf8')).not.toMatch(/^\s*env\s*:/m)
   })
-  test('only stripe-client / stripe-mode read the Stripe secret key or mode', () => {
+  test('Stripe configuration reads are limited to audited server-only modules, never client bundles', () => {
     const readers = files.filter(f => /process\.env\.(STRIPE_SECRET_KEY|STRIPE_MODE)\b/.test(fs.readFileSync(f, 'utf8')))
-    expect(readers.map(f => path.relative(ROOT, f)).sort()).toEqual(['lib/stripe-client.ts', 'lib/stripe-mode.ts'])
+    const permitted = [
+      'app/api/stripe/webhook/route.ts',
+      'lib/store-credit-checkout-capture.ts',
+      'lib/store-credit-checkout-release.ts',
+      'lib/store-credit-split-return-restoration.ts',
+      'lib/stripe-client.ts',
+      'lib/stripe-mode.ts',
+    ]
+    // Exact allowlist fails if a new reader appears. The separate clientFiles assertion
+    // rejects exposing any key or server-only mode variable to the browser.
+    expect(readers.map(f => path.relative(ROOT, f)).sort()).toEqual(permitted)
+    expect(readers.some(f => clientFiles.includes(f))).toBe(false)
   })
   const staticDir = path.join(ROOT, '.next/static')
   ;(fs.existsSync(staticDir) ? test : test.skip)('built client assets (.next/static) contain no Stripe secret material', () => {

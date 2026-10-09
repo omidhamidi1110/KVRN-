@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
+import {readAdminMutationJson} from '@/lib/admin-mutation-safety'
+import {validateAiAgentEdit} from '@/lib/ai/admin-control-safety'
 
 export const dynamic = 'force-dynamic'
-const AUTONOMY = new Set(['shadow','approval','limited','trusted'])
 
 export async function GET(req: NextRequest) {
   const { error } = await requireAdmin(req)
@@ -28,12 +29,11 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { identity, error } = await requireAdmin(req)
   if (error) return error
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 }) }
-  const id = typeof body?.id === 'string' ? body.id : ''
-  const enabled = typeof body?.enabled === 'boolean' ? body.enabled : null
-  const autonomy = typeof body?.autonomyLevel === 'string' && AUTONOMY.has(body.autonomyLevel) ? body.autonomyLevel : null
-  if (!id || (enabled === null && autonomy === null)) return NextResponse.json({ error: 'No valid change.' }, { status: 400 })
+  const parsed=await readAdminMutationJson(req,2048)
+  if(!parsed.ok)return NextResponse.json({error:'Invalid or unauthorized JSON request.'},{status:parsed.status})
+  const checked=validateAiAgentEdit(parsed.value)
+  if(!checked.ok)return NextResponse.json({error:checked.error},{status:checked.status})
+  const {id,enabled,autonomyLevel:autonomy}=checked.value
 
   try {
     const rows = await sql`

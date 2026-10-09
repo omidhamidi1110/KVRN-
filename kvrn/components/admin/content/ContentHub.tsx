@@ -13,6 +13,8 @@ import { EntityEditor } from './EntityEditor'
 import { CollectionsPanel } from './CollectionsPanel'
 import { SeoPanel } from './SeoPanel'
 import { LanguagesPanel } from './LanguagesPanel'
+import { PolicyAuditPanel } from './PolicyAuditPanel'
+import { MessagingPoliciesCard } from './MessagingPoliciesCard'
 
 export type HubTab =
   | 'policies' | 'size-guides' | 'size-guide-page' | 'blocks' | 'faq' | 'pages' | 'about-contact'
@@ -92,6 +94,9 @@ export function ContentHub() {
       <AdminPageHeader title="Site content" description="Edit the storefront’s text without code." eyebrow="Content" />
       <AdminTabs<HubTab> ariaLabel="Content sections" value={tab} onChange={t => go(t, null)} tabs={HUB_TABS} />
       <p className="-mt-2 mb-4 text-[12px] text-[#6B6B66]">{DESCRIPTION[tab]}</p>
+
+      {(tab === 'policies' || tab === 'faq') && !id && <PolicyAuditPanel />}
+      {tab === 'policies' && !id && <MessagingPoliciesCard onOpen={nid => go('policies', nid)} />}
 
       {listKind && (id
         ? <EntityEditor key={`${listKind}:${id}`} kind={listKind} id={id} onClose={() => { go(tab, null); bump() }}

@@ -89,10 +89,11 @@ export default function TrackOrderPage() {
     <div>
       <PageHero title={t['track.title']} breadcrumb={t['track.title']} />
       <div data-nav-theme="light" className="container-kvrn section-padding max-w-xl">
-<h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-10">
+<h2 className="font-display font-light text-[28px] md:text-[36px] leading-none tracking-tighter mb-5">
           {t.trackYourOrder}
-        </h1>
+        </h2>
 
+        <p className="text-[13px] text-kvrn-muted leading-relaxed mb-8">Enter the KVRN order number and the email used at checkout. Both must match the order. Carrier tracking appears after a shipment is prepared and a tracking number is assigned; the first carrier scan may take additional time.</p>
         {/* Search form */}
         <form onSubmit={handleSearch} className="space-y-4" noValidate>
           <div>
@@ -133,14 +134,15 @@ export default function TrackOrderPage() {
           </Button>
         </form>
 
+        <p className="mt-4 text-[12px] text-kvrn-muted leading-relaxed">Do not send payment-card numbers, passwords, or government identification when requesting order support.</p>
         {/* Results */}
         {state === 'not-found' && (
           <div className="mt-10 border border-kvrn-border p-6">
             <p className="text-[14px] font-light mb-2">{t['track.notFoundTitle']}</p>
             <p className="text-[13px] text-kvrn-muted leading-relaxed">
               {t['track.notFoundBody']}{' '}
-              <a href="mailto:orders@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
-                orders@kvrn.shop
+              <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                support@kvrn.shop
               </a>{' '}
               {t['track.notFoundBodyEnd']}
             </p>
@@ -199,8 +201,8 @@ export default function TrackOrderPage() {
             <div className="border-t border-kvrn-border pt-6">
               <p className="text-[13px] text-kvrn-muted">
                 {t['track.questions']}{' '}
-                <a href="mailto:orders@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
-                  orders@kvrn.shop
+                <a href="mailto:support@kvrn.shop" className="text-kvrn-text underline underline-offset-2">
+                  support@kvrn.shop
                 </a>
               </p>
             </div>

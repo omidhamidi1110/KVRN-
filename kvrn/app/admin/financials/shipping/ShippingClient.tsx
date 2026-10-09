@@ -9,9 +9,10 @@ import {
   money, moneyOrUnknown,
   Metric, RangePicker, buildQuery,
 } from '@/components/admin/FinancialUI'
+import { orderWord, noCostKnown, costSub, marginSub, missingCostTitle, missingCostBody } from '@/components/admin/shippingCopy'
 import {
   AdminPage, AdminPageHeader, AdminSectionHeader, AdminNotice, AdminButton, AdminStatGrid,
-  AdminTable, AdminTh, AdminTd, AdminLoading, AdminTag, adminInputClass,
+  AdminTable, AdminTr, AdminTh, AdminTd, AdminLoading, AdminTag, adminInputClass,
 } from '@/components/admin/ui/AdminUI'
 
 type Totals = {
@@ -119,9 +120,8 @@ export function ShippingClient() {
       {t && (
         <>
           {t.ordersMissingCost > 0 && (
-            <AdminNotice tone="warning" className="mb-4" title={`${t.ordersMissingCost} of ${t.orders} orders have no recorded label cost.`}>
-              Margin and subsidy below cover only the {t.ordersWithKnownCost} orders where the
-              actual carrier cost is known.
+            <AdminNotice tone="warning" className="mb-4" title={missingCostTitle(t)}>
+              {missingCostBody(t)}
             </AdminNotice>
           )}
 
@@ -131,17 +131,22 @@ export function ShippingClient() {
                     sub="Charged to customers" />
             <Metric label="Shipping discounts" value={`-${money(t.shippingDiscountCents)}`} tone="muted"
                     sub="Auto free + promo codes" />
-            <Metric label="Actual carrier cost" value={money(t.shippingCostCents)}
-                    sub={`${t.ordersWithKnownCost} orders known`}
-                    pending={t.ordersMissingCost > 0} />
-            <Metric label="Shipping margin" value={money(t.shippingMarginCents)}
-                    tone={t.shippingMarginCents >= 0 ? 'positive' : 'negative'}
-                    sub="Revenue − cost" />
-            <Metric label="Subsidised" value={money(t.shippingSubsidyCents)} tone="negative"
-                    sub={`${t.ordersUnderwater} orders below cost`}
+            <Metric label="Actual carrier cost"
+                    value={noCostKnown(t) ? 'Not recorded' : money(t.shippingCostCents)}
+                    tone={noCostKnown(t) ? 'muted' : 'default'}
+                    sub={costSub(t)}
+                    pending={t.ordersMissingCost > 0 && !noCostKnown(t)} />
+            <Metric label="Shipping margin"
+                    value={noCostKnown(t) ? 'Unknown' : money(t.shippingMarginCents)}
+                    tone={noCostKnown(t) ? 'muted' : t.shippingMarginCents >= 0 ? 'positive' : 'negative'}
+                    sub={marginSub(t)} />
+            <Metric label="Subsidised"
+                    value={noCostKnown(t) ? 'Unknown' : money(t.shippingSubsidyCents)}
+                    tone={noCostKnown(t) ? 'muted' : 'negative'}
+                    sub={`${t.ordersUnderwater} ${orderWord(t.ordersUnderwater)} below cost`}
                     info="Carrier cost above what the customer paid, summed over orders where the cost is known." />
             <Metric label="Free shipping cost" value={money(t.freeShippingCostCents)} tone="muted"
-                    sub={`${t.freeShippingOrders} free-shipping orders`} />
+                    sub={`${t.freeShippingOrders} free-shipping ${orderWord(t.freeShippingOrders)}`} />
           </AdminStatGrid>
 
           {/* Manual label-cost worklist — makes shipping margin computable */}
@@ -150,22 +155,22 @@ export function ShippingClient() {
               <AdminSectionHeader title={`Label cost not recorded (${data!.pendingCost.length})`}
                 description="Enter the real carrier cost. Until then margin is unknown, not $0."
                 info="KVRN does not purchase labels programmatically yet. Until the real carrier cost is entered here, these orders report shipping margin as unknown rather than assuming zero." />
-              <AdminTable minWidth={720} caption="Shipments without a label cost">
+              <AdminTable stack minWidth={720} caption="Shipments without a label cost">
                 <thead>
-                  <tr>
+                  <AdminTr>
                     {['Order', 'Carrier', 'Service', 'Tracking', 'Customer paid', 'Actual label cost'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
                     <AdminTh><span className="sr-only">Save</span></AdminTh>
-                  </tr>
+                  </AdminTr>
                 </thead>
                 <tbody>
                   {data!.pendingCost.map(p2 => (
-                    <tr key={p2.shipmentId}>
-                      <AdminTd>{p2.orderNumber}</AdminTd>
-                      <AdminTd className="text-[#6B6B66]">{p2.carrier ?? '—'}</AdminTd>
-                      <AdminTd className="text-[#6B6B66]">{p2.serviceLevel ?? '—'}</AdminTd>
-                      <AdminTd className="font-mono text-[11px] text-[#6B6B66]">{p2.trackingNumber ?? '—'}</AdminTd>
-                      <AdminTd>{money(p2.shippingRevenueCents)}</AdminTd>
-                      <AdminTd>
+                    <AdminTr key={p2.shipmentId}>
+                      <AdminTd label="Order">{p2.orderNumber}</AdminTd>
+                      <AdminTd label="Carrier" className="text-[#6B6B66]">{p2.carrier ?? '—'}</AdminTd>
+                      <AdminTd label="Service" className="text-[#6B6B66]">{p2.serviceLevel ?? '—'}</AdminTd>
+                      <AdminTd label="Tracking" className="break-all font-mono text-[11px] text-[#6B6B66]">{p2.trackingNumber ?? '—'}</AdminTd>
+                      <AdminTd label="Customer paid">{money(p2.shippingRevenueCents)}</AdminTd>
+                      <AdminTd label="Actual label cost">
                         <input
                           type="number" step="0.01" min="0"
                           value={costDraft[p2.shipmentId] ?? ''}
@@ -176,7 +181,7 @@ export function ShippingClient() {
                           className={`${adminInputClass} !w-[96px]`}
                         />
                       </AdminTd>
-                      <AdminTd>
+                      <AdminTd className="max-sm:!justify-end">
                         <AdminButton
                           variant="primary" size="sm"
                           onClick={() => void saveLabelCost(p2.shipmentId)}
@@ -185,7 +190,7 @@ export function ShippingClient() {
                           Save
                         </AdminButton>
                       </AdminTd>
-                    </tr>
+                    </AdminTr>
                   ))}
                 </tbody>
               </AdminTable>
@@ -194,36 +199,36 @@ export function ShippingClient() {
 
           <AdminSectionHeader title="Per order"
             description="Revenue against carrier cost for each paid order." />
-          <AdminTable minWidth={640} caption="Shipping by order">
+          <AdminTable stack minWidth={640} caption="Shipping by order">
             <thead>
-              <tr>
+              <AdminTr>
                 {['Order', 'Paid', 'Charged', 'Discount', 'Carrier cost', 'Margin'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
                 <AdminTh><span className="sr-only">Notes</span></AdminTh>
-              </tr>
+              </AdminTr>
             </thead>
             <tbody>
               {data!.orders.length === 0 && (
-                <tr><AdminTd colSpan={7} className="text-[#6B6B66]">No paid orders in this period.</AdminTd></tr>
+                <AdminTr><AdminTd colSpan={7} className="text-[#6B6B66]">No paid orders in this period.</AdminTd></AdminTr>
               )}
               {data!.orders.map(o => (
-                <tr key={o.orderId}>
-                  <AdminTd>{o.orderNumber}</AdminTd>
-                  <AdminTd className="text-[#6B6B66]">
+                <AdminTr key={o.orderId}>
+                  <AdminTd label="Order">{o.orderNumber}</AdminTd>
+                  <AdminTd label="Paid" className="text-[#6B6B66]">
                     {o.paidAt ? new Date(o.paidAt).toISOString().slice(0, 10) : '—'}
                   </AdminTd>
-                  <AdminTd>{money(o.shippingRevenueCents)}</AdminTd>
-                  <AdminTd className="text-[#6B6B66]">
+                  <AdminTd label="Charged">{money(o.shippingRevenueCents)}</AdminTd>
+                  <AdminTd label="Discount" className="text-[#6B6B66]">
                     {o.shippingDiscountTotalCents > 0 ? `-${money(o.shippingDiscountTotalCents)}` : '—'}
                   </AdminTd>
-                  <AdminTd className={o.shippingCostCents === null ? 'font-medium text-[#92400E]' : ''}>
+                  <AdminTd label="Carrier cost" className={o.shippingCostCents === null ? 'font-medium text-[#92400E]' : ''}>
                     {moneyOrUnknown(o.shippingCostCents, 'Not recorded')}
                   </AdminTd>
-                  <AdminTd className={o.shippingMarginCents === null ? 'text-[#6B6B66]'
+                  <AdminTd label="Margin" className={o.shippingMarginCents === null ? 'text-[#6B6B66]'
                                     : o.shippingMarginCents >= 0 ? 'text-[#047857]' : 'text-[#B91C1C]'}>
                     {moneyOrUnknown(o.shippingMarginCents, '—')}
                   </AdminTd>
-                  <AdminTd>{o.isAutoFreeShipping && <AdminTag tone="info">Free ship</AdminTag>}</AdminTd>
-                </tr>
+                  <AdminTd label={o.isAutoFreeShipping ? 'Note' : undefined} className={o.isAutoFreeShipping ? '' : 'max-sm:hidden'}>{o.isAutoFreeShipping && <AdminTag tone="info">Free ship</AdminTag>}</AdminTd>
+                </AdminTr>
               ))}
             </tbody>
           </AdminTable>

@@ -59,7 +59,7 @@ export function Footer({ shell }: { shell?: ShellData | null } = {}) {
       <div className="container-kvrn">
 
         {/* ── Main columns ─────────────────────────────────────────── */}
-        <div className={`py-10 md:py-12 grid ${view.groups.length <= 3 ? 'grid-cols-3' : 'grid-cols-2'} md:grid-cols-4 gap-6 md:gap-8 text-center`}>
+        <div className={`py-10 md:py-12 grid ${view.groups.length <= 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'} md:grid-cols-4 gap-6 md:gap-8 text-center`}>
 
           {/* Brand block — desktop only */}
           <div className="hidden md:block space-y-3">
@@ -94,8 +94,9 @@ export function Footer({ shell }: { shell?: ShellData | null } = {}) {
         </div>
 
         {/* ── Bottom bar ────────────────────────────────────────────── */}
-        <div className="py-4 border-t border-[#E8E5E0] flex flex-row items-center justify-between gap-4">
+        <div className="py-4 border-t border-[#E8E5E0] flex flex-wrap items-center justify-between gap-3">
           <p className="text-[11px] text-[#9B9B9B]">{view.copyright}</p>
+          <Link href="/privacy-choices" className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors">Your Privacy Choices</Link>
           <button
             onClick={openPreferences}
             className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors flex-shrink-0"

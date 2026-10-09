@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 
 type Agent = {
   id: string
@@ -376,7 +377,7 @@ export function AiOperationsClient() {
           </div>
           <p className="mt-2 max-w-2xl text-[13px] leading-5 text-black/45">One control center for agents, approvals, every AI action, spend protection, Chief alerts, and automated feature verification.</p>
         </div>
-        <button onClick={()=>load(true)} disabled={refreshing} className="h-10 rounded-lg border border-black/[0.10] bg-white px-4 text-[12px] font-medium text-black/65 shadow-sm hover:border-black/20 disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+        <div className="flex flex-wrap gap-2"><Link href="/admin/ai/insights" className="inline-flex h-10 items-center rounded-lg border border-black/[0.10] bg-white px-4 text-[12px] font-medium text-black/65 shadow-sm hover:border-black/20">Private insights</Link><button onClick={()=>load(true)} disabled={refreshing} className="h-10 rounded-lg border border-black/[0.10] bg-white px-4 text-[12px] font-medium text-black/65 shadow-sm hover:border-black/20 disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Refresh'}</button></div>
       </div>
 
       {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">{error}</div>}

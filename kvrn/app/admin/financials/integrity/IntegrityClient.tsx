@@ -187,7 +187,7 @@ export function IntegrityClient() {
 
           <AdminSectionHeader title="By entity type" description="Entities with no finding are reconciled." />
           <div className="mb-7">
-            <AdminTable minWidth={520} caption="Reconciliation by entity type">
+            <AdminTable minWidth={520} caption="Reconciliation by entity type" stack>
               <thead><tr>
                 {['Type', 'Total', 'Reconciled', 'Incomplete', 'Exception'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
@@ -227,7 +227,7 @@ export function IntegrityClient() {
         : findings.length === 0 ? (
           <AdminEmpty title="No findings for this filter." />
         ) : (
-          <AdminTable minWidth={960} caption="Reconciliation findings">
+          <AdminTable minWidth={960} caption="Reconciliation findings" stack>
             <thead><tr>
               {['State', 'Issue', 'Entity', 'Why', 'Evidence', 'Resolution', 'First seen'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               <AdminTh><span className="sr-only">Open</span></AdminTh>

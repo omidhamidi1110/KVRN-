@@ -83,7 +83,7 @@ function DocumentsSection({ onChanged }: { onChanged?: () => void }) {
               It has not had legal review. The public application form stays closed until real wording is published here.
             </AdminNotice>
           )}
-          <AdminTable caption="Versions">
+          <AdminTable caption="Versions" stack>
             <thead><tr><AdminTh>Version</AdminTh><AdminTh>Title</AdminTh><AdminTh>State</AdminTh><AdminTh>Published</AdminTh><AdminTh>Change</AdminTh><AdminTh /></tr></thead>
             <tbody>
               {forType.length === 0 && <tr><AdminTd>—</AdminTd><AdminTd>None yet</AdminTd><AdminTd /><AdminTd /><AdminTd /><AdminTd /></tr>}
@@ -163,7 +163,7 @@ function ReacceptanceSection({ onChanged }: { onChanged?: () => void }) {
       {rows && rows.length === 0 && <AdminEmpty title="Everyone is up to date" />}
       {rows && rows.length > 0 && (
         <>
-          <AdminTable caption="Affiliates needing re-acceptance">
+          <AdminTable caption="Affiliates needing re-acceptance" stack>
             <thead><tr><AdminTh /><AdminTh>Affiliate</AdminTh><AdminTh>Accepted</AdminTh><AdminTh>Current</AdminTh><AdminTh>Reason</AdminTh></tr></thead>
             <tbody>
               {rows.map(r => (

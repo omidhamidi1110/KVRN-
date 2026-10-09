@@ -70,7 +70,7 @@ export function AffiliateApplicationsTab({ onChanged }: { onChanged?: () => void
       {!rows && !err && <AdminLoading />}
       {rows && rows.length === 0 && <AdminEmpty title="No applications" description="Applications appear here after someone applies." />}
       {rows && rows.length > 0 && (
-        <AdminTable caption="Applications">
+        <AdminTable caption="Applications" stack>
           <thead><tr><AdminTh>Applicant</AdminTh><AdminTh>Audience</AdminTh><AdminTh>Country</AdminTh><AdminTh>Flags</AdminTh><AdminTh>Submitted</AdminTh><AdminTh>Status</AdminTh><AdminTh /></tr></thead>
           <tbody>
             {rows.map(r => {
@@ -99,7 +99,7 @@ export function AffiliateApplicationsTab({ onChanged }: { onChanged?: () => void
       <div>
         <AdminSectionHeader title="Invitations" info="An invitation emails a private link that pre-fills the application. The invitee still applies, accepts every document and is reviewed. Links work once and expire." />
         {invites.length === 0 ? <AdminEmpty title="No invitations yet" /> : (
-          <AdminTable caption="Invitations">
+          <AdminTable caption="Invitations" stack>
             <thead><tr><AdminTh>Email</AdminTh><AdminTh>Name</AdminTh><AdminTh>Status</AdminTh><AdminTh>Email</AdminTh><AdminTh>Expires</AdminTh><AdminTh /></tr></thead>
             <tbody>
               {invites.map(i => <InviteRow key={i.id} inv={i} onChanged={changed} setFlash={setFlash} />)}

@@ -16,12 +16,13 @@ async function load() {
 
 // The coded page had no metadata of its own (it is a client component), so it inherits the site's.
 export async function generateMetadata(): Promise<Metadata> {
-  if (!cmsContentEnabled()) return {}
+  const coded = { title: 'Size Guide — KVRN', description: 'KVRN size guide: garment measurements in cm and inches for the heavyweight hoodie and sweatpants, with fit notes.' }
+  if (!cmsContentEnabled()) return { ...coded, alternates: { canonical: '/support/size-guide' } }
   const d = await load()
-  if (!d) return {}
+  if (!d) return { ...coded, alternates: { canonical: '/support/size-guide' } }
   const seo = d.page.variants.en.data.seo
   const has = seo.title || seo.description || seo.noindex || seo.shareTitle || seo.shareImageId
-  return has ? pageMetadata({ title: 'Size Guide — KVRN' }, seo, seo.shareImageId ? d.page.media[seo.shareImageId]?.url ?? null : null) : {}
+  return { ...(has ? pageMetadata(coded, seo, seo.shareImageId ? d.page.media[seo.shareImageId]?.url ?? null : null) : coded), alternates: { canonical: '/support/size-guide' } }
 }
 
 export default async function SizeGuidePage() {

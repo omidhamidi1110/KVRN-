@@ -132,7 +132,8 @@ export function createCms(sql: Sql) {
           FROM content_entities e
           JOIN content_versions v ON v.entity_type=e.entity_type AND v.entity_id=e.entity_id
                                  AND v.version_no=e.published_version_no
-         WHERE e.entity_type=${type} AND lower(e.slug)=lower(${slug}) AND e.status='published'` as any[]
+         WHERE e.entity_type=${type} AND lower(e.slug)=lower(${slug}) AND e.status='published'
+           AND v.published_by IS DISTINCT FROM 'seed@kvrn.internal'` as any[]
       return rows[0] ?? null
     },
   }

@@ -15,9 +15,9 @@ export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
   const { type } = await searchParams
-  if (type === 'hoodies')    return { title: 'Hoodies — KVRN', description: 'Shop KVRN heavyweight hoodies. 400 GSM brushed fleece and 500 GSM French terry.' }
-  if (type === 'sweatpants') return { title: 'Sweatpants — KVRN', description: 'Shop KVRN heavyweight sweatpants. Wide-leg and relaxed fits.' }
-  return { title: 'Shop — KVRN', description: 'Shop the full KVRN collection. Heavyweight hoodies and sweatpants.' }
+  if (type === 'hoodies')    return { title: 'Hoodies — KVRN', description: 'Shop KVRN heavyweight hoodies. 400 GSM brushed fleece and 500 GSM French terry.', alternates: { canonical: '/shop' } }
+  if (type === 'sweatpants') return { title: 'Sweatpants — KVRN', description: 'Shop KVRN heavyweight sweatpants. Wide-leg and relaxed fits.', alternates: { canonical: '/shop' } }
+  return { title: 'Shop — KVRN', description: 'Shop the full KVRN collection. Heavyweight hoodies and sweatpants.', alternates: { canonical: '/shop' } }
 }
 
 export default async function ShopPage({ searchParams }: PageProps) {

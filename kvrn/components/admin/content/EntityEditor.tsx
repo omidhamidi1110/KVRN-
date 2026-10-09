@@ -27,6 +27,7 @@ const AUTOSAVE_MS = 1500
 interface Loaded {
   id: string; exists: boolean; revision: number; status: string; hasDraft: boolean; isLive: boolean
   snapshot: any; published: any; path: string | null; updatedAt?: string; updatedBy?: string | null; publishedAt?: string | null
+  placeholderSeed?: boolean; ownerDraftAvailable?: boolean
 }
 
 const LABEL: Record<Kind, string> = {
@@ -150,6 +151,19 @@ export function EntityEditor({ kind, id, onClose, onCreated, onChanged }: {
     await load(); loadUsage(); onChanged?.()
   }
 
+  // Terms / privacy only: put the owner's October 6 text into the DRAFT (never publishes).
+  async function loadOwnerDraft() {
+    if ((dirty || loaded?.hasDraft) && !(await confirm('Replace the text of your current draft with the owner’s October 6 draft? Your draft’s earlier saves stay in History.'))) return
+    setBusy('ownerDraft'); setResult(null)
+    if (dirty && !(await saveNow())) { setBusy(null); return }
+    const r = await api<{ revision: number }>('POST', `${BASE}/policies/${encodeURIComponent(id)}/owner-draft`, { revision: ref.current.revision })
+    setBusy(null)
+    if (!r.ok) { setResult(r); return }
+    await load()
+    onChanged?.()
+    setNotice('October 6 draft loaded as an unpublished draft. Nothing is public yet: review it, get owner approval and legal review, then publish.')
+  }
+
   async function unpublish() {
     const warn = usage && usage.length && kind === 'blocks' ? ` Pages that use this block (${usage.length}) will lose it, so it cannot be unpublished while a live page uses it.` : ''
     if (await confirm(`Take this ${LABEL[kind]} offline? Visitors will no longer see it.${warn}`)) act('unpublish')
@@ -180,7 +194,7 @@ export function EntityEditor({ kind, id, onClose, onCreated, onChanged }: {
             <div className="flex flex-wrap items-center gap-2">
               {onClose && <AdminButton size="sm" variant="ghost" onClick={async () => { if (dirty && !(await confirm('You have unsaved changes. Leave without saving?'))) return; onClose() }}>Back</AdminButton>}
               <h2 className="truncate text-[15px] font-medium text-[#171717]">{title}</h2>
-              {!isNew && entityStatusBadge(loaded.status, loaded.hasDraft, live)}
+              {!isNew && entityStatusBadge(loaded.status, loaded.hasDraft, live, !!loaded.placeholderSeed)}
             </div>
             <p className="mt-0.5 text-[11px]" aria-live="polite" style={{ color: saveState === 'error' || saveState === 'conflict' ? '#B91C1C' : '#8A8A85' }}>
               {isNew ? 'Not created yet' : dirtyText}
@@ -215,6 +229,17 @@ export function EntityEditor({ kind, id, onClose, onCreated, onChanged }: {
       {result?.ok && <InvalidationNotice result={result.invalidation} />}
       {archived && <AdminNotice tone="info">This is archived and hidden from the public site. Restore it to edit.</AdminNotice>}
       {legacyPolicy && <AdminNotice tone="info">This legal page is always part of the storefront, so it cannot be unpublished or archived. Edit it and publish the changes.</AdminNotice>}
+      {loaded.placeholderSeed && (
+        <AdminNotice tone="warning" title="This is the original placeholder text installed by the migration.">
+          <p>The public page currently shows the version built into the site’s code (for Terms and Privacy that is the owner’s October 6 copy), not this text. Publishing this placeholder unchanged is blocked so it cannot replace that copy by accident.{loaded.ownerDraftAvailable ? '' : ' Edit the text first; it is published only after owner approval and legal review.'}</p>
+        </AdminNotice>
+      )}
+      {loaded.ownerDraftAvailable && !isNew && (
+        <AdminNotice tone="info" title="Owner’s October 6 draft">
+          <p>Loads the October 6 text into this draft exactly as supplied (headings and bullets become formatted blocks). It is not published, and it still needs owner approval and legal review.</p>
+          <div className="mt-2"><AdminButton size="sm" variant={loaded.placeholderSeed ? 'primary' : 'secondary'} loading={busy === 'ownerDraft'} disabled={archived} onClick={loadOwnerDraft}>Load October 6 draft</AdminButton></div>
+        </AdminNotice>
+      )}
       {kind === 'blocks' && usage && usage.length > 0 && (
         <AdminNotice tone="warning" title={`Used by ${usage.length} page${usage.length === 1 ? '' : 's'}`}>
           <ul className="list-disc pl-4">{usage.slice(0, 8).map((u, i) => <li key={i}>{u.owner_type} {u.slug ? `/${u.slug}` : u.owner_id} ({u.scope === 'published' ? 'live' : 'draft'})</li>)}</ul>

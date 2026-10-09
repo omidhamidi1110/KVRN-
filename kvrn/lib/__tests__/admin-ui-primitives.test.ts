@@ -48,6 +48,11 @@ describe('refresh additions to the shared primitives', () => {
   })
   test('the confirm dialog closes on Escape', () => { expect(ui).toMatch(/e\.key === 'Escape'/) })
   test('Cancelled is part of the fixed status vocabulary', () => { expect(ui).toMatch(/Cancelled: 'neutral'/) })
+  test('InfoTip touch padding is vertical only (a sideways pad widened the page by 8px on phones)', () => {
+    const src2 = read('components/admin/ui/InfoTip.tsx')
+    expect(src2).not.toMatch(/before:-inset-(?:2|1|x)/)
+    expect(src2).toMatch(/before:-inset-y-2/)
+  })
   test('InfoTip is portalled so a table or card never clips it', () => {
     expect(read('components/admin/ui/InfoTip.tsx')).toMatch(/createPortal/)
   })

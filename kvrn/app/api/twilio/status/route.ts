@@ -5,15 +5,18 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { validateTwilioSignature, parseFormBody, getWebhookUrl } from '@/lib/twilio'
 import { normalizePhoneE164 } from '@/lib/phone'
 import { upsertMessageStatus } from '@/lib/sms-subscribers'
+import { readLimitedText } from '@/lib/limited-json-request'
+import { recordSignedTwilioMarketingAcceptance } from '@/lib/marketing-signed-twilio-outcome'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text()
+  const read = await readLimitedText(req, 4096)
+  if (!read.ok) return new NextResponse('Invalid request.', { status: read.status })
   const sig     = req.headers.get('X-Twilio-Signature') ?? ''
   const url     = getWebhookUrl(req)   // reconstructed public URL Twilio signed
 
-  const params   = parseFormBody(rawBody)
+  const params   = parseFormBody(read.value)
   const validity = await validateTwilioSignature(url, params, sig)
 
   if (validity === 'unconfigured') {
@@ -38,9 +41,16 @@ export async function POST(req: NextRequest) {
 
   try {
     await upsertMessageStatus({ sid, phone: phoneE164, status, errorCode, direction: 'outbound' })
-    if (errorCode) console.log(`[twilio/status] ${sid} status=${status} error=${errorCode}`)
-  } catch (err: any) {
-    console.error('[twilio/status] DB error:', err?.message?.slice(0, 80))
+    // Marketing-only reconciliation of an independently signed callback.
+    // The additional flags are OFF until migration 060 and staging QA pass.
+    // Transactional SMS continues through the existing status-upsert flow.
+    await recordSignedTwilioMarketingAcceptance(sid,status,phoneE164,true)
+  } catch {
+    // Never log message SIDs, recipient data, or exception strings: driver
+    // failures may contain PII. Returning success would lose the callback;
+    // a retry is safe because upsertMessageStatus keys on Twilio SID.
+    console.error('[twilio/status] Delivery-status storage temporarily failed (redacted).')
+    return new NextResponse('Temporary failure; retry required.', { status: 503 })
   }
 
   return new NextResponse('', { status: 200 })

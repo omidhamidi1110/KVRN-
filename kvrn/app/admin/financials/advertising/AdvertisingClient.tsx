@@ -188,7 +188,7 @@ export function AdvertisingClient() {
       <AdminSectionHeader title="Recorded spend"
         info="Spend straddling a report boundary is pro-rated by overlapping days." />
       {loading ? <AdminLoading /> : ads.length === 0 ? <AdminEmpty title="No advertising spend recorded." /> : (
-        <AdminTable minWidth={760} caption="Recorded advertising spend">
+        <AdminTable minWidth={760} caption="Recorded advertising spend" stack>
           <thead><tr>
             {['Platform','Campaign','Spend','From','To','Reported rev.','Source'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
             <AdminTh><span className="sr-only">Actions</span></AdminTh>

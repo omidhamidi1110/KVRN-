@@ -6,8 +6,9 @@
 // Copy rules: short, decision-useful. Put background/method/units in <InfoTip>, but keep
 // warnings and Exception/Incomplete/Failed/Unresolved states visible (see StatusBadge, Notice).
 
-import { type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react'
 import { InfoTip } from './InfoTip'
+import './admin-stack.css'
 
 export { InfoTip }
 
@@ -21,7 +22,7 @@ export function AdminPage({ children, width = 'default', className = '' }: {
   children: ReactNode; width?: keyof typeof PAGE_WIDTH; className?: string
 }) {
   return (
-    <div className={cx('mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8', PAGE_WIDTH[width], className)}>
+    <div className={cx('mx-auto w-full min-w-0 max-w-full px-4 py-6 sm:px-6 lg:px-8 lg:py-8', PAGE_WIDTH[width], className)}>
       {children}
     </div>
   )
@@ -275,7 +276,7 @@ export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }
     onChange(tabs[next].id)
   }
   return (
-    <div role="tablist" aria-label={ariaLabel} className="mb-4 flex gap-1 overflow-x-auto border-b border-black/[0.08]">
+    <div role="tablist" aria-label={ariaLabel} className="relative mb-4 flex gap-1 overflow-x-auto overscroll-x-contain border-b border-black/[0.08]">
       {tabs.map((t, i) => {
         const active = t.id === value
         return (
@@ -293,24 +294,101 @@ export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 
-export function AdminTable({ children, caption, minWidth = 560 }: { children: ReactNode; caption?: string; minWidth?: number }) {
+/**
+ * Contained horizontal scroll for wide tables.
+ *
+ * `relative` is load-bearing (root cause of the Admin Shipping "black right strip", measured in
+ * qa/admin-responsive): `.sr-only` is position:absolute, and an overflow:auto box is NOT the
+ * containing block for absolutely-positioned descendants unless it is itself positioned. Without
+ * it, the sr-only caption / "Notes" / "Save" header text sat at its static position at the table's
+ * far-right edge (~x=637) OUTSIDE this scroller's clip, so it widened the DOCUMENT's scrollable
+ * overflow. Mobile browsers then shrink the layout viewport to fit (iOS zooms out); the admin shell
+ * stays one phone-width wide and the dark html/body background shows to its right. `relative` makes
+ * this scroller the containing block, so those boxes are clipped and scroll with the table.
+ */
+const StackCtx = createContext(false)
+
+/**
+ * `stack` (opt-in): below 640px every row becomes a labelled card (label on the left, value on
+ * the right) so the operator reads the data without swiping. NOTHING is hidden: every cell
+ * stays, header labels move onto the cells (`label`), and the wide-table scroller remains as a
+ * safety net. From 640px up it is the normal table. Use AdminTr/AdminTd/AdminTh inside.
+ * Explicit ARIA roles keep table semantics when CSS changes the display type.
+ */
+/**
+ * Copy each column header's text onto the cells of that column (`data-label`) so the stacked cards can show it.
+ * Cells that already carry a label (an explicit `label` prop) and full-width cells (colSpan > 1: empty/detail rows) are left alone.
+ * Idempotent; safe to run after every DOM change.
+ */
+export function labelStackCells(table: HTMLTableElement): void {
+  const headRow = table.tHead?.rows[table.tHead.rows.length - 1]
+  if (!headRow) return
+  const labels: string[] = []
+  for (const th of Array.from(headRow.cells)) {
+    const text = (th.textContent ?? '').replace(/\s+/g, ' ').trim()
+    for (let i = 0; i < Math.max(1, th.colSpan); i++) labels.push(text)
+  }
+  for (const body of Array.from(table.tBodies)) {
+    for (const tr of Array.from(body.rows)) {
+      let col = 0
+      for (const td of Array.from(tr.cells)) {
+        const auto = td.getAttribute('data-auto-label') === '1'
+        if (td.colSpan <= 1 && (auto || !td.hasAttribute('data-label'))) {
+          const l = labels[col]
+          if (l) { if (td.getAttribute('data-label') !== l) td.setAttribute('data-label', l); td.setAttribute('data-auto-label', '1') }
+          else if (auto) { td.removeAttribute('data-label'); td.removeAttribute('data-auto-label') }
+        }
+        col += Math.max(1, td.colSpan)
+      }
+    }
+  }
+}
+
+export function AdminTable({ children, caption, minWidth = 560, stack = false }: { children: ReactNode; caption?: string; minWidth?: number; stack?: boolean }) {
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    const t = tableRef.current
+    if (!stack || !t) return
+    labelStackCells(t)
+    if (typeof MutationObserver === 'undefined') return
+    const mo = new MutationObserver(() => labelStackCells(t))   // rows arrive after the data loads; attribute writes do not re-trigger it
+    mo.observe(t, { childList: true, subtree: true, characterData: true })
+    return () => mo.disconnect()
+  }, [stack])
   return (
-    <div className="overflow-x-auto rounded-[12px] border border-black/[0.08] bg-white">
-      <table className="w-full border-collapse text-left text-[12px]" style={{ minWidth }}>
-        {caption && <caption className="sr-only">{caption}</caption>}
-        {children}
-      </table>
+    <div className="relative w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-[12px] border border-black/[0.08] bg-white" tabIndex={0} role="region" aria-label={caption ? `${caption} (scrollable)` : 'Scrollable table'}>
+      <StackCtx.Provider value={stack}>
+        <table
+          ref={tableRef}
+          role={stack ? 'table' : undefined}
+          className={cx('w-full border-collapse text-left text-[12px]', stack && 'kv-stack')}
+          style={{ minWidth }}>
+          {caption && <caption className="sr-only">{caption}</caption>}
+          {children}
+        </table>
+      </StackCtx.Provider>
     </div>
   )
 }
-export const AdminTh = ({ children, className = '', info }: { children?: ReactNode; className?: string; info?: ReactNode }) => (
-  <th scope="col" className={cx('whitespace-nowrap border-b border-black/[0.08] bg-[#FAFAF8] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.08em] text-[#8A8A85]', className)}>
-    {children}{info && <InfoTip label={`About ${typeof children === 'string' ? children : 'this column'}`}>{info}</InfoTip>}
-  </th>
-)
-export const AdminTd = ({ children, className = '', colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) => (
-  <td colSpan={colSpan} className={cx('border-b border-black/[0.05] px-3 py-2.5 align-top text-[#171717]', className)}>{children}</td>
-)
+export function AdminTr({ children, className = '', onClick }: { children: ReactNode; className?: string; onClick?: () => void }) {
+  const stack = useContext(StackCtx)
+  return <tr role={stack ? 'row' : undefined} onClick={onClick} className={className}>{children}</tr>
+}
+export const AdminTh = ({ children, className = '', info }: { children?: ReactNode; className?: string; info?: ReactNode }) => {
+  const stack = useContext(StackCtx)
+  return (
+    <th scope="col" role={stack ? 'columnheader' : undefined} className={cx('whitespace-nowrap border-b border-black/[0.08] bg-[#FAFAF8] px-3 py-2 text-[10px] font-medium uppercase tracking-[0.08em] text-[#8A8A85]', className)}>
+      {children}{info && <InfoTip label={`About ${typeof children === 'string' ? children : 'this column'}`}>{info}</InfoTip>}
+    </th>
+  )
+}
+export const AdminTd = ({ children, className = '', colSpan, label }: { children?: ReactNode; className?: string; colSpan?: number; label?: string }) => {
+  const stack = useContext(StackCtx)
+  return (
+    <td colSpan={colSpan} role={stack ? 'cell' : undefined} data-label={stack ? label : undefined}
+      className={cx('border-b border-black/[0.05] px-3 py-2.5 align-top text-[#171717]', className)}>{children}</td>
+  )
+}
 
 // ── Empty / loading / error ───────────────────────────────────────────────────
 

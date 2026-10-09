@@ -1,119 +1,72 @@
-// POST /api/twilio/incoming — Twilio inbound SMS webhook
-// Handles keyword-driven consent changes (STOP/START/HELP).
-// Twilio Advanced Opt-Out may already handle standard keywords at the Messaging Service level.
-// This webhook mirrors Twilio's consent state into Neon.
-//
-// SECURITY: Requires Twilio webhook signature validation via TWILIO_AUTH_TOKEN.
-// See lib/twilio.ts. If TWILIO_AUTH_TOKEN is not set, the route fails closed.
-import { type NextRequest, NextResponse } from 'next/server'
-import { validateTwilioSignature, parseFormBody, getWebhookUrl } from '@/lib/twilio'
-import { normalizePhoneE164 } from '@/lib/phone'
-import { unsubscribeSmsPhone, resubscribeSmsPhone, upsertSmsSubscriber } from '@/lib/sms-subscribers'
-import { upsertSmsDiscountCode, isSmsOfferActive } from '@/lib/discounts'
-import { confirmSmsSignupClaim } from '@/lib/sms-signup-claims'
-
-export const dynamic = 'force-dynamic'
-
-const STOP_KEYWORDS  = new Set(['STOP','STOPALL','UNSUBSCRIBE','CANCEL','END','QUIT'])
-const START_KEYWORDS = new Set(['START','YES','UNSTOP','JOIN'])
-const HELP_KEYWORDS  = new Set(['HELP'])
-
-const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response/>'
-
-export async function POST(req: NextRequest) {
-  const rawBody = await req.text()
-  const sig     = req.headers.get('X-Twilio-Signature') ?? ''
-  const url     = getWebhookUrl(req)   // reconstructed public URL Twilio signed
-
-  const params  = parseFormBody(rawBody)
-  const validity = await validateTwilioSignature(url, params, sig)
-
-  if (validity === 'unconfigured') {
-    // TWILIO_AUTH_TOKEN not set — cannot validate. Fail closed.
-    console.error('[twilio/incoming] TWILIO_AUTH_TOKEN not configured — cannot validate webhook')
-    return new NextResponse('Webhook signature validation not configured.', { status: 503 })
-  }
-  if (validity === 'invalid') {
-    console.error('[twilio/incoming] Invalid Twilio signature')
-    return new NextResponse('Forbidden', { status: 403 })
-  }
-
-  const rawFrom   = params.From ?? ''
-  const bodyRaw   = (params.Body ?? '').trim()
-  const body      = bodyRaw.toUpperCase().split(/\s+/)[0]  // first word for keyword detection
-  // Extract claim token if present: TK-{base64url} anywhere in the body
-  // Browser embeds this when customer taps TEXT US before Messages opens
-  const tkMatch        = bodyRaw.match(/TK-([A-Za-z0-9_-]{20,40})/)
-  const claimTokenRaw  = tkMatch ? tkMatch[1] : null
-
-  const phoneE164 = normalizePhoneE164(rawFrom)
-  if (!phoneE164) {
-    // Cannot normalize — log and return empty TwiML
-    console.error('[twilio/incoming] Could not normalize From number')
-    return new NextResponse(EMPTY_TWIML, { headers: { 'Content-Type': 'text/xml' } })
-  }
-
-  try {
-    if (STOP_KEYWORDS.has(body)) {
-      // Mirror Twilio opt-out into Neon
-      await unsubscribeSmsPhone(phoneE164, 'sms_keyword')
-      console.log('[twilio/incoming] STOP received — local unsubscribe recorded')
-      // Twilio Advanced Opt-Out handles the automated "You have been unsubscribed" reply.
-      // Return empty TwiML to avoid double-responding.
-
-    } else if (START_KEYWORDS.has(body)) {
-      // Re-subscribe or create subscriber record
-      const existed = await resubscribeSmsPhone(phoneE164, 'sms_keyword')
-      let smsSubscriberId: string | null = null
-      if (!existed) {
-        // First-time subscriber via keyword
-        const sub = await upsertSmsSubscriber({ phoneE164, consentSource: 'sms_keyword' })
-        smsSubscriberId = sub.id
-      } else {
-        // Re-subscribe: look up existing subscriber id
-        const rows = await (await import('@/lib/db')).sql`
-          SELECT id FROM sms_subscribers WHERE phone_e164 = ${phoneE164} LIMIT 1
-        `
-        smsSubscriberId = (rows as any[])[0]?.id ?? null
-      }
-      // Generate/retrieve unique SMS discount code (stored for future welcome SMS)
-      // Does NOT send while A2P is pending — code stored only
-      if (smsSubscriberId) {
-        try {
-          const offer = await isSmsOfferActive()
-          if (offer.active) await upsertSmsDiscountCode({ subscriberId: smsSubscriberId, phoneE164 })
-        } catch (discErr: any) {
-          console.error('[twilio/incoming] discount code error (non-fatal):', discErr?.message?.slice(0, 60))
-        }
-      }
-      console.log('[twilio/incoming] START/JOIN received — local subscribe recorded')
-
-      // Confirm browser claim if a token was sent with the JOIN message
-      // SECURITY: This is the ONLY path that can bind token → subscriber
-      // Token must have been placed in the SMS by the browser before sending
-      // The phone owner is authenticated by Twilio's inbound From (already verified above)
-      // MUST AWAIT: Cloudflare Workers exits after the response; .then() chains can be dropped
-      if (claimTokenRaw && smsSubscriberId) {
-        try {
-          const confirmed = await confirmSmsSignupClaim({ rawToken: claimTokenRaw, subscriberId: smsSubscriberId })
-          if (confirmed) console.log('[twilio/incoming] claim confirmed for subscriber')
-        } catch (err: any) {
-          // Non-fatal: ordinary JOIN subscription already succeeded above
-          console.error('[twilio/incoming] claim confirm error (non-fatal):', err?.message?.slice(0, 60))
-        }
-      }
-
-    } else if (HELP_KEYWORDS.has(body)) {  // HELP keywords — no consent change
-      // HELP: do not alter consent state; Twilio handles reply
-      console.log('[twilio/incoming] HELP received — consent unchanged')
+/** Twilio inbound consent events; NEVER trust browser-supplied STOP/YES.
+ * Verified Twilio signatures are required, and A2P + keyword confirmation must be
+ * explicitly enabled before new enrollment. No marketing provider sends here.
+ */
+import {type NextRequest,NextResponse} from 'next/server'
+import {validateTwilioSignature,parseFormBody,getWebhookUrl} from '@/lib/twilio'
+import {normalizePhoneE164} from '@/lib/phone'
+import {readLimitedText} from '@/lib/limited-json-request'
+import {suppressInboundSmsPhone} from '@/lib/sms-subscribers'
+import {upsertSmsDiscountCode,isSmsOfferActive} from '@/lib/discounts'
+import {KEYWORD_STARTS,KEYWORD_CONFIRMS,KEYWORD_STOPS,parseSmsKeyword,canAcceptSmsKeywordOptin,startKeywordConfirmation,clearPendingKeyword,confirmKeywordSms} from '@/lib/sms-double-optin'
+export const dynamic='force-dynamic'
+const asXml=(message?:string)=>new NextResponse(message
+  ? `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`
+  : '<?xml version="1.0" encoding="UTF-8"?><Response/>',
+  {headers:{'Content-Type':'text/xml; charset=utf-8','Cache-Control':'no-store'}})
+export async function POST(req:NextRequest){
+  // Enforce a byte cap *while reading*; Twilio does not need large POST bodies.
+  const read=await readLimitedText(req,4096)
+  if(!read.ok)return new NextResponse('Invalid request.',{status:read.status})
+  const params=parseFormBody(read.value)
+  const signature=req.headers.get('X-Twilio-Signature')??''
+  const verified=await validateTwilioSignature(getWebhookUrl(req),params,signature)
+  if(verified==='unconfigured')return new NextResponse('Webhook not configured.',{status:503})
+  if(verified!=='valid')return new NextResponse('Forbidden',{status:403})
+  const phone=normalizePhoneE164(params.From??'')
+  if(!phone)return asXml()
+  const rawText=String(params.Body??'').trim()
+  const keyword=parseSmsKeyword(rawText)
+  // A signed STOP must not be acknowledged as processed if Neon failed to
+  // persist the suppression. Let Twilio retry the event (upsert is idempotent).
+  // Advanced Opt-Out may additionally block the number at the provider level.
+  if(KEYWORD_STOPS.has(keyword)){
+    try{
+      await suppressInboundSmsPhone(phone)
+    }catch{
+      console.error('[twilio/incoming] STOP persistence failed (redacted).')
+      return new NextResponse('Temporary failure; retry required.',{status:503})
     }
-    // All other inbound messages: log and return empty TwiML
-  } catch (err: any) {
-    console.error('[twilio/incoming] DB error:', err?.message?.slice(0, 80))
-    // Return empty TwiML even on error — do not expose internal errors to Twilio
+    try { await clearPendingKeyword(phone) } catch { /* optional table absent */ }
+    return asXml()
   }
-
-  return new NextResponse(EMPTY_TWIML, {
-    headers: { 'Content-Type': 'text/xml' },
-  })
+  try{
+    if(keyword==='HELP')return asXml() // configured Twilio Messaging Service owns HELP.
+    const enabled=canAcceptSmsKeywordOptin(process.env)
+    if(KEYWORD_STARTS.has(keyword)){
+      if(!enabled)return asXml() // no signup, no send, no silent consent
+      // Token is only honored if embedded in verified inbound text.
+      const token=rawText.match(/TK-([A-Za-z0-9_-]{20,40})/)?.[1]??null
+      await startKeywordConfirmation(phone,token)
+      return asXml('KVRN: Reply YES within 30 minutes to confirm recurring marketing texts. Must be 18+. Msg and data rates may apply. STOP to cancel. Consent not required to buy.')
+    }
+    if(KEYWORD_CONFIRMS.has(keyword)){
+      if(!enabled)return asXml()
+      const subscriberId=await confirmKeywordSms(phone,params.MessageSid??params.SmsMessageSid??'')
+      if(!subscriberId)return asXml('KVRN: No pending signup. Text JOIN to begin, then reply YES to confirm.')
+      try{
+        const offer=await isSmsOfferActive()
+        if(offer.active)await upsertSmsDiscountCode({subscriberId,phoneE164:phone})
+      }catch{ /* A discount failure must never alter consent or emit PII */ }
+      return asXml('KVRN: You are subscribed to recurring marketing texts. Frequency varies. Msg and data rates may apply. Reply STOP to unsubscribe or HELP for help.')
+    }
+    return asXml()
+  }catch{
+    // JOIN/YES database errors must not be acknowledged as completed consent.
+    // Twilio can retry with its original signed MessageSid; future retries of YES
+    // are idempotent because sms_keyword_consent_proofs has a UNIQUE SID.
+    // Never log phone, message body, claim token, discount or provider details.
+    console.error('[twilio/incoming] Keyword consent persistence failed (redacted).')
+    return new NextResponse('Temporary failure; retry required.',{status:503})
+  }
 }

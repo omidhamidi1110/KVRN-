@@ -44,7 +44,7 @@ export function AffiliatePayoutReadinessTab() {
         Identity, tax and payout method must be confirmed, terms accepted and nothing under review. Sensitive details live with the payout provider, never here.
       </AdminNotice>
       {rows.length === 0 ? <AdminEmpty title="No affiliates yet" /> : (
-        <AdminTable caption="Affiliate payout readiness">
+        <AdminTable caption="Affiliate payout readiness" stack>
           <thead><tr><AdminTh>Affiliate</AdminTh><AdminTh>Identity</AdminTh><AdminTh>Tax</AdminTh><AdminTh>Payout method</AdminTh><AdminTh>Portal</AdminTh><AdminTh className="text-right">Payable</AdminTh><AdminTh /></tr></thead>
           <tbody>
             {rows.map(r => (

@@ -8,6 +8,9 @@ import { cmsContentEnabled, contentPublic } from '@/lib/content-public'
 import { pageMetadata } from '@/lib/content-seo'
 import { PageHero } from '@/components/layout/PageHero'
 import { CollectionGrid } from '@/components/content/CollectionGrid'
+import { JsonLd } from '@/components/seo/JsonLd'
+import { buildBreadcrumbJsonLd } from '@/lib/seo-jsonld'
+import { getSiteOrigin } from '@/lib/site-origin'
 
 export const dynamic = 'force-dynamic'
 type Props = { params: Promise<{ slug: string }> }
@@ -22,10 +25,11 @@ async function resolve(slug: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const r = await resolve((await params).slug)
+  const slug = (await params).slug.toLowerCase()
+  const r = await resolve(slug)
   if (r.kind !== 'view') return { robots: { index: false, follow: false } }
   const t = r.c.text.en
-  return pageMetadata({ title: `${t.name} — KVRN`, description: t.description || undefined },
+  return pageMetadata({ title: `${t.name} — KVRN`, description: t.description || undefined, canonical: `/collections/${slug}` },
     { ...r.c.seo, title: t.seoTitle || undefined, description: t.seoDescription || undefined } as any, r.c.shareImageUrl ?? r.c.hero?.url ?? null)
 }
 
@@ -36,6 +40,7 @@ export default async function CollectionPage({ params }: Props) {
   const { c } = r
   return (
     <div>
+      <JsonLd data={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: c.text.en.name, path: `/collections/${(await params).slug.toLowerCase()}` }], getSiteOrigin())} />
       <PageHero title={c.text.en.name} breadcrumb={c.text.en.name} />
       <div data-nav-theme="light" className="container-kvrn max-w-5xl py-12">
         {c.hero && (

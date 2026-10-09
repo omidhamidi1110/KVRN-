@@ -10,15 +10,18 @@ export function policyMetadata(view: View<PolicySnapshot>, legacy: Metadata, ext
   const s = view.variants.en.data
   const img = s.seo.shareImageId ? view.media[s.seo.shareImageId]?.url ?? null : null
   const robots = extra.noindex ? { index: false, follow: false } : (legacy.robots ?? undefined)
-  return pageMetadata(
+  const result = pageMetadata(
     { title: `${s.title} — KVRN`, description: typeof legacy.description === 'string' ? legacy.description : undefined, robots: robots as Metadata['robots'] },
     extra.noindex ? { ...s.seo, noindex: true } : s.seo, img)
+  // pageMetadata focuses on title/OG/robots; preserve the real canonical URL here.
+  return { ...result, alternates: { ...legacy.alternates, canonical: view.path ?? legacy.alternates?.canonical } }
 }
 
 export function genericPageMetadata(view: View<PageSnapshot>): Metadata {
   const s = view.variants.en.data
   const img = s.seo.shareImageId ? view.media[s.seo.shareImageId]?.url ?? null : null
-  return pageMetadata({ title: `${s.title} — KVRN`, description: s.subtitle }, s.seo, img)
+  const result = pageMetadata({ title: `${s.title} — KVRN`, description: s.subtitle }, s.seo, img)
+  return { ...result, ...(view.path ? { alternates: { canonical: view.path } } : {}) }
 }
 
 export { contentPublic }

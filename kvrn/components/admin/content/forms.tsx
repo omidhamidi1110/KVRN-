@@ -14,6 +14,7 @@ import type {
   SupportPageSnapshot, AnnouncementSnapshot, AnnouncementMessage, NavigationSnapshot, FooterSnapshot, NavLink,
 } from '@/lib/content-schemas'
 import type { RichText } from '@/lib/content-richtext'
+import { parsePolicyPaste } from '@/lib/content-paste-import'
 
 export interface FormProps<T> { value: T; onChange: (v: T) => void; blockChoices?: BlockChoice[]; entityId?: string; isNew?: boolean }
 
@@ -38,6 +39,9 @@ export const NEW_SNAPSHOT: Partial<Record<Kind, () => any>> = {
 
 export function PolicyForm({ value: v, onChange, blockChoices, entityId, isNew }: FormProps<PolicySnapshot>) {
   const set = (p: Partial<PolicySnapshot>) => onChange({ ...v, ...p })
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
+  const [pasteError, setPasteError] = useState('')
   const legacy = entityId ? LEGACY_POLICY_PATHS[entityId] : undefined
   const path = v.slug ? policyPath(entityId ?? 'new', v.slug) : '/legal/…'
   return (
@@ -58,7 +62,26 @@ export function PolicyForm({ value: v, onChange, blockChoices, entityId, isNew }
           <Select label="Layout" value={v.style} onChange={s => set({ style: s })} options={[{ value: 'legal', label: 'Legal (narrow, with title)' }, { value: 'support', label: 'Support (wider sections)' }]} />
         </div>
       </Section>
-      <Section title="Content">
+      <Section title="Content" description="One readable legal document for the storefront. Existing draft autosaves; only Publish makes it public.">
+        <div className="rounded-[9px] border border-black/10 bg-[#FAFAF9] p-3 space-y-3">
+          <button type="button" className="text-xs font-medium underline underline-offset-4" onClick={() => { setPasteOpen(!pasteOpen); setPasteError('') }}>
+            {pasteOpen ? 'Close plain-text importer' : 'Import full policy copy into draft'}
+          </button>
+          {pasteOpen && <>
+            <p className="text-[11px] text-black/60">Paste the exact owner-approved draft. This replaces this draft&apos;s policy text, not the published page. Headings and bullet points become accessible sections. Review the result and obtain legal approval before publishing.</p>
+            <textarea aria-label="Paste full policy text" value={pasteText} onChange={e => setPasteText(e.target.value)} rows={12} maxLength={120000}
+              className="w-full min-w-0 rounded-[8px] border border-black/15 bg-white p-3 text-xs leading-relaxed" placeholder="KVRN — Privacy Policy\n\nLast updated: October 6, 2026\n\n1. PERSONAL INFORMATION WE COLLECT\n\n…" />
+            {pasteError && <p role="alert" className="text-xs text-red-700">{pasteError}</p>}
+            <AdminButton size="sm" onClick={() => {
+              try {
+                const result = parsePolicyPaste(pasteText)
+                if (!window.confirm(`Replace the draft policy text with ${result.blockCount} blocks? This will autosave the DRAFT, not publish.`)) return
+                set({body:result.body, ...(result.effectiveDate ? { effectiveDate:result.effectiveDate } : {})})
+                setPasteOpen(false); setPasteText(''); setPasteError('')
+              } catch(error) { setPasteError(error instanceof Error ? error.message : 'Invalid policy text') }
+            }}>Replace Draft Text</AdminButton>
+          </>}
+        </div>
         <RichTextEditor value={v.body} onChange={body => set({ body })} blockChoices={blockChoices} allowCookieControls={entityId === 'cookies' || v.body.blocks.some(b => b.t === 'embed')} variant={v.style === 'support' ? 'support' : 'legal'} label="Policy text" />
       </Section>
       <Section title="Search & sharing"><SeoForm value={v.seo} onChange={seo => set({ seo })} /></Section>
@@ -127,7 +150,7 @@ export function SizeGuideForm({ value: v, onChange }: FormProps<SizeGuideSnapsho
         <ListEditor items={v.columns} onChange={columns => set({ columns, rows: v.rows.map(r => ({ ...r, values: Object.fromEntries(columns.map(c => [c.id, r.values[c.id] ?? ''])) })) })}
           makeNew={() => ({ id: newId('c'), label: '' })} addLabel="Add column" max={10} itemLabel={(_, i) => `Column ${i + 1}`}
           render={(c, up) => <TextInput label="Column heading" value={c.label} onChange={label => up({ label })} max={60} />} />
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto overscroll-x-contain">
           <table className="w-full min-w-[480px] border-collapse text-[12px]">
             <thead><tr><th className="p-1 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-[#8A8A85]">{v.rowHeader || 'Size'}</th>
               {v.columns.map(c => <th key={c.id} className="p-1 text-left text-[10px] font-medium uppercase tracking-[0.08em] text-[#8A8A85]">{c.label || '—'} ({v.unit})</th>)}<th /></tr></thead>

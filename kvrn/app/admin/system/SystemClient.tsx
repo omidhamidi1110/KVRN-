@@ -47,7 +47,7 @@ export function SystemClient() {
         <div className="mb-8">
           <AdminSectionHeader title="Feature switches"
             info={<>Switches are Cloudflare Worker variables named <code>KVRN_FLAG_…</code>. They default to off and are changed only in Cloudflare, so a switch still works if the database is down.</>} />
-          <AdminTable caption="Feature switches">
+          <AdminTable caption="Feature switches" stack>
             <thead><tr><AdminTh>Feature</AdminTh><AdminTh>State</AdminTh><AdminTh>Variable</AdminTh></tr></thead>
             <tbody>
               {flags.map(f => (
@@ -76,7 +76,7 @@ export function SystemClient() {
           {inv.open > 0 && <AdminNotice tone="warning" className="mb-3" title={`${inv.open} refresh${inv.open === 1 ? '' : 'es'} not completed.`}>The public site may show older content until these succeed.</AdminNotice>}
           {retryMsg && <AdminNotice tone="info" className="mb-3">{retryMsg}</AdminNotice>}
           {inv.rows.length === 0 ? <AdminEmpty title="No refreshes yet" /> : (
-            <AdminTable caption="Recent site refreshes">
+            <AdminTable caption="Recent site refreshes" stack>
               <thead><tr><AdminTh>When</AdminTh><AdminTh>What changed</AdminTh><AdminTh>Status</AdminTh></tr></thead>
               <tbody>
                 {inv.rows.map(r => (

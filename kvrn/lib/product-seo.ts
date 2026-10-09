@@ -55,6 +55,13 @@ export function buildProductMetadata(i: MetaInput): Metadata {
       url: canonical,
       images: ogImg ? [{ url: ogImg.url, alt: ogImg.alt }] : [],
     },
+    // Without this the card falls back to the site-wide twitter title/description, which describe the brand, not the product.
+    twitter: {
+      card: 'summary_large_image',
+      title: i.ogTitle || title,
+      description: i.ogDescription || description,
+      images: ogImg ? [{ url: ogImg.url, alt: ogImg.alt }] : [],
+    },
   }
 }
 
@@ -65,6 +72,8 @@ export interface JsonLdInput {
   origin: string | null
   imageUrls: string[]
   availability: Availability
+  /** False for the legacy coded catalog: its static price is not authoritative checkout price. */
+  emitOffer?: boolean
 }
 
 export function buildProductJsonLd(i: JsonLdInput): Record<string, unknown> {
@@ -81,7 +90,7 @@ export function buildProductJsonLd(i: JsonLdInput): Record<string, unknown> {
   if (imgs.length) ld.image = imgs
   if (p.productCode) ld.sku = p.productCode
   ld.brand = { '@type': 'Brand', name: 'KVRN' }
-  if (typeof p.price === 'number' && p.price > 0) {
+  if (i.emitOffer !== false && typeof p.price === 'number' && p.price > 0) {
     const offer: Record<string, unknown> = {
       '@type': 'Offer', url, priceCurrency: 'USD', price: (p.price / 100).toFixed(2),
     }

@@ -8,7 +8,7 @@ import { submitSmsSignup } from '@/lib/sms-signup'
 const SMS_RAW = process.env.NEXT_PUBLIC_KVRN_SMS_NUMBER || '+16572149996'
 // SMS deep link: RFC-standard ?body= works on modern iOS + Android
 // SMS link is built dynamically with an embedded claim token (pre-fetched when popup opens)
-// If token fetch fails, fallback body is used — customer still subscribes
+// If claim token fetch fails, JOIN can still start opt-in but cannot claim an on-site reward until verified.
 const SMS_CONSENT_TEXT = ' \u2014 I agree to receive recurring automated marketing texts from KVRN. Msg & data rates may apply. Reply STOP to unsubscribe.'
 const SMS_NUMBER_DISPLAY = SMS_RAW
   ? SMS_RAW.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '+1 ($1) $2-$3')
@@ -345,7 +345,7 @@ export function SmsPopup() {
 
   const Body = (
     <p style={{ fontFamily:SANS, fontSize:13, color:MUTED, margin:'0 0 24px', lineHeight:1.55, letterSpacing:'0.01em' }}>
-      Private access to drops, restocks, and KVRN releases.
+      Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription.
     </p>
   )
 
@@ -358,77 +358,12 @@ export function SmsPopup() {
     </p>
   )
 
+  // Verified inbound JOIN → YES is required; browser phone entry cannot give consent.
   const PhoneForm = (
-    <div>
-      <label htmlFor="sms-phone" style={{ display:'block', fontFamily:SANS, fontSize:9,
-        letterSpacing:'0.12em', textTransform:'uppercase', color:MUTED, marginBottom:6 }}>
-        Mobile number
-      </label>
-      <input id="sms-phone" type="tel" value={phone} autoComplete="tel"
-        placeholder="+1 (555) 000-0000"
-        onChange={e => setPhone(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
-        style={{ width:'100%', padding:'12px 14px', background:'#1A1A1A',
-          border:'1px solid #2A2A2A', color:FG, fontFamily:SANS, fontSize:14,
-          outline:'none', boxSizing:'border-box', marginBottom:10 }}
-        disabled={submitting} aria-required="true" />
-
-        <label
-          htmlFor="sms-consent"
-          style={{
-            display:'flex',
-            alignItems:'flex-start',
-            gap:10,
-            margin:'6px 0 14px',
-            cursor:'pointer',
-          }}
-        >
-          <input
-            id="sms-consent"
-            type="checkbox"
-            checked={smsConsent}
-            onChange={e => {
-              setSmsConsent(e.target.checked)
-              if (e.target.checked) setError('')
-            }}
-            disabled={submitting}
-            style={{
-              width:16,
-              height:16,
-              margin:'2px 0 0',
-              flexShrink:0,
-              accentColor:FG,
-            }}
-          />
-          <span style={{
-            fontFamily:SANS,
-            fontSize:10,
-            lineHeight:1.6,
-            color:'#B7B1A7',
-          }}>
-            I agree to receive recurring automated marketing text messages about
-            KVRN product launches, drops, restocks, early access, and promotional
-            offers. Message frequency varies. Msg &amp; data rates may apply.
-            Reply STOP to cancel, HELP for help. Consent is not a condition of purchase.{' '}
-            <a href="/terms" onClick={e => e.stopPropagation()}
-              style={{ color:'#D3CDC3', textDecoration:'underline' }}>
-              Terms
-            </a>
-            {' · '}
-            <a href="/privacy" onClick={e => e.stopPropagation()}
-              style={{ color:'#D3CDC3', textDecoration:'underline' }}>
-              Privacy
-            </a>
-          </span>
-        </label>
-      {error && <p style={{ fontFamily:SANS, fontSize:11, color:'#C0392B', marginBottom:8 }} role="alert">{error}</p>}
-      <button onClick={handleSubmit} disabled={submitting || !smsConsent}
-        style={{ width:'100%', padding:'13px 0', background:FG, color:BG,
-          border:'none', cursor:'pointer', fontFamily:SANS, fontSize:11, fontWeight:500,
-          letterSpacing:'0.12em', textTransform:'uppercase', opacity:(submitting || !smsConsent) ? 0.45 : 1 }}
-        aria-busy={submitting}>
-        {submitting ? 'SIGNING UP…' : (mobile ? 'SIGN UP & GET $10 OFF' : CTA_DESK)}
-      </button>
+    <div style={{fontFamily:SANS,color:FG,fontSize:13,lineHeight:1.7}}>
+      <p>To join, text <strong>JOIN</strong> to <strong>{SMS_NUMBER_DISPLAY}</strong>.</p>
+      <p>After KVRN replies, send <strong>YES</strong> within 30 minutes to confirm your signup.</p>
+      <p style={{color:MUTED,fontSize:11}}>No subscription or discount is created until confirmation. Replies are subject to provider registration and availability.</p>
     </div>
   )
 
@@ -515,7 +450,7 @@ export function SmsPopup() {
               justifyContent:'space-between',
             }}
           >
-            <span>Enter your number manually</span>
+            <span>How to subscribe by text</span>
             <span
               aria-hidden="true"
               style={{
@@ -547,12 +482,12 @@ export function SmsPopup() {
                   color:MUTED,
                 }}
               >
-                Sign up with your number
+                Confirm by text message
               </span>
 
               <button
                 onClick={() => setShowManual(false)}
-                aria-label="Close manual phone entry"
+                aria-label="Close SMS instructions"
                 style={{
                   background:'none',
                   border:'none',

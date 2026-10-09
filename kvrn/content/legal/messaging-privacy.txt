@@ -1,0 +1,154 @@
+KVRN — Messaging Privacy Policy
+
+Last updated: October 6, 2026
+
+This Messaging Privacy Policy explains how KVRN collects, uses, and discloses personal information in connection with the KVRN text-messaging program.
+
+This policy supplements the main KVRN Privacy Policy.
+
+1. INFORMATION WE COLLECT FOR THE MESSAGING PROGRAM
+
+When you join, use, or leave the KVRN messaging program, KVRN may collect:
+
+• Mobile telephone number
+• Date and time of consent
+• Consent source or signup method
+• Consent status
+• Keyword or signup-flow information
+• Messages you send to KVRN
+• Message-delivery status
+• Message identifiers
+• Opt-in, opt-out, and HELP events
+• Date and time of opt-out or re-opt-in
+• Error or delivery codes
+• Promotion or discount information associated with the signup flow
+• Technical metadata needed to operate and secure the Program
+
+KVRN may also associate your mobile number with other KVRN information when reasonably necessary to operate the Program, honor preferences, prevent fraud, or support a transaction.
+
+2. HOW WE USE MESSAGING INFORMATION
+
+KVRN may use messaging information to:
+
+• Send recurring marketing messages after valid consent
+• Confirm enrollment
+• Deliver Program promotions or updates
+• Process STOP, START, HELP, and other supported consent events
+• Maintain an internal do-not-contact/suppression record
+• Prevent fraudulent or unauthorized signup
+• Prevent abuse of signup incentives
+• Troubleshoot delivery
+• Monitor messaging reliability
+• Maintain records demonstrating consent or revocation
+• Comply with applicable law, carrier rules, and provider requirements
+• Respond to customer support requests
+
+3. TWILIO
+
+KVRN currently uses Twilio to provide messaging infrastructure.
+
+Twilio may process:
+• Your mobile number
+• Message content
+• Message-delivery status
+• Message identifiers
+• Opt-in/opt-out/help events
+• Technical information needed to route, deliver, block, or support messages
+
+Twilio acts as a service provider supporting KVRN’s Program and may apply its own security, anti-fraud, carrier, opt-out, and compliance systems.
+
+KVRN may synchronize consent or opt-out status with Twilio so that a subscriber who has opted out is blocked from receiving further marketing messages.
+
+4. NO SALE OR THIRD-PARTY MARKETING USE OF SMS CONSENT
+
+KVRN does not sell or share SMS opt-in data, mobile telephone numbers, or SMS consent information with third parties or affiliates for their own marketing or promotional purposes.
+
+Mobile information may be disclosed to service providers only as reasonably necessary to operate, secure, support, and deliver the KVRN messaging program, or as otherwise required by law.
+
+No unrelated third party may rely on your consent to the KVRN Program as consent to market its own products or services to you.
+
+5. OPT-OUT AND SUPPRESSION RECORDS
+
+If you opt out, KVRN may retain:
+• Your mobile number
+• Opt-out status
+• Date of opt-out
+• Consent history
+• Limited messaging metadata
+
+KVRN retains these records so that it can continue honoring your request not to receive marketing messages and document the consent history.
+
+Deleting all evidence of an opt-out could cause a number to be marketed to again, so suppression records may be retained even after other marketing information is deleted.
+
+6. REASSIGNED NUMBERS
+
+If a mobile number is reassigned to a new subscriber, the new subscriber may not have provided the original consent.
+
+KVRN may use Twilio or other provider-supported reassigned-number safeguards to help identify reassigned numbers and reduce messages sent without current consent.
+
+If you stop using a number, you should opt out before relinquishing it when possible.
+
+7. MESSAGE CONTENT
+
+Messages you send to KVRN may be processed and stored as needed to:
+
+• Process keywords
+• Provide HELP or support
+• Investigate abuse
+• Resolve a complaint
+• Maintain legally necessary records
+
+Do not send payment-card numbers, passwords, government identification, tax identification numbers, bank credentials, medical information, or other highly sensitive information by SMS.
+
+8. SECURITY
+
+KVRN uses reasonable administrative and technical safeguards intended to protect messaging information.
+
+No messaging, storage, or transmission system can be guaranteed completely secure.
+
+9. RETENTION
+
+KVRN retains messaging information for as long as reasonably necessary to:
+
+• Operate the Program
+• Honor consent and opt-out preferences
+• Maintain suppression records
+• Investigate delivery or abuse
+• Comply with applicable law
+• Resolve disputes
+• Maintain appropriate business and compliance records
+
+Different categories of messaging information may be kept for different periods.
+
+10. CHILDREN AND AGE
+
+The KVRN marketing messaging program is intended for people who are 18 years of age or older.
+
+KVRN does not knowingly seek to enroll children in the marketing Program.
+
+11. YOUR CHOICES
+
+To stop marketing texts:
+Reply STOP.
+
+You may also communicate a reasonable revocation request to:
+support@kvrn.shop
+
+For help:
+Reply HELP or contact support@kvrn.shop.
+
+Depending on applicable law, you may also have rights to request access, deletion, or correction of personal information. Some consent or suppression records may be retained when legally or operationally necessary to continue honoring your opt-out or maintain required records.
+
+12. CHANGES TO THIS POLICY
+
+KVRN may update this Messaging Privacy Policy to reflect changes in law, technology, provider requirements, or the Program.
+
+The “Last updated” date will be revised when the policy changes.
+
+If a material change requires additional notice or consent, KVRN will provide it as required.
+
+13. CONTACT
+
+Questions about the KVRN messaging program or this policy may be sent to:
+
+support@kvrn.shop

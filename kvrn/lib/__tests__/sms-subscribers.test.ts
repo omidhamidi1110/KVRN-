@@ -59,13 +59,13 @@ describe('SMS source allowlist', () => {
     expect(ALLOWED_SMS_SOURCES.has('')).toBe(false)
   })
 
-  // Item 9: client cannot set arbitrary status
-  test('subscribe endpoint always sets status=subscribed (SQL enforced)', () => {
+  test('there are no public unrestricted SMS subscriber enrollment helpers', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../sms-subscribers.ts'), 'utf8'
     )
-    expect(src).toContain("'subscribed'")
-    expect(src).toContain('ON CONFLICT (phone_e164) DO UPDATE')
+    expect(src).not.toContain('export async function upsertSmsSubscriber(')
+    expect(src).not.toContain('export async function resubscribeSmsPhone(')
+    expect(src).toContain('suppressInboundSmsPhone')
   })
 })
 
@@ -97,19 +97,21 @@ describe('consent separation', () => {
     expect(src).toContain('phone_e164')
     expect(src).toContain("status IN ('subscribed', 'unsubscribed')")
   })
-  // Item 4: duplicate signup reuses same row
-  test('upsertSmsSubscriber uses ON CONFLICT (phone_e164) DO UPDATE', () => {
+  test('unknown STOP is stored as suppression, not as enrollment', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../sms-subscribers.ts'), 'utf8'
     )
+    expect(src).toContain('export async function suppressInboundSmsPhone(')
+    expect(src).toContain("'unsubscribed', 'sms_keyword'")
     expect(src).toContain('ON CONFLICT (phone_e164) DO UPDATE')
   })
-  // Item 5: unsubscribed phone can re-subscribe
-  test('resubscribeSmsPhone clears unsubscribed_at and sets status=subscribed', () => {
+  test('only JOIN→YES transactional CTE can mark verified keyword subscribers', () => {
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../sms-subscribers.ts'), 'utf8'
+      require('path').join(__dirname, '../sms-double-optin.ts'), 'utf8'
     )
-    expect(src).toContain("status = 'subscribed', unsubscribed_at = NULL")
+    expect(src).toContain('export async function confirmKeywordSms(')
+    expect(src).toContain("consent_source")
+    expect(src).toContain("confirmation_message_sid")
   })
 })
 
@@ -216,31 +218,30 @@ describe('Twilio adapter', () => {
 // ── Keyword handling ──────────────────────────────────────────────────────────
 
 describe('inbound SMS keyword handling (source inspection)', () => {
-  // Item 14: STOP marks local phone unsubscribed
-  test('incoming route handles STOP → calls unsubscribeSmsPhone', () => {
+  test('STOP is persisted before acknowledging receipt', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
     )
-    expect(src).toContain('STOP_KEYWORDS')
-    expect(src).toContain('unsubscribeSmsPhone')
+    expect(src).toContain('KEYWORD_STOPS.has(keyword)')
+    expect(src).toContain('await suppressInboundSmsPhone(phone)')
+    expect(src).toContain("status:503")
   })
-  // Item 15: START restores subscription
-  test('incoming route handles START → calls resubscribeSmsPhone', () => {
+  test('START and JOIN create pending consent but cannot subscribe directly', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
     )
-    expect(src).toContain('START_KEYWORDS')
-    expect(src).toContain('resubscribeSmsPhone')
+    expect(src).toContain('KEYWORD_STARTS.has(keyword)')
+    expect(src).toContain('await startKeywordConfirmation(phone,token)')
+    expect(src).toContain('KEYWORD_CONFIRMS.has(keyword)')
+    expect(src).toContain('await confirmKeywordSms(')
+    expect(src).not.toContain('resubscribeSmsPhone(')
   })
-  // Item 16: HELP leaves consent unchanged
-  test('incoming route handles HELP → no consent change', () => {
+  test('HELP does not enroll or change local marketing consent', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
     )
-    expect(src).toContain('HELP_KEYWORDS')
-    // HELP block must not call unsubscribe or resubscribe
-    // Check that the HELP handling is present but neutral
-    expect(src).toContain('HELP keywords')
+    expect(src).toContain("if(keyword==='HELP')return asXml()")
+    expect(src.indexOf("if(keyword==='HELP')")).toBeLessThan(src.indexOf('KEYWORD_STARTS.has(keyword)'))
   })
 })
 

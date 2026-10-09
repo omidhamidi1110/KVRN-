@@ -8,6 +8,7 @@ import { pageMetadata } from '@/lib/content-seo'
 const LEGACY_METADATA = {
   title: 'Project KVRN — Available Now',
   description: 'Shop the Project KVRN collection. 500 GSM French terry, enzyme washed, pre-shrunk.',
+  alternates: { canonical: '/collections/project-kvrn' },
 }
 
 function LegacyProjectKVRNPage() {
@@ -45,7 +46,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const c = await contentPublic().getCollection('project-kvrn')
   if (!c) return LEGACY_METADATA
   const t = c.text.en
-  return pageMetadata({ title: LEGACY_METADATA.title, description: LEGACY_METADATA.description },
+  return pageMetadata({ title: LEGACY_METADATA.title, description: LEGACY_METADATA.description, canonical: '/collections/project-kvrn' },
     { ...c.seo, title: c.seo.title || undefined, description: t.seoDescription || t.description || undefined } as any,
     c.shareImageUrl ?? c.hero?.url ?? null)
 }

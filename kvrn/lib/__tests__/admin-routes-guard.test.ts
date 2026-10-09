@@ -24,7 +24,23 @@ describe('admin API routes require requireAdmin', () => {
     for (const h of handlers) {
       const start = src.indexOf(`export async function ${h}`)
       const body = src.slice(start, start + 1500)
-      expect(body).toMatch(/requireAdmin\(/)
+      if (!/requireAdmin\(/.test(body)) {
+        // Only private owner-scoped wrappers already present in this module may
+        // authenticate a handler. A regex match alone is insufficient: the exact
+        // called helper must independently reach requireAdmin(req).
+        const delegated = /const auth=await (owner|authorized)\(req\)/.exec(body)
+        expect(delegated).not.toBeNull()
+        const helper = delegated![1]
+        const definition = src.indexOf(`async function ${helper}(req:NextRequest)`)
+        expect(definition).toBeGreaterThan(-1)
+        const helperBody = src.slice(definition, src.indexOf('\n}', definition) + 2)
+        expect(helperBody).toMatch(/await requireAdmin\(req\)/)
+        // Authenticate before the handler can access request bodies or data.
+        expect(body.indexOf(delegated![0])).toBeLessThan(
+          Math.min(...['readAdminMutationJson(req', 'sql`', 'previewApprovedEmailCampaign(', 'recordOwnerApproval(']
+            .map(k => { const i = body.indexOf(k); return i < 0 ? Infinity : i }))
+        )
+      }
     }
   })
 })

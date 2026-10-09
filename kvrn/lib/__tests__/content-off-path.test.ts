@@ -1,7 +1,10 @@
 // With KVRN_FLAG_CMS_PUBLIC_CONTENT off (the default) every storefront page and shell component
 // must render EXACTLY what it rendered before the content CMS existed.
 //
-// The fixtures in ./fixtures/content-off/ were produced by rendering the ORIGINAL (pre-CMS) sources
+// RE-BASELINED 2026-10-08 on the CP08 coded copy (owner October 6 drafts: support@kvrn.shop, 14-day store credit,
+// $150 free shipping, Your Privacy Choices link, 1–3 day processing); the text diff against the pre-CMS goldens was
+// reviewed line by line. The two /legal/* aliases are now redirects and are tested as such below.
+// Original provenance: the fixtures in ./fixtures/content-off/ were produced by rendering the ORIGINAL (pre-CMS) sources
 // of each page/component from git commit 4c48f29 with this same loader:
 //     UPDATE_CONTENT_FIXTURES=1 npx jest lib/__tests__/content-off-path.test.ts
 // (only ever re-run that against the original commit's sources; the normal run renders the CURRENT
@@ -25,8 +28,6 @@ const TARGETS: Target[] = [
   { file: 'app/support/shipping-returns/page.tsx', fixture: 'shipping-returns.html', kind: 'page' },
   { file: 'app/support/faq/page.tsx', fixture: 'faq.html', kind: 'page' },
   { file: 'app/about/page.tsx', fixture: 'about.html', kind: 'page' },
-  { file: 'app/legal/terms/page.tsx', fixture: 'legal-terms.html', kind: 'page' },
-  { file: 'app/legal/privacy/page.tsx', fixture: 'legal-privacy.html', kind: 'page' },
   { file: 'app/support/size-guide/page.tsx', fixture: 'size-guide.html', kind: 'page' },
   { file: 'app/contact/page.tsx', fixture: 'contact.html', kind: 'page' },
   { file: 'app/collections/project-kvrn/page.tsx', fixture: 'project-kvrn.html', kind: 'page' },
@@ -73,6 +74,17 @@ describe('flag OFF: pages and shell render exactly as before the CMS', () => {
   beforeAll(() => { delete process.env.KVRN_FLAG_CMS_PUBLIC_CONTENT })
   afterAll(() => { if (saved !== undefined) process.env.KVRN_FLAG_CMS_PUBLIC_CONTENT = saved })
 
+  // Re-baseline on the CURRENT coded copy (flag off). Used once on 2026-10-08 after Checkpoint 08 replaced the
+  // pre-CMS policy/contact/footer copy with the owner's October 6 drafts; the text diff was reviewed first:
+  //     REBASELINE_CONTENT_FIXTURES_TO=/some/dir npx jest lib/__tests__/content-off-path.test.ts -t rebaseline
+  if (process.env.REBASELINE_CONTENT_FIXTURES_TO) {
+    test('rebaseline fixtures from the current sources', async () => {
+      const out = process.env.REBASELINE_CONTENT_FIXTURES_TO as string
+      fs.mkdirSync(out, { recursive: true })
+      for (const t of TARGETS) fs.writeFileSync(path.join(out, t.fixture), await renderTarget(t, false))
+    }, 120000)
+  }
+
   if (process.env.UPDATE_CONTENT_FIXTURES === '1') {
     test('regenerate fixtures from the original sources', async () => {
       fs.mkdirSync(FIX, { recursive: true })
@@ -85,6 +97,14 @@ describe('flag OFF: pages and shell render exactly as before the CMS', () => {
     expect(fixture.length).toBeGreaterThan(50)
     expect(await renderTarget(t, false)).toBe(fixture)
   }, 60000)
+
+  // CP08 turned the two legacy /legal aliases into permanent redirects to the one canonical route
+  // (one policy URL, no duplicate indexable copies). They no longer render a page, so they are not goldens.
+  test.each([['privacy', '/privacy'], ['terms', '/terms']])('legacy alias /legal/%s permanently redirects to %s', (name, to) => {
+    const src = fs.readFileSync(path.join(__dirname, `../../app/legal/${name}/page.tsx`), 'utf8')
+    expect(src).toMatch(new RegExp(`permanentRedirect\\('${to}'\\)`))
+    expect(src).not.toMatch(/contentPublic|PolicyView|OwnerPolicyFallback/)
+  })
 
   test('ORIGINAL_SOURCE_PATH is documented for the two relocated client pages', () => {
     expect(Object.keys(ORIGINAL_SOURCE_PATH)).toHaveLength(2)

@@ -6,22 +6,29 @@ import { useCookiePrefs, type CookiePrefs } from '@/context/CookiePrefsContext'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/context/I18nContext'
 import { fillMessages } from '@/lib/i18n/messages'
+import { usePathname } from 'next/navigation'
 
 // ─── Slide-up banner ─────────────────────────────────────────────────────────
 export function CookieBanner() {
   const { showBanner, showPrefs, acceptAll, denyNonEssential, openPreferences } = useCookiePrefs()
   const t = fillMessages(useI18n().t)
   const [visible, setVisible] = useState(false)
+  // The Admin is not the storefront: the visitor-consent banner must not cover the operator's screen
+  // (on phones it hid the bottom third of every Admin page). Tracking stays consent-gated regardless.
+  const pathname = usePathname() ?? ''
+  const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/')
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>
-    if (showBanner && !showPrefs) {
+    if (showBanner && !showPrefs && !isAdmin) {
       t = setTimeout(() => setVisible(true), 60)
     } else {
       setVisible(false)
     }
     return () => clearTimeout(t)
-  }, [showBanner, showPrefs])
+  }, [showBanner, showPrefs, isAdmin])
+
+  if (isAdmin) return null
 
   return (
     <>

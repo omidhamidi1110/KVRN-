@@ -117,7 +117,7 @@ export function LanguagesPanel() {
 
       <AdminCard>
         <AdminSectionHeader title="Languages" description={`Wording built into the site (${st.messageKeyCount} items) plus your translated content.`} />
-        <AdminTable caption="Languages" minWidth={880}>
+        <AdminTable caption="Languages" minWidth={880} stack>
           <thead><tr>
             <AdminTh>On</AdminTh><AdminTh>Language</AdminTh><AdminTh>Site wording</AdminTh>
             <AdminTh info="Product text translated in Admin and published. Missing means the English text is shown and labelled as English.">Content translations</AdminTh>
@@ -222,7 +222,7 @@ export function LanguagesPanel() {
 
       <AdminCard>
         <AdminSectionHeader title="What customers can be charged in" description="Showing a price in a currency is not the same as charging it." />
-        <AdminTable caption="Currency support" minWidth={760}>
+        <AdminTable caption="Currency support" minWidth={760} stack>
           <thead><tr><AdminTh>Currency</AdminTh><AdminTh>Shown to visitors</AdminTh><AdminTh>Charged in</AdminTh></tr></thead>
           <tbody>
             {st.currencies.map(c => (

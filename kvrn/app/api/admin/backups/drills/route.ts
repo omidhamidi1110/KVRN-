@@ -1,29 +1,22 @@
-// POST /api/admin/backups/drills — append a disaster-recovery drill that was run OUTSIDE the app
-//
-// Records the fact and the outcome only. It executes no recovery step.
-import { type NextRequest, NextResponse } from 'next/server'
+// Store only an external disaster-recovery drill record, never run one here.
+import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
-import { createBackupService, parseJsonBody, validateDrillInput } from '@/lib/backup-records'
-import { notifyBackupFailure } from '@/lib/owner-notifications'
+import { createBackupService, LIMITS, parseJsonBody, validateDrillInput } from '@/lib/backup-records'
 
 export const dynamic = 'force-dynamic'
-
+const respond = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { 'Cache-Control': 'no-store' } })
 export async function POST(req: NextRequest) {
   const { identity, error } = await requireAdmin(req)
   if (error) return error
-
-  const body = parseJsonBody(await req.text())
-  if (!body.ok) return NextResponse.json({ error: body.error }, { status: 400 })
-  const v = validateDrillInput(body.value, new Date())
-  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 })
-
-  try {
-    const { id } = await createBackupService(sql as any).recordDrill(v.value, identity!.email)
-    if (v.value.result === 'failed') await notifyBackupFailure('dr_drill')
-    return NextResponse.json({ id, recorded: true }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
-  } catch (err: any) {
-    console.error('[admin/backups/drills POST]', String(err?.message ?? err).slice(0, 120))
-    return NextResponse.json({ error: 'Could not record the drill.' }, { status: 500 })
-  }
+  if (!identity) return respond({ error: 'Unauthorized.' }, 401)
+  if (Number(req.headers.get('content-length') || 0) > LIMITS.bodyBytes) return respond({ error: 'Invalid input.' }, 400)
+  let raw: string
+  try { raw = await req.text() } catch { return respond({ error: 'Invalid input.' }, 400) }
+  const parsed = parseJsonBody(raw)
+  if (!parsed.ok) return respond({ error: 'Invalid input.' }, 400)
+  const input = validateDrillInput(parsed.value, new Date())
+  if (!input.ok) return respond({ error: 'Invalid drill metadata.' }, 400)
+  try { return respond(await createBackupService(sql).recordDrill(input.value, identity.email), 201) }
+  catch { return respond({ error: 'Drill record unavailable.' }, 503) }
 }

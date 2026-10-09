@@ -81,6 +81,9 @@ export interface GaOrderRow {
   shipping_cents: number | null
   tax_cents: number | null
   total_cents: number | null
+  /** Only set by the trusted credit-capture-proof query; never from a browser. */
+  gross_order_cents?: number | null
+  credit_captured_cents?: number | null
 }
 export interface GaOrderItemRow {
   slug: string | null
@@ -189,7 +192,19 @@ export function buildGaPurchaseBody(a: {
   if (o.payment_status !== 'paid') return { ok: false, reason: 'not_paid' }
   if ((o.currency ?? '').toLowerCase() !== 'usd') return { ok: false, reason: 'currency' }
 
-  const total = o.total_cents, ship = o.shipping_cents, tax = o.tax_cents
+  // Credit is a payment tender, not a price discount. The Stripe-cash value
+  // alone would UNDERSTATE GA4 merchandise revenue. For credit orders we use
+  // the atomically committed capture proof or skip if it is missing/conflicting.
+  const hasTenderProof = o.gross_order_cents !== undefined
+  const credit = o.credit_captured_cents
+  const total = hasTenderProof ? o.gross_order_cents : o.total_cents
+  const ship = o.shipping_cents, tax = o.tax_cents
+  if (hasTenderProof && (
+    typeof credit !== 'number' || !Number.isSafeInteger(credit) || credit < 0 ||
+    typeof o.total_cents !== 'number' || !Number.isSafeInteger(o.total_cents) ||
+    !Number.isSafeInteger((o.total_cents as number) + credit) ||
+    total !== (o.total_cents as number) + credit
+  )) return {ok:false,reason:'credit_tender_proof_missing_or_mismatched'}
   if (![total, ship, tax].every(n => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0)) {
     return { ok: false, reason: 'amount_unknown' }
   }
@@ -261,10 +276,24 @@ export async function tryRecordGaPurchase(
     const controller = new AbortController()
     const doFetch = a.fetchImpl ?? fetch
     const work = (async (): Promise<GaSendOutcome> => {
-      const [orderRows, itemRows] = await Promise.all([
-        sql`SELECT order_number, currency, payment_status, subtotal_cents, discount_cents,
+      const creditTenderMode = (a.env ?? process.env).STORE_CREDIT_SPLIT_TENDER_ENABLED === 'true'
+      const orderQuery = creditTenderMode ? sql`
+          SELECT o.order_number,o.currency,o.payment_status,o.subtotal_cents,o.discount_cents,
+            o.shipping_cents,o.tax_cents,o.total_cents,
+            CASE WHEN h.reservation_id IS NULL THEN o.total_cents
+              WHEN p.id IS NULL OR p.cash_received_cents<>o.total_cents::bigint
+                OR p.cash_received_cents+p.credit_captured_cents<>p.gross_order_cents
+              THEN NULL ELSE p.gross_order_cents::integer END AS gross_order_cents,
+            CASE WHEN h.reservation_id IS NULL THEN 0
+              ELSE p.credit_captured_cents::integer END AS credit_captured_cents
+          FROM orders o LEFT JOIN store_credit_checkout_holds h ON h.reservation_id=o.reservation_id
+          LEFT JOIN store_credit_checkout_capture_proofs p ON p.order_id=o.id AND p.reservation_id=o.reservation_id
+          WHERE o.id=${a.orderId}::uuid`
+        : sql`SELECT order_number, currency, payment_status, subtotal_cents, discount_cents,
                    shipping_cents, tax_cents, total_cents
-            FROM orders WHERE id = ${a.orderId}::uuid` as unknown as Promise<GaOrderRow[]>,
+            FROM orders WHERE id = ${a.orderId}::uuid`
+      const [orderRows, itemRows] = await Promise.all([
+        orderQuery as unknown as Promise<GaOrderRow[]>,
         sql`SELECT p.slug AS slug, oi.sku AS sku, oi.product_name AS product_name,
                    oi.quantity AS quantity, oi.unit_price_cents AS unit_price_cents
             FROM order_items oi

@@ -1,0 +1,17 @@
+{
+  "db/migrations/041_store_credit_liability_foundation.sql": "ecd645f61a04c4720357fdbe888b718ba6500a79a0299a2bf8fd529d37362e5e",
+  "db/migrations/046_marketing_budget_atomic_control.sql": "680e1d07183fd2a14cd0665aec87601d91b3f28313f47a66a92b42ec2cf3fd59",
+  "db/migrations/051_store_credit_checkout_holds.sql": "81678bfddcc5a1598a8f06a91b1b191873f7d4f3ce8fc101a91daa42b642325d",
+  "db/migrations/052_marketing_owner_approval.sql": "61921a1f9a599f6253a51ed5b5cd70cd6135179f4828cbfe0d4c5e0768861acc",
+  "db/migrations/053_store_credit_return_issuance.sql": "6e0f2f452c828060afcc78166d1f884b601c22a459e5ae0635687d8c0022e105",
+  "db/migrations/054_marketing_budget_cost_reconciliation.sql": "f7a1e7bfa7f13378928fbfcb68c5af52a58dbdd8e743682a1c94ae8c18c3bb4c",
+  "db/migrations/056_store_credit_checkout_release.sql": "8a0745ef9d557da1089989ffec5f865ec07cff4012d89a4526692e6fab574696",
+  "db/migrations/057_store_credit_verified_capture.sql": "c60865ad23184ce1667a92c8b9190ad516e39fdf8d5921e2c9fcd95ce7f13805",
+  "db/migrations/058_marketing_at_most_once_claim.sql": "4e928a8b78a9a12191ab6206e744321fc06a53e2c0c3f26e71f4afc7ced0a7da",
+  "db/migrations/059_marketing_outcome_reconciliation.sql": "609df8703b56af021a95a0fee4f291697bf9422332c3f5826ca2e1bba1373b0f",
+  "db/migrations/060_marketing_provisional_provider_receipts.sql": "c6581841bf34dc48b4ec554a8b5597a975bd4a769bf3da307b31a5d5a0e1c59c",
+  "db/migrations/061_store_credit_verified_customer_identity.sql": "b955a55dab377b15be359a2126d9110fe772753c1dd3598b7e00512d1d875174",
+  "db/migrations/062_store_credit_checkout_split_tender.sql": "5cf631c1bbaa05b2eb0db2f0efb5aaa373f3a6dba2237f93aba281858a965dbb",
+  "db/migrations/063_store_credit_split_tender_return_restoration.sql": "62be9d9e3009ae9433c39c581a25c32b2e7fa8209b85428997526dc7ac03b1cc",
+  "db/migrations/064_marketing_email_recipient_evidence.sql": "ed9a9592296a1b7b08b6f2cf17ad5d736b4859b5517608a0805fb26d76669298"
+}

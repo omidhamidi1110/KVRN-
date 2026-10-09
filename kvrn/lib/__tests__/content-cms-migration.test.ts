@@ -5,6 +5,7 @@ import path from 'path'
 import { createFiDb, HAVE_DB, ROOT, type FiDb } from './helpers/fi-pg'
 import { createCms } from '../cms-core'
 import { validateSnapshot, KINDS, kindForType, policyPath } from '../content-schemas'
+import { adoptSeeds } from './helpers/cms-adopt'
 import { buildSeedSql, seedEntities, SEED_BEGIN, SEED_END } from '../content-seed'
 
 const A = 'owner@kvrn.test'
@@ -54,12 +55,15 @@ d('030 site content CMS (real PG)', () => {
     expect(col).toEqual([{ slug: 'project-kvrn', is_active: true }])
   })
 
-  test('seeded policies are reachable by their legacy slug', async () => {
+  test('seeded policies exist under their legacy slug but are deferred to the coded copy until a human publishes', async () => {
     for (const slug of ['terms', 'privacy', 'cookies', 'shipping-returns']) {
-      const p = await cms.getPublishedBySlug('policy', slug)
-      expect(p).toBeTruthy()
-      expect(policyPath(p.entity_id, slug)).toBe(slug === 'shipping-returns' ? '/support/shipping-returns' : `/${slug}`)
+      expect(await cms.getPublishedBySlug('policy', slug)).toBeNull()          // seed-published => not served
+      const rows = await db.q(`SELECT entity_id FROM content_entities WHERE entity_type='policy' AND slug=$1 AND status='published'`, [slug])
+      expect(rows.length).toBe(1)                                              // …but the entity is seeded and routable
+      expect(policyPath(rows[0].entity_id, slug)).toBe(slug === 'shipping-returns' ? '/support/shipping-returns' : `/${slug}`)
     }
+    await adoptSeeds(db.q, ['policy'])
+    for (const slug of ['terms', 'privacy', 'cookies', 'shipping-returns']) expect(await cms.getPublishedBySlug('policy', slug)).toBeTruthy()
   })
 
   test('re-applying 030 is a no-op (no duplicate seeds, no errors, editor changes kept)', async () => {

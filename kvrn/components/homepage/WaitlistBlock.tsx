@@ -10,6 +10,7 @@ export function WaitlistBlock() {
   const { t }    = useI18n()
   const [email,  setEmail]  = useState('')
   const [state,  setState]  = useState<State>('idle')
+  const [emailConsent, setEmailConsent] = useState(false)
   const [errMsg, setErrMsg] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,12 +20,13 @@ export function WaitlistBlock() {
       setErrMsg(t['waitlist.enterValidEmail'])
       return
     }
+    if (!emailConsent) { setErrMsg('Please check the box to receive KVRN marketing emails.'); return }
     setState('loading')
     try {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), source: 'homepage' }),
+        body: JSON.stringify({ email: email.trim(), source: 'homepage', emailMarketingConsent: emailConsent }),
       })
       if (!res.ok) throw new Error()
       setState('success')
@@ -63,7 +65,7 @@ export function WaitlistBlock() {
 
           {state === 'success' ? (
             <div className="space-y-2">
-              <p className="text-[20px] font-light text-[#F0EDE8]">{t.onTheList}</p>
+              <p className="text-[20px] font-light text-[#F0EDE8]">Thanks — your request was received.</p>
               <p className="text-[13px] text-[#F0EDE8]/35">{t.collectionOnly}</p>
             </div>
           ) : (
@@ -99,9 +101,10 @@ export function WaitlistBlock() {
                 <p role="alert" className="text-[12px] text-[#F87171] font-light">{errMsg}</p>
               )}
 
-              <p className="text-[11px] font-light text-[#FFFFFF] tracking-wide">
-                {t.collectionOnly}
-              </p>
+              <label className="flex items-start gap-3 text-left text-[11px] leading-relaxed font-light text-[#F0EDE8]/80">
+                <input type="checkbox" className="mt-0.5 accent-white" checked={emailConsent} onChange={e => setEmailConsent(e.target.checked)} required />
+                <span>I agree to receive KVRN marketing emails about launches, restocks and offers. I can unsubscribe any time. <a href="/privacy" className="underline underline-offset-2">Privacy Policy</a>.</span>
+              </label>
             </form>
           )}
         </div>

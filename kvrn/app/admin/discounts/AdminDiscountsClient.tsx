@@ -178,7 +178,7 @@ export function AdminDiscountsClient() {
         discounts.length === 0 && !error ? (
           <AdminEmpty title="No discounts yet." />
         ) : discounts.length > 0 && (
-          <AdminTable minWidth={900} caption="Discounts">
+          <AdminTable minWidth={900} caption="Discounts" stack>
             <thead>
               <tr>
                 {['Code','Name','Type','Value','Status','Single use','Uses','Max','Min subtotal','Expires','Created'].map(h => (

@@ -1,0 +1,319 @@
+KVRN — Privacy Policy
+
+Last updated: October 6, 2026
+
+This Privacy Policy explains how KVRN (“KVRN,” “we,” “us,” or “our”) collects, uses, discloses, and protects personal information when you visit kvrn.shop, make a purchase, contact us, join a marketing program, use order tracking, interact with an affiliate link, apply to the KVRN affiliate program, or otherwise use our services.
+
+This policy applies to KVRN’s website and services. Separate KVRN Messaging Terms and a KVRN Messaging Privacy Policy also apply to the KVRN text-messaging program.
+
+1. PERSONAL INFORMATION WE COLLECT
+
+Depending on how you interact with KVRN, we may collect the following categories of information.
+
+Information you provide directly
+• Name
+• Email address
+• Telephone number
+• Billing and shipping information
+• Order details
+• Contact-form messages and support correspondence
+• Return, refund, damage, or product-support information
+• Marketing preferences
+• Waitlist or launch-notification information
+• Information you voluntarily provide in surveys, forms, or other communications
+
+Checkout and payment information
+Payment-card and wallet information is processed by our payment provider. KVRN does not intentionally store raw payment-card numbers or card security codes.
+
+KVRN may receive transaction information such as:
+• Payment status
+• Transaction identifiers
+• Amount and currency
+• Billing details supplied through checkout
+• Refund and dispute information
+• Fraud and payment-risk signals made available by our payment provider
+
+Order and fulfillment information
+We may collect and process:
+• Products and variants purchased
+• Shipping destination
+• Selected shipping method
+• Carrier and tracking information
+• Fulfillment status
+• Returns, cancellations, refunds, and disputes
+• Communications relating to an order
+
+Website and device information
+Depending on your settings and consent choices, we may collect:
+• Browser and device type
+• Approximate device or network information
+• Pages viewed
+• Referring source or referring origin
+• Landing page
+• UTM or campaign parameters
+• Cart and checkout events
+• Product views and add-to-cart events
+• Session identifiers that do not directly identify you
+
+KVRN’s first-party analytics are designed to minimize personal information and, where configured, are gated by the site’s analytics-consent controls.
+
+Affiliate and referral information
+If you arrive through a KVRN affiliate link, we may process:
+• A random first-party referral/session identifier
+• Affiliate or referral-link identifier
+• Referral timestamp
+• Referring origin
+• Attribution window
+• Order attribution and related commission records
+
+We do not use affiliate referral tracking to give affiliates customer names, customer email addresses, shipping addresses, payment information, or other customer personal information.
+
+Affiliate applicant information
+If you apply to or participate in the KVRN affiliate program, we may collect:
+• Applicant and creator/display name
+• Email
+• Country and state/province where relevant
+• Social-media profiles and website links
+• Audience or follower information you provide
+• Application answers
+• Age-eligibility attestation
+• Program status
+• Affiliate code and referral information
+• Commission and payout records
+• Terms and policy acceptance records
+• Compliance and program-administration records
+
+Identity, tax, and payout verification for affiliates should be completed through an approved provider-hosted process where available. KVRN does not intend to store raw government-ID images, raw bank credentials, or raw tax-identification documents in the ordinary KVRN affiliate portal.
+
+2. HOW WE USE PERSONAL INFORMATION
+
+We may use personal information to:
+
+• Operate, maintain, secure, and improve kvrn.shop
+• Process payments and orders
+• Reserve and manage inventory
+• Calculate shipping rates and fulfill orders
+• Provide tracking and delivery information
+• Process cancellations, returns, refunds, disputes, and support requests
+• Detect, investigate, and prevent fraud, abuse, security incidents, and payment risk
+• Maintain accounting, financial, tax, audit, and reconciliation records
+• Send transactional emails such as order confirmations, shipping updates, support replies, refund notices, and other service messages
+• Send marketing email where permitted and consistent with your communication preferences
+• Send abandoned-checkout reminders where permitted by law and consistent with applicable consent and communication rules
+• Operate the KVRN SMS program for people who have validly opted in
+• Maintain consent, unsubscribe, and suppression records
+• Provide language, currency, cart, wishlist, and other saved preferences
+• Measure site performance and shopping-funnel activity where allowed by your settings
+• Attribute eligible orders to affiliates
+• Review, approve, administer, and pay affiliates
+• Enforce KVRN’s terms, policies, and program rules
+• Comply with legal obligations and valid legal process
+
+3. SMS AND MOBILE INFORMATION
+
+If you opt in to the KVRN messaging program, KVRN may collect and use:
+
+• Your mobile telephone number
+• Date and method of consent
+• Consent source, such as a web form or keyword
+• Messaging-program status
+• SMS or MMS message content you send to KVRN
+• Message-delivery and status metadata
+• Opt-out, opt-in, and help-request information
+• Message identifiers and technical delivery information
+• Promotion or discount information associated with the signup flow, where applicable
+
+KVRN currently uses Twilio as a messaging service provider.
+
+KVRN may use this information to:
+• Deliver recurring KVRN marketing messages after valid opt-in
+• Process opt-in and opt-out requests
+• Respond to HELP or support requests
+• Maintain suppression records
+• Prevent unauthorized or fraudulent enrollment
+• Measure program delivery and performance
+• Maintain records of consent and revocation
+
+We do not sell or share SMS opt-in data, mobile telephone numbers, or SMS consent information with third parties or affiliates for their own marketing or promotional purposes.
+
+Mobile information may be disclosed to service providers only as reasonably necessary to operate, secure, support, and deliver KVRN’s messaging program, or as otherwise required by law.
+
+Message frequency varies. Message and data rates may apply. Consent to marketing texts is not a condition of purchase. Reply STOP to cancel or HELP for help.
+
+See the KVRN Messaging Terms and KVRN Messaging Privacy Policy for additional information.
+
+4. EMAIL COMMUNICATIONS
+
+KVRN may send transactional or service-related emails when necessary to process or support a transaction or request.
+
+Where permitted, KVRN may also send marketing emails to subscribers. Marketing emails will provide a way to unsubscribe as required by applicable law.
+
+Unsubscribing from marketing email does not prevent KVRN from sending non-promotional messages that are necessary for an order, support request, security issue, legal notice, or other existing transaction or relationship.
+
+5. COOKIES, LOCAL STORAGE, AND SIMILAR TECHNOLOGIES
+
+KVRN uses cookies, local storage, session storage, and similar browser technologies for purposes such as:
+
+• Cart functionality
+• Language and currency preferences
+• Cookie/privacy preferences
+• Wishlist or product preferences
+• Security and session functionality
+• Affiliate attribution
+• Analytics, if enabled and permitted by your choices
+
+Some technologies are necessary or functional. Others are optional and may require consent depending on the technology and your location.
+
+See the KVRN Cookie Policy and the Cookie Preferences control for more information.
+
+6. FRAUD PREVENTION AND STRIPE RADAR
+
+KVRN may use payment-provider fraud and risk tools, including Stripe Radar where enabled, to help detect suspicious transactions.
+
+KVRN may receive or process information such as:
+• Risk level or score
+• Review status
+• Address or postal-code checks
+• Card-country information
+• Authentication outcomes
+• Billing/shipping mismatch signals
+• Other payment-risk indicators supplied by the payment provider
+
+These signals may be used to place a paid order on a temporary fulfillment hold while it is reviewed. A fraud-review hold does not by itself mean that a customer has committed fraud.
+
+7. SERVICE PROVIDERS
+
+KVRN uses service providers to operate the website and business. Depending on the service and configuration, these may include providers for:
+
+• Payment processing, such as Stripe
+• Shipping rates, labels, and tracking, such as Shippo and shipping carriers
+• Email delivery, such as Resend
+• SMS and messaging, such as Twilio
+• Website hosting, security, and content delivery, such as Cloudflare
+• Database infrastructure, such as Neon
+• Analytics, if enabled and consented to
+• Fraud prevention
+• Identity, tax, or payout onboarding for approved affiliates
+
+These providers may process personal information only as necessary to provide their services, comply with law, protect their systems, or as otherwise described in their applicable privacy terms.
+
+8. WHEN WE MAY DISCLOSE INFORMATION
+
+We may disclose personal information:
+
+• To service providers acting on our behalf
+• To shipping carriers in order to deliver an order
+• To payment providers to process payments, refunds, disputes, and fraud review
+• When you direct or authorize us to do so
+• To comply with applicable law, court orders, subpoenas, or lawful government requests
+• To investigate fraud, security issues, abuse, or violations of our terms
+• To protect the rights, safety, property, or security of KVRN, our customers, or others
+• In connection with a merger, acquisition, financing, sale of assets, reorganization, or similar business transaction, subject to applicable law
+
+9. SALE, SHARING, AND TARGETED ADVERTISING
+
+KVRN does not sell personal information for money.
+
+KVRN does not currently use personal information for cross-context behavioral advertising in a manner that KVRN treats as a “sale” or “sharing” under California privacy law.
+
+KVRN does not sell or share SMS opt-in data, mobile numbers, or SMS consent information with third parties or affiliates for their own marketing or promotional purposes.
+
+If KVRN’s practices change in a way that creates a legal right to opt out of sale, sharing, or targeted advertising, KVRN will update the applicable notices and privacy controls before or when required.
+
+10. GLOBAL PRIVACY CONTROL AND BROWSER PRIVACY SIGNALS
+
+Where applicable, KVRN recognizes supported browser privacy signals, including Global Privacy Control, as required by applicable law.
+
+KVRN’s current analytics implementation is designed so that Global Privacy Control or an enabled Do Not Track signal prevents optional analytics from running even if analytics was previously selected in the site’s preferences.
+
+You can also use the Your Privacy Choices page and Cookie Preferences control.
+
+11. DATA RETENTION
+
+KVRN retains personal information only for as long as reasonably necessary for the purposes described in this policy, including to:
+
+• Fulfill orders
+• Maintain transaction and accounting records
+• Comply with tax, financial, legal, and recordkeeping obligations
+• Resolve disputes
+• Enforce agreements
+• Maintain fraud and security records
+• Maintain affiliate commission and payout history
+• Document consent and honor opt-out or suppression requests
+• Operate support and customer-service functions
+
+Different categories of information may have different retention periods.
+
+Opt-out and suppression records may be retained after a marketing subscription ends so that KVRN can continue honoring the request not to send marketing messages.
+
+12. SECURITY
+
+KVRN uses administrative, technical, and organizational safeguards intended to protect personal information.
+
+No system, website, transmission, or storage method can be guaranteed to be completely secure. You should not send highly sensitive information through ordinary email, contact forms, or SMS unless KVRN specifically provides a secure method for doing so.
+
+13. INTERNATIONAL PROCESSING
+
+KVRN and its service providers may process or store information in the United States or other countries where they operate.
+
+Where applicable law requires specific safeguards for cross-border transfers, KVRN or its service providers will use appropriate mechanisms as required.
+
+14. CHILDREN
+
+The KVRN website is not directed to children under 13, and KVRN does not knowingly seek to collect personal information from children under 13.
+
+The KVRN marketing SMS program is intended for individuals 18 years of age or older.
+
+The KVRN affiliate program is also limited to applicants who are 18 years of age or older.
+
+If you believe a child provided personal information to KVRN inappropriately, contact support@kvrn.shop.
+
+15. YOUR PRIVACY RIGHTS
+
+Depending on where you live and which privacy laws apply, you may have rights to:
+
+• Request access to personal information
+• Request deletion, subject to legal exceptions
+• Request correction of inaccurate information
+• Obtain information about how personal information is collected, used, and disclosed
+• Opt out of certain sale, sharing, or targeted-advertising activities
+• Withdraw consent where processing is based on consent
+• Receive a portable copy of certain information where required
+• Appeal certain privacy-request decisions where applicable
+• Avoid unlawful discrimination for exercising privacy rights
+
+To submit a privacy request:
+• Email support@kvrn.shop, or
+• Use the KVRN Contact page and identify the request as a privacy request
+
+KVRN may need to verify your identity before completing certain requests. We will use information submitted for verification only as reasonably necessary to process the request.
+
+Where permitted, an authorized agent may submit a request on your behalf. KVRN may request evidence of that authority.
+
+16. YOUR PRIVACY CHOICES
+
+You can manage optional browser technologies using KVRN’s Cookie Preferences control.
+
+You may opt out of:
+• Marketing SMS by replying STOP
+• Marketing email by using the unsubscribe link in a marketing email
+• Optional analytics through Cookie Preferences
+• Sale or sharing, if applicable, through the Your Privacy Choices page and supported browser privacy signals
+
+17. THIRD-PARTY LINKS
+
+The KVRN website may link to third-party websites, social platforms, carriers, payment services, or other services that KVRN does not control.
+
+Their privacy practices are governed by their own notices, not this policy.
+
+18. CHANGES TO THIS PRIVACY POLICY
+
+KVRN may update this Privacy Policy from time to time to reflect changes in our services, technology, legal requirements, or business practices.
+
+The “Last updated” date will be revised when the policy changes. If a change materially affects how we use information, KVRN will provide additional notice when required by applicable law.
+
+19. CONTACT
+
+For privacy questions or requests, contact:
+
+support@kvrn.shop

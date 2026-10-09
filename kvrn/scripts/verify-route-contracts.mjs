@@ -8,7 +8,8 @@ const migrationPath = path.join(root, 'db', 'migrations', '036_ai_os_foundation.
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
 const featureContracts = JSON.parse(fs.readFileSync(featureContractPath, 'utf8'))
-const migration = fs.readFileSync(migrationPath, 'utf8')
+// Never mutate 036: newly introduced features live in additive 042.
+const migration = fs.readFileSync(migrationPath, 'utf8') + '\n' + fs.readFileSync(path.join(root,'db/migrations/042_qa_feature_contracts_marketing_credit.sql'),'utf8')
 const registered = new Map((manifest.routes || []).map(r => [r.path, r]))
 const contractedFeatures = new Map((featureContracts.features || []).map(f => [f.id, f]))
 
@@ -41,7 +42,7 @@ const invalidFeatureContracts = []
 
 for (const [id, contract] of contractedFeatures) {
   const problems = []
-  if (!id || !sqlSeedContainsFeature(id)) problems.push('feature is not seeded in migration 036')
+  if (!id || !sqlSeedContainsFeature(id)) problems.push('feature is not seeded in the registered additive migrations')
   if (!Array.isArray(contract.requiredTestCaseIds) || contract.requiredTestCaseIds.length === 0) problems.push('no requiredTestCaseIds')
   for (const testCaseId of contract.requiredTestCaseIds || []) {
     if (!sqlSeedContainsTestCase(testCaseId)) problems.push(`test case not seeded: ${testCaseId}`)

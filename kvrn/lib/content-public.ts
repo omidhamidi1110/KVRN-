@@ -27,6 +27,7 @@ import { checkUrl } from './content-urls'
 import type { ShellData, TrMap } from './content-shell'
 import { EMPTY_TR } from './content-shell'
 import type { RenderMedia } from '../components/content/render-richtext'
+import { SEED_ACTOR } from './content-seed-actor'
 
 type Sql = any
 
@@ -110,7 +111,8 @@ export function createContentPublic(sql: Sql) {
       SELECT e.entity_id, e.slug, e.published_at, v.snapshot
         FROM content_entities e
         JOIN content_versions v ON v.entity_type = e.entity_type AND v.entity_id = e.entity_id AND v.version_no = e.published_version_no
-       WHERE e.entity_type = ${KINDS[kind].type} AND e.entity_id = ${id} AND e.status = 'published'` as any[]
+       WHERE e.entity_type = ${KINDS[kind].type} AND e.entity_id = ${id} AND e.status = 'published'
+         AND v.published_by IS DISTINCT FROM ${SEED_ACTOR}` as any[]
     return rows[0] ?? null
   }
 
@@ -154,6 +156,7 @@ export function createContentPublic(sql: Sql) {
         FROM content_entities e
         JOIN content_versions v ON v.entity_type = e.entity_type AND v.entity_id = e.entity_id AND v.version_no = e.published_version_no
        WHERE e.entity_type = 'size_guide' AND e.status = 'published'
+         AND v.published_by IS DISTINCT FROM ${SEED_ACTOR}
          AND COALESCE((v.snapshot->>'showOnGuidePage')::boolean, true)
        ORDER BY COALESCE((v.snapshot->>'order')::int, 0), e.entity_id` as any[]
     if (!rows.length) return null
@@ -266,7 +269,8 @@ export function createContentPublic(sql: Sql) {
         SELECT e.entity_type, e.entity_id, e.slug, e.published_at, v.snapshot
           FROM content_entities e
           JOIN content_versions v ON v.entity_type = e.entity_type AND v.entity_id = e.entity_id AND v.version_no = e.published_version_no
-         WHERE e.status = 'published' AND e.entity_type IN ('policy', 'page', 'faq', 'about', 'contact', 'support_page')` as any[]
+         WHERE e.status = 'published' AND e.entity_type IN ('policy', 'page', 'faq', 'about', 'contact', 'support_page')
+           AND v.published_by IS DISTINCT FROM ${SEED_ACTOR}` as any[]
       for (const r of rows) {
         if (r.snapshot?.seo?.noindex) { const px = pathOf(r); if (px) excluded.push(px); continue }
         const lm = r.published_at ? new Date(r.published_at) : undefined

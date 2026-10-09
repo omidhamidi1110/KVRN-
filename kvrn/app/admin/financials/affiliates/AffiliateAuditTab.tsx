@@ -38,7 +38,7 @@ export function AffiliateAuditTab() {
         {flash && <AdminNotice className="mb-3">{flash}</AdminNotice>}
         {failed > 0 && <AdminNotice tone="danger" className="mb-3" title={`${failed} email${failed === 1 ? '' : 's'} failed to send`}>Check the email provider settings, then retry.</AdminNotice>}
         {emails.length === 0 ? <AdminEmpty title="No program emails yet" /> : (
-          <AdminTable caption="Program emails">
+          <AdminTable caption="Program emails" stack>
             <thead><tr><AdminTh>Type</AdminTh><AdminTh>Status</AdminTh><AdminTh>Attempts</AdminTh><AdminTh>Queued</AdminTh><AdminTh>Last problem</AdminTh></tr></thead>
             <tbody>
               {emails.map(e => { const b = emailStatusBadge(e.status); return (
@@ -54,7 +54,7 @@ export function AffiliateAuditTab() {
         {!entries && !err && <AdminLoading />}
         {entries && entries.length === 0 && <AdminEmpty title="No entries yet" />}
         {entries && entries.length > 0 && (
-          <AdminTable caption="Audit log">
+          <AdminTable caption="Audit log" stack>
             <thead><tr><AdminTh>When</AdminTh><AdminTh>Who</AdminTh><AdminTh>Action</AdminTh><AdminTh>Record</AdminTh></tr></thead>
             <tbody>
               {entries.map((e, i) => <tr key={i}><AdminTd>{formatDateTime(e.at)}</AdminTd><AdminTd><span className="break-all">{e.actor}</span></AdminTd><AdminTd><span className="font-mono text-[11px]">{e.action}</span></AdminTd><AdminTd><span className="text-[11px] text-[#6B6B66]">{e.resource}</span></AdminTd></tr>)}

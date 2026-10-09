@@ -2,7 +2,7 @@
 // List of every item of one content kind, with search, a status filter and "New".
 
 import { useCallback, useEffect, useState } from 'react'
-import { AdminButton, AdminEmpty, AdminError, AdminLoading, AdminTable, AdminTh, AdminTd, adminInputClass } from '@/components/admin/ui/AdminUI'
+import { AdminButton, AdminEmpty, AdminError, AdminLoading, AdminTable, AdminTr, AdminTh, AdminTd, adminInputClass } from '@/components/admin/ui/AdminUI'
 import { api, BASE, type Kind } from './api'
 import { entityStatusBadge } from './ui'
 
@@ -58,27 +58,27 @@ export function ListPanel({ kind, onOpen, refreshKey }: { kind: Kind; onOpen: (i
           action={!q && !status ? <AdminButton variant="primary" onClick={() => onOpen('new')}>New {noun}</AdminButton> : undefined} />
       )}
       {rows && rows.length > 0 && (
-        <AdminTable caption={`${noun}s`}>
-          <thead><tr>
+        <AdminTable stack caption={`${noun}s`}>
+          <thead><AdminTr>
             <AdminTh>Name</AdminTh><AdminTh>Status</AdminTh>
             {kind === 'size-guides' && <AdminTh>Products</AdminTh>}
             {kind === 'blocks' && <AdminTh>Used on</AdminTh>}
             <AdminTh>Updated</AdminTh>
-          </tr></thead>
+          </AdminTr></thead>
           <tbody>
             {rows.map(r => (
-              <tr key={r.id} className="hover:bg-black/[0.02]">
-                <AdminTd>
+              <AdminTr key={r.id} className="hover:bg-black/[0.02]">
+                <AdminTd className="max-sm:!block max-sm:!text-left">
                   <button type="button" onClick={() => onOpen(r.id)} className="text-left font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40">
                     {r.title || '(untitled)'}
                   </button>
                   {r.slug && <div className="text-[11px] text-[#8A8A85]">/{r.slug}</div>}
                 </AdminTd>
-                <AdminTd>{entityStatusBadge(r.status, r.hasDraft, r.isLive)}</AdminTd>
-                {kind === 'size-guides' && <AdminTd>{r.extra?.productCount ?? 0}</AdminTd>}
-                {kind === 'blocks' && <AdminTd>{r.extra?.usageCount ?? 0} page{(r.extra?.usageCount ?? 0) === 1 ? '' : 's'}</AdminTd>}
-                <AdminTd className="whitespace-nowrap text-[#6B6B66]">{new Date(r.updatedAt).toLocaleDateString()}</AdminTd>
-              </tr>
+                <AdminTd label="Status">{entityStatusBadge(r.status, r.hasDraft, r.isLive)}</AdminTd>
+                {kind === 'size-guides' && <AdminTd label="Products">{r.extra?.productCount ?? 0}</AdminTd>}
+                {kind === 'blocks' && <AdminTd label="Used on">{r.extra?.usageCount ?? 0} page{(r.extra?.usageCount ?? 0) === 1 ? '' : 's'}</AdminTd>}
+                <AdminTd label="Updated" className="whitespace-nowrap text-[#6B6B66]">{new Date(r.updatedAt).toLocaleDateString()}</AdminTd>
+              </AdminTr>
             ))}
           </tbody>
         </AdminTable>

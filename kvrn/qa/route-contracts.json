@@ -20,6 +20,15 @@
       ]
     },
     {
+      "path": "app/admin/ai/insights/page.tsx",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/admin/ai/page.tsx",
       "feature": "ai_os",
       "requiredChecks": [
@@ -39,7 +48,7 @@
     },
     {
       "path": "app/admin/backups/page.tsx",
-      "feature": "admin_auth",
+      "feature": "admin_ui_refresh",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -173,6 +182,33 @@
       ]
     },
     {
+      "path": "app/admin/live/page.tsx",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/marketing/page.tsx",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/marketing/templates/page.tsx",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/admin/media/page.tsx",
       "feature": "media_library",
       "requiredChecks": [
@@ -247,6 +283,15 @@
     {
       "path": "app/admin/sms/page.tsx",
       "feature": "admin_auth",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/admin/store-credit/page.tsx",
+      "feature": "store_credit",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -614,6 +659,16 @@
       ]
     },
     {
+      "path": "app/api/admin/ai/private-insights/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
       "path": "app/api/admin/ai/qa/route.ts",
       "feature": "ai_os",
       "requiredChecks": [
@@ -659,8 +714,17 @@
       ]
     },
     {
+      "path": "app/api/admin/analytics/live/route.ts",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/api/admin/backups/drills/route.ts",
-      "feature": "storefront_render",
+      "feature": "admin_ui_refresh",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -669,7 +733,7 @@
     },
     {
       "path": "app/api/admin/backups/route.ts",
-      "feature": "storefront_render",
+      "feature": "admin_ui_refresh",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -678,7 +742,7 @@
     },
     {
       "path": "app/api/admin/backups/verify/route.ts",
-      "feature": "storefront_render",
+      "feature": "admin_ui_refresh",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -791,6 +855,26 @@
         "typecheck",
         "build",
         "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/policies/[id]/owner-draft/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/content/policy-audit/route.ts",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
       ]
     },
     {
@@ -1064,6 +1148,176 @@
       ]
     },
     {
+      "path": "app/api/admin/marketing/audience-preview/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/audience-snapshots/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/budget-status/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/calendar/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/campaigns/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/delivery-attempts/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/delivery-plans/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/execute-approved-campaign/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "auth",
+        "consent",
+        "budget",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/execute-approved-once/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "auth",
+        "consent",
+        "budget",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/execute-local-once/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/overview/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/owner-approvals/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/readiness/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/recipient-evidence-batch/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "auth",
+        "consent",
+        "budget",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/recipient-evidence/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/suppress-email/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/templates/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/marketing/twilio-a2p-readiness/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "auth",
+        "consent",
+        "budget",
+        "regression"
+      ]
+    },
+    {
       "path": "app/api/admin/media/[id]/route.ts",
       "feature": "media_library",
       "requiredChecks": [
@@ -1316,6 +1570,44 @@
       ]
     },
     {
+      "path": "app/api/admin/store-credit/issue/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/store-credit/reconciliation/route.ts",
+      "feature": "financial_integrity",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/store-credit/restore/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/admin/store-credit/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/api/admin/support/threads/[id]/read/route.ts",
       "feature": "support_inbox",
       "requiredChecks": [
@@ -1514,6 +1806,15 @@
       ]
     },
     {
+      "path": "app/api/analytics/presence/route.ts",
+      "feature": "analytics",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/api/bundles/quote/route.ts",
       "feature": "bundles",
       "requiredChecks": [
@@ -1685,12 +1986,32 @@
       ]
     },
     {
+      "path": "app/api/marketing/one-click-unsubscribe/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
       "path": "app/api/marketing/subscribe/route.ts",
       "feature": "storefront_render",
       "requiredChecks": [
         "typecheck",
         "build",
         "regression"
+      ]
+    },
+    {
+      "path": "app/api/marketing/unsubscribe/route.ts",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
       ]
     },
     {
@@ -1723,6 +2044,15 @@
     {
       "path": "app/api/orders/route.ts",
       "feature": "storefront_render",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/resend/marketing-webhook/route.ts",
+      "feature": "marketing_suite",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -1781,6 +2111,46 @@
         "typecheck",
         "build",
         "regression"
+      ]
+    },
+    {
+      "path": "app/api/store-credit/balance/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/store-credit/identity/logout/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/store-credit/identity/start/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
+      ]
+    },
+    {
+      "path": "app/api/store-credit/identity/verify/route.ts",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
       ]
     },
     {
@@ -1892,6 +2262,26 @@
       ]
     },
     {
+      "path": "app/email-preferences/page.tsx",
+      "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "browser"
+      ]
+    },
+    {
+      "path": "app/feeds/google-products.xml/route.ts",
+      "feature": "product_detail",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "merchant_feed_offline",
+        "regression"
+      ]
+    },
+    {
       "path": "app/legal/[slug]/page.tsx",
       "feature": "cms_content",
       "requiredChecks": [
@@ -1928,6 +2318,24 @@
       ]
     },
     {
+      "path": "app/messaging-privacy/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/messaging-terms/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/page.tsx",
       "feature": "storefront_render",
       "requiredChecks": [
@@ -1938,6 +2346,15 @@
     },
     {
       "path": "app/pages/[slug]/page.tsx",
+      "feature": "cms_content",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/privacy-choices/page.tsx",
       "feature": "cms_content",
       "requiredChecks": [
         "typecheck",
@@ -1979,6 +2396,16 @@
         "typecheck",
         "build",
         "regression"
+      ]
+    },
+    {
+      "path": "app/store-credit/verify/page.tsx",
+      "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression",
+        "security"
       ]
     },
     {

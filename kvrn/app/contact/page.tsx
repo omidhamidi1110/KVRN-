@@ -9,13 +9,14 @@ import { ContactClient, type ContactSlots } from './ContactClient'
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata(): Promise<Metadata> {
-  if (!cmsContentEnabled()) return {}
+  const coded = { title: 'Contact — KVRN', description: 'Contact KVRN support about an order, sizing, a return or a product question. We reply by email.' }
+  if (!cmsContentEnabled()) return { ...coded, alternates: { canonical: '/contact' } }
   const view = await contentPublic().getContact()
-  if (!view) return {}
+  if (!view) return { ...coded, alternates: { canonical: '/contact' } }
   const seo = view.variants.en.data.seo
-  const m = pageMetadata({ title: 'Contact — KVRN' }, seo, seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null)
+  const m = pageMetadata(coded, seo, seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null)
   // Without any SEO override the page keeps inheriting the site title (as it always did).
-  return seo.title || seo.description || seo.noindex || seo.shareTitle || seo.shareImageId ? m : {}
+  return { ...(seo.title || seo.description || seo.noindex || seo.shareTitle || seo.shareImageId ? m : coded), alternates: { canonical: '/contact' } }
 }
 
 export default async function ContactPage() {

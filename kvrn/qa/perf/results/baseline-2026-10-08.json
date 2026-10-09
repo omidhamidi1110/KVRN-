@@ -1,0 +1,152 @@
+{
+  "base": "http://localhost:3112",
+  "at": "2026-10-08T21:40:21.844Z",
+  "env": "mobile 390x844 DPR2, CPU 4x, 1.6Mbps/150ms RTT (LAB)",
+  "runs": 3,
+  "pages": {
+    "/": {
+      "ok": 3,
+      "lcpMs": 712,
+      "lcpElement": "H1",
+      "cls": 0,
+      "tbtMs": 169,
+      "longTasks": 2,
+      "ttfbMs": 43,
+      "loadMs": 3512,
+      "jsKB": 221,
+      "cssKB": 14,
+      "imgKB": 284,
+      "fontKB": 0,
+      "requests": 21,
+      "domNodes": 288,
+      "imgsWithoutDimensions": 2,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    },
+    "/shop": {
+      "ok": 3,
+      "lcpMs": 732,
+      "lcpElement": "SPAN",
+      "cls": 0.002,
+      "tbtMs": 118,
+      "longTasks": 2,
+      "ttfbMs": 87,
+      "loadMs": 28942,
+      "jsKB": 220,
+      "cssKB": 14,
+      "imgKB": 5599,
+      "fontKB": 0,
+      "requests": 24,
+      "domNodes": 310,
+      "imgsWithoutDimensions": 1,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [
+        {
+          "v": 0.0019,
+          "t": 29397,
+          "src": [
+            "P"
+          ]
+        },
+        {
+          "v": 0.0019,
+          "t": 11392,
+          "src": [
+            "P"
+          ]
+        },
+        {
+          "v": 0.0019,
+          "t": 29387,
+          "src": [
+            "P"
+          ]
+        }
+      ],
+      "errors": []
+    },
+    "/products/kvrn-phantom-hoodie": {
+      "ok": 3,
+      "lcpMs": 804,
+      "lcpElement": "H1",
+      "cls": 0.002,
+      "tbtMs": 178,
+      "longTasks": 3,
+      "ttfbMs": 97,
+      "loadMs": 44515,
+      "jsKB": 232,
+      "cssKB": 14,
+      "imgKB": 8761,
+      "fontKB": 0,
+      "requests": 27,
+      "domNodes": 539,
+      "imgsWithoutDimensions": 15,
+      "lazyImagesAboveFold": 11,
+      "worstShifts": [
+        {
+          "v": 0.0019,
+          "t": 34627,
+          "src": [
+            "P"
+          ]
+        },
+        {
+          "v": 0.0019,
+          "t": 16825,
+          "src": [
+            "P"
+          ]
+        },
+        {
+          "v": 0.0009,
+          "t": 28823,
+          "src": [
+            "P"
+          ]
+        }
+      ],
+      "errors": []
+    },
+    "/support/faq": {
+      "ok": 3,
+      "lcpMs": 636,
+      "lcpElement": "BUTTON",
+      "cls": 0,
+      "tbtMs": 138,
+      "longTasks": 2,
+      "ttfbMs": 41,
+      "loadMs": 1612,
+      "jsKB": 220,
+      "cssKB": 14,
+      "imgKB": 0,
+      "fontKB": 0,
+      "requests": 19,
+      "domNodes": 403,
+      "imgsWithoutDimensions": 0,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    },
+    "/privacy": {
+      "ok": 3,
+      "lcpMs": 624,
+      "lcpElement": "P",
+      "cls": 0,
+      "tbtMs": 126,
+      "longTasks": 2,
+      "ttfbMs": 61,
+      "loadMs": 1607,
+      "jsKB": 220,
+      "cssKB": 14,
+      "imgKB": 0,
+      "fontKB": 0,
+      "requests": 18,
+      "domNodes": 563,
+      "imgsWithoutDimensions": 0,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    }
+  }
+}

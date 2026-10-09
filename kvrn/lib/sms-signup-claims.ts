@@ -73,9 +73,10 @@ export async function confirmSmsSignupClaim(opts: {
       RETURNING id
     `
     return (rows as any[]).length > 0
-  } catch (err: any) {
+  } catch {
     // Non-fatal — ordinary JOIN still succeeds even if claim confirmation fails
-    console.error('[sms-claim] confirmSmsSignupClaim error:', err?.message?.slice(0, 60))
+    // Driver error messages can include personal data; only log a static code.
+    console.error('[sms-claim] Claim confirmation failed (redacted).')
     return false
   }
 }

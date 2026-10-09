@@ -15,8 +15,6 @@ import type { Variant } from '@/lib/content-localize'
 import type { PolicySnapshot, FaqSnapshot, AboutSnapshot, PageSnapshot, SizeGuideSnapshot, SupportPageSnapshot } from '@/lib/content-schemas'
 import type { RichText } from '@/lib/content-richtext'
 import { isInternalHref } from '@/lib/content-urls'
-import { MESSAGES } from '@/lib/i18n/messages'
-import { isLocale } from '@/lib/i18n/locales'
 
 type AnyView<T> = View<T>
 
@@ -46,20 +44,6 @@ export function formatPolicyDate(iso: string, locale: string): string {
   } catch { return iso }
 }
 
-// Rendered once per language variant, so its words come from that variant's own dictionary.
-const Crumb = ({ label, locale }: { label: string; locale: string }) => {
-  const t = MESSAGES[isLocale(locale) ? locale : 'en']
-  return (
-  <nav aria-label={t['common.breadcrumb']} className="mb-10">
-    <ol className="flex items-center gap-2 text-[11px] text-kvrn-muted tracking-wide">
-      <li><Link href="/" className="hover:text-kvrn-text transition-colors">{t['common.home']}</Link></li>
-      <li aria-hidden="true">·</li>
-      <li className="text-kvrn-text" aria-current="page">{label}</li>
-    </ol>
-  </nav>
-  )
-}
-
 // ── Policies ──────────────────────────────────────────────────────────────────
 
 export function PolicyView({ view }: { view: AnyView<PolicySnapshot> }) {
@@ -79,14 +63,12 @@ export function PolicyView({ view }: { view: AnyView<PolicySnapshot> }) {
       <div>
         <PageHero title={p.heroTitle || p.title} breadcrumb={p.heroBreadcrumb || p.title} />
         <div className="pt-0">
-          <div data-nav-theme="light" className="container-kvrn section-padding max-w-2xl">
-            <Crumb label={p.title} locale={locale} />
-            <h1 className="font-display font-light text-[40px] md:text-[48px] leading-none tracking-tighter mb-3">{p.title}</h1>
+          <article aria-label={p.title} data-nav-theme="light" className="container-kvrn section-padding max-w-2xl">
             {p.effectiveDate && (
               <p className="label-11 text-kvrn-muted mb-14">{p.lastUpdatedLabel || 'Last updated'}: {formatPolicyDate(p.effectiveDate, locale)}</p>
             )}
             {rich(view, locale, p.body, 'legal')}
-          </div>
+          </article>
         </div>
       </div>
     )

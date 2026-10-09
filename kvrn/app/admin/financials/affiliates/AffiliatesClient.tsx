@@ -306,7 +306,7 @@ export function AffiliatesClient() {
           )}
 
           <AdminSectionHeader title="Affiliates" info="Accrual is period economics from the append-only ledger; cash is what has actually been paid. They are never mixed." />
-          <AdminTable caption="Affiliates and their commission terms">
+          <AdminTable caption="Affiliates and their commission terms" stack>
             <thead><tr>
               {['Code', 'Name', 'Status', 'Terms', 'Window', 'Hold', 'Discount', 'Orders', 'Net commission', 'Paid'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
             </tr></thead>
@@ -343,7 +343,7 @@ export function AffiliatesClient() {
       {tab === 'commissions' && (
         <>
           <AdminSectionHeader title="Commissions" info="Net ledger is the figure to rely on: accrual plus every reversal and restoration. The status column only summarises it." />
-          <AdminTable caption="Commissions">
+          <AdminTable caption="Commissions" stack>
             <thead><tr>
               {['Order', 'Affiliate', 'Via', 'Base', 'Commission', 'Net ledger', 'Payable', 'Overpaid', 'Status', 'Hold'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
             </tr></thead>
@@ -384,7 +384,7 @@ export function AffiliatesClient() {
             the commission adjustment fires exactly once.
           </AdminNotice>
 
-          <AdminTable caption="Unresolved commission sources">
+          <AdminTable caption="Unresolved commission sources" stack>
             <thead><tr>
               {['Order', 'Affiliate', 'Blocked by', 'Amount', 'Merchandise $', 'Shipping $', 'Tax $', 'Total', ''].map(h => <AdminTh key={h}>{h}</AdminTh>)}
             </tr></thead>
@@ -475,7 +475,7 @@ export function AffiliatesClient() {
           <AdminSectionHeader title="Recovery — overpaid commissions"
             info="Outstanding is DERIVED from cash paid minus what the ledger says was earned, so it cannot drift. 'Pursuit recorded' is an internal marker of a decision to chase the money — it is NOT cash and NOT an amount still owed. Collected is money actually received back." />
           <div className="mb-7">
-            <AdminTable caption="Overpaid commissions">
+            <AdminTable caption="Overpaid commissions" stack>
               <thead><tr>
                 {['Order', 'Affiliate', 'Outstanding (derived)', 'Pursuit recorded', 'Collected (cash)', 'Collect $', 'Date', 'Method', 'Reference', ''].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
@@ -533,7 +533,7 @@ export function AffiliatesClient() {
           </div>
 
           <AdminSectionHeader title="Payout history" info="Cash flow reads the paid date only. Accrual lives in the commission ledger and is never mixed in." />
-          <AdminTable caption="Payouts">
+          <AdminTable caption="Payouts" stack>
             <thead><tr>
               {['Payout', 'Affiliate', 'Amount', 'Lines', 'Status', 'Paid on', 'Reference', 'Actions'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
             </tr></thead>

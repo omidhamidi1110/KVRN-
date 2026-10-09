@@ -130,7 +130,7 @@ export function AbandonedCheckoutsClient() {
           <AdminSectionHeader title="Checkouts" />
           <AdminTabs tabs={TABS} value={view} onChange={setView} ariaLabel="Checkout status" />
           {data.rows.length === 0 ? <AdminEmpty title="Nothing here yet" description="Abandoned checkouts appear after a checkout expires unpaid." /> : (
-            <AdminTable caption="Abandoned checkouts">
+            <AdminTable caption="Abandoned checkouts" stack>
               <thead><tr>
                 <AdminTh>Customer</AdminTh><AdminTh>Bag</AdminTh><AdminTh>Abandoned</AdminTh>
                 <AdminTh>Locale</AdminTh><AdminTh>Status</AdminTh><AdminTh>Recovered</AdminTh><AdminTh />

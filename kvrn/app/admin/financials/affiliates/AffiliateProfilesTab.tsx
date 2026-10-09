@@ -41,7 +41,7 @@ export function AffiliateProfilesTab({ onChanged }: { onChanged?: () => void }) 
       {!rows && !err && <AdminLoading />}
       {rows && rows.length === 0 && <AdminEmpty title="No affiliates yet" description="Approve an application or add one manually." />}
       {rows && rows.length > 0 && (
-        <AdminTable caption="Affiliates">
+        <AdminTable caption="Affiliates" stack>
           <thead><tr><AdminTh>Code</AdminTh><AdminTh>Affiliate</AdminTh><AdminTh>Status</AdminTh><AdminTh>Commission</AdminTh><AdminTh>Terms accepted</AdminTh><AdminTh>Code live</AdminTh><AdminTh /></tr></thead>
           <tbody>
             {rows.map(p => {

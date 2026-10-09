@@ -19,11 +19,12 @@ export function WaitlistForm({
   heading,
   subheading,
   className,
-  source = 'unknown',
+  source = 'waitlist',
 }: WaitlistFormProps) {
   const { t }  = useI18n()
   const [email,  setEmail]  = useState('')
   const [state,  setState]  = useState<State>('idle')
+  const [emailConsent, setEmailConsent] = useState(false)
   const [errMsg, setErrMsg] = useState('')
 
   const dark      = variant === 'dark'
@@ -45,12 +46,13 @@ export function WaitlistForm({
       return
     }
 
+    if (!emailConsent) { setErrMsg('Please check the box to receive KVRN marketing emails.'); return }
     setState('loading')
     try {
       const res = await fetch('/api/waitlist', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: email.trim(), source }),
+        body:    JSON.stringify({ email: email.trim(), source, emailMarketingConsent: emailConsent }),
       })
       if (!res.ok) throw new Error()
       setState('success')
@@ -65,7 +67,7 @@ export function WaitlistForm({
       <div className={cn(className)}>
         {heading && <p className={cn('text-[15px] font-light mb-1', txtColor)}>{heading}</p>}
         <p className={cn('text-[13px] font-light', mutColor)}>
-          {t.onTheList}
+          Thanks — your signup request was received.
         </p>
       </div>
     )
@@ -117,9 +119,10 @@ export function WaitlistForm({
           </p>
         )}
 
-        <p className={cn('mt-3 text-[11px] font-light tracking-wide', mutColor)}>
-          {t.collectionOnly}
-        </p>
+        <label className={cn('mt-3 flex items-start gap-3 text-[11px] leading-relaxed font-light', mutColor)}>
+          <input type="checkbox" checked={emailConsent} onChange={e => setEmailConsent(e.target.checked)} className="mt-0.5" required />
+          <span>I agree to receive KVRN marketing emails about launches, restocks and offers. I can unsubscribe any time. <a className="underline underline-offset-2" href="/privacy">Privacy Policy</a>.</span>
+        </label>
       </form>
     </div>
   )

@@ -4,7 +4,9 @@ import type { Metadata } from 'next'
 import { getProductBySlug, products } from '@/data/products'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { getPublishedProductBySlug, resolveProductRedirect, getGlobalSeoRaw, type PublishedProduct } from '@/lib/product-public'
-import { buildProductMetadata, buildProductJsonLd, jsonLdString, parseGlobalSeo } from '@/lib/product-seo'
+import { buildProductMetadata, buildProductJsonLd, jsonLdString, parseGlobalSeo, productPath } from '@/lib/product-seo'
+import { buildBreadcrumbJsonLd } from '@/lib/seo-jsonld'
+import { JsonLd } from '@/components/seo/JsonLd'
 import { getSiteOrigin } from '@/lib/site-origin'
 import { getPublicBundleForOwner } from '@/lib/bundle-public'
 import { PDPClient } from './PDPClient'
@@ -81,10 +83,21 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title:       product.seo.title,
     description: product.seo.description,
+    // The legacy coded catalog also needs a stable canonical URL. Hidden legacy
+    // products remain routable for old customer links but must not be indexed.
+    alternates: { canonical: productPath(product.slug) },
+    ...(product.hidden ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title:       product.seo.title,
       description: product.seo.description,
       type:        'website',
+      url: productPath(product.slug),
+      images:      firstImage ? [{ url: firstImage.src, alt: firstImage.alt }] : [],
+    },
+    twitter: {
+      card:        'summary_large_image',
+      title:       product.seo.title,
+      description: product.seo.description,
       images:      firstImage ? [{ url: firstImage.src, alt: firstImage.alt }] : [],
     },
   }
@@ -109,6 +122,7 @@ export default async function ProductPage({ params }: PageProps) {
       return (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(ld) }} />
+          <JsonLd data={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }, { name: hit.product.name, path: `/products/${hit.slug}` }], getSiteOrigin())} />
           <PDPClient product={hit.product} relatedProduct={hit.relatedProduct} {...(bundle ? { bundle } : {})} />
         </>
       )
@@ -123,5 +137,19 @@ export default async function ProductPage({ params }: PageProps) {
     ? (products.find((p) => p.slug === product.relatedProductSlug) ?? null)
     : null
 
-  return <PDPClient product={product} relatedProduct={relatedProduct} />
+  // Coded catalog products are still publicly routable while CMS routing is OFF.
+  // Their static display price/size booleans are not authoritative inventory or
+  // checkout data. Describe the product without publishing an unverified Offer.
+  const origin = getSiteOrigin() ?? 'https://kvrn.shop'
+  const ld = buildProductJsonLd({
+    product, origin, imageUrls: product.colors[0]?.images.map(i => i.src) ?? [],
+    availability: null, emitOffer: false,
+  })
+  return (
+    <>
+      {!product.hidden && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(ld) }} />}
+      {!product.hidden && <JsonLd data={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: 'Shop', path: '/shop' }, { name: product.name, path: productPath(product.slug) }], origin)} />}
+      <PDPClient product={product} relatedProduct={relatedProduct} />
+    </>
+  )
 }

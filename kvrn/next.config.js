@@ -1,14 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // ── Image optimisation ──────────────────────────────────────────────────────
-  // Cloudflare Workers (via OpenNext) handles image serving.
-  // Set unoptimized: true to let OpenNext/Cloudflare optimise.
-  // Switch to unoptimized: true ONLY if using static export (output: 'export').
+  // Cloudflare Workers (OpenNext) has no /_next/image optimiser here, and `unoptimized: true` made next/image serve the ORIGINAL
+  // file at every size (a half-width product card on a phone fetched a 1.3-5 MB image). Instead a custom loader points static
+  // images at pre-built WebP renditions (scripts/generate-image-renditions.mjs -> public/images-r/<width>/, listed in
+  // lib/image-renditions.generated.json). Anything without a rendition (R2 /media/ assets, remote URLs, small files) is served as-is.
   images: {
-    unoptimized: true,
-    formats:     ['image/avif', 'image/webp'],
-    // Add external image domains here if using a CDN or external images:
-    // remotePatterns: [{ protocol: 'https', hostname: 'your-cdn.com' }],
+    loader:     'custom',
+    loaderFile: './lib/image-loader.ts',
   },
 
   // ── Strict mode ─────────────────────────────────────────────────────────────
@@ -32,6 +31,13 @@ const nextConfig = {
         source: '/_next/static/(.*)',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        // Responsive renditions of public images (regenerated only when an original changes)
+        source: '/images-r/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=86400' },
         ],
       },
       {

@@ -174,7 +174,7 @@ export function CostsClient() {
         info="Resolved in order: variant, then colour, then product." />
       <div className="mb-7">
         {loading ? <AdminLoading /> : coverage.length === 0 ? <AdminEmpty title="No active SKUs." /> : (
-          <AdminTable minWidth={600} caption="Cost coverage by SKU">
+          <AdminTable minWidth={600} caption="Cost coverage by SKU" stack>
             <thead>
               <tr>{['SKU', 'Product', 'Colour', 'Size', 'Unit cost', 'Source'].map(h => <AdminTh key={h}>{h}</AdminTh>)}</tr>
             </thead>
@@ -199,7 +199,7 @@ export function CostsClient() {
       <AdminSectionHeader title="Cost batches" description="Append-only history."
         info="A newer batch supersedes an older one from its effective date." />
       {batches.length === 0 && !loading ? <AdminEmpty title="No cost batches yet." /> : (
-        <AdminTable minWidth={760} caption="Cost batches">
+        <AdminTable minWidth={760} caption="Cost batches" stack>
           <thead>
             <tr>{['Effective', 'Product', 'Scope', 'Batch', 'Mfg', 'Freight', 'Duties+Tax', 'Packaging', 'Unit cost'].map(h => <AdminTh key={h}>{h}</AdminTh>)}</tr>
           </thead>

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import Script from 'next/script'
 import { CartProvider }     from '@/context/CartContext'
 import { CookiePrefsProvider } from '@/context/CookiePrefsContext'
 import { CurrencyProvider } from '@/context/CurrencyContext'
@@ -55,7 +54,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // GA is loaded by <GaTracker /> ONLY after effective analytics consent — nothing Google-related is
   // in the initial HTML. The measurement id is deliberately NOT read here: layout code is inlined at
   // BUILD time, and the id is a RUNTIME Cloudflare variable (see /api/analytics/config).
-  const clarityId = process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID
 
   return (
     <html lang={i18n.locale} dir={i18n.dir === 'rtl' ? 'rtl' : undefined}>
@@ -67,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           dangerouslySetInnerHTML={{ __html: jsonLd(orgSchema(seo)) }}
         />
       </head>
-      <body className="bg-kvrn-bg text-kvrn-text font-body antialiased">
+      <body className="w-full min-w-0 bg-kvrn-bg text-kvrn-text font-body antialiased">
         <a href="#main-content" className="skip-link">{MESSAGES[i18n.locale]['nav.skipToContent']}</a>
 
         <StorefrontSeedProvider seed={{
@@ -87,7 +85,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <CartDrawer />
         <ConditionalSmsPopup />
                 <WishlistDrawer />
-                <main id="main-content">{children}</main>
+                <main id="main-content" className="w-full min-w-0">{children}</main>
                 <ConditionalFooter shell={shell} />
                 <CookieBanner />
                 <FunnelTracker />
@@ -102,17 +100,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </CookiePrefsProvider>
         </StorefrontSeedProvider>
 
-        {clarityId && (
-          <Script id="clarity-init" strategy="afterInteractive">{`
-            setTimeout(function(){
-              (function(c,l,a,r,i,t,y){
-                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-              })(window,document,"clarity","script","${clarityId}");
-            },3000);
-          `}</Script>
-        )}
+        {/* Microsoft Clarity is disabled: it must never initialize before effective analytics consent.
+            Re-enable only with a tested consent/revocation lifecycle. GA4 remains consent-gated. */}
       </body>
     </html>
   )

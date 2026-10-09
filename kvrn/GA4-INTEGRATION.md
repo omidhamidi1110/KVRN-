@@ -144,7 +144,8 @@ Google Analytics. No GA numbers are pulled in.
   redelivers after a missed send, that purchase can be reconciled from the first-party/Stripe records. A ledger would need a migration.
 * A purchase for a visitor who withdraws consent while on Stripe's hosted page cannot be detected (the consent decision was made at checkout).
 * Google Ads / Meta / any ad-tech, audiences, enhanced conversions, user_id.
-* **Microsoft Clarity** (`NEXT_PUBLIC_CLARITY_PROJECT_ID`) still loads in `app/layout.tsx` **outside the consent gate** (it is not GA and is
-  untouched here). Overall site consent is therefore **not** fully solved by this batch; Clarity gating belongs to a later privacy/legal pass.
+* **Microsoft Clarity** is **disabled** in `app/layout.tsx` (Checkpoint 08): it must never initialize before effective analytics consent.
+  `NEXT_PUBLIC_CLARITY_PROJECT_ID` is therefore not read anywhere. Re-enable only with a tested consent/revocation lifecycle (same gate as GA4:
+  `analyticsConsentGranted()`, DNT/GPC respected). Until then no Clarity request is made for any visitor.
 * The orphaned `components/ui/CookieBanner.tsx` (separate legacy consent key, not rendered) is left untouched.
 * Privacy / Cookies page wording should be updated to describe the above.

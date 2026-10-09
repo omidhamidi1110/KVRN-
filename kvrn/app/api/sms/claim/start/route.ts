@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { rawToken, expiresAt } = await createSmsSignupClaim()
     return NextResponse.json({ token: rawToken, expiresAt })
   } catch (err: any) {
-    console.error('[sms/claim/start] DB error:', err?.message?.slice(0, 80))
+    console.error('[sms/claim/start] Claim unavailable (redacted).')
     return NextResponse.json({ error: 'Could not create claim.' }, { status: 500 })
   }
 }

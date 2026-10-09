@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminButton, AdminNotice, AdminField, AdminStat, AdminStatGrid,
-  AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading, AdminError, StatusBadge, AdminTag,
+  AdminTable, AdminTr, AdminTh, AdminTd, AdminEmpty, AdminLoading, AdminError, StatusBadge, AdminTag,
   adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
 
@@ -134,9 +134,9 @@ export default function AdminInventoryClient() {
           {variants.length === 0 ? (
             <AdminEmpty title="No inventory variants." />
           ) : (
-            <AdminTable minWidth={900} caption="Stock by variant">
+            <AdminTable stack minWidth={900} caption="Stock by variant">
               <thead>
-                <tr>
+                <AdminTr>
                   <AdminTh>Product</AdminTh>
                   <AdminTh>Size</AdminTh>
                   <AdminTh>SKU</AdminTh>
@@ -146,7 +146,7 @@ export default function AdminInventoryClient() {
                   <AdminTh>Status</AdminTh>
                   <AdminTh>Updated</AdminTh>
                   <AdminTh><span className="sr-only">Manage</span></AdminTh>
-                </tr>
+                </AdminTr>
               </thead>
               <tbody>
                 {variants.map(v => {
@@ -154,7 +154,7 @@ export default function AdminInventoryClient() {
                   const isSoldOut = v.active && available <= 0
 
                   return (
-                    <tr
+                    <AdminTr
                       key={v.id}
                       onClick={() => selectVariant(v.id)}
                       className={[
@@ -162,27 +162,27 @@ export default function AdminInventoryClient() {
                         selected === v.id ? 'bg-black/[0.03]' : '',
                       ].join(' ')}
                     >
-                      <AdminTd>
-                        <p className="max-w-[220px] truncate font-medium">{v.product_name}</p>
+                      <AdminTd label="Product" className="max-sm:!block max-sm:!text-left">
+                        <p className="max-w-[220px] truncate font-medium max-sm:max-w-none">{v.product_name}</p>
                         {v.color_name && <p className="mt-0.5 text-[11px] text-[#8A8A85]">{v.color_name}</p>}
                       </AdminTd>
-                      <AdminTd className="whitespace-nowrap text-[#4A4A46]">{v.size}</AdminTd>
-                      <AdminTd className="whitespace-nowrap"><span className="font-mono text-[11px] text-[#4A4A46]">{v.sku}</span></AdminTd>
-                      <AdminTd className="font-medium">{v.stock_on_hand}</AdminTd>
-                      <AdminTd className="text-[#4A4A46]">{v.reserved_quantity}</AdminTd>
-                      <AdminTd className={['font-medium', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</AdminTd>
-                      <AdminTd>
-                        <span className="flex flex-wrap items-center gap-1">
+                      <AdminTd label="Size" className="whitespace-nowrap text-[#4A4A46]">{v.size}</AdminTd>
+                      <AdminTd label="SKU" className="whitespace-nowrap"><span className="font-mono text-[11px] text-[#4A4A46]">{v.sku}</span></AdminTd>
+                      <AdminTd label="On hand" className="font-medium">{v.stock_on_hand}</AdminTd>
+                      <AdminTd label="Reserved" className="text-[#4A4A46]">{v.reserved_quantity}</AdminTd>
+                      <AdminTd label="Available" className={['font-medium', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</AdminTd>
+                      <AdminTd label="Status">
+                        <span className="flex flex-wrap items-center gap-1 max-sm:justify-end">
                           <StatusBadge status={v.active ? 'Active' : 'Inactive'} />
                           {isSoldOut && <AdminTag tone="danger">Sold out</AdminTag>}
                         </span>
                       </AdminTd>
-                      <AdminTd className="whitespace-nowrap text-[11px] text-[#6B6B66]">{new Date(v.updated_at).toLocaleString()}</AdminTd>
-                      <AdminTd className="whitespace-nowrap text-right">
+                      <AdminTd label="Updated" className="whitespace-nowrap text-[11px] text-[#6B6B66]">{new Date(v.updated_at).toLocaleString()}</AdminTd>
+                      <AdminTd className="whitespace-nowrap text-right max-sm:!justify-end">
                         <AdminButton size="sm" variant="ghost" aria-label={`Manage ${v.sku}`}
                           onClick={e => { e.stopPropagation(); selectVariant(v.id) }}>Manage →</AdminButton>
                       </AdminTd>
-                    </tr>
+                    </AdminTr>
                   )
                 })}
               </tbody>

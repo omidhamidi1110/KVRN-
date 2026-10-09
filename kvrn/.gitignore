@@ -43,3 +43,6 @@ coverage/
 # Misc
 *.pem
 .cache/
+
+# TypeScript incremental build cache (generated)
+*.tsbuildinfo

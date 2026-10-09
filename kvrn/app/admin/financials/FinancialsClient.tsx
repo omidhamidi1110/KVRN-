@@ -563,7 +563,7 @@ export function FinancialsClient() {
 
           {/* Recent orders */}
           <AdminSectionHeader title="Recent orders" />
-          <AdminTable caption="Recent orders" minWidth={640}>
+          <AdminTable caption="Recent orders" minWidth={640} stack>
             <thead>
               <tr>
                 {['Order', 'Paid', 'Net revenue', 'Contribution', 'Margin', 'Status'].map(h => (

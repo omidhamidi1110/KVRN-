@@ -15,7 +15,8 @@ import { SEED_POLICIES, SEED_FAQ, SEED_SIZE_GUIDES } from './content-seed-data'
 
 export const SEED_BEGIN = '-- BEGIN GENERATED SEED (lib/content-seed.ts — do not edit by hand)'
 export const SEED_END = '-- END GENERATED SEED'
-export const SEED_ACTOR = 'seed@kvrn.internal'
+import { SEED_ACTOR } from './content-seed-actor'
+export { SEED_ACTOR }
 
 export interface SeedEntity { type: string; id: string; snapshot: unknown }
 

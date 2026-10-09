@@ -5,7 +5,8 @@
 //   * a real <button> with an aria-label, reachable and operable by keyboard
 //   * Enter/Space toggles; Escape closes and returns focus to the button
 //   * click/tap outside closes
-//   * NOT hover-only: works on touch (the hit area is padded beyond the 28px visual button)
+//   * NOT hover-only: works on touch (the hit area is padded ABOVE/BELOW the 28px visual button; never sideways —
+//     a sideways pad on a tip that sits flush against the right edge widened the whole page by 8px on phones)
 //   * aria-expanded + aria-controls wire the button to its panel
 // Use it for definitions, accounting rules, methodology, provider caveats, field units
 // (cents/BPS). NEVER use it to hide a destructive-action warning or a current
@@ -95,7 +96,7 @@ export function InfoTip({ label = 'More information', children, align = 'start',
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(o => !o)}
-        className="relative inline-flex h-7 w-7 items-center justify-center rounded-full text-[#8A8A85] transition-colors before:absolute before:-inset-2 before:content-[''] hover:bg-black/[0.05] hover:text-[#171717] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40"
+        className="relative inline-flex h-7 w-7 items-center justify-center rounded-full text-[#8A8A85] transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-[''] hover:bg-black/[0.05] hover:text-[#171717] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>

@@ -88,6 +88,11 @@ const navGroups: NavGroup[] = [
         </>),
       },
       {
+        label: 'Store Credit',
+        href: '/admin/store-credit',
+        icon: icon(<><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M3 10h18" stroke="currentColor" strokeWidth="1.5"/></>),
+      },
+      {
         label: 'Discounts',
         href: '/admin/discounts',
         icon: icon(<>
@@ -95,6 +100,11 @@ const navGroups: NavGroup[] = [
           <path d="M7 3H3v4l10 10 4-4L7 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
           <path d="m14 14 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
         </>),
+      },
+      {
+        label: 'Live View',
+        href: '/admin/live',
+        icon: icon(<><circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5"/><path d="M5 12h14M12 5v14" stroke="currentColor" strokeWidth="1.5"/></>),
       },
       {
         label: 'Analytics',
@@ -106,6 +116,11 @@ const navGroups: NavGroup[] = [
   {
     label: 'Content',
     items: [
+      {
+        label: 'Marketing Suite',
+        href: '/admin/marketing',
+        icon: icon(<><path d="M4 6h16v12H4zM4 7l8 6 8-6" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></>),
+      },
       {
         label: 'Content',
         href: '/admin/content',
@@ -321,7 +336,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (/^\/admin\/products\/[^/]+\/preview\/?$/.test(pathname)) return <>{children}</>
 
   return (
-    <div className="min-h-screen bg-[#F5F5F3] font-normal leading-[1.5] text-[#171717]">
+    <div className="w-full min-w-0 min-h-screen bg-[#F5F5F3] font-normal leading-[1.5] text-[#171717]">
       <a href="#admin-main"
         className="sr-only z-[60] rounded-[8px] bg-white px-3 py-2 text-[12px] font-medium text-[#171717] focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
         Skip to content
@@ -390,7 +405,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile header: brand, current page, one Menu button. All routes live in the panel. */}
-      <div className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#111111] text-white lg:hidden">
+      <div className="sticky top-0 z-40 w-full min-w-0 border-b border-white/[0.08] bg-[#111111] text-white lg:hidden">
         <div className="flex h-[56px] items-center justify-between gap-3 px-4">
           <Link href="/admin" className="flex min-w-0 items-baseline gap-2">
             <span className="text-[13px] font-light uppercase tracking-[0.18em]">KVRN</span>
@@ -455,9 +470,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Admin content */}
-      <main id="admin-main" className="min-h-screen min-w-0 overflow-x-clip lg:pl-[248px]">
+      {/* The root layout already wraps every route (admin included) in the single main landmark (id "main-content"); a second main element would nest
+          landmarks (invalid HTML, flagged by axe). This is a plain region that the "Skip to content" link can focus. */}
+      <div id="admin-main" tabIndex={-1} className="w-full min-w-0 min-h-screen bg-[#F5F5F3] outline-none lg:pl-[248px]">
         {children}
-      </main>
+      </div>
     </div>
   )
 }

@@ -20,11 +20,12 @@ export function GaTracker() {
 
   // The affiliate portal (/affiliate, /affiliate/*) is a partner area, not the storefront: no GA there.
   const inAffiliatePortal = pathname === '/affiliate' || (pathname ?? '').startsWith('/affiliate/')
+  const inCreditVerification = pathname === '/store-credit/verify'
 
   useEffect(() => {
-    if (inAffiliatePortal) { disableGa(); return }
+    if (inAffiliatePortal || inCreditVerification) { disableGa(); return }
     void syncGa(pref)      // idempotent; declines/opt-outs disable GA immediately
-  }, [pref, prefs, pathname, inAffiliatePortal])
+  }, [pref, prefs, pathname, inAffiliatePortal, inCreditVerification])
 
   // Consent changed in ANOTHER tab (or DNT/GPC now blocks): stop here too.
   useEffect(() => {

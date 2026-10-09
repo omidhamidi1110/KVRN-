@@ -1,0 +1,185 @@
+KVRN — Messaging Terms & Conditions
+
+Last updated: October 6, 2026
+
+These Messaging Terms & Conditions (“Messaging Terms”) apply to the KVRN recurring text-messaging program (the “Program”).
+
+By affirmatively opting in to the Program, you agree to these Messaging Terms and the KVRN Messaging Privacy Policy.
+
+1. PROGRAM NAME AND DESCRIPTION
+
+Program name: KVRN Messaging Program
+
+The Program provides recurring messages from KVRN relating to topics such as:
+
+• Product launches and drops
+• Restocks
+• Early access
+• Promotional offers
+• Discount information
+• Brand or product updates reasonably related to the Program
+
+Messages may be delivered through SMS or MMS and, if KVRN later enables and supports it, other compatible mobile-messaging formats such as RCS.
+
+KVRN currently uses Twilio as a messaging service provider.
+
+The Program is for KVRN's own products, launches, restocks, promotions, and related KVRN communications. KVRN does not use your consent to this Program as consent for unrelated third-party or affiliate marketing.
+
+2. CONSENT
+
+By opting in, you authorize KVRN to send recurring automated marketing messages to the mobile telephone number you provide.
+
+Consent may be collected through approved methods such as:
+• A KVRN website signup form with affirmative SMS consent
+• A KVRN keyword signup flow
+• Another KVRN-controlled signup method that clearly discloses the Program terms
+
+Consent to receive marketing messages is not a condition of purchasing any KVRN product or service.
+
+You represent that:
+• You are the subscriber or an authorized user of the mobile number you provide
+• The information you provide is accurate
+• You are at least 18 years old
+• You are permitted to participate in the Program under applicable law
+
+3. RECURRING MESSAGES AND FREQUENCY
+
+The Program sends recurring messages.
+
+Message frequency varies based on launches, restocks, promotions, and other Program activity.
+
+KVRN does not promise a fixed number of messages per day, week, or month.
+
+4. MESSAGE AND DATA RATES
+
+Message and data rates may apply.
+
+Your wireless carrier’s rates, data plan, roaming rules, and other charges are your responsibility.
+
+5. OPTING OUT
+
+Reply STOP to a KVRN marketing message to unsubscribe.
+
+KVRN and its messaging provider may also recognize other standard or legally valid opt-out commands, including commands such as END, CANCEL, UNSUBSCRIBE, QUIT, REVOKE, or OPT OUT where supported.
+
+You may also revoke consent using another reasonable method recognized by applicable law, including contacting support@kvrn.shop and clearly requesting removal from the KVRN marketing SMS program.
+
+After an opt-out request, you may receive one final confirmation message stating that you have been unsubscribed.
+
+KVRN may retain a suppression record so that the opt-out continues to be honored.
+
+6. REJOINING THE PROGRAM
+
+If you previously opted out, you may rejoin only by providing new valid consent.
+
+Depending on the messaging configuration, recognized opt-in commands may include START or UNSTOP.
+
+A new website signup or another affirmative KVRN-controlled opt-in method may also be used.
+
+7. HELP
+
+Reply HELP for help.
+
+You may also contact:
+
+support@kvrn.shop
+
+KVRN may provide additional support instructions in the automated HELP response.
+
+8. NUMBER REASSIGNMENT AND AUTHORIZED USE
+
+You must provide a mobile number that you are authorized to use.
+
+If you stop using the number, transfer it, or believe it has been reassigned, please opt out or contact KVRN so that marketing messages are not intentionally sent to a new user of that number.
+
+KVRN may use provider tools or other reasonable safeguards intended to reduce messaging to reassigned numbers.
+
+9. QUIET HOURS AND DELIVERY TIMING
+
+KVRN intends to send non-essential marketing messages only at times permitted by applicable law, carrier rules, and messaging-provider requirements.
+
+Carrier or network delays can cause a message to arrive later than the time KVRN initiated it.
+
+Nothing in these Messaging Terms is intended to waive or override a legally applicable time-of-day restriction.
+
+10. DELIVERY AND CARRIER DISCLAIMER
+
+Delivery is subject to your wireless carrier, network availability, device compatibility, and other factors outside KVRN’s control.
+
+Carriers are not liable for any delayed or undelivered messages.
+
+KVRN does not guarantee that every message will be delivered or delivered at a particular time.
+
+11. SUPPORTED CARRIERS AND DEVICES
+
+The Program may not be available on every carrier, device, country, or messaging technology.
+
+Features may vary depending on the recipient’s device, carrier, messaging application, and location.
+
+12. CHANGES TO SENDING NUMBER OR PROVIDER
+
+KVRN may change the telephone number, sender, messaging service, or service provider used to operate the Program.
+
+If KVRN changes the sender, you remain responsible for following the opt-out instructions included in KVRN messages.
+
+A change in service provider does not transfer your consent to unrelated third parties. Your consent is for KVRN’s Program.
+
+13. PRIVACY
+
+KVRN’s handling of mobile information is described in:
+
+• KVRN Privacy Policy
+• KVRN Messaging Privacy Policy
+
+KVRN does not sell or share SMS opt-in data, mobile telephone numbers, or SMS consent information with third parties or affiliates for their own marketing or promotional purposes.
+
+14. PROGRAM SECURITY AND ABUSE
+
+KVRN may take reasonable steps to prevent:
+• Fraudulent enrollment
+• Unauthorized use of another person’s number
+• Abuse of signup incentives
+• Bot or automated signup activity
+• Attempts to manipulate opt-in or discount systems
+
+KVRN may suspend or refuse Program participation where reasonably necessary to prevent fraud, abuse, or unlawful activity.
+
+15. MARKETING VS. TRANSACTIONAL COMMUNICATIONS
+
+These Messaging Terms govern the recurring KVRN marketing Program.
+
+If KVRN later offers a separate transactional SMS service for specific order, security, or support messages, KVRN will apply the consent and disclosure rules that are appropriate to that use case.
+
+Opting out of the marketing Program does not authorize KVRN to continue sending marketing messages under another label.
+
+16. CHANGES TO THE PROGRAM OR THESE TERMS
+
+KVRN may update the Program or these Messaging Terms.
+
+If a change requires new consent under applicable law, KVRN will obtain that consent before relying on the change.
+
+For other updates, KVRN may post revised terms and update the “Last updated” date.
+
+17. TERMINATION
+
+KVRN may suspend or discontinue the Program at any time.
+
+You may leave the Program at any time using the opt-out methods described above.
+
+Sections that reasonably need to survive termination, including privacy, records, disclaimers, and dispute-related provisions, may continue to apply.
+
+18. GOVERNING LAW
+
+These Messaging Terms are governed by applicable federal law and the laws of the State of California, except where mandatory law in another jurisdiction applies.
+
+Nothing in these Messaging Terms limits a right or remedy that cannot legally be waived.
+
+These Messaging Terms do not create a binding-arbitration requirement.
+
+19. CONTACT
+
+For Program support:
+
+support@kvrn.shop
+
+For the fastest automated opt-out, reply STOP to a KVRN marketing message.

@@ -1,0 +1,229 @@
+KVRN — Terms of Service
+
+Last updated: October 6, 2026
+
+These Terms of Service (“Terms”) govern your access to and use of kvrn.shop and purchases from KVRN (“KVRN,” “we,” “us,” or “our”).
+
+By accessing the website, placing an order, or using a KVRN service, you agree to these Terms and the policies incorporated by reference.
+
+1. ELIGIBILITY AND USE OF THE SITE
+
+You may use the website only for lawful purposes.
+
+If you are under the age of majority where you live, you may use the website or make a purchase only with the involvement and permission of a parent or legal guardian where required.
+
+You may not:
+• Attempt to gain unauthorized access to the website, Admin systems, accounts, APIs, databases, or infrastructure
+• Interfere with the security or operation of the website
+• Introduce malicious code
+• Scrape, copy, or harvest data in a manner that violates law or KVRN’s rights
+• Use the website for fraud, abuse, impersonation, or other unlawful activity
+
+2. PRODUCTS AND AVAILABILITY
+
+KVRN makes reasonable efforts to display product descriptions, colors, measurements, materials, images, prices, and availability accurately.
+
+Actual colors may vary based on device displays, lighting, production variation, or photography.
+
+Inventory is limited and may change quickly. Adding an item to a cart does not guarantee availability until the checkout and inventory-reservation process confirms it.
+
+KVRN may limit quantities, discontinue products, correct errors, or refuse or cancel orders where reasonably necessary.
+
+3. ORDERS
+
+Submitting an order is a request to purchase the items shown at checkout.
+
+An order is subject to:
+• Payment authorization
+• Inventory availability
+• Fraud and risk review
+• Shipping availability
+• Verification of pricing and checkout information
+
+KVRN may cancel or refuse an order before shipment if, for example:
+• Inventory is unavailable
+• Payment fails
+• There is a material pricing or system error
+• Shipping cannot be completed
+• The order appears fraudulent, abusive, or unauthorized
+• The order violates these Terms or applicable law
+
+If KVRN cancels an order after collecting payment and no amount is properly due, the applicable amount will be refunded to the original payment method.
+
+4. FRAUD REVIEW AND FULFILLMENT HOLDS
+
+KVRN may use payment-provider fraud tools, including Stripe Radar where enabled.
+
+A successfully paid order may be placed on a temporary fulfillment hold while risk signals are reviewed.
+
+A fulfillment hold does not by itself mean that the customer committed fraud. While a hold is active, KVRN may delay shipment or label creation until review is complete.
+
+If KVRN reasonably determines that an order is unauthorized or fraudulent, KVRN may cancel and refund the order, decline fulfillment, or take other appropriate action.
+
+5. PRICES, CURRENCY, TAXES, AND FEES
+
+Prices are shown on the website and at checkout.
+
+KVRN may allow customers to view prices or pay in more than one supported currency. The amount and currency shown on the final checkout screen before payment are the controlling checkout amount for that transaction.
+
+Prices may change without notice before an order is completed.
+
+Shipping charges, taxes, duties, or other charges may apply depending on the destination and transaction.
+
+Where required or supported, applicable taxes or charges may be calculated at checkout.
+
+For international orders, customs duties, taxes, brokerage charges, or import fees that are not expressly shown as prepaid or included at checkout are the responsibility of the recipient.
+
+A bank, card issuer, wallet provider, or payment provider may impose separate currency-conversion or other fees that KVRN does not control.
+
+6. PAYMENT
+
+Payments are processed through KVRN’s payment provider.
+
+KVRN does not intentionally store raw payment-card numbers or card security codes.
+
+By submitting payment information, you represent that you are authorized to use the payment method.
+
+7. DISCOUNTS, PROMOTIONS, AND STORE CREDIT
+
+Discount codes, affiliate codes, store credit, and promotional offers may be subject to additional terms shown with the offer.
+
+Unless KVRN expressly allows it:
+• Discounts may not be combined
+• Codes may not be copied, sold, manipulated, or used fraudulently
+• Expired or revoked offers are not valid
+• KVRN may correct or cancel an offer used in violation of its stated terms
+
+Store credit has no cash value except where required by applicable law and may be subject to reasonable program rules disclosed when issued.
+
+8. SHIPPING AND DELIVERY
+
+Shipping methods, rates, and estimates are described at checkout and in the Shipping & Returns policy.
+
+Delivery dates are estimates, not guarantees.
+
+Carrier delays, customs, weather, incorrect addresses, local delivery conditions, and events outside KVRN’s reasonable control may affect delivery.
+
+Customers are responsible for providing a complete and accurate shipping address.
+
+If an order appears lost, materially delayed, or damaged, contact support@kvrn.shop and KVRN will assist with an appropriate investigation.
+
+Nothing in these Terms eliminates any non-waivable consumer right relating to delivery or damaged goods.
+
+9. RETURNS, STORE CREDIT, AND REFUNDS
+
+KVRN’s current return rules are described in the Shipping & Returns policy at:
+
+kvrn.shop/support/shipping-returns
+
+Eligible discretionary returns are generally accepted for store credit within the stated return window and subject to the conditions in that policy.
+
+Different remedies may apply to items that arrive damaged, defective, misdescribed, or incorrect.
+
+Nothing in KVRN’s return policy limits a remedy that cannot legally be waived.
+
+10. ORDER CANCELLATIONS
+
+If you want to request cancellation, contact support@kvrn.shop immediately.
+
+KVRN cannot guarantee cancellation after an order enters fulfillment or shipment.
+
+If KVRN cancels an unshipped order, any amount that should be returned will be refunded to the original payment method.
+
+11. EMAIL COMMUNICATIONS
+
+By placing an order or contacting KVRN, you agree that KVRN may send service-related communications needed to process or support the transaction or request.
+
+Marketing email is subject to separate communication preferences and applicable law.
+
+Where permitted, KVRN may send abandoned-checkout reminders relating to an incomplete checkout. Marketing messages will provide an applicable unsubscribe method.
+
+12. KVRN SMS PROGRAM
+
+Participation in the KVRN SMS program is optional.
+
+If you affirmatively opt in, you may receive recurring automated marketing messages from KVRN concerning product launches, drops, restocks, early access, and promotions.
+
+Message frequency varies. Message and data rates may apply. Consent is not a condition of purchase.
+
+Reply STOP to cancel or HELP for help.
+
+Additional requirements are contained in the KVRN Messaging Terms and KVRN Messaging Privacy Policy. Those messaging-specific terms control if they conflict with this section on a matter specific to the messaging program.
+
+13. AFFILIATE PROGRAM
+
+Applicants and participants in the KVRN affiliate program are subject to separate Affiliate Program Terms, disclosure rules, brand rules, compliance requirements, and payout requirements.
+
+Affiliate status does not automatically grant KVRN ownership or unlimited rights to affiliate or creator content. Any UGC or content-use rights must be separately granted under applicable terms.
+
+14. INTELLECTUAL PROPERTY
+
+The KVRN name, branding, website design, product photography, graphics, copy, software, content, and other materials are owned by or licensed to KVRN and are protected by applicable intellectual-property laws.
+
+Except as permitted by law, you may not reproduce, distribute, modify, sell, exploit, or create derivative works from KVRN content without prior authorization.
+
+15. REVIEWS, MESSAGES, AND SUBMISSIONS
+
+If you send KVRN feedback, support messages, photos, product questions, or other materials, you represent that you have the right to send them and that they do not violate another person’s rights or applicable law.
+
+Sending ordinary customer-service content does not transfer ownership of your content to KVRN except to the limited extent reasonably necessary to review and respond to your request.
+
+Separate written permission may be required before KVRN uses creator or customer content for advertising or promotional purposes.
+
+16. THIRD-PARTY SERVICES AND LINKS
+
+KVRN uses third-party service providers to operate payments, shipping, email, SMS, hosting, databases, fraud prevention, and other functions.
+
+The website may also link to carriers, social-media platforms, or other third-party services.
+
+KVRN is not responsible for the content or independent practices of third-party websites or services that KVRN does not control.
+
+17. PRIVACY AND COOKIES
+
+KVRN’s collection and use of personal information is described in the Privacy Policy.
+
+Use of cookies, local storage, and similar technologies is described in the Cookie Policy.
+
+18. DISCLAIMERS
+
+To the maximum extent permitted by applicable law, the website and its general informational content are provided on an “as available” basis.
+
+KVRN does not guarantee that the website will always be uninterrupted, error-free, or available.
+
+Nothing in these Terms disclaims warranties, remedies, or consumer rights that cannot legally be excluded.
+
+19. LIMITATION OF LIABILITY
+
+To the maximum extent permitted by law, KVRN will not be liable for indirect, incidental, special, punitive, or consequential damages arising from use of the website or products.
+
+Where liability cannot be excluded, KVRN’s liability will be limited only to the extent permitted by applicable law.
+
+Nothing in this section limits liability that cannot legally be limited or excluded.
+
+20. GOVERNING LAW
+
+These Terms are governed by the laws of the State of California and applicable federal law, without regard to conflict-of-law principles, except to the extent mandatory consumer law in another jurisdiction applies.
+
+Nothing in these Terms deprives a consumer of non-waivable rights or protections that apply in the consumer’s jurisdiction.
+
+Before starting formal proceedings, you and KVRN are encouraged to contact the other party and attempt to resolve the issue in good faith.
+
+These Terms do not create a binding-arbitration requirement.
+
+21. CHANGES TO THESE TERMS
+
+KVRN may update these Terms from time to time.
+
+The updated version will be posted on the website with a revised “Last updated” date.
+
+If a change requires additional notice or renewed consent under applicable law, KVRN will provide it.
+
+22. SEVERABILITY
+
+If any provision of these Terms is found unenforceable, the remaining provisions will remain in effect to the maximum extent permitted by law.
+
+23. CONTACT
+
+Questions about these Terms may be sent to:
+
+support@kvrn.shop

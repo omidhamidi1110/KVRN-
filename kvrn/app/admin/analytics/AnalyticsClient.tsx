@@ -223,7 +223,7 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
                   : `No ${rankMetric === 'adds' ? 'add-to-cart' : rankMetric === 'purchases' ? 'purchase' : 'view'} activity recorded for any product in this window`} />
             </ChartBoundary>
           </div>
-          <AdminTable caption="Product funnel">
+          <AdminTable caption="Product funnel" stack>
             <thead><tr>
               {['Product', 'Views', 'Add to cart', 'Checkout starts', 'Purchases', 'Cart rate', 'Purchase rate'].map(h =>
                 <AdminTh key={h}>{h}</AdminTh>)}

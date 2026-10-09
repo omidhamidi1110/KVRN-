@@ -12,6 +12,7 @@ import { sql } from '@/lib/db'
 const LEGACY_METADATA: Metadata = {
   title: 'About — KVRN',
   description: 'KVRN is built around weight, structure, and restraint. Quiet garments designed for daily wear.',
+  alternates: { canonical: '/about' },
 }
 
 function LegacyAboutPage({ locale }: { locale: Locale }) {
@@ -74,8 +75,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const view = await contentPublic().getAbout()
   if (!view) return LEGACY_METADATA
   const seo = view.variants.en.data.seo
-  return pageMetadata({ title: LEGACY_METADATA.title as string, description: LEGACY_METADATA.description as string }, seo,
-    seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null)
+  return { ...pageMetadata({ title: LEGACY_METADATA.title as string, description: LEGACY_METADATA.description as string }, seo,
+    seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null), alternates: { canonical: '/about' } }
 }
 
 export default async function AboutPage() {

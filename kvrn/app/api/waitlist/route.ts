@@ -1,92 +1,44 @@
+// KVRN waitlist = email only. Phone data in a web request is NEVER marketing SMS consent.
+// A real inbound Twilio JOIN->YES confirmation has a separate, gated flow.
 import { NextRequest, NextResponse } from 'next/server'
-import { sendEmail, waitlistConfirmationHTML } from '@/lib/email'
-import { normaliseEmail, upsertSubscriber, updateSyncStatus, ALLOWED_CONSENT_SOURCES } from '@/lib/marketing-subscribers'
-import { normalizePhoneE164 } from '@/lib/phone'
-import { upsertSmsSubscriber } from '@/lib/sms-subscribers'
-import { syncSubscribeToResend } from '@/lib/resend-marketing'
+import { normaliseEmail, upsertSubscriber } from '@/lib/marketing-subscribers'
+import { validatePublicEmailConsent } from '@/lib/marketing-email-consent'
+import { readLimitedJson } from '@/lib/limited-json-request'
+import { allowPublicApiRequest } from '@/lib/public-api-rate-limit'
+import { sql } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
+const noStore = { 'Cache-Control': 'no-store' }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const {
-      email,
-      phone,
-      smsConsent = false,
-      dropId     = 'drop_001',
-      source     = 'waitlist',
-    } = body
-
-    // ── Validate ──────────────────────────────────────────────────────────
-    if (!email?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ success: false, error: 'A valid email address is required.' }, { status: 400 })
-    }
-
-    const normEmail    = normaliseEmail(email)
-    const consentSource = ALLOWED_CONSENT_SOURCES.has(source) ? source : 'waitlist'
-
-    // ── Store marketing consent in Neon (source of truth) ─────────────────
-    // If Neon fails, the explicit email marketing consent cannot be stored.
-    // Return a failure — do not silently report success without stored consent.
-    let subscriberId: string
+  if (process.env.NODE_ENV === 'production') {
     try {
-      const result = await upsertSubscriber({ email: normEmail, consentSource })
-      subscriberId = result.id
-    } catch (dbErr: any) {
-      console.error('[waitlist] DB error (consent not stored):', dbErr?.message?.slice(0, 80))
-      return NextResponse.json(
-        { success: false, error: 'Subscription could not be saved. Please try again.' },
-        { status: 500 }
-      )
-    }
-
-    // ── Sync to Resend (best-effort) ──────────────────────────────────────
-    if (subscriberId) {
-      try {
-        const sync = await syncSubscribeToResend({ email: normEmail, firstName: null, lastName: null })
-        await updateSyncStatus(subscriberId, sync.ok ? 'synced' : 'failed', sync.contactId, sync.ok ? null : sync.error)
-      } catch (syncErr: any) {
-        console.error('[waitlist] Resend sync failed (non-fatal):', syncErr?.message?.slice(0, 80))
-        try { await updateSyncStatus(subscriberId, 'failed', null, 'Sync exception') } catch {}
-      }
-    }
-
-    // ── Store SMS consent (independent from email) ─────────────────────
-    // Only store if explicit smsConsent provided AND phone is valid.
-    // SMS consent does not depend on email consent and vice versa.
-    if (smsConsent && phone) {
-      const phoneE164 = normalizePhoneE164(String(phone))
-      if (phoneE164) {
-        try {
-          await upsertSmsSubscriber({ phoneE164, consentSource: 'waitlist' })
-        } catch (smsErr: any) {
-          // Non-fatal — SMS consent failure does not block email signup
-          console.error('[waitlist] SMS DB error (non-fatal):', smsErr?.message?.slice(0, 80))
-        }
-      }
-    }
-
-    // ── Confirmation email (stub — kept for backward compat) ─────────────
-    // In production, Resend Broadcasts handle promotional emails.
-    // This stub call is a no-op (sendEmail is not yet wired for marketing).
-    try {
-      await sendEmail({
-        to:      email.trim(),
-        subject: "You're on the list.",
-        html:    waitlistConfirmationHTML({ email: email.trim(), dropId }),
-      })
-    } catch {
-      // Non-fatal stub
-    }
-
-    console.log(`[waitlist] ${normEmail} | drop: ${dropId} | source: ${consentSource} | sms: ${smsConsent}`)
-
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error('[waitlist] Error:', err)
-    return NextResponse.json({ success: false, error: 'Server error. Please try again.' }, { status: 500 })
+      const ok = await allowPublicApiRequest(sql, { bucket: 'waitlist_email_signup', headers: req.headers, limit: 8, windowSeconds: 600 })
+      if (!ok) return NextResponse.json({ success: false, error: 'Too many attempts.' }, { status: 429, headers: { ...noStore, 'Retry-After': '600' } })
+    } catch { return NextResponse.json({ success: false, error: 'Temporarily unavailable.' }, { status: 503, headers: noStore }) }
   }
+  const read = await readLimitedJson(req, 2048)
+  if (!read.ok || typeof read.value !== 'object' || !read.value || Array.isArray(read.value)) {
+    return NextResponse.json({ success: false, error: 'Invalid request.' }, { status: read.ok ? 400 : read.status, headers: noStore })
+  }
+  const body = read.value as Record<string, unknown>
+  if (typeof body.email !== 'string') return NextResponse.json({ success: false, error: 'Valid email required.' }, { status: 400, headers: noStore })
+  const email = normaliseEmail(body.email)
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ success: false, error: 'Valid email required.' }, { status: 400, headers: noStore })
+  }
+  const consent = validatePublicEmailConsent(body, 'waitlist')
+  if (!consent.ok) return NextResponse.json({ success: false, error: consent.error }, { status: 400, headers: noStore })
+  try {
+    await upsertSubscriber({ email, consentSource: consent.source })
+  } catch {
+    return NextResponse.json({ success: false, error: 'Unable to save signup. Try again.' }, { status: 503, headers: noStore })
+  }
+  // Contact sync is performed by the authenticated, permissioned marketing cron.
+  // The public form never connects directly to a provider or dispatches mail.
+  return NextResponse.json({ success: true }, { headers: noStore })
 }
 
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed.' }, { status: 405 })
+  return NextResponse.json({ error: 'Method not allowed.' }, { status: 405, headers: noStore })
 }

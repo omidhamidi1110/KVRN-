@@ -57,6 +57,15 @@ export function getFunnelSessionIdIfConsented(): string | null {
   } catch { return null }
 }
 
+/** Existing consent-covered session only; presence never initializes a new session. */
+export function getExistingFunnelSessionIdIfConsented(): string | null {
+  try {
+    if (!analyticsConsentGranted()) return null
+    const sid = window.sessionStorage.getItem(FUNNEL_SID_KEY)
+    return sid && UUID_V4.test(sid) ? sid : null
+  } catch { return null }
+}
+
 /** Forget the session (consent withdrawn). */
 export function clearFunnelSession(): void {
   try {
@@ -79,7 +88,7 @@ function send(payload: Record<string, unknown>): void {
   } catch { /* ignore */ }
 }
 
-const isInternal = (path: string) => /^\/(admin|api|_next)(\/|$)/i.test(path)
+const isInternal = (path: string) => /^\/(admin|api|_next)(\/|$)|^\/store-credit\/verify\/?$/i.test(path)
 
 export interface EntryContext {
   landing: string | null

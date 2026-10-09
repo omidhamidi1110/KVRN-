@@ -366,7 +366,12 @@ d('auth service + routes (real PostgreSQL)', () => {
   })
 
   test('production cookies are Secure', async () => {
-    const prev = process.env.NODE_ENV; (process.env as any).NODE_ENV = 'production'
+    const prev = process.env.NODE_ENV
+    const prevPepper = process.env.AFFILIATE_AUTH_PEPPER;
+    // Exercise actual production security with a fresh test-only secret.
+    // Production must still refuse missing/weak AFFILIATE_AUTH_PEPPER values.
+    (process.env as any).NODE_ENV = 'production'
+    process.env.AFFILIATE_AUTH_PEPPER = newToken()
     try {
       const a = await mkAffiliate(fx.q)
       const svc = createAffiliateAuthService(fx.sql, { siteOrigin: () => ORIGIN, sendLoginEmail: async m => { mockSent.push({ to: '', subject: '', from: '', html: m.link }); return true } })
@@ -374,7 +379,11 @@ d('auth service + routes (real PostgreSQL)', () => {
       const token = mockSent[mockSent.length - 1].html.split('#t=')[1]
       const ok = await verifyPOST(mkReq('/api/affiliate/auth/verify', { method: 'POST', body: { token }, headers: { 'cf-connecting-ip': '10.25.0.2' } }))
       expect(ok.headers.getSetCookie().every((c: string) => /; Secure/.test(c))).toBe(true)
-    } finally { (process.env as any).NODE_ENV = prev }
+    } finally {
+      (process.env as any).NODE_ENV = prev
+      if (prevPepper === undefined) delete process.env.AFFILIATE_AUTH_PEPPER
+      else process.env.AFFILIATE_AUTH_PEPPER = prevPepper
+    }
   })
 
   test('requireAffiliate: no cookie 401; CSRF layers on POST; read-only accounts cannot write; logout works for them', async () => {

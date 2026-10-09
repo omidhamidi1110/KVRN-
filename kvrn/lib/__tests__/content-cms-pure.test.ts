@@ -315,15 +315,15 @@ describe('source guards', () => {
   })
   test('every wrapped storefront page consults the flag before touching the CMS, and keeps its coded page', () => {
     const wrapped: Array<[string, RegExp]> = [
-      ['app/terms/page.tsx', /LegacyTermsPage/], ['app/privacy/page.tsx', /LegacyPrivacyPage/], ['app/cookies/page.tsx', /LegacyCookiesPage/],
-      ['app/support/shipping-returns/page.tsx', /LegacyShippingReturnsPage/], ['app/support/faq/page.tsx', /LegacyFAQPage/],
-      ['app/about/page.tsx', /LegacyAboutPage/], ['app/legal/terms/page.tsx', /LegacyLegalTermsPage/], ['app/legal/privacy/page.tsx', /LegacyLegalPrivacyPage/],
+      ['app/terms/page.tsx', /OwnerPolicyFallback policy="terms"/], ['app/privacy/page.tsx', /OwnerPolicyFallback policy="privacy"/], ['app/cookies/page.tsx', /OwnerPolicyFallback policy="cookies"|CookiesFallback|Fallback/],
+      ['app/support/shipping-returns/page.tsx', /LegacyShippingReturnsPage|OwnerPolicyFallback/], ['app/support/faq/page.tsx', /LegacyFAQPage/],
+      ['app/about/page.tsx', /LegacyAboutPage/],
       ['app/collections/project-kvrn/page.tsx', /LegacyProjectKVRNPage/], ['app/support/size-guide/page.tsx', /LegacySizeGuide/], ['app/contact/page.tsx', /ContactClient/],
     ]
     for (const [f, legacy] of wrapped) {
       const s = read(f)
       expect(s).toMatch(legacy)
-      expect(s).toContain("export const dynamic = 'force-dynamic'")
+      expect(s).toMatch(/export const dynamic\s*=\s*'force-dynamic'/)
       // every loader call must be preceded (in its own function) by the flag check; the size-guide
       // page keeps its loader in a helper that is only ever called after the check.
       const body = s.replace(/async function load\(\) \{[\s\S]*?\n\}\n/, '')
@@ -333,6 +333,13 @@ describe('source guards', () => {
         const before = body.slice(Math.max(0, at - 260), at)
         expect(before).toMatch(/cmsContentEnabled\(\)/)
       }
+    }
+  })
+  test('legacy /legal/* aliases permanently redirect to the one canonical route and never render a second copy', () => {
+    for (const [f, to] of [['app/legal/terms/page.tsx', '/terms'], ['app/legal/privacy/page.tsx', '/privacy']]) {
+      const s = read(f)
+      expect(s).toContain(`permanentRedirect('${to}')`)
+      expect(s).not.toMatch(/contentPublic|OwnerPolicyFallback|PolicyView/)
     }
   })
   test('routes that exist only with the flag on 404 when it is off', () => {

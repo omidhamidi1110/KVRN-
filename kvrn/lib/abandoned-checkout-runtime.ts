@@ -14,12 +14,13 @@ import { syncUnsubscribeFromResend } from './resend-marketing'
 async function unsubscribeMarketing(email: string): Promise<void> {
   const wasSubscribed = await unsubscribeByEmail(email)
   if (!wasSubscribed) return
+  if (process.env.RESEND_MARKETING_CONTACT_SYNC_ENABLED !== 'true') return
   try {
     const rows = await sql`SELECT id, resend_contact_id AS "resendContactId" FROM marketing_subscribers WHERE email = ${email} LIMIT 1`
     const row = (rows as any[])[0]
     if (row) {
-      const sync = await syncUnsubscribeFromResend({ contactId: row.resendContactId })
-      await updateSyncStatus(row.id, sync.ok ? 'synced' : 'failed', null, sync.ok ? null : sync.error)
+      const sync = await syncUnsubscribeFromResend({ contactId: row.resendContactId, email })
+      await updateSyncStatus(row.id, sync.ok ? 'synced' : 'failed', null, sync.ok ? null : sync.error, 'unsubscribed')
     }
   } catch { /* the Neon unsubscribe already happened; sync is retried by the existing job */ }
 }

@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
+import {readAdminMutationJson} from '@/lib/admin-mutation-safety'
+import {validateAiNotificationSettings} from '@/lib/ai/admin-control-safety'
 import { getAiRuntimeSettings, isValidAiBusinessTimezone, updateAiRuntimeSettings } from '@/lib/ai/repository'
 
 export const dynamic = 'force-dynamic'
@@ -14,10 +16,10 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { identity, error } = await requireAdmin(req)
   if (error) return error
-  let body: any
-  try { body = await req.json() } catch {
-    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400, headers: NO_STORE })
-  }
+  const parsed=await readAdminMutationJson(req,4096)
+  if(!parsed.ok)return NextResponse.json({error:'Invalid or unauthorized JSON request.'},{status:parsed.status,headers:NO_STORE})
+  const body=parsed.value as Record<string,unknown>
+  if(!validateAiNotificationSettings(body))return NextResponse.json({error:'Invalid AI notification settings.'},{status:400,headers:NO_STORE})
   const hour = (v: unknown) => Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 23 ? Number(v) : null
   const limit = Number(body.noncriticalPushLimitDay)
   const timezone = String(body.businessTimezone ?? '').trim()
@@ -35,7 +37,7 @@ export async function PATCH(req: NextRequest) {
   const settings = await updateAiRuntimeSettings({
     businessTimezone: timezone,
     dailyBriefHourLocal: daily,
-    quietHoursEnabled: body.quietHoursEnabled !== false,
+    quietHoursEnabled: body.quietHoursEnabled === true,
     quietHoursStartLocal: quietStart,
     quietHoursEndLocal: quietEnd,
     noncriticalPushLimitDay: limit,

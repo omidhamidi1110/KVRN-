@@ -113,43 +113,27 @@ describe('claim security architecture', () => {
     expect(src).not.toContain('body.subscriber')
   })
 
-  // Item 7: Twilio inbound webhook can confirm the claim
-  test('incoming webhook calls confirmSmsSignupClaim after authentication', () => {
+  // Claims are linked only after a separately verified YES, never on JOIN alone.
+  test('Twilio YES confirmation is gated by validated signature and sender identity', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
     )
-    expect(src).toContain('confirmSmsSignupClaim')
-    expect(src).toContain('claimTokenRaw')
-    // Confirm is called AFTER validateTwilioSignature (after auth)
-    const authIdx    = src.indexOf('validateTwilioSignature')
-    const confirmIdx = src.indexOf('confirmSmsSignupClaim')
-    expect(authIdx).toBeGreaterThan(0)
-    expect(confirmIdx).toBeGreaterThan(authIdx)
-  })
-
-  // Item 8: Subscriber association comes from Twilio From
-  test('subscriber ID passed to confirm comes from Twilio From (not browser body)', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
-    )
-    // Confirm call embeds smsSubscriberId (derived from Twilio From, not browser)
-    expect(src).toContain('subscriberId: smsSubscriberId')
-    // params.From is the source of phone ownership
+    expect(src).toContain('validateTwilioSignature(')
     expect(src).toContain('params.From')
+    expect(src).toContain('KEYWORD_CONFIRMS.has(keyword)')
+    expect(src).toContain('await confirmKeywordSms(phone,params.MessageSid')
+    expect(src.indexOf("verified!=='valid'")).toBeLessThan(src.indexOf('await confirmKeywordSms('))
   })
 
-  // Item 9: Claim cannot be reassigned to another subscriber
-  test('confirm update only transitions pending → confirmed once (status guard)', () => {
+  test('claim is linked transactionally to the Twilio-verified YES sender', () => {
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../sms-signup-claims.ts'), 'utf8'
+      require('path').join(__dirname, '../sms-double-optin.ts'), 'utf8'
     )
-    // Check confirmSmsSignupClaim in lib source
-    const claimSrc = require('fs').readFileSync(
-      require('path').join(__dirname, '../sms-signup-claims.ts'), 'utf8'
-    )
-    expect(claimSrc).toContain("AND status     = 'pending'")
-    expect(claimSrc).toContain('UPDATE sms_signup_claims')
-    // Once confirmed, a second Twilio JOIN cannot overwrite subscriber_id
+    expect(src).toContain('INSERT INTO sms_keyword_consent_proofs')
+    expect(src).toContain('UPDATE sms_signup_claims sc')
+    expect(src).toContain("sc.status='pending' AND sc.expires_at>NOW()")
+    expect(src).toContain('EXISTS(SELECT 1 FROM enrolled)')
+    expect(src).toContain('WHERE phone_e164=${phone} AND expires_at>NOW()')
   })
 
   // Item 10: Consumed claim cannot be replayed
@@ -169,72 +153,46 @@ describe('claim security architecture', () => {
   })
 })
 
-// ── Existing behavior preserved (items 11-16) ───────────────────────────────
+// ── Current opt-in security invariants ─────────────────────────────────────
 
-describe('existing behavior preserved', () => {
-  // Item 11: Plain JOIN without claim token still subscribes
-  test('incoming webhook handles JOIN with no TK- token gracefully', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
-    )
-    // claimTokenRaw will be null when no TK- present
-    expect(src).toContain('claimTokenRaw')
-    // Subscription logic runs regardless
-    expect(src).toContain('upsertSmsSubscriber')
-    expect(src).toContain('resubscribeSmsPhone')
-    // Claim confirmation is guarded by claimTokenRaw being truthy
-    const confirmBlock = src.slice(src.indexOf('if (claimTokenRaw &&'), src.indexOf('if (claimTokenRaw &&') + 200)
-    expect(confirmBlock).toContain('claimTokenRaw')
+describe('current verified keyword consent behavior', () => {
+  const inboundSource = () => require('fs').readFileSync(
+    require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
+  )
+  test('JOIN with no TK- token still requires a separate YES', () => {
+    const src = inboundSource()
+    expect(src).toContain('const token=rawText.match(')
+    expect(src).toContain('await startKeywordConfirmation(phone,token)')
+    expect(src).toContain('KEYWORD_CONFIRMS.has(keyword)')
+    expect(src).not.toContain('upsertSmsSubscriber(')
+    expect(src).not.toContain('resubscribeSmsPhone(')
   })
-
-  // Item 12: STOP still unsubscribes
-  test('STOP_KEYWORDS still handled in incoming webhook', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
-    )
-    expect(src).toContain("STOP_KEYWORDS")
-    expect(src).toContain('unsubscribeSmsPhone')
+  test('STOP fails closed when suppression persistence fails', () => {
+    const src = inboundSource()
+    expect(src).toContain('KEYWORD_STOPS.has(keyword)')
+    expect(src).toContain('await suppressInboundSmsPhone(phone)')
+    expect(src).toContain('Temporary failure; retry required.')
   })
-
-  // Item 13: START still resubscribes
-  test('START_KEYWORDS still handled including JOIN', () => {
+  test('all new signup paths require explicit provider approval and double opt-in', () => {
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
+      require('path').join(__dirname, '../sms-double-optin.ts'), 'utf8'
     )
-    expect(src).toContain("'JOIN'")
-    expect(src).toContain('START_KEYWORDS')
+    for (const gate of ['TWILIO_A2P_APPROVED','TWILIO_SIGNUP_ENABLED','TWILIO_KEYWORD_DOUBLE_OPTIN_ENABLED']) {
+      expect(src).toContain(gate)
+    }
   })
-
-  // Item 14: Manual website signup still works
-  test('POST /api/sms/subscribe still exists', () => {
-    const exists = require('fs').existsSync(
-      require('path').join(__dirname, '../../app/api/sms/subscribe/route.ts')
-    )
-    expect(exists).toBe(true)
-  })
-
-  // Item 15: Desktop SMS signup (phone form) still works
-  test('desktop phone form submits to /api/sms/subscribe', () => {
+  test('public phone enrollment rejects self-asserted ownership', () => {
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
+      require('path').join(__dirname, '../../app/api/sms/subscribe/route.ts'), 'utf8'
     )
-    // GA Audit Revision 2: the request itself moved, unchanged, into lib/sms-signup.ts (so its analytics
-    // lifecycle is unit-testable); the popup must still submit through it.
-    const signup = require('fs').readFileSync(
-      require('path').join(__dirname, '../../lib/sms-signup.ts'), 'utf8'
-    )
-    expect(src).toContain('submitSmsSignup(')
-    expect(signup).toContain("'/api/sms/subscribe'")
-    expect(src).toContain("type=\"tel\"")
+    expect(src).toContain('status: 409')
+    expect(src).not.toContain('upsertSmsSubscriber(')
   })
-
-  // Item 16: Mobile manual-number alternative still present
-  test('mobile popup has manual phone entry option (showManual toggle)', () => {
+  test('public SMS popup is disabled until specifically enabled', () => {
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
+      require('path').join(__dirname, '../../components/sms/ConditionalSmsPopup.tsx'), 'utf8'
     )
-    expect(src).toContain('showManual')
-    expect(src).toContain('Enter your number manually')  // actual text in current popup
+    expect(src).toContain("NEXT_PUBLIC_SMS_SIGNUP_ENABLED !== 'true'")
   })
 })
 
@@ -268,9 +226,8 @@ describe('mobile claim flow mechanics', () => {
       require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
     )
     expect(src).toContain('/TK-([A-Za-z0-9_-]{20,40})/')
-    expect(src).toContain('bodyRaw')
-    // First word extraction for keyword detection preserved
-    expect(src).toContain('toUpperCase().split')
+    expect(src).toContain('const rawText=String(params.Body')
+    expect(src).toContain('parseSmsKeyword(rawText)')
   })
 
   // Item 18: SMS code still undergoes V58.4 server validation
@@ -471,12 +428,12 @@ describe('resolve behavior — all new scenarios from spec', () => {
   })
 
   // Item 13: Twilio confirmation is now awaited
-  test('confirmSmsSignupClaim is awaited in Twilio webhook', () => {
+  test('confirmKeywordSms is awaited only after verified YES in Twilio webhook', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
     )
-    expect(src).toContain('await confirmSmsSignupClaim')
-    // .then() chains removed
+    expect(src).toContain('await confirmKeywordSms(phone,params.MessageSid')
+    // no detached async callback may confirm consent
     expect(src).not.toContain('.then(confirmed =>')
   })
 })

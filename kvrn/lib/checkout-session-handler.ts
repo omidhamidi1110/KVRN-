@@ -33,6 +33,7 @@ import type { BundlePrep, BundlePrepResult } from './bundle-checkout'
 import { ABANDONED_RECOVERY_COOKIE } from './abandoned-checkout-token'
 import { checkoutPresentation } from './i18n/checkout'
 import { isFeatureEnabled } from './feature-flags'
+import {parseRequestedCredit,storeCreditIdentityCookieName,prepareCustomerStoreCreditRedemption,createCreditCheckoutCoupon,markCreditCheckoutProviderStarted,releaseCreditBeforeProvider} from './store-credit-checkout-redemption'
 
 export interface CheckoutRouteDeps {
   isCheckoutEnabled:              () => boolean
@@ -695,7 +696,57 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       )
     }
 
+    // ── TEST-MODE STORE CREDIT: bind owner-verified credit before Stripe ────
+    // Absent storeCreditCents: the previous checkout remains byte-for-byte
+    // equivalent in its Stripe payload and canonical reservation economics.
+    let creditTender: Awaited<ReturnType<typeof prepareCustomerStoreCreditRedemption>> | null = null
+    let creditCouponId: string | null = null
+    if (body.storeCreditCents !== undefined && body.storeCreditCents !== null) {
+      const requestedCreditCents = parseRequestedCredit(body.storeCreditCents)
+      if (requestedCreditCents === null || hasBundle) {
+        try { await releaseDiscountClaim(reservation.reservationId) } catch {}
+        try { await deps.failReservation(reservation.reservationId, 'invalid_credit_request') } catch {}
+        return NextResponse.json({error:'This store-credit amount cannot be applied.'},{status:400})
+      }
+      try {
+        const cookieValue=req.cookies?.get(storeCreditIdentityCookieName())?.value
+        creditTender=await prepareCustomerStoreCreditRedemption({
+          requestedCreditCents,customerEmail:email,cookieValue,
+          reservationId:reservation.reservationId,subtotalCents,
+          discountCents:appliedDiscount?.type !== 'shipping' ? (appliedDiscount?.amountCents ?? 0) : 0,
+          shippingCents:adjustedShippingCents,taxCents:0,
+        })
+        creditCouponId=await createCreditCheckoutCoupon(stripe,reservation.reservationId,
+          creditTender.quote.discountCents,creditTender.quote.creditTenderCents)
+      } catch (err: any) {
+        // We have NOT invoked Stripe sessions.create yet. The DB only allows
+        // releasing a hold while the durable provider-start marker is ABSENT.
+        // Coupon requests themselves cannot charge a customer.
+        if(creditTender){
+          try { await releaseCreditBeforeProvider(reservation.reservationId) }
+          catch(releaseErr:any){console.error('[checkout] credit pre-provider release needs reconciliation:',releaseErr?.message?.slice(0,85))}
+        }
+        console.error('[checkout] credit redemption could not initialize:',String(err?.message??'error').slice(0,85))
+        try { await releaseDiscountClaim(reservation.reservationId) } catch {}
+        try { await deps.failReservation(reservation.reservationId,'credit_redemption_failed') } catch {}
+        return NextResponse.json({error:'Store credit could not be applied. Please try another checkout.'},{status:503})
+      }
+    }
+
     // ── Step 3: Create Stripe Session ─────────────────────────────────────────
+    // Durable marker MUST precede the network request. Never infer "unsent"
+    // from a network timeout after this point.
+    if(creditTender && creditCouponId){
+      try { await markCreditCheckoutProviderStarted(reservation.reservationId,creditCouponId) }
+      catch(err:any){
+        // A DB timeout may mean marker already committed. The no-provider
+        // release procedure will reject it; unresolved holds get reviewed.
+        try{await releaseCreditBeforeProvider(reservation.reservationId)}catch{}
+        try{await releaseDiscountClaim(reservation.reservationId)}catch{}
+        try{await deps.failReservation(reservation.reservationId,'credit_provider_marker_failed')}catch{}
+        return NextResponse.json({error:'Checkout could not be started. Please try again.'},{status:503})
+      }
+    }
     let session: any
     try {
       session = await stripe.checkout.sessions.create(
@@ -757,6 +808,7 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
           // Authoritative attribution is in Neon reservation/order/redemption tables.
           metadata: {
             reservation_id: reservation.reservationId,
+            ...(creditTender ? {kvrn_store_credit_cents:String(creditTender.quote.creditTenderCents)} : {}),
             shipping_method: shippingMethod,
             ...(bundlePrep ? { kvrn_bundle_id: bundlePrep.quote.bundleId } : {}),
             ...(gaClientId ? { ga_client_id: gaClientId, ...(gaSessionId ? { ga_session_id: gaSessionId } : {}) } : {}),
@@ -770,8 +822,8 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
             } : {}),
           },
           // Stripe coupon for merchandise discounts; shipping discounts applied to shippingCents directly
-          ...(appliedDiscount?.type !== 'shipping' && appliedDiscount?.stripeCouponId
-            ? { discounts: [{ coupon: appliedDiscount.stripeCouponId }] }
+          ...(creditCouponId || (appliedDiscount?.type !== 'shipping' && appliedDiscount?.stripeCouponId)
+            ? { discounts: [{ coupon: creditCouponId || appliedDiscount!.stripeCouponId }] }
             : {}),
           // allow_promotion_codes: omitted — KVRN is the only discount entry point
           success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -783,6 +835,16 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
       )
     } catch (err: any) {
       console.error('Stripe session creation failed:', err.message)
+      if (creditTender) {
+        // The provider-start marker was committed BEFORE this request. A Stripe
+        // timeout can mean a live (test-mode) session exists with payable cash.
+        // NEVER release the credit or inventory/discount here: doing so could
+        // let the same goods and credit fund a second checkout while payment
+        // for the first is still completing. Escalate to owner reconciliation.
+        if (isStripeProviderFault(err)) await recordProviderFailure('Stripe', 'credit_checkout_ambiguous_session_create')
+        return NextResponse.json({error:'Store-credit checkout requires payment-session reconciliation. No charge has been confirmed.'},{status:503})
+      }
+      // Ordinary checkout retains its existing reservation cleanup behavior.
       // Release discount claim if session creation fails
       if (appliedDiscount && (_appliedValidation?.valid ? _appliedValidation.discount.singleUse || _appliedValidation.discount.maxRedemptions !== null : false)) {
         try { await releaseDiscountClaim(reservation.reservationId) } catch {}
@@ -801,6 +863,14 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
 
     if (!isValidHttpsUrl(session.url)) {
       console.error(`CRITICAL: Stripe returned null session.url for ${session.id}`)
+      if(creditTender){
+        // No reliable durable session association was established. Even a
+        // successful expire response is not a sufficient accounting proof for
+        // a DB hold still missing its verified finalization linkage.
+        try{await stripe.checkout.sessions.expire(session.id)}catch{}
+        await recordProviderFailure('Stripe','credit_checkout_missing_session_url')
+        return NextResponse.json({error:'Store-credit checkout needs reconciliation.'},{status:503})
+      }
       // Release discount claim before expiring (Blocker 5)
       try { await releaseDiscountClaim(reservation.reservationId) } catch {}
       try {
@@ -833,6 +903,14 @@ export function createCheckoutPostHandler(deps: CheckoutRouteDeps) {
 
     if (!attached) {
       console.error(`CRITICAL: Failed to attach ${session.id} to reservation ${reservation.reservationId}`)
+      if(creditTender){
+        // Keep paid-order recovery possible; a session could have been paid
+        // before our attempt to expire it. Without DB linkage, manual provider
+        // reconciliation must precede any inventory/discount/credit release.
+        try{await stripe.checkout.sessions.expire(session.id)}catch{}
+        await recordProviderFailure('Neon','credit_checkout_attach_needs_reconciliation')
+        return NextResponse.json({error:'Store-credit checkout needs reconciliation.'},{status:503})
+      }
       // Release discount claim before expiring (Blocker 6)
       try { await releaseDiscountClaim(reservation.reservationId) } catch {}
       let stripeExpired = false

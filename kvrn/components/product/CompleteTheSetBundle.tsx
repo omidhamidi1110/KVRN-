@@ -7,6 +7,7 @@
 // the server to quote the exact selection first, then puts the set in the bag as its real component
 // lines. The server prices the set again at checkout.
 import { useMemo, useState } from 'react'
+import { imageSrcSet } from '@/lib/responsive-image'
 import Link from 'next/link'
 import { useCart } from '@/context/CartContext'
 import { formatProductPrice } from '@/lib/product-price'
@@ -28,7 +29,7 @@ function ComponentCard({ c, colorCode, sku, onColor, onSku }: {
       <div style={{ position: 'relative', width: '100%', aspectRatio: '3/4', overflow: 'hidden', background: '#EDEAE4', marginBottom: 14 }}>
         {img?.src && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img.src} alt={img.alt || c.name} loading="lazy"
+          <img src={img.src} srcSet={imageSrcSet(img.src)} sizes="(max-width: 640px) 50vw, 300px" alt={img.alt || c.name} loading="lazy"
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
         )}
         {!c.available && (

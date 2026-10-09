@@ -1,41 +1,31 @@
-// GET  /api/admin/backups — backup / restore-test / DR-drill readiness + bounded history
-// POST /api/admin/backups — record metadata for a backup that was made OUTSIDE the app
-//
-// Admin-only. This route never creates a backup, reads a dump, or contacts Neon: it appends a
-// metadata row to admin_audit_logs and reads such rows back. See lib/backup-records.ts.
-import { type NextRequest, NextResponse } from 'next/server'
+// Append-only metadata about backups that were created outside the website.
+import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { sql } from '@/lib/db'
-import { createBackupService, parseJsonBody, validateBackupInput } from '@/lib/backup-records'
+import { createBackupService, LIMITS, parseJsonBody, validateBackupInput } from '@/lib/backup-records'
 
 export const dynamic = 'force-dynamic'
+const NO_STORE = { 'Cache-Control': 'no-store' }
+const respond = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: NO_STORE })
 
 export async function GET(req: NextRequest) {
   const { error } = await requireAdmin(req)
   if (error) return error
-  try {
-    const dashboard = await createBackupService(sql as any).getDashboard()
-    return NextResponse.json(dashboard, { headers: { 'Cache-Control': 'no-store' } })
-  } catch (err: any) {
-    console.error('[admin/backups GET]', String(err?.message ?? err).slice(0, 120))
-    return NextResponse.json({ error: 'Could not load backup records.' }, { status: 500 })
-  }
+  try { return respond(await createBackupService(sql).getDashboard()) }
+  catch { return respond({ error: 'Backup records unavailable.' }, 503) }
 }
 
 export async function POST(req: NextRequest) {
   const { identity, error } = await requireAdmin(req)
   if (error) return error
-
-  const body = parseJsonBody(await req.text())
-  if (!body.ok) return NextResponse.json({ error: body.error }, { status: 400 })
-  const v = validateBackupInput(body.value, new Date())
-  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 })
-
-  try {
-    const { id } = await createBackupService(sql as any).recordBackup(v.value, identity!.email)
-    return NextResponse.json({ id, recorded: true }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
-  } catch (err: any) {
-    console.error('[admin/backups POST]', String(err?.message ?? err).slice(0, 120))
-    return NextResponse.json({ error: 'Could not record the backup.' }, { status: 500 })
-  }
+  if (!identity) return respond({ error: 'Unauthorized.' }, 401)
+  if (Number(req.headers.get('content-length') || 0) > LIMITS.bodyBytes) return respond({ error: 'Invalid input.' }, 400)
+  let raw: string
+  try { raw = await req.text() } catch { return respond({ error: 'Invalid input.' }, 400) }
+  const parsed = parseJsonBody(raw)
+  if (!parsed.ok) return respond({ error: 'Invalid input.' }, 400)
+  const input = validateBackupInput(parsed.value, new Date())
+  if (!input.ok) return respond({ error: 'Invalid backup metadata.' }, 400)
+  try { return respond(await createBackupService(sql).recordBackup(input.value, identity.email), 201) }
+  catch { return respond({ error: 'Backup record unavailable.' }, 503) }
 }

@@ -11,6 +11,7 @@ import { cn }          from '@/lib/utils'
 import type { Product, ColorOption, SizeLabel, SizeOption } from '@/types'
 import { formatProductPrice, sumPriceCents } from '@/lib/product-price'
 import { objectPositionFor } from '@/lib/product-images'
+import { imageSrcSet } from '@/lib/responsive-image'
 import { useCookiePrefs } from '@/context/CookiePrefsContext'
 import { trackProductView } from '@/lib/funnel-client'
 import { gaViewItemWhenReady } from '@/lib/ga-client'
@@ -942,6 +943,10 @@ function MobileGallery({ images, productName, onShop }: any) {
     images.forEach((img: any) => {
       if (!img?.src) return
       const el = new window.Image()
+      // Same candidate set + slot width as the visible slides, so the browser fetches (and reuses) the
+      // responsive rendition rather than the multi-megabyte original. `sizes` must be set before `srcset`/`src`.
+      const set = imageSrcSet(img.src)
+      if (set) { el.sizes = '100vw'; el.srcset = set }
       el.src = img.src
     })
   }, [images])
@@ -1022,6 +1027,7 @@ function MobileGallery({ images, productName, onShop }: any) {
             {img?.src ? (
               <img
                 src={img.src}
+                srcSet={imageSrcSet(img.src)} sizes="100vw"
                 alt={i === active ? (img.alt || productName) : ''}
                 loading="eager"
                 decoding="async"
@@ -1138,7 +1144,7 @@ function DesktopGallery3({ images, productName }: { images: any[]; productName: 
                      outline: i === idx ? '1.5px solid #111' : '1.5px solid transparent',
                      outlineOffset: 2, transition: 'outline-color 150ms' }}
           >
-            {img?.src && <img src={img.src} alt="" loading="lazy" style={{
+            {img?.src && <img src={img.src} srcSet={imageSrcSet(img.src)} sizes="80px" alt="" loading="lazy" style={{
               position: 'absolute', inset: 0, width: '100%', height: '100%',
               objectFit: 'cover', objectPosition: 'center top', pointerEvents: 'none'
             }} onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />}
@@ -1158,7 +1164,7 @@ function DesktopGallery3({ images, productName }: { images: any[]; productName: 
           style={{ position: 'relative', width: '100%', aspectRatio: '3/4',
                    overflow: 'hidden', background: '#EDEAE4' }}>
           {images.map((img: any, i: number) => img?.src ? (
-            <img key={img.src} src={img.src}
+            <img key={img.src} src={img.src} srcSet={imageSrcSet(img.src)} sizes="(max-width: 1024px) 100vw, 620px"
               alt={i===idx ? (img.alt||productName) : ''}
               loading={i<2?'eager':'lazy'}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -1235,7 +1241,7 @@ function MobileCarousel3({ images, productName }: { images: any[]; productName: 
                  overflow:'hidden', background:'#EDEAE4', touchAction:'pan-y' }}
       >
         {images.map((img: any, i: number) => img?.src ? (
-          <img key={img.src} src={img.src}
+          <img key={img.src} src={img.src} srcSet={imageSrcSet(img.src)} sizes="100vw"
             alt={i===idx ? (img.alt||productName) : ''}
             loading={i<2?'eager':'lazy'}
             style={{ position:'absolute', inset:0, width:'100%', height:'100%',
@@ -1632,7 +1638,7 @@ function BundleCard({ product, img, selectedSize, onSize }: {
     <div style={{ background:'transparent' }}>
       <div style={{ position:'relative', width:'100%', aspectRatio:'3/4',
                     overflow:'hidden', background:'#EDEAE4', marginBottom:14 }}>
-        {img?.src && <img src={img.src} alt={product.name} loading="lazy"
+        {img?.src && <img src={img.src} srcSet={imageSrcSet(img.src)} sizes="(max-width: 640px) 50vw, 300px" alt={product.name} loading="lazy"
           style={{ position:'absolute', inset:0, width:'100%', height:'100%',
                    objectFit:'cover', objectPosition:'center top' }}
           onError={e=>{(e.target as HTMLImageElement).style.display='none'}} />}

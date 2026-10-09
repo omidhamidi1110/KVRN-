@@ -75,7 +75,7 @@ export function PortalClient() {
         <button type="button" onClick={logout} className="h-9 rounded-[9px] border border-black/[0.14] bg-white px-3 text-[12px]">Sign out</button>
       </div>
       {banner && <Banner tone={banner.tone}>{banner.text}</Banner>}
-      <div role="tablist" aria-label="Portal sections" className="mb-4 flex gap-1 overflow-x-auto border-b border-black/[0.08]">
+      <div role="tablist" aria-label="Portal sections" className="relative mb-4 flex gap-1 overflow-x-auto border-b border-black/[0.08]">
         {TABS.map(t => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
             className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-[13px] font-medium ${tab === t.id ? 'border-[#171717] text-[#171717]' : 'border-transparent text-[#6B6B66]'}`}>{t.label}</button>
@@ -183,7 +183,7 @@ function CommissionsTab() {
     <Card>
       <H2>Sales and commission status</H2>
       {c.data.sales.length === 0 ? <p className="text-[13px] text-[#6B6B66]">No sales yet. When someone buys with your code or link, it shows up here.</p> : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto overscroll-x-contain">
           <table className="w-full min-w-[640px] text-left text-[12px]">
             <thead><tr className="text-[10px] uppercase tracking-[0.08em] text-[#8A8A85]">
               <th className="py-2 pr-3">Date</th><th className="pr-3">Sale ref</th><th className="pr-3">Items</th><th className="pr-3 text-right">Net sale</th><th className="pr-3 text-right">Commission</th><th>Status</th></tr></thead>
@@ -259,7 +259,7 @@ function Statement({ payoutRef }: { payoutRef: string }) {
         {st.totals.recoveredCents !== 0 && (<><dt>Recovered from you</dt><dd className="text-right">{formatCents(st.totals.recoveredCents)}</dd></>)}
         <dt className="font-medium">Net payout</dt><dd className="text-right font-medium">{formatCents(st.totals.netCents)}</dd>
       </dl>
-      <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[420px] text-left">
+      <div className="relative mt-3 overflow-x-auto overscroll-x-contain"><table className="w-full min-w-[420px] text-left">
         <thead><tr className="text-[10px] uppercase tracking-[0.08em] text-[#8A8A85]"><th className="py-1 pr-2">Sale</th><th className="pr-2">Date</th><th className="pr-2 text-right">Earned</th><th className="pr-2 text-right">Adjust.</th><th className="text-right">Line</th></tr></thead>
         <tbody>{st.lines.map((l: any) => (
           <tr key={l.saleRef} className="border-t border-black/[0.06]"><td className="py-1.5 pr-2 font-mono text-[11px]">{l.saleRef}</td><td className="pr-2">{dateOnly(l.saleDate)}</td>

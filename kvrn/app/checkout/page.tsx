@@ -17,6 +17,7 @@ import { gaBeginCheckout, getGaIdentifiers } from '@/lib/ga-client'
 import { getFunnelSessionIdIfConsented } from '@/lib/funnel-client'
 import { effectiveUnitCents, splitCartForCheckout } from '@/lib/bundle-cart'
 import { BUNDLE_CODE_NOT_COMBINABLE_MESSAGE } from '@/lib/bundle-pricing'
+import StoreCreditCheckout from '@/components/checkout/StoreCreditCheckout'
 
 type Step = 'contact' | 'shipping'
 
@@ -56,6 +57,7 @@ export default function CheckoutPage() {
   const [isClient,         setIsClient]         = useState(false)
   const [step,             setStep]             = useState<Step>('contact')
   const [paymentError,     setPaymentError]     = useState('')
+  const [storeCreditCents, setStoreCreditCents] = useState<number|null>(null)
   const [creatingSession,  setCreatingSession]  = useState(false)
 
   const [contact, setContact] = useState<ContactData>({ email: '', smsOptIn: false, phone: '' })
@@ -257,6 +259,7 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...(discountApplied.code ? { discountCode: discountApplied.code } : {}),
+          ...(!hasBundle && storeCreditCents!==null ? {storeCreditCents} : {}),
           // Opaque analytics session id; present only when analytics consent was given.
           ...(analyticsSid ? { analyticsSessionId: analyticsSid } : {}),
           ...(ga ? { gaClientId: ga.clientId, ...(ga.sessionId ? { gaSessionId: ga.sessionId } : {}) } : {}),
@@ -308,7 +311,7 @@ export default function CheckoutPage() {
     } finally {
       setCreatingSession(false)
     }
-  }, [items, contact, address, shippingMethod, canProceed, discountApplied.code, refreshBundles, t])
+  }, [items, contact, address, shippingMethod, canProceed, discountApplied.code, storeCreditCents, hasBundle, refreshBundles, t])
 
   const handleApplyDiscount = async (overrideCode?: string) => {
     const code = (overrideCode ?? discountInput).trim().toUpperCase()
@@ -718,6 +721,9 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               )}
+
+              {!hasBundle && <StoreCreditCheckout email={contact.email.trim()} netMerchandiseCents={Math.max(0,subtotalPence-appliedDiscountCents)}
+                totalCents={Math.max(0,totalCents)} onChange={setStoreCreditCents} />}
 
               {paymentError && (
                 <div style={{ marginTop:16, padding:'12px 16px', background:'#FEF2F2',

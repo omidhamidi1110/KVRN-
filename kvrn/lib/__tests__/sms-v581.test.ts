@@ -60,26 +60,32 @@ describe('canSendMarketingSms triple gate', () => {
   })
 })
 
-// ── JOIN keyword (item 21-22) ─────────────────────────────────────────────────
+// ── Verified JOIN → YES keyword consent ────────────────────────────────────
 
 describe('JOIN keyword in incoming route', () => {
-  // Item 21: JOIN creates sms_keyword subscriber
-  test('JOIN is in START_KEYWORDS in incoming route', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
-    )
-    expect(src).toContain("'JOIN'")
-    expect(src).toContain("'JOIN'")
-    expect(src).toContain('START_KEYWORDS')
+  const source = () => require('fs').readFileSync(
+    require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
+  )
+
+  test('JOIN only starts a pending confirmation after Twilio signature validation', () => {
+    const src = source()
+    expect(src).toContain('KEYWORD_STARTS.has(keyword)')
+    expect(src).toContain('startKeywordConfirmation(phone,token)')
+    expect(src).toContain('validateTwilioSignature(')
+    expect(src.indexOf("verified!=='valid'")).toBeLessThan(src.indexOf('startKeywordConfirmation(phone,token)'))
+    expect(src).not.toContain('resubscribeSmsPhone')
+    expect(src).not.toContain('upsertSmsSubscriber')
   })
 
-  // Item 22: JOIN re-subscribes existing unsubscribed row
-  test('START_KEYWORDS block calls both resubscribeSmsPhone and upsertSmsSubscriber', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/twilio/incoming/route.ts'), 'utf8'
+  test('a separate YES confirms only a pending verified signup', () => {
+    const src = source()
+    const domain = require('fs').readFileSync(
+      require('path').join(__dirname, '../sms-double-optin.ts'), 'utf8'
     )
-    expect(src).toContain('resubscribeSmsPhone')
-    expect(src).toContain('upsertSmsSubscriber')
+    expect(src).toContain('KEYWORD_CONFIRMS.has(keyword)')
+    expect(src).toContain('await confirmKeywordSms(phone,params.MessageSid')
+    expect(domain).toContain("KEYWORD_CONFIRMS=new Set(['YES'])")
+    expect(domain).toContain('WHERE phone_e164=${phone} AND expires_at>NOW()')
   })
 })
 
@@ -119,22 +125,17 @@ describe('no Twilio secrets in client component', () => {
 
 // ── Source cannot spoof internal source (item 26) ─────────────────────────────
 
-describe('homepage client cannot spoof internal source', () => {
-  test('subscribe route uses allowlisted source, falls back to homepage', () => {
+describe('public SMS enrollment stays closed until verified keyword opt-in', () => {
+  test('public number form cannot assert consent or choose an internal source', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/sms/subscribe/route.ts'), 'utf8'
     )
-    // New behavior: rejects invalid sources with 400, not silently remapping
-    expect(src).toContain('PUBLIC_SMS_SOURCES.has(rawSource)')
-    expect(src).toContain("Invalid request.")
+    expect(src).toContain('status: 409')
+    expect(src).not.toContain('upsertSmsSubscriber(')
+    expect(src).not.toContain('resubscribeSmsPhone(')
+    expect(src).not.toContain('sendSms(')
   })
-  test('manual_admin and sms_keyword not assignable by client', () => {
-    // Client sends source: 'manual_admin' → server validates → defaults to 'homepage'
-    const rawSource = 'manual_admin'
-    const source = ALLOWED_SMS_SOURCES.has(rawSource) ? rawSource : 'homepage'
-    // manual_admin IS in the allowlist (for admin UI use), so it passes
-    // BUT the route should only accept it from admin endpoints, not public
-    // This is a known limitation — the allowlist permits it but it's documented
+  test('server-side source allowlist is never a substitute for verified consent', () => {
     expect(ALLOWED_SMS_SOURCES.has('manual_admin')).toBe(true)
     expect(ALLOWED_SMS_SOURCES.has('arbitrary_source')).toBe(false)
   })
@@ -246,22 +247,24 @@ describe('desktop/mobile layout (source assertions)', () => {
     expect(src).toContain('JOIN') // JOIN keyword in SMS body
     expect(src).toContain('sms:') // sms: protocol
   })
-  test('mobile manual phone field present alongside deep link', () => {
+  test('mobile deep link offers inbound JOIN, but cannot issue consent from typed phone data', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    // New popup: inline JSX sections rather than separate component functions
-    const mobileStr = src  // search whole file
-    // SMS_LINK is derived from NEXT_PUBLIC_KVRN_SMS_NUMBER — referenced in MobileContent
-    expect(mobileStr).toContain('SMS_RAW')  // env var for dynamic SMS link
-    expect(mobileStr).toContain('tel')       // phone input type
+    expect(src).toContain('sms:${SMS_RAW}?body=')
+    expect(src).toContain('JOIN KVRN')
+    expect(src).toContain('After texting JOIN, reply YES')
+    expect(src).not.toContain('type="tel"')
   })
-  test('desktop has manual phone field', () => {
+  test('desktop and manual mobile instructions explain verified JOIN then YES', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../components/sms/SmsPopup.tsx'), 'utf8'
     )
-    // New popup: desktop section is inline JSX in main component
-    expect(src).toContain('type="tel"')
+    expect(src).toContain('const PhoneForm')
+    expect(src).toContain('To join, text')
+    expect(src).toContain('send <strong>YES</strong>')
+    expect(src).toContain('{PhoneForm}')
+    expect(src).toContain('No subscription or discount is created until confirmation')
   })
 })
 

@@ -48,8 +48,7 @@ body {
   --z-modal:    400;
   --z-toast:    500;
 
-  /* Nav */
-  --nav-height: 60px;
+  /* Navbar geometry is 56px; announcement is 36px. Keep one definition. */
 }
 
 /* ─── BASE ───────────────────────────────────────────────────────────────── */

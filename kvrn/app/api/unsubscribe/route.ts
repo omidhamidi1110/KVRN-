@@ -1,96 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { normaliseEmail, unsubscribeByEmail, updateSyncStatus, getPendingSyncs } from '@/lib/marketing-subscribers'
-import { syncUnsubscribeFromResend } from '@/lib/resend-marketing'
-import { sql } from '@/lib/db'
+/** Legacy unsubscribe URL retained for links already in circulation.
+ * An unauthenticated `?email=` MUST NEVER identify an account or change consent.
+ * GET never mutates state. RFC 8058 POST accepts an opaque signed contact token.
+ */
+import { type NextRequest, NextResponse } from 'next/server'
+import { verifyMarketingUnsubscribe } from '@/lib/marketing-unsubscribe'
+import { revokeMarketingSubscriberById } from '@/lib/marketing-subscribers'
+import { readLimitedText } from '@/lib/limited-json-request'
+export const dynamic = 'force-dynamic'
+const NO_STORE = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex' }
+const tokenPattern = /^v1\.[A-Za-z0-9._-]{70,150}$/
 
-async function processUnsubscribe(rawEmail: string): Promise<void> {
-  const email = normaliseEmail(rawEmail)
-
-  // Mark unsubscribed in Neon (source of truth)
-  const wasSubscribed = await unsubscribeByEmail(email)
-
-  // Sync to Resend (best-effort)
-  if (wasSubscribed) {
-    try {
-      // Get the contact ID for this subscriber
-      const rows = await sql`
-        SELECT id, resend_contact_id AS "resendContactId"
-        FROM marketing_subscribers WHERE email = ${email} LIMIT 1
-      `
-      const row = (rows as any[])[0]
-      if (row) {
-        const sync = await syncUnsubscribeFromResend({ contactId: row.resendContactId })
-        await updateSyncStatus(row.id, sync.ok ? 'synced' : 'failed', null, sync.ok ? null : sync.error)
-      }
-    } catch (syncErr: any) {
-      console.error('[unsubscribe] Resend sync failed (non-fatal):', syncErr?.message?.slice(0, 80))
-    }
-  }
-}
-
-// ─── GET /api/unsubscribe ─────────────────────────────────────────────────────
-// One-click unsubscribe from email List-Unsubscribe header and direct links.
-// GDPR/PECR: processes immediately; marketing only — transactional emails unaffected.
 export async function GET(req: NextRequest) {
-  const url   = new URL(req.url)
-  const email = url.searchParams.get('email')
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return new NextResponse('Missing or invalid email parameter.', { status: 400 })
-  }
-
-  try {
-    await processUnsubscribe(email)
-    console.log(`[unsubscribe] GET: ${normaliseEmail(email)}`)
-  } catch (err) {
-    console.error('[unsubscribe] GET error:', err)
-    // Still show confirmation to user — do not reveal DB errors
-  }
-
-  return new NextResponse(
-    `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Unsubscribed — KVRN</title>
-  <style>
-    body { font-family: -apple-system, Helvetica Neue, sans-serif; background: #FAFAF8; color: #1A1A1A; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-    .wrap { max-width: 400px; padding: 40px 24px; text-align: center; }
-    h1 { font-weight: 300; font-size: 28px; letter-spacing: -0.02em; margin-bottom: 16px; }
-    p { font-size: 14px; color: #6B6B6B; line-height: 1.6; }
-    a { color: #1A1A1A; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>Unsubscribed.</h1>
-    <p>You've been removed from our email list. You won't receive marketing emails from KVRN.</p>
-    <p style="font-size:12px;color:#9B9B9B;margin-top:8px;">Order confirmations and shipping updates are transactional and are not affected.</p>
-    <p style="margin-top: 24px;"><a href="https://kvrn.shop">Return to kvrn.shop</a></p>
-  </div>
-</body>
-</html>`,
-    { status: 200, headers: { 'Content-Type': 'text/html' } }
-  )
+  const token = req.nextUrl.searchParams.get('t') ?? ''
+  const destination = new URL('/email-preferences', req.nextUrl.origin)
+  if (tokenPattern.test(token)) destination.searchParams.set('token', token)
+  // An old ?email= link cannot be trusted to unsubscribe anybody.
+  return NextResponse.redirect(destination, { status: 303, headers: NO_STORE })
 }
 
-// ─── POST /api/unsubscribe ────────────────────────────────────────────────────
-// RFC 8058 List-Unsubscribe-Post one-click handler.
+/** One-click headers should link here with ?t=<signed-token>. Body per RFC 8058. */
 export async function POST(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get('t') ?? ''
+  const id = await verifyMarketingUnsubscribe(token)
+  if (!id) return NextResponse.json({ error: 'Invalid subscription link.' }, { status: 400, headers: NO_STORE })
+  const contentType = req.headers.get('content-type') ?? ''
+  if (!/application\/x-www-form-urlencoded(?:\s*;|\s*$)/i.test(contentType)) {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 415, headers: NO_STORE })
+  }
+  const data = await readLimitedText(req, 256)
+  if (!data.ok || new URLSearchParams(data.value).get('List-Unsubscribe') !== 'One-Click') {
+    return NextResponse.json({ error: 'Invalid one-click request.' }, { status: 400, headers: NO_STORE })
+  }
   try {
-    const url   = new URL(req.url)
-    const email = url.searchParams.get('email')
-
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Missing or invalid email.' }, { status: 400 })
-    }
-
-    await processUnsubscribe(email)
-    console.log(`[unsubscribe] POST: ${normaliseEmail(email)}`)
-    return NextResponse.json({ success: true }, { status: 200 })
-  } catch (err) {
-    console.error('[unsubscribe] POST error:', err)
-    return NextResponse.json({ error: 'Server error.' }, { status: 500 })
+    await revokeMarketingSubscriberById(id)
+    return NextResponse.json({ success: true }, { headers: NO_STORE })
+  } catch {
+    return NextResponse.json({ error: 'Subscription update unavailable.' }, { status: 503, headers: NO_STORE })
   }
 }

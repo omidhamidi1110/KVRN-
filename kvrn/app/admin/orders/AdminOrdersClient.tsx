@@ -347,7 +347,7 @@ export function AdminOrdersClient() {
           ) : orders.length === 0 && !error ? (
             <AdminEmpty title="No orders found." />
           ) : (
-            <AdminTable caption="Orders">
+            <AdminTable caption="Orders" stack>
               <thead>
                 <tr>
                   {['Order','Date','Customer','Items','Total','Payment','Fulfillment','Tags','Shipping'].map(h => <AdminTh key={h}>{h}</AdminTh>)}

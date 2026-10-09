@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ success: false, reason: result.reason })
   } catch (err: any) {
-    console.error('[sms/claim/resolve] error:', err?.message?.slice(0, 80))
+    console.error('[sms/claim/resolve] Claim unavailable (redacted).')
     return NextResponse.json({ success: false, reason: 'server_error' }, { status: 500 })
   }
 }

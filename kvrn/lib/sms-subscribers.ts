@@ -29,33 +29,11 @@ export interface SmsSubscriber {
   createdAt:      string
 }
 
-/**
- * Subscribe (or re-subscribe) a phone number.
- * Idempotent: existing subscribed row → no-op.
- * Existing unsubscribed row → re-subscribes.
+/** Enrollment is intentionally NOT available via a general-purpose subscriber helper.
+ * Only confirmKeywordSms() (signed JOIN -> YES) may create marketing consent.
+ * Historical/import consent must be reviewed and migrated through a separately
+ * approved process; arbitrary admin/API upserts can never create it.
  */
-export async function upsertSmsSubscriber(opts: {
-  phoneE164:     string   // must be pre-normalized E.164
-  consentSource: string
-}): Promise<{ id: string; isNew: boolean }> {
-  const rows = await sql`
-    INSERT INTO sms_subscribers (phone_e164, status, consent_source, consented_at)
-    VALUES (${opts.phoneE164}, 'subscribed', ${opts.consentSource}, NOW())
-    ON CONFLICT (phone_e164) DO UPDATE
-      SET
-        status          = 'subscribed',
-        consent_source  = EXCLUDED.consent_source,
-        consented_at    = CASE
-          WHEN sms_subscribers.status = 'unsubscribed' THEN NOW()
-          ELSE sms_subscribers.consented_at
-        END,
-        unsubscribed_at = NULL,
-        updated_at      = NOW()
-    RETURNING id, (xmax = 0) AS is_new
-  `
-  const row = (rows as any[])[0]
-  return { id: row.id as string, isNew: Boolean(row.is_new) }
-}
 
 /**
  * Unsubscribe a phone number. Idempotent.
@@ -77,22 +55,23 @@ export async function unsubscribeSmsPhone(
   return (rows as any[]).length > 0
 }
 
-/** Re-subscribe a phone number (e.g. after Twilio START keyword). */
-export async function resubscribeSmsPhone(
-  phoneE164: string,
-  source = 'sms_keyword'
-): Promise<boolean> {
-  const rows = await sql`
-    UPDATE sms_subscribers
-    SET status = 'subscribed', unsubscribed_at = NULL,
-        consent_source = ${source}, consented_at = NOW(),
-        twilio_opt_out_state = 'opted_in', updated_at = NOW()
-    WHERE phone_e164 = ${phoneE164}
-      AND status = 'unsubscribed'
-    RETURNING id
+/** Durable inbound STOP, including numbers that were never in the subscriber table.
+ * An unknown STOP creates a SUPPRESSED row, not a valid opt-in. The schema requires
+ * consented_at; for a suppression-only row this timestamp MUST NOT be treated as
+ * evidence of affirmative marketing consent. No new marketing path reads it as proof.
+ */
+export async function suppressInboundSmsPhone(phoneE164: string): Promise<void> {
+  await sql`
+    INSERT INTO sms_subscribers
+      (phone_e164, status, consent_source, consented_at, unsubscribed_at, twilio_opt_out_state)
+    VALUES (${phoneE164}, 'unsubscribed', 'sms_keyword', NOW(), NOW(), 'opted_out')
+    ON CONFLICT (phone_e164) DO UPDATE
+      SET status = 'unsubscribed', unsubscribed_at = NOW(),
+          twilio_opt_out_state = 'opted_out', updated_at = NOW()
   `
-  return (rows as any[]).length > 0
 }
+
+/** START/UNSTOP do not grant marketing consent. Verified YES is required. */
 
 /** Returns true if the phone is locally marked subscribed. */
 export async function isLocallySubscribed(phoneE164: string): Promise<boolean> {

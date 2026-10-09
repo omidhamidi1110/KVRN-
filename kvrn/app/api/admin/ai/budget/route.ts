@@ -2,6 +2,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { getAiBudgetSnapshot } from '@/lib/ai/budget'
 import { sql } from '@/lib/db'
+import {readAdminMutationJson} from '@/lib/admin-mutation-safety'
+import {validateAiBudgetLockInput} from '@/lib/ai/admin-control-safety'
 
 export const dynamic = 'force-dynamic'
 const NO_STORE = { 'Cache-Control': 'no-store' }
@@ -17,16 +19,18 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { identity, error } = await requireAdmin(req)
   if (error) return error
-  let body: any
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400, headers: NO_STORE }) }
-  if (typeof body?.manuallyLocked !== 'boolean') return NextResponse.json({ error: 'manuallyLocked must be boolean.' }, { status: 400, headers: NO_STORE })
+  const parsed=await readAdminMutationJson(req,1024)
+  if(!parsed.ok)return NextResponse.json({error:'Invalid or unauthorized JSON request.'},{status:parsed.status,headers:NO_STORE})
+  const checked=validateAiBudgetLockInput(parsed.value)
+  if(!checked.ok)return NextResponse.json({error:checked.reason},{status:403,headers:NO_STORE})
+  const manuallyLocked=checked.manuallyLocked
   try {
     // Lock state and its audit record move atomically; a crash cannot create an
     // unaudited unlock or an audit entry for a change that never committed.
     await sql`
       WITH changed AS (
         INSERT INTO ai_budget_controls(id, manually_locked, updated_by)
-        VALUES ('global', ${body.manuallyLocked}, ${identity.email})
+        VALUES ('global', ${manuallyLocked}, ${identity.email})
         ON CONFLICT (id) DO UPDATE SET
           manually_locked=EXCLUDED.manually_locked,
           updated_by=EXCLUDED.updated_by
@@ -34,7 +38,7 @@ export async function PATCH(req: NextRequest) {
       )
       INSERT INTO admin_audit_logs(actor_email, action, resource, resource_id, payload)
       SELECT ${identity.email}, 'ai_budget_lock_changed', 'ai_budget', id,
-             ${JSON.stringify({ manuallyLocked: body.manuallyLocked })}::jsonb
+             ${JSON.stringify({ manuallyLocked: manuallyLocked })}::jsonb
       FROM changed
     `
     return NextResponse.json({ budget: await getAiBudgetSnapshot() }, { headers: NO_STORE })

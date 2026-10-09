@@ -11,9 +11,9 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 
 // Admin page + API route files that existed in the foundation commit (git ls-tree b9f9290). The refresh
 // must not delete or move any of them.
+// NOTE: the Admin Backups pages/routes were removed in Checkpoint 08 (ChatGPT workstream); their guards were dropped here.
 const FOUNDATION_PAGES = [
   'app/admin/analytics/page.tsx',
-  'app/admin/backups/page.tsx',
   'app/admin/discounts/page.tsx',
   'app/admin/financials/advertising/page.tsx',
   'app/admin/financials/affiliates/page.tsx',
@@ -42,9 +42,6 @@ const FOUNDATION_API_ROUTES = [
   'app/api/admin/affiliates/recoveries/route.ts',
   'app/api/admin/affiliates/route.ts',
   'app/api/admin/analytics/funnel/route.ts',
-  'app/api/admin/backups/drills/route.ts',
-  'app/api/admin/backups/route.ts',
-  'app/api/admin/backups/verify/route.ts',
   'app/api/admin/cache-invalidations/route.ts',
   'app/api/admin/dashboard/route.ts',
   'app/api/admin/discounts/[id]/route.ts',
@@ -100,7 +97,7 @@ const TOUCHED = [
   'app/admin/financials/infrastructure/InfrastructureClient.tsx', 'app/admin/financials/inventory/InventoryClient.tsx',
   'app/admin/financials/returns/ReturnsClient.tsx', 'app/admin/financials/disputes/DisputesClient.tsx',
   'app/admin/financials/integrity/IntegrityClient.tsx', 'app/admin/financials/expenses/ExpensesClient.tsx',
-  'app/admin/sms/AdminSmsClient.tsx', 'app/admin/backups/BackupsClient.tsx',
+  'app/admin/sms/AdminSmsClient.tsx',
   'app/admin/support/SupportInboxClient.tsx',
 ]
 
@@ -119,7 +116,7 @@ describe('no admin route was removed or moved', () => {
   test.each(FOUNDATION_PAGES)('page %s still exists', p => { expect(fs.existsSync(path.join(ROOT, p))).toBe(true) })
   test.each(FOUNDATION_API_ROUTES)('api route %s still exists', p => { expect(fs.existsSync(path.join(ROOT, p))).toBe(true) })
   test('the page list is not accidentally empty', () => {
-    expect(FOUNDATION_PAGES.length).toBeGreaterThanOrEqual(20)
+    expect(FOUNDATION_PAGES.length).toBeGreaterThanOrEqual(19)
     expect(FOUNDATION_API_ROUTES.length).toBeGreaterThanOrEqual(50)
   })
 })
@@ -194,7 +191,7 @@ describe('InfoTip placement and accessibility (refresh additions)', () => {
   test('click inside the panel does not trigger a parent row action', () => {
     expect(src).toMatch(/onClick=\{e => e\.stopPropagation\(\)\}/)
   })
-  test('the button is padded beyond its visual size for touch', () => { expect(src).toMatch(/before:-inset-2/) })
+  test('the button is padded above and below its visual size for touch (never sideways)', () => { expect(src).toMatch(/before:-inset-y-2/); expect(src).not.toMatch(/before:-inset-2/) })
 })
 
 describe('warnings and exception states stay visible (not hidden in a tooltip)', () => {
@@ -206,9 +203,6 @@ describe('warnings and exception states stay visible (not hidden in a tooltip)',
     ['app/admin/financials/FinancialsClient.tsx', 'Some costs are not yet reconciled.'],
     ['app/admin/financials/infrastructure/InfrastructureClient.tsx', 'Estimated and projected figures are forecasts, not invoices.'],
     ['app/admin/financials/infrastructure/InfrastructureClient.tsx', 'Usage units differ between providers'],
-    ['app/admin/backups/BackupsClient.tsx', 'This does not create a backup.'],
-    ['app/admin/backups/BackupsClient.tsx', 'This does not restore anything.'],
-    ['app/admin/backups/BackupsClient.tsx', 'its restore test FAILED'],
     ['app/admin/support/SupportInboxClient.tsx', 'in the forwarded mailbox'],
   ]
   test.each(MUST_BE_VISIBLE)('%s shows "%s" outside any tooltip', (file, text) => {
@@ -289,7 +283,7 @@ describe('shell and page structure', () => {
     expect(src).not.toMatch(/\bBORDER\b/)
   })
   test('no page-level horizontal scroll: tables scroll inside their own wrapper', () => {
-    expect(read('components/admin/ui/AdminUI.tsx')).toMatch(/overflow-x-auto rounded-\[12px\]/)
+    expect(read('components/admin/ui/AdminUI.tsx')).toMatch(/overflow-x-auto overscroll-x-contain rounded-\[12px\]/)
   })
   test('the admin layout still guards every page (requireAdmin guard suite is the authority)', () => {
     expect(fs.existsSync(path.join(ROOT, 'lib/__tests__/admin-routes-guard.test.ts'))).toBe(true)

@@ -38,6 +38,7 @@ export function createLoader(externalRequire: NodeRequire, opts: { rootDir?: str
     const mod = { exports: {} as any }
     cache.set(file, mod)
     const req = (spec: string) => {
+      if (/\.(css|scss)$/.test(spec)) return {}   // stylesheet side-effect imports (e.g. admin-stack.css) have no runtime value here
       if (spec.startsWith('@/') || spec.startsWith('.')) {
         const f = resolveFile(spec, file)
         if (!f) throw new Error(`tsx-loader: cannot resolve ${spec} from ${file}`)

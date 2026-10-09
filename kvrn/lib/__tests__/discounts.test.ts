@@ -299,14 +299,14 @@ describe('SMS subscribe source spoofing fix', () => {
     expect(ALL_SMS_SOURCES.has('sms_keyword')).toBe(true)
   })
 
-  // Item 7: subscribe route explicitly rejects internal sources
-  test('subscribe route rejects invalid source with 400 not silent remap', () => {
+  // Public phone form is closed until Twilio can prove number control.
+  test('subscribe route refuses ALL public phone enrollments, including forged internal sources', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/sms/subscribe/route.ts'), 'utf8'
     )
-    expect(src).toContain('PUBLIC_SMS_SOURCES.has(rawSource)')
-    expect(src).toContain("Invalid request.")
-    // Must NOT silently fall back to homepage for internal sources
+    expect(src).toContain('status: 409')
+    expect(src).not.toContain('upsertSmsSubscriber(')
+    expect(src).not.toContain('resubscribeSmsPhone(')
     expect(src).not.toContain("ALLOWED_SMS_SOURCES.has(rawSource) ? rawSource : 'homepage'")
   })
 })
@@ -364,11 +364,12 @@ describe('twilio_opt_out_state semantics', () => {
     expect(src).toContain("twilio_opt_out_state = 'opted_out'")
   })
 
-  test("resubscribeSmsPhone sets twilio_opt_out_state='opted_in'", () => {
+  test('a verified YES transaction is required to restore opted_in state', () => {
     const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../sms-subscribers.ts'), 'utf8'
+      require('path').join(__dirname, '../sms-double-optin.ts'), 'utf8'
     )
-    expect(src).toContain("twilio_opt_out_state = 'opted_in'")
+    expect(src).toContain("twilio_opt_out_state='opted_in'")
+    expect(src).toContain('confirmation_message_sid')
   })
 })
 

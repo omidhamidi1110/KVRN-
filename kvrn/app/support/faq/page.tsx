@@ -9,6 +9,7 @@ import { Accordion } from '@/components/ui/Accordion'
 const LEGACY_METADATA: Metadata = {
   title: 'FAQ — KVRN',
   description: 'Frequently asked questions about KVRN products, sizing, shipping and returns.',
+  alternates: { canonical: '/support/faq' },
 }
 
 const FAQ_SECTIONS = [
@@ -101,7 +102,7 @@ const FAQ_SECTIONS = [
         trigger: 'How long does processing take?',
         content: (
           <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
-            Orders are processed within approximately 1 to 3 business days of payment. Products are in stock and ship promptly unless a product page states otherwise.
+            Orders are typically processed within 1–3 business days after payment confirmation. This is an estimate; launches, holidays, high-volume periods and fraud review may take longer. Pre-orders are identified on the applicable product page.
           </p>
         ),
       },
@@ -111,7 +112,7 @@ const FAQ_SECTIONS = [
         content: (
           <div className="space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed">
             <p>Domestic orders typically arrive within 2 to 7 business days after dispatch. International orders typically take 5 to 14 business days or more, depending on the destination and customs.</p>
-            <p>Delivery estimates are not guarantees. All orders include tracking, sent when your order dispatches.</p>
+            <p>Delivery estimates are not guarantees. Tracking information is provided when available after a carrier tracking number is assigned.</p>
           </div>
         ),
       },
@@ -120,7 +121,7 @@ const FAQ_SECTIONS = [
         trigger: 'Is there free shipping?',
         content: (
           <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
-            Complimentary shipping is available on U.S. orders over $150. Shipping costs for all other orders are calculated at checkout based on destination and method selected.
+            Complimentary shipping is available on eligible U.S. orders over $150. Qualification and shipping rates are determined by checkout before payment.
           </p>
         ),
       },
@@ -129,7 +130,7 @@ const FAQ_SECTIONS = [
         trigger: 'How do I track my order?',
         content: (
           <div className="text-[13px] text-[#6B6B6B] leading-relaxed">
-            <p>You will receive a tracking number by email once your order ships. You can also use the track order page.</p>
+            <p>When tracking is available, we email it after a shipment is prepared or dispatched. Carrier updates may take additional time. You can also use the Track Order page.</p>
             <div className="mt-3">
               <Link href="/support/track" className="text-[#1A1A1A] underline underline-offset-2">Track your order</Link>
             </div>
@@ -146,8 +147,8 @@ const FAQ_SECTIONS = [
         trigger: 'What is the returns policy?',
         content: (
           <div className="space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed">
-            <p>We accept returns for store credit on unworn, unwashed items with tags still attached, within our return window. The return window is shown in your order confirmation.</p>
-            <p>Customer covers return shipping unless the item arrives damaged, faulty, or incorrect.</p>
+            <p>Eligible unworn, unwashed items in their original condition with original tags attached may be returned for KVRN store credit within 14 days after delivery. Damaged, defective, misdescribed, or incorrect items may qualify for other remedies required by law.</p>
+            <p>Customers pay discretionary return shipping. If KVRN sent the wrong item or an item arrives damaged or defective, contact support before returning it. Approved claims may receive reasonable return shipping coverage or reimbursement.</p>
             <div className="mt-1">
               <Link href="/support/shipping-returns#returns" className="text-[#1A1A1A] underline underline-offset-2">Full returns policy</Link>
             </div>
@@ -159,7 +160,7 @@ const FAQ_SECTIONS = [
         trigger: 'How do I start a return?',
         content: (
           <div className="text-[13px] text-[#6B6B6B] leading-relaxed">
-            <p>Email <a href="mailto:returns@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">returns@kvrn.shop</a> with your order number and the items you would like to return. We will respond within 24 hours with next steps.</p>
+            <p>Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> with your order number, the items you want to return, and the reason. Do not mail an unapproved return. We generally respond within 1–2 business days.</p>
           </div>
         ),
       },
@@ -168,7 +169,7 @@ const FAQ_SECTIONS = [
         trigger: 'What if my order arrived wrong or damaged?',
         content: (
           <p className="text-[13px] text-[#6B6B6B] leading-relaxed">
-            Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> with your order number and photos. If the item is faulty, incorrect, or damaged on arrival, we will cover the return shipping and resolve it at no cost to you.
+            Email <a href="mailto:support@kvrn.shop" className="text-[#1A1A1A] underline underline-offset-2">support@kvrn.shop</a> with your order number and photos. If approved, KVRN will provide an appropriate remedy, which may include replacement, refund, or store credit. Where applicable, we will cover or reimburse reasonable return shipping.
           </p>
         ),
       },
@@ -216,8 +217,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const view = await contentPublic().getFaq()
   if (!view) return LEGACY_METADATA
   const seo = view.variants.en.data.seo
-  return pageMetadata({ title: LEGACY_METADATA.title as string, description: LEGACY_METADATA.description as string }, seo,
-    seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null)
+  return { ...pageMetadata({ title: LEGACY_METADATA.title as string, description: LEGACY_METADATA.description as string }, seo,
+    seo.shareImageId ? view.media[seo.shareImageId]?.url ?? null : null), alternates: { canonical: '/support/faq' } }
 }
 
 export default async function FAQPage() {

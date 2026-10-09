@@ -1,0 +1,130 @@
+{
+  "base": "http://localhost:3112",
+  "at": "2026-10-08T21:50:42.908Z",
+  "env": "mobile 390x844 DPR2, CPU 4x, 1.6Mbps/150ms RTT (LAB)",
+  "runs": 3,
+  "pages": {
+    "/": {
+      "ok": 3,
+      "lcpMs": 684,
+      "lcpElement": "H1",
+      "cls": 0,
+      "tbtMs": 169,
+      "longTasks": 2,
+      "ttfbMs": 38,
+      "loadMs": 2887,
+      "jsKB": 224,
+      "cssKB": 14,
+      "imgKB": 145,
+      "fontKB": 0,
+      "requests": 21,
+      "domNodes": 287,
+      "imgsWithoutDimensions": 2,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    },
+    "/shop": {
+      "ok": 3,
+      "lcpMs": 700,
+      "lcpElement": "SPAN",
+      "cls": 0,
+      "tbtMs": 130,
+      "longTasks": 2,
+      "ttfbMs": 66,
+      "loadMs": 2300,
+      "jsKB": 223,
+      "cssKB": 14,
+      "imgKB": 141,
+      "fontKB": 0,
+      "requests": 24,
+      "domNodes": 315,
+      "imgsWithoutDimensions": 1,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    },
+    "/products/kvrn-phantom-hoodie": {
+      "ok": 3,
+      "lcpMs": 776,
+      "lcpElement": "H1",
+      "cls": 0.002,
+      "tbtMs": 160,
+      "longTasks": 2,
+      "ttfbMs": 97,
+      "loadMs": 47546,
+      "jsKB": 235,
+      "cssKB": 14,
+      "imgKB": 9383,
+      "fontKB": 0,
+      "requests": 34,
+      "domNodes": 550,
+      "imgsWithoutDimensions": 15,
+      "lazyImagesAboveFold": 11,
+      "worstShifts": [
+        {
+          "v": 0.0019,
+          "t": 11095,
+          "src": [
+            "P"
+          ]
+        },
+        {
+          "v": 0.0019,
+          "t": 11028,
+          "src": [
+            "P"
+          ]
+        },
+        {
+          "v": 0.0019,
+          "t": 47095,
+          "src": [
+            "P"
+          ]
+        }
+      ],
+      "errors": []
+    },
+    "/support/faq": {
+      "ok": 3,
+      "lcpMs": 636,
+      "lcpElement": "BUTTON",
+      "cls": 0,
+      "tbtMs": 126,
+      "longTasks": 2,
+      "ttfbMs": 54,
+      "loadMs": 1591,
+      "jsKB": 221,
+      "cssKB": 14,
+      "imgKB": 0,
+      "fontKB": 0,
+      "requests": 19,
+      "domNodes": 404,
+      "imgsWithoutDimensions": 0,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    },
+    "/privacy": {
+      "ok": 3,
+      "lcpMs": 636,
+      "lcpElement": "P",
+      "cls": 0,
+      "tbtMs": 138,
+      "longTasks": 2,
+      "ttfbMs": 55,
+      "loadMs": 1601,
+      "jsKB": 221,
+      "cssKB": 14,
+      "imgKB": 0,
+      "fontKB": 0,
+      "requests": 18,
+      "domNodes": 565,
+      "imgsWithoutDimensions": 0,
+      "lazyImagesAboveFold": 0,
+      "worstShifts": [],
+      "errors": []
+    }
+  }
+}

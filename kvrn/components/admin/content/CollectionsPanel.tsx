@@ -55,7 +55,7 @@ function CollectionList({ onOpen, refreshKey }: { onOpen: (id: string) => void; 
       {!err && rows === null && <AdminLoading />}
       {rows && rows.length === 0 && <AdminEmpty title={archived ? 'No archived collections.' : 'No collections yet.'} description={archived ? undefined : 'Create a collection to group products on its own page.'} />}
       {rows && rows.length > 0 && (
-        <AdminTable caption="Collections">
+        <AdminTable caption="Collections" stack>
           <thead><tr><AdminTh>Name</AdminTh><AdminTh>Status</AdminTh><AdminTh>Products</AdminTh><AdminTh>Order</AdminTh></tr></thead>
           <tbody>
             {rows.map(r => (

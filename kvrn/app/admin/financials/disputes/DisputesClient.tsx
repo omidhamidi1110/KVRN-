@@ -94,7 +94,7 @@ export function DisputesClient() {
           {disputes.length === 0 ? (
             <AdminEmpty title="No disputes." description="Stripe dispute webhooks will populate this automatically." />
           ) : (
-            <AdminTable minWidth={760} caption="Disputes">
+            <AdminTable minWidth={760} caption="Disputes" stack>
               <thead>
                 <tr>
                   {['Order', 'Amount', 'Status', 'Stripe status', 'Refund offset',

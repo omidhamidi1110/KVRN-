@@ -14,25 +14,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try { productEntries = await getPublishedProductSitemapEntries() } catch { productEntries = [] }
   const productPages: MetadataRoute.Sitemap = productEntries.map(({ path, lastModified }) => ({
     url: `${BASE}${path}`,
-    lastModified:   lastModified ?? new Date(),
+    ...(lastModified ? { lastModified } : {}),
     changeFrequency:'weekly',
     priority:        0.9,
   }))
 
   const coded: MetadataRoute.Sitemap = [
-    { url: BASE,                                    lastModified: new Date(), changeFrequency:'weekly',  priority: 1.0 },
-    { url: `${BASE}/shop`,                          lastModified: new Date(), changeFrequency:'weekly',  priority: 0.9 },
-    { url: `${BASE}/shop?type=hoodies`,             lastModified: new Date(), changeFrequency:'weekly',  priority: 0.8 },
-    { url: `${BASE}/shop?type=sweatpants`,          lastModified: new Date(), changeFrequency:'weekly',  priority: 0.8 },
+    { url: BASE,                                    changeFrequency:'weekly',  priority: 1.0 },
+    { url: `${BASE}/shop`,                          changeFrequency:'weekly',  priority: 0.9 },
     ...productPages,
-    { url: `${BASE}/about`,                         lastModified: new Date(), changeFrequency:'monthly', priority: 0.7 },
-    { url: `${BASE}/contact`,                       lastModified: new Date(), changeFrequency:'monthly', priority: 0.5 },
-    { url: `${BASE}/support/faq`,                   lastModified: new Date(), changeFrequency:'monthly', priority: 0.6 },
-    { url: `${BASE}/support/shipping-returns`,      lastModified: new Date(), changeFrequency:'monthly', priority: 0.6 },
-    { url: `${BASE}/support/size-guide`,            lastModified: new Date(), changeFrequency:'monthly', priority: 0.6 },
-    { url: `${BASE}/support/track`,                 lastModified: new Date(), changeFrequency:'monthly', priority: 0.4 },
-    { url: `${BASE}/privacy`,                       lastModified: new Date(), changeFrequency:'yearly',  priority: 0.2 },
-    { url: `${BASE}/terms`,                         lastModified: new Date(), changeFrequency:'yearly',  priority: 0.2 },
+    { url: `${BASE}/about`,                         changeFrequency:'monthly', priority: 0.7 },
+    { url: `${BASE}/contact`,                       changeFrequency:'monthly', priority: 0.5 },
+    { url: `${BASE}/support/faq`,                   changeFrequency:'monthly', priority: 0.6 },
+    { url: `${BASE}/support/shipping-returns`,      changeFrequency:'monthly', priority: 0.6 },
+    { url: `${BASE}/support/size-guide`,            changeFrequency:'monthly', priority: 0.6 },
+    // Order tracking is a private utility form, not a search landing page.
+    { url: `${BASE}/privacy`,                       changeFrequency:'yearly',  priority: 0.2 },
+    { url: `${BASE}/terms`,                         changeFrequency:'yearly',  priority: 0.2 },
   ]
   if (!cmsContentEnabled()) return coded
 
@@ -43,9 +41,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const byUrl = new Map<string, MetadataRoute.Sitemap[number]>()
   for (const e of coded) if (!excluded.has(e.url)) byUrl.set(e.url, e)
   for (const e of plan.entries) {
+    if (e.path === '/support/track' || e.path === '/privacy-choices' || e.path === '/email-preferences') continue
+    // Dedicated SMS policy URLs must not be offered to crawlers while gated (404).
+    if ((e.path === '/messaging-terms' || e.path === '/messaging-privacy') && process.env.KVRN_SMS_POLICY_PUBLIC_ENABLED !== 'true') continue
     const url = `${BASE}${e.path}`
     const prev = byUrl.get(url)
-    byUrl.set(url, { url, lastModified: e.lastModified ?? prev?.lastModified ?? new Date(),
+    byUrl.set(url, { url, ...(e.lastModified || prev?.lastModified ? { lastModified: e.lastModified ?? prev?.lastModified } : {}),
                      changeFrequency: e.changeFrequency ?? prev?.changeFrequency, priority: e.priority ?? prev?.priority })
   }
   return [...byUrl.values()]

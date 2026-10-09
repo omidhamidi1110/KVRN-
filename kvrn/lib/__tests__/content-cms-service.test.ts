@@ -56,6 +56,11 @@ d('content service (real PG)', () => {
     })
 
     test('slug change: redirect old→new, BOTH paths invalidated, rollback restores', async () => {
+      // v1 is the migration placeholder: it can never be rolled back to. A human-edited v2 (same slug) is the restore target.
+      const g0 = await svc.get('policies', 'privacy')
+      const e1 = await svc.saveDraft('policies', 'privacy', { ...g0.snapshot, lastUpdatedLabel: 'Last updated (reviewed)' }, g0.revision, A)
+      await svc.publish('policies', 'privacy', e1.data.revision, A)
+      calls.length = 0
       const g = await svc.get('policies', 'privacy')
       const s = await svc.saveDraft('policies', 'privacy', { ...g.snapshot, slug: 'privacy-notice' }, g.revision, A)
       const r = await svc.publish('policies', 'privacy', s.data.revision, A)
@@ -65,7 +70,7 @@ d('content service (real PG)', () => {
       const hist = await svc.history('policies', 'privacy')
       calls.length = 0
       const cur = await svc.get('policies', 'privacy')
-      const rb = await svc.rollback('policies', 'privacy', 1, cur.revision, A)
+      const rb = await svc.rollback('policies', 'privacy', 2, cur.revision, A)
       expect(rb.data.slug).toBe('privacy')
       expect(calls[0].paths).toEqual(expect.arrayContaining(['/privacy', '/legal/privacy-notice']))
       expect(await db.q(`SELECT from_path FROM content_redirects WHERE from_path='/privacy'`)).toEqual([])
@@ -231,6 +236,10 @@ d('content service (real PG)', () => {
 
   // ── FAQ ────────────────────────────────────────────────────────────────────
   test('FAQ: order and active flags persist atomically with versioning + rollback', async () => {
+    // v1 is the migration placeholder (never publishable unchanged). A human-edited v2 keeps the original order and is the restore target.
+    const g1 = await svc.get('faq')
+    const e1 = await svc.saveDraft('faq', undefined, { ...g1.snapshot, heroTitle: 'FAQ & help' }, g1.revision, A)
+    await svc.publish('faq', undefined, e1.data.revision, A)
     const g = await svc.get('faq')
     expect(g.snapshot.categories.map((c: any) => c.id)).toEqual(['products', 'sizing', 'shipping', 'returns'])
     const reordered = { ...g.snapshot, categories: [g.snapshot.categories[3], ...g.snapshot.categories.slice(0, 3)] }
@@ -241,7 +250,7 @@ d('content service (real PG)', () => {
     expect(now.snapshot.categories[0].id).toBe('returns')
     expect(now.snapshot.categories[1].items[1].active).toBe(false)
     expect(calls.at(-1)!.paths).toContain('/support/faq')
-    const rb = await svc.rollback('faq', undefined, 1, now.revision, A)
+    const rb = await svc.rollback('faq', undefined, 2, now.revision, A)
     expect((await svc.get('faq')).snapshot.categories[0].id).toBe('products')
     expect(rb.invalidation?.ok).toBe(true)
     await expectCode(svc.saveDraft('faq', undefined, { ...SEED_FAQ, categories: [SEED_FAQ.categories[0], SEED_FAQ.categories[0]] }, (await svc.get('faq')).revision, A), 'invalid')  // duplicate ids

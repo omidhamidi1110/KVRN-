@@ -21,6 +21,7 @@ import {
 import { upsertTranslation, summarizeCompleteness, SOURCE_LOCALE, type TranslationRow } from './translations'
 import { getEnabledLocales, isValidLocale } from './content-locales'
 import { validateRichText } from './content-richtext'
+import { isPlaceholderSeed, hasOwnerDraft, applyOwnerDraft, isOwnerNewPolicy, ownerPolicyBase, OWNER_DRAFT_NOTE, SEED_COPY_MESSAGE } from './content-owner-draft'
 import { DEFAULT_NAVIGATION, DEFAULT_FOOTER, DEFAULT_ANNOUNCEMENT, DEFAULT_ABOUT, DEFAULT_CONTACT, DEFAULT_SIZE_GUIDE_PAGE } from './content-defaults'
 
 type Sql = any
@@ -37,14 +38,14 @@ export const CODE_TO_PUBLIC_SLUG: Record<string, string> = {
 }
 
 export class ContentError extends Error {
-  constructor(public readonly code: 'invalid' | 'in_use' | 'forbidden' | 'not_found' | 'unusable_media' | 'missing_block' | 'conflict',
+  constructor(public readonly code: 'invalid' | 'in_use' | 'forbidden' | 'not_found' | 'unusable_media' | 'missing_block' | 'conflict' | 'seed_copy',
               message: string, public readonly details?: unknown) {
     super(message); this.name = 'ContentError'
   }
   get status(): number {
     switch (this.code) {
       case 'not_found': return 404
-      case 'in_use': case 'conflict': return 409
+      case 'in_use': case 'conflict': case 'seed_copy': return 409
       case 'forbidden': return 403
       default: return 400
     }
@@ -86,6 +87,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const newId = () => (globalThis.crypto as any).randomUUID() as string
 
 export const DEFAULTS_BY_KIND: Partial<Record<ContentKind, (id: string) => unknown>> = {
+  policies: (id) => isOwnerNewPolicy(id) ? ownerPolicyBase(id) : undefined,
   about: () => DEFAULT_ABOUT, contact: () => DEFAULT_CONTACT, announcement: () => DEFAULT_ANNOUNCEMENT,
   navigation: () => DEFAULT_NAVIGATION, footer: () => DEFAULT_FOOTER,
   'support-pages': () => DEFAULT_SIZE_GUIDE_PAGE,
@@ -231,6 +233,11 @@ export function createContentService(sql: Sql, deps: {
     }
   }
 
+  /** Refuse to make the unchanged migration-030 placeholder (older copy) live over the coded October 6 text. */
+  function assertNotPlaceholderSeed(kind: ContentKind, id: string, snap: any) {
+    if (isPlaceholderSeed(KINDS[kind].type, id, snap, (seed) => parse(kind, id, seed))) throw new ContentError('seed_copy', SEED_COPY_MESSAGE)
+  }
+
   // ── reads ───────────────────────────────────────────────────────────────────
 
   async function list(kind: ContentKind, o: { q?: string; status?: string; limit?: number } = {}): Promise<EntityRow[]> {
@@ -275,7 +282,7 @@ export function createContentService(sql: Sql, deps: {
     const row = await cms.get(def.type, id)
     if (!row) {
       const dflt = DEFAULTS_BY_KIND[kind]?.(id)
-      if (dflt) return { id, kind, exists: false, revision: 0, status: 'draft' as const, slug: null, hasDraft: false, isLive: false, snapshot: dflt, published: null, publishedVersion: null, draftVersion: null }
+      if (dflt) return { id, kind, exists: false, revision: 0, status: 'draft' as const, slug: null, hasDraft: false, isLive: false, snapshot: dflt, published: null, publishedVersion: null, draftVersion: null, placeholderSeed: false, ownerDraftAvailable: kind === 'policies' && hasOwnerDraft(id) }
       throw new ContentError('not_found', 'Not found.')
     }
     return {
@@ -286,6 +293,9 @@ export function createContentService(sql: Sql, deps: {
       publishedAt: row.published_at ? new Date(row.published_at).toISOString() : null,
       updatedAt: new Date(row.updated_at).toISOString(), updatedBy: row.updated_by as string | null,
       path: kind === 'policies' && row.slug ? policyPath(id, row.slug) : kind === 'pages' && row.slug ? `/pages/${row.slug}` : null,
+      // Editor hints: is the text the editor would publish still the unchanged migration placeholder, and can the October 6 draft be loaded?
+      placeholderSeed: (() => { try { const snap = row.draft_snapshot ?? row.published_snapshot; return !!snap && isPlaceholderSeed(def.type, id, parse(kind, id, snap), (x) => parse(kind, id, x)) } catch { return false } })(),
+      ownerDraftAvailable: kind === 'policies' && hasOwnerDraft(id),
     }
   }
 
@@ -316,6 +326,20 @@ export function createContentService(sql: Sql, deps: {
     return { data: { id, revision: r.revision, versionNo: r.version_no }, invalidation: null }
   }
 
+  /** Put the owner's October 6 text into the policy DRAFT. Never publishes. Only terms and privacy have owner text. */
+  async function loadOwnerDraft(rawId: string, expectedRevision: number, actor: string): Promise<Outcome<{ id: string; revision: number; versionNo: number; blocks: number }>> {
+    const id = resolveEntityId(KINDS.policies, rawId)
+    if (!hasOwnerDraft(id)) throw new ContentError('forbidden', 'No October 6 owner draft exists for this page.')
+    const row = await cms.get(KINDS.policies.type, id)
+    // Messaging Terms/Privacy are not seeded: the first "Load October 6 draft" creates the (unpublished) draft row at revision 0.
+    if (!row && !isOwnerNewPolicy(id)) throw new ContentError('not_found', 'Not found.')
+    const current = (row ? (row.draft_snapshot ?? row.published_snapshot) : ownerPolicyBase(id)) as Record<string, unknown>
+    const snap = parse('policies', id, applyOwnerDraft(current, id))
+    const r = await cms.saveDraft(KINDS.policies.type, id, snap as any, row ? expectedRevision : 0, actor, OWNER_DRAFT_NOTE)
+    await syncAllUsages('policies', id, snap, 'draft')
+    return { data: { id, revision: r.revision, versionNo: r.version_no, blocks: ((snap as any).body?.blocks ?? []).length }, invalidation: null }
+  }
+
   async function publish(kind: ContentKind, rawId: string | undefined, expectedRevision: number, actor: string): Promise<Outcome<{ id: string; revision: number; slug: string | null; previousSlug: string | null; redirectCreated: boolean; path: string | null }>> {
     const def = KINDS[kind]
     const id = resolveEntityId(def, rawId)
@@ -323,6 +347,7 @@ export function createContentService(sql: Sql, deps: {
     if (!row) throw new ContentError('not_found', 'Not found.')
     if (row.draft_version_no === null) throw new CmsError('no_draft', 'There is no draft to publish.')
     const snap = parse(kind, id, row.draft_snapshot)               // re-validate server-side, always
+    assertNotPlaceholderSeed(kind, id, snap)
     await assertPublishable(kind, snap)
     let r: any
     try {
@@ -345,6 +370,7 @@ export function createContentService(sql: Sql, deps: {
     const target = await cms.getVersion(def.type, id, toVersionNo)
     if (!target) throw new ContentError('not_found', 'Version not found.')
     const snap = parse(kind, id, target.snapshot)                  // an old snapshot must still be valid today
+    assertNotPlaceholderSeed(kind, id, snap)
     await assertPublishable(kind, snap)
     let r: any
     try {
@@ -595,7 +621,7 @@ export function createContentService(sql: Sql, deps: {
   }
 
   return {
-    cms, list, get, history, getVersion, create, saveDraft, publish, rollback, unpublish, archive, restore, duplicate,
+    cms, list, get, history, getVersion, create, saveDraft, loadOwnerDraft, publish, rollback, unpublish, archive, restore, duplicate,
     translationOverview, saveTranslation, clearTranslation, publishLocale, unpublishLocale,
     listGuideProducts, assignSizeGuide, duplicateSizeGuideForProduct, blockUsage, targetFor,
   }

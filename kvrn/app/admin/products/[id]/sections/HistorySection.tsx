@@ -9,7 +9,7 @@ export function HistorySection({ state, busy, onRollback }: { state: EditorState
       <AdminSectionHeader title="Version history" description="Every publish keeps a copy you can restore."
         info="Restoring brings back a version’s content (text, images, SEO) as a new version. Price, sizes and stock are left as they are now, and past orders never change." />
       {state.history.length === 0 ? <AdminEmpty title="No versions yet" /> : (
-        <AdminTable caption="Versions">
+        <AdminTable caption="Versions" stack>
           <thead><tr><AdminTh>Version</AdminTh><AdminTh>State</AdminTh><AdminTh>Saved</AdminTh><AdminTh>By</AdminTh><AdminTh /></tr></thead>
           <tbody>
             {state.history.map(v => {

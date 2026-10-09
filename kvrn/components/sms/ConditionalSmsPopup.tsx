@@ -12,6 +12,7 @@ function isExcluded(path: string): boolean {
 
 export function ConditionalSmsPopup() {
   const path = usePathname()
+  if (process.env.NEXT_PUBLIC_SMS_SIGNUP_ENABLED !== 'true') return null
   if (isExcluded(path)) return null
   return <SmsPopup />
 }

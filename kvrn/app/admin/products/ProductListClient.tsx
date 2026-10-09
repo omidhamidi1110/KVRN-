@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, AdminTable, AdminTabs, AdminTd, AdminTh,
+  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, AdminTable, AdminTr, AdminTabs, AdminTd, AdminTh,
   StatusBadge, adminInputClass, useConfirm, InfoTip,
 } from '@/components/admin/ui/AdminUI'
 import { formatProductPrice } from '@/lib/product-price'
@@ -143,16 +143,16 @@ export function ProductListClient() {
       {err ? <AdminError message={err} onRetry={() => void load()} /> : !items ? <AdminLoading /> : shown.length === 0 ? (
         <AdminEmpty title={items.length ? 'No products match' : 'No products yet'} description={items.length ? 'Try another filter.' : 'Create your first product.'} action={items.length ? undefined : <Link href="/admin/products/new" className="text-[12px] underline">New product</Link>} />
       ) : (
-        <AdminTable caption="Products">
-          <thead><tr>
+        <AdminTable stack caption="Products">
+          <thead><AdminTr>
             <AdminTh><input type="checkbox" aria-label="Select all" checked={allPicked} onChange={e => setPicked(e.target.checked ? new Set(shown.map(i => i.id)) : new Set())} /></AdminTh>
             <AdminTh>Product</AdminTh><AdminTh>Status</AdminTh><AdminTh>Price</AdminTh><AdminTh>Checks</AdminTh><AdminTh>Edited</AdminTh><AdminTh />
-          </tr></thead>
+          </AdminTr></thead>
           <tbody>
             {shown.map(i => (
-              <tr key={i.id}>
-                <AdminTd><input type="checkbox" aria-label={`Select ${i.name}`} checked={picked.has(i.id)} onChange={() => toggle(i.id)} /></AdminTd>
-                <AdminTd>
+              <AdminTr key={i.id}>
+                <AdminTd label="Select"><input type="checkbox" aria-label={`Select ${i.name}`} checked={picked.has(i.id)} onChange={() => toggle(i.id)} /></AdminTd>
+                <AdminTd className="max-sm:!block max-sm:!text-left">
                   <div className="flex items-center gap-3">
                     {i.thumb ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={i.thumb} alt="" className="h-12 w-10 rounded-[6px] border border-black/10 object-cover" /> : <span className="h-12 w-10 rounded-[6px] border border-dashed border-black/20" aria-hidden="true" />}
                     <div className="min-w-0">
@@ -161,22 +161,22 @@ export function ProductListClient() {
                     </div>
                   </div>
                 </AdminTd>
-                <AdminTd>
+                <AdminTd label="Status">
                   <StatusBadge status={BADGE[i.displayStatus].s} label={BADGE[i.displayStatus].label} />
                   {i.hasUnpublishedChanges && <p className="mt-1 text-[10px] text-[#92400E]">Unpublished changes</p>}
                   {i.overdue && <p className="mt-1 text-[10px] font-medium text-[#B91C1C]">Overdue: not live</p>}
                   {i.publishAt && i.displayStatus === 'scheduled' && !i.overdue && <p className="mt-1 text-[10px] text-[#8A8A85]">{new Date(i.publishAt).toLocaleString()}</p>}
                 </AdminTd>
-                <AdminTd>{formatProductPrice(i.priceCents)}</AdminTd>
-                <AdminTd>
+                <AdminTd label="Price">{formatProductPrice(i.priceCents)}</AdminTd>
+                <AdminTd label="Checks">
                   {i.blockerCount === null ? <span className="text-[11px] text-[#8A8A85]">—</span>
                     : i.blockerCount > 0 ? <Link href={`/admin/products/${i.id}`} className="text-[11px] font-medium text-[#B91C1C]">{i.blockerCount} to fix</Link>
                     : <span className="text-[11px] text-[#166534]">Ready</span>}
                   {i.warningCount ? <span className="ml-1 text-[10px] text-[#92400E]">{i.warningCount} tips</span> : null}
                 </AdminTd>
-                <AdminTd className="whitespace-nowrap text-[11px] text-[#6B6B66]">{new Date(i.updatedAt).toLocaleDateString()}</AdminTd>
-                <AdminTd>
-                  <div className="flex flex-wrap justify-end gap-1">
+                <AdminTd label="Edited" className="whitespace-nowrap text-[11px] text-[#6B6B66]">{new Date(i.updatedAt).toLocaleDateString()}</AdminTd>
+                <AdminTd className="max-sm:!justify-start max-sm:!text-left">
+                  <div className="flex flex-wrap justify-end gap-1 max-sm:justify-start">
                     {(i.displayStatus === 'live' || i.displayStatus === 'sold_out') && <a href={`/products/${i.slug}`} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-[9px] px-2 text-[11px] underline underline-offset-2">View live</a>}
                     {(i.displayStatus === 'live' || i.displayStatus === 'sold_out') && <AdminButton size="sm" variant="ghost" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/products/${i.slug}`); setNotice({ tone: 'success', text: 'Link copied.' }) }}>Copy URL</AdminButton>}
                     <AdminButton size="sm" variant="ghost" disabled={busy} onClick={() => void rowAction(i, 'duplicate')}>Duplicate</AdminButton>
@@ -185,7 +185,7 @@ export function ProductListClient() {
                       : <AdminButton size="sm" variant="ghost" disabled={busy} onClick={() => void rowAction(i, 'archive')}>Archive</AdminButton>}
                   </div>
                 </AdminTd>
-              </tr>
+              </AdminTr>
             ))}
           </tbody>
         </AdminTable>

@@ -155,7 +155,7 @@ export function sumLineCents(lines: Array<{ priceCents: number | null | undefine
   return total
 }
 
-const INTERNAL_PATH_RE = /^\/(admin|api|_next)(\/|$)/i
+const INTERNAL_PATH_RE = /^\/(admin|api|_next)(\/|$)|^\/store-credit\/verify\/?$/i
 /** Admin and internal API/asset routes are never storefront traffic. */
 export function isGaInternalPath(pathname: string): boolean {
   return INTERNAL_PATH_RE.test(pathname)

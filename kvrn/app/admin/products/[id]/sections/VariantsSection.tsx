@@ -70,7 +70,7 @@ export function VariantsSection({ snap, update, state, issues, locked }: Section
         {!snap.colors.length && <AdminNotice tone="warning" className="mb-3">Add a colour first.</AdminNotice>}
         <IssueList issues={issues.filter(i => i.field === 'commerce.variants')} />
         {snap.commerce.variants.length > 0 && (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[620px] border-collapse text-left text-[12px]">
               <thead><tr className="text-[10px] uppercase tracking-[0.08em] text-[#8A8A85]">
                 <th className="py-1 pr-2">Colour</th><th className="px-2">Size</th><th className="px-2">SKU</th><th className="px-2">Order</th><th className="px-2">On sale</th><th className="px-2">Stock</th><th /></tr></thead>

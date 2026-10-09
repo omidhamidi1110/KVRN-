@@ -108,7 +108,7 @@ export function ContactClient({ slots }: { slots?: Record<string, ContactSlots> 
 
       {/* Form */}
       <div className="container-kvrn max-w-2xl py-14">
-        {S.intro && <p className="text-[14px] text-[#6B6B6B] leading-relaxed mb-8 whitespace-pre-line">{S.intro}</p>}
+        <p className="text-[14px] text-[#6B6B6B] leading-relaxed mb-8 whitespace-pre-line">{S.intro || 'We’re here to help with orders, sizing, returns, product questions, collaborations and other inquiries. Use the form below or email support@kvrn.shop.'}</p>
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
@@ -169,12 +169,12 @@ export function ContactClient({ slots }: { slots?: Record<string, ContactSlots> 
             {state === 'loading' ? '…' : t.sendMessage}
           </button>
         </form>
-        {(S.supportHours || S.helpNote) && (
-          <div className="mt-10 pt-8 border-t border-[#E8E5E0] space-y-2 text-[13px] text-[#6B6B6B] leading-relaxed whitespace-pre-line">
-            {S.supportHours && <p>{S.supportHours}</p>}
-            {S.helpNote && <p>{S.helpNote}</p>}
-          </div>
-        )}
+        <div className="mt-10 pt-8 border-t border-[#E8E5E0] space-y-3 text-[13px] text-[#6B6B6B] leading-relaxed whitespace-pre-line">
+          <p>{S.supportHours || 'We generally respond within 1–2 business days.'}</p>
+          <p>{S.helpNote || 'For order support or returns, include your KVRN order number. Do not send payment-card details, passwords, government identification, bank or tax identification numbers through this form.'}</p>
+          <p>Existing order? <Link href="/support/track" className="underline underline-offset-2">Track your order</Link>. Returns? See <Link href="/support/shipping-returns" className="underline underline-offset-2">Shipping &amp; Returns</Link>.</p>
+          <p>Instagram: @thekvrn · TikTok: @thekvrn</p>
+        </div>
       </div>
     </div>
   )

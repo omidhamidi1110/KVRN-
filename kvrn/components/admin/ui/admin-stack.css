@@ -1,0 +1,14 @@
+/* Admin table "stack" mode (opt-in via <AdminTable stack>). Below 640px each body row becomes a labelled card:
+   label on the left (copied from the column header), value on the right. Nothing is hidden: every cell stays, the header row stays
+   in the accessibility tree (visually hidden), and the table's scroller remains as a safety net. From 640px up: the normal table.
+   Works for <AdminTr>/<AdminTd> and for plain <tr>/<td> alike (labels are applied by AdminTable at runtime). */
+@media (max-width: 639px) {
+  .kv-stack { display: block; min-width: 0 !important; }
+  .kv-stack thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .kv-stack tbody, .kv-stack tbody tr { display: block; }
+  .kv-stack tbody tr { padding: 8px 12px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+  .kv-stack tbody tr:last-child { border-bottom: 0; }
+  .kv-stack tbody td { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 6px 0; border: 0; text-align: right; max-width: none !important; white-space: normal !important; }
+  .kv-stack tbody td[data-label]::before { content: attr(data-label); flex: none; text-align: left; font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #8a8a85; }
+  .kv-stack tbody td[colspan] { display: block; text-align: left; }
+}

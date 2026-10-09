@@ -62,7 +62,7 @@ export function AdminSmsClient() {
           {data.recent.length === 0 ? (
             <AdminEmpty title="No SMS subscribers yet." />
           ) : (
-            <AdminTable caption="Recent SMS subscribers" minWidth={560}>
+            <AdminTable caption="Recent SMS subscribers" minWidth={560} stack>
               <thead><tr>
                 {['Phone', 'Status', 'Source', 'Consented', 'Signed up'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>

@@ -145,12 +145,19 @@ describe('source regression: the id is runtime-only (never inlined at build time
     expect(SRC.filter(f => strip(read(f)).includes('/api/analytics/config')).sort()).toEqual(['lib/ga-client.ts'])
   })
 
-  test('documentation and .env.example state the runtime-variable requirement explicitly', () => {
+  // .env.example is not part of the CP08 source snapshot (the checkpoint tooling never archives .env*), so these
+  // assertions run only where the owner's real file exists.
+  const envTest = fs.existsSync(path.join(ROOT, '.env.example')) ? test : test.skip
+  test('documentation states the runtime-variable requirement explicitly', () => {
     const doc = read('GA4-INTEGRATION.md')
     expect(doc).toMatch(/RUNTIME/)
     expect(doc).toMatch(/NOT needed .* at build time|not needed .* at build time/i)
     expect(doc).toMatch(/\/api\/analytics\/config/)
     expect(doc).toMatch(/Cloudflare dashboard/)
+    expect(doc).not.toMatch(/G-[A-Z0-9]{8,12}(?![A-Z0-9])(?<!G-XXXXXXXXXX)/)
+  })
+  envTest('.env.example states the runtime-variable requirement explicitly', () => {
+    const doc = ''
     const env = read('.env.example')
     expect(env).toMatch(/RUNTIME Worker variable/)
     expect(env).toMatch(/NOT needed at build time/)
@@ -162,11 +169,11 @@ describe('source regression: the id is runtime-only (never inlined at build time
     for (const f of SRC) expect(strip(read(f))).not.toMatch(/['"`]G-[A-Z0-9]{8,12}['"`]/)
   })
 
-  test('Clarity is still documented as loading outside the consent gate (not claimed solved)', () => {
+  test('Clarity is disabled (it cannot load outside the consent gate) and the doc says so', () => {
     const doc = read('GA4-INTEGRATION.md')
     expect(doc).toMatch(/Microsoft Clarity/)
-    expect(doc).toMatch(/outside the consent gate/)
-    expect(doc).toMatch(/not\*\* fully solved/)
-    expect(strip(read('app/layout.tsx'))).toMatch(/NEXT_PUBLIC_CLARITY_PROJECT_ID/)   // untouched, deliberately
+    expect(doc).toMatch(/\*\*disabled\*\*/)
+    const layout = strip(read('app/layout.tsx'))
+    expect(layout).not.toMatch(/clarity\.ms|NEXT_PUBLIC_CLARITY_PROJECT_ID|<Script[\s>]|next\/script/)   // no unconsented third-party script in the root layout
   })
 })

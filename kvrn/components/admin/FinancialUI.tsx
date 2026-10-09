@@ -94,18 +94,18 @@ export function RangePicker({
 }) {
   const canApply = Boolean(custom.start && custom.end)
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
       <AdminSegmented ariaLabel="Date range" value={range}
         options={RANGE_OPTIONS.map(o => ({ id: o.value as string, label: o.label }))}
         onChange={onRange} />
-      <span className="flex flex-wrap items-center gap-1.5">
+      <span className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
         <input type="date" value={custom.start} aria-label="Start date"
           onChange={e => onCustom({ ...custom, start: e.target.value })}
-          className={`${adminInputClass} !w-auto`} />
+          className={`${adminInputClass} !w-auto max-w-full min-w-0`} />
         <span className="text-[11px] text-[#6B6B66]">to</span>
         <input type="date" value={custom.end} aria-label="End date"
           onChange={e => onCustom({ ...custom, end: e.target.value })}
-          className={`${adminInputClass} !w-auto`} />
+          className={`${adminInputClass} !w-auto max-w-full min-w-0`} />
         <button type="button" onClick={() => onRange('custom')} disabled={!canApply}
           aria-pressed={range === 'custom'}
           className={adminButtonClass(range === 'custom' ? 'primary' : 'secondary', 'md')}>

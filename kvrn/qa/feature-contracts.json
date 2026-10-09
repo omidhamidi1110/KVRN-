@@ -25,7 +25,8 @@
       "evidenceFiles": [
         "lib/__tests__/ga4-client.test.ts",
         "app/products/[slug]/page.tsx",
-        "scripts/browser-smoke.mjs"
+        "scripts/browser-smoke.mjs",
+        "scripts/test-google-merchant-feed.mjs"
       ]
     },
     {
@@ -121,7 +122,8 @@
       "evidenceFiles": [
         "lib/__tests__/funnel-analytics.test.ts",
         "lib/__tests__/ga4-client.test.ts",
-        "scripts/smoke-test.mjs"
+        "scripts/smoke-test.mjs",
+        "scripts/test-live-analytics-privacy.mjs"
       ]
     },
     {
@@ -155,7 +157,8 @@
         "package.json",
         "scripts/browser-smoke.mjs",
         "scripts/verify-change-test-coverage.mjs",
-        "scripts/verify-ai-local-imports.mjs"
+        "scripts/verify-ai-local-imports.mjs",
+        "scripts/test-ai-private-insights.mjs"
       ]
     },
     {
@@ -292,6 +295,50 @@
         "lib/__tests__/admin-ui-primitives.test.ts",
         "lib/__tests__/admin-ui-refresh.test.ts",
         "lib/__tests__/content-admin-ui.test.ts"
+      ]
+    },
+    {
+      "id": "marketing_suite",
+      "requiredTestCaseIds": [
+        "marketing_drafts_jest",
+        "marketing_budget_jest",
+        "sms_optin_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/marketing-campaign-drafts.test.ts",
+        "lib/__tests__/marketing-dispatch-policy.test.ts",
+        "lib/__tests__/sms-double-optin.test.ts",
+        "scripts/verify-development-gates.mjs",
+        "lib/__tests__/marketing-email-consent.test.ts",
+        "lib/__tests__/marketing-unsubscribe.test.ts",
+        "scripts/test-offline-domain-safety.mjs",
+        "lib/__tests__/marketing-suppression.test.ts",
+        "lib/__tests__/sms-segment-estimate.test.ts",
+        "scripts/test-resend-sync-safety.mjs",
+        "scripts/test-resend-webhook-safety.mjs",
+        "lib/resend-webhook-suppression.ts",
+        "db/migrations/045_resend_webhook_suppression.sql",
+        "scripts/test-marketing-preview-calendar.mjs",
+        "scripts/test-private-audience-snapshots.mjs",
+        "scripts/test-marketing-owner-approval.mjs",
+        "scripts/test-marketing-cost-reconciliation.mjs",
+        "scripts/test-marketing-copy-templates.mjs",
+        "app/admin/marketing/templates/TemplateClient.tsx"
+      ]
+    },
+    {
+      "id": "store_credit",
+      "requiredTestCaseIds": [
+        "store_credit_domain_jest",
+        "store_credit_identity_jest"
+      ],
+      "evidenceFiles": [
+        "lib/__tests__/store-credit-domain.test.ts",
+        "lib/__tests__/store-credit-identity.test.ts",
+        "scripts/verify-development-gates.mjs",
+        "scripts/test-store-credit-checkout-holds.mjs",
+        "scripts/test-store-credit-return-issuance.mjs",
+        "scripts/test-store-credit-split-tender.mjs"
       ]
     }
   ]

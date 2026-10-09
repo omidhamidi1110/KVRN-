@@ -15,6 +15,7 @@ import { createDisputesService } from '@/lib/disputes'
 import { createAffiliatesService } from '@/lib/affiliates'
 import { reconcileStripeFeeForOrder } from '@/lib/stripe-fees'
 import { getStripe } from '@/lib/stripe-client'
+import { releaseExpiredCreditHold } from '@/lib/store-credit-checkout-release'
 import { createFraudReviewService } from '@/lib/fraud-review'
 import { isFeatureEnabled } from '@/lib/feature-flags'
 import { tryRecordPurchase } from '@/lib/funnel-analytics'
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.expired':
         await releaseReservationForEvent(session.id, event.id, event.type, 'session_expired')
         await releaseDiscountClaimForSession(session)
+        await releaseCreditForExpiredSession(session)
         break
 
       // ── Refunds ────────────────────────────────────────────────────────────
@@ -130,6 +132,22 @@ export async function POST(req: NextRequest) {
     console.error(`[WEBHOOK] Error [${event.type}] ${event.id}:`, err?.message)
     return NextResponse.json({ error: 'Processing error.' }, { status: 500 })
   }
+}
+
+/** A receipt of checkout.session.expired is insufficient by itself to
+ * release credit. This path independently retrieves the expired session and
+ * final canceled/absent PaymentIntent through releaseExpiredCreditHold.
+ * Errors intentionally propagate to Stripe retry if a credit hold exists.
+ */
+async function releaseCreditForExpiredSession(session: any):Promise<void>{
+  if(process.env.STORE_CREDIT_CHECKOUT_RELEASE_ENABLED!=='true'||process.env.STRIPE_MODE!=='test')return
+  const reservationId=session?.metadata?.reservation_id
+  if(typeof reservationId!=='string'||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(reservationId))return
+  const hold=await sql`SELECT 1 AS present FROM store_credit_checkout_holds
+    WHERE reservation_id=${reservationId}::uuid LIMIT 1`
+  if(hold.length!==1)return
+  await releaseExpiredCreditHold({reservationId,requestKey:`expire:${reservationId}`})
 }
 
 async function handlePaid(session: any, eventId: string, eventType: string) {

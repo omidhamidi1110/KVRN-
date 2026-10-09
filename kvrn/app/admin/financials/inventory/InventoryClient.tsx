@@ -213,7 +213,7 @@ export function InventoryClient() {
 
           <AdminSectionHeader title="By variant" description="Cost basis only." />
           {rows.length === 0 && !loading ? <AdminEmpty title="No inventory." /> : (
-            <AdminTable minWidth={720} caption="Inventory value by variant">
+            <AdminTable minWidth={720} caption="Inventory value by variant" stack>
               <thead><tr>
                 {['SKU','Product','On hand','Layers','Known','Unknown','Value at cost','Reconciled'].map(h =>
                   <AdminTh key={h}>{h}</AdminTh>)}
@@ -300,7 +300,7 @@ export function InventoryClient() {
             {batches.length === 0 && !loading ? (
               <AdminEmpty title="No cost batches." description="Create one under Product Costs first." />
             ) : (
-              <AdminTable minWidth={820} caption="Cost batch receiving progress">
+              <AdminTable minWidth={820} caption="Cost batch receiving progress" stack>
                 <thead><tr>
                   {['Product','Batch','Intended','Received','Remaining','Unit cost',
                     'Intended cost','Received cost','Status'].map(h =>
@@ -342,7 +342,7 @@ export function InventoryClient() {
             info="Variance compares cash paid against the value ACTUALLY RECEIVED, not against the cost of units still in transit. A non-zero variance is expected while deposits or freight invoices are outstanding — it is a review flag, not an error." />
           <div className="mb-7">
             {recon.length === 0 && !loading ? <AdminEmpty title="No purchases recorded." /> : (
-              <AdminTable minWidth={720} caption="Purchase reconciliation">
+              <AdminTable minWidth={720} caption="Purchase reconciliation" stack>
                 <thead><tr>
                   {['Supplier','Reference','Status','Batches','Ordered cost',
                     'Received cost','Cash paid','Variance'].map(h =>
@@ -375,7 +375,7 @@ export function InventoryClient() {
 
           <AdminSectionHeader title="Recent receipts" />
           {receipts.length === 0 && !loading ? <AdminEmpty title="No receipts recorded." /> : (
-            <AdminTable minWidth={560} caption="Recent receipts">
+            <AdminTable minWidth={560} caption="Recent receipts" stack>
               <thead><tr>
                 {['Received','SKU','Batch','Qty','Premium units','By'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
@@ -439,7 +439,7 @@ export function InventoryClient() {
 
           <AdminSectionHeader title="Recorded write-offs" />
           {writeOffs.length === 0 && !loading ? <AdminEmpty title="No write-offs recorded." /> : (
-            <AdminTable minWidth={640} caption="Recorded write-offs">
+            <AdminTable minWidth={640} caption="Recorded write-offs" stack>
               <thead><tr>
                 {['SKU','Qty','Reason','Type','Cost','Date','By'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>
@@ -539,7 +539,7 @@ export function InventoryClient() {
           <AdminSectionHeader title="Cash payments"
             info="A payment date is not a receipt date. Cash flow uses the paid date only." />
           {payments.length === 0 && !loading ? <AdminEmpty title="No payments recorded." /> : (
-            <AdminTable minWidth={480} caption="Cash payments">
+            <AdminTable minWidth={480} caption="Cash payments" stack>
               <thead><tr>
                 {['Paid on','Supplier','Type','Amount'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
               </tr></thead>

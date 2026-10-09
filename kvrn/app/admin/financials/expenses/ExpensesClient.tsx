@@ -305,7 +305,7 @@ export function ExpensesClient() {
               title="Billed invoices"
               info="Real invoices. These are the only expenses that reduce realised profit. Voided invoices stay in the history but count nowhere."
             />
-            <AdminTable caption="Billed invoices" minWidth={820}>
+            <AdminTable caption="Billed invoices" minWidth={820} stack>
               <thead><tr>
                 {['Provider', 'Description', 'Category', 'Amount', 'Paid', 'Service period', 'Source', ''].map((h, i) => (
                   <AdminTh key={i}>{h}</AdminTh>
@@ -404,7 +404,7 @@ export function ExpensesClient() {
               title="Expected obligations"
               info="Monthly equivalent is for planning comparison only — it never creates billed rows."
             />
-            <AdminTable caption="Expected obligations" minWidth={900}>
+            <AdminTable caption="Expected obligations" minWidth={900} stack>
               <thead><tr>
                 {['Provider', 'Name', 'Category', 'Cadence', 'Expected', 'Monthly equiv.', 'Start / renews', 'Status', ''].map((h, i) => (
                   <AdminTh key={i}>{h}</AdminTh>

@@ -50,7 +50,7 @@ export function AffiliateComplianceTab() {
         actions={<AdminButton size="sm" loading={busy} onClick={scan}>Run self-referral check</AdminButton>} />
       {scanMsg && <AdminNotice tone="info">{scanMsg}</AdminNotice>}
       {data.affiliates.length === 0 ? <AdminEmpty title="No affiliates yet" /> : (
-        <AdminTable caption="Affiliate compliance">
+        <AdminTable caption="Affiliate compliance" stack>
           <thead><tr><AdminTh>Affiliate</AdminTh><AdminTh>Status</AdminTh><AdminTh>Last review</AdminTh><AdminTh>Posts to review</AdminTh><AdminTh>Open warnings</AdminTh><AdminTh>Open flags</AdminTh><AdminTh /></tr></thead>
           <tbody>
             {[...data.affiliates].sort((a, b) => (b.itemsOpen + b.warningsOpen + b.flagsOpen) - (a.itemsOpen + a.warningsOpen + a.flagsOpen)).map(a => (

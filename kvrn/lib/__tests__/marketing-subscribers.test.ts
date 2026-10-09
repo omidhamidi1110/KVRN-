@@ -37,6 +37,16 @@ const OK_CONTACT = { ok: true, data: { id: 'contact-abc' } }
 const OK_SEGMENT = { ok: true, data: { id: 'seg-membership' } }
 const OK_TOPIC   = { ok: true, data: { id: 'topic-abc' } }
 const FAIL_500   = { ok: false, status: 500 }
+const OK_EMPTY_TOPICS = { ok: true, data: { data: [], has_more: false } }
+const OK_OPTED_TOPICS = { ok: true, data: { data: [{ id: 'topic-456', subscription: 'opt_in' }], has_more: false } }
+const OK_OPTED_OUT_TOPICS = { ok: true, data: { data: [{ id: 'topic-456', subscription: 'opt_out' }], has_more: false } }
+function confirmedContact(email = 'a@b.com') {
+  return { ok: true, data: { id: 'contact-abc', email, unsubscribed: false } }
+}
+function mockSubscribeSequence(email = 'a@b.com') {
+  mockFetchSequence(OK_CONTACT, confirmedContact(email), OK_EMPTY_TOPICS,
+    OK_SEGMENT, OK_TOPIC, OK_OPTED_TOPICS, confirmedContact(email))
+}
 
 // ── Normalisation + allowlist ─────────────────────────────────────────────────
 
@@ -54,7 +64,7 @@ describe('consent source allowlist', () => {
   test('arbitrary source not in allowlist', () => {
     expect(ALLOWED_CONSENT_SOURCES.has('hack')).toBe(false)
   })
-  // Item 15: no duplicate consent_source check
+  // Source allowlist is enforced by the shared consent service
   test('upsertSubscriber SQL uses ON CONFLICT (email) DO UPDATE — no duplicate rows', () => {
     const src = require('fs').readFileSync(require('path').join(__dirname, '../marketing-subscribers.ts'), 'utf8')
     expect(src).toContain('ON CONFLICT (email) DO UPDATE')
@@ -73,16 +83,42 @@ describe('syncSubscribeToResend — current Resend API', () => {
 
   // Item 1: global Contact is created/upserted
   test('calls POST /contacts (not legacy /audiences/{id}/contacts)', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+    mockSubscribeSequence()
     await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     const [url] = (global.fetch as jest.Mock).mock.calls[0]
     expect(url).toContain('/contacts')
     expect(url).not.toContain('/audiences/')
   })
 
+  test('does not clear a provider-level unsubscribe on contact upsert', async () => {
+    mockSubscribeSequence()
+    await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
+    const [,request] = (global.fetch as jest.Mock).mock.calls[0]
+    const contact = JSON.parse(request.body)
+    expect(contact).not.toHaveProperty('unsubscribed')
+  })
+
+  test('a provider-suppressed contact is never added to a campaign segment or opted in', async () => {
+    mockFetchSequence({ok:true,data:{id:'contact-abc',unsubscribed:true}})
+    const result = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/Provider-suppressed/)
+    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(1)
+  })
+
+  test('existing topic opt-out blocks enrollment even when global Contact is subscribed', async () => {
+    mockFetchSequence(OK_CONTACT, confirmedContact(),
+      { ok: true, data: { data: [{ id: 'topic-456', subscription: 'opt_out' }] } })
+    const r = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
+    expect(r.ok).toBe(false)
+    expect(r.providerTopicOptOut).toBe(true)
+    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(3)
+  })
+
   // Item 2: existing Contact doesn't duplicate (POST is idempotent by email at Resend)
   test('second call for same email still uses POST /contacts — Resend deduplicates', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC, OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+    mockFetchSequence(OK_CONTACT, confirmedContact(), OK_EMPTY_TOPICS, OK_SEGMENT, OK_TOPIC, OK_OPTED_TOPICS, confirmedContact(),
+      OK_CONTACT, confirmedContact(), OK_EMPTY_TOPICS, OK_SEGMENT, OK_TOPIC, OK_OPTED_TOPICS, confirmedContact())
     await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     const firstUrl = (global.fetch as jest.Mock).mock.calls[0][0]
@@ -91,7 +127,7 @@ describe('syncSubscribeToResend — current Resend API', () => {
 
   // Item 3: Contact is added to KVRN Marketing Segment
   test('calls POST /contacts/{id}/segments/{segmentId}', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+    mockSubscribeSequence()
     await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     const calls = (global.fetch as jest.Mock).mock.calls.map(([url]) => url)
     expect(calls.some(u => u.includes('/contacts/contact-abc/segments/seg-123'))).toBe(true)
@@ -99,17 +135,17 @@ describe('syncSubscribeToResend — current Resend API', () => {
 
   // Item 4: Contact is subscribed to KVRN Updates Topic
   test('calls PATCH /contacts/{id}/topics with opt_in', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+    mockSubscribeSequence()
     await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
-    const topicCall = (global.fetch as jest.Mock).mock.calls.find(([url]) => url.includes('/topics'))
+    const topicCall = (global.fetch as jest.Mock).mock.calls.find(([url, init]) => url.includes('/topics') && init.method === 'PATCH')
     expect(topicCall).toBeTruthy()
     const body = JSON.parse(topicCall[1].body)
-    expect(body[0]).toEqual({ id: 'topic-456', subscription: 'opt_in' })
+    expect(body.topics).toEqual([{ id: 'topic-456', subscription: 'opt_in' }])
   })
 
   // Item 5: Contact success + Segment failure remains retryable
   test('Segment failure → ok=false but contactId preserved', async () => {
-    mockFetchSequence(OK_CONTACT, FAIL_500)
+    mockFetchSequence(OK_CONTACT, confirmedContact(), OK_EMPTY_TOPICS, FAIL_500)
     const r = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     expect(r.ok).toBe(false)
     expect(r.contactId).toBe('contact-abc')   // stored for retry
@@ -118,7 +154,7 @@ describe('syncSubscribeToResend — current Resend API', () => {
 
   // Item 6: Contact + Segment success + Topic failure remains retryable
   test('Topic failure → ok=false but contactId preserved', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, FAIL_500)
+    mockFetchSequence(OK_CONTACT, confirmedContact(), OK_EMPTY_TOPICS, OK_SEGMENT, FAIL_500)
     const r = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     expect(r.ok).toBe(false)
     expect(r.contactId).toBe('contact-abc')   // preserved for retry
@@ -127,34 +163,35 @@ describe('syncSubscribeToResend — current Resend API', () => {
 
   // Item 7: only full Contact+Segment+Topic success marks synced
   test('all three steps succeed → ok=true', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+    mockSubscribeSequence()
     const r = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     expect(r.ok).toBe(true)
     expect(r.contactId).toBe('contact-abc')
-    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(3)
+    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(7)
   })
 
-  // Item 11: re-subscription restores Contact, Segment, Topic
-  test('re-subscribe also calls all three Resend steps', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+  // A second confirmed signup can sync a non-suppressed contact; provider opt-outs never reverse.
+  test('verified contact re-sync also checks provider state', async () => {
+    mockSubscribeSequence('re@b.com')
     const r = await syncSubscribeToResend({ email: 're@b.com', firstName: null, lastName: null })
     expect(r.ok).toBe(true)
-    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(3)
+    expect((global.fetch as jest.Mock)).toHaveBeenCalledTimes(7)
   })
 
   // Topic not configured — fail safely
-  test('missing RESEND_MARKETING_TOPIC_ID → ok=false with contactId preserved', async () => {
+  test('missing RESEND_MARKETING_TOPIC_ID → fail before touching a provider contact', async () => {
     delete process.env.RESEND_MARKETING_TOPIC_ID
     mockFetchSequence(OK_CONTACT, OK_SEGMENT)
     const r = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     expect(r.ok).toBe(false)
-    expect(r.contactId).toBe('contact-abc')
+    expect(r.contactId).toBeUndefined()
     expect(r.error).toContain('RESEND_MARKETING_TOPIC_ID')
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
   // Item 16: no legacy /audiences/{id}/contacts calls
   test('no call to legacy /audiences/{id}/contacts endpoint', async () => {
-    mockFetchSequence(OK_CONTACT, OK_SEGMENT, OK_TOPIC)
+    mockSubscribeSequence()
     await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     const allUrls = (global.fetch as jest.Mock).mock.calls.map(([url]) => url as string)
     allUrls.forEach(url => {
@@ -184,13 +221,14 @@ describe('syncUnsubscribeFromResend — current Resend API', () => {
   }))
   afterEach(resetEnv)
 
-  // Item 8: unsubscribe updates local Neon immediately (tested via route inspection)
+  // Item 8: signed marketing opt-out never requires a provider API before local suppression
   test('unsubscribe route calls unsubscribeByEmail before Resend sync', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../../app/api/unsubscribe/route.ts'), 'utf8'
     )
-    expect(src).toContain('unsubscribeByEmail')
-    expect(src).toContain('syncUnsubscribeFromResend')
+    expect(src).toContain('revokeMarketingSubscriberById')
+    expect(src).toContain('verifyMarketingUnsubscribe')
+    expect(src).not.toContain('syncUnsubscribeFromResend')
   })
 
   // Item 9: Resend unsubscribe failure leaves local unsubscribe intact + retryable
@@ -202,23 +240,23 @@ describe('syncUnsubscribeFromResend — current Resend API', () => {
 
   // Item 10: marketing unsubscribe does NOT affect transactional email
   test('no legacy /audiences/ endpoint used for unsubscribe', async () => {
-    mockFetchSequence(OK_TOPIC, OK_SEGMENT)
+    mockFetchSequence(OK_TOPIC, OK_SEGMENT, OK_OPTED_OUT_TOPICS)
     await syncUnsubscribeFromResend({ contactId: 'c-abc' })
     const urls = (global.fetch as jest.Mock).mock.calls.map(([u]) => u as string)
     urls.forEach(u => expect(u).not.toContain('/audiences/'))
   })
 
   test('calls PATCH /contacts/{id}/topics with opt_out', async () => {
-    mockFetchSequence(OK_TOPIC, OK_SEGMENT)
+    mockFetchSequence(OK_TOPIC, OK_SEGMENT, OK_OPTED_OUT_TOPICS)
     await syncUnsubscribeFromResend({ contactId: 'c-abc' })
-    const topicCall = (global.fetch as jest.Mock).mock.calls.find(([u]) => u.includes('/topics'))
+    const topicCall = (global.fetch as jest.Mock).mock.calls.find(([u, init]) => u.includes('/topics') && init.method === 'PATCH')
     expect(topicCall).toBeTruthy()
     const body = JSON.parse(topicCall[1].body)
-    expect(body[0]).toEqual({ id: 'topic-456', subscription: 'opt_out' })
+    expect(body.topics).toEqual([{ id: 'topic-456', subscription: 'opt_out' }])
   })
 
   test('calls DELETE /contacts/{id}/segments/{segmentId}', async () => {
-    mockFetchSequence(OK_TOPIC, OK_SEGMENT)
+    mockFetchSequence(OK_TOPIC, OK_SEGMENT, OK_OPTED_OUT_TOPICS)
     await syncUnsubscribeFromResend({ contactId: 'c-abc' })
     const segCall = (global.fetch as jest.Mock).mock.calls.find(
       ([u, opts]) => u.includes('/segments/') && opts?.method === 'DELETE'
@@ -227,11 +265,12 @@ describe('syncUnsubscribeFromResend — current Resend API', () => {
     expect(segCall[0]).toContain('/contacts/c-abc/segments/seg-123')
   })
 
-  test('no contactId → returns ok=true with no Resend calls', async () => {
+  test('no contactId → fail closed for reconciliation, with no Resend calls', async () => {
     const spy = jest.fn() as any
     global.fetch = spy
     const r = await syncUnsubscribeFromResend({ contactId: null })
-    expect(r.ok).toBe(true)
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('reconcile')
     expect(spy).not.toHaveBeenCalled()
   })
 })
@@ -268,25 +307,19 @@ describe('separation from transactional email', () => {
 
 // ── Waitlist DB failure ───────────────────────────────────────────────────────
 
-describe('waitlist: Neon failure returns error (item 17)', () => {
-  // Item 17: waitlist returns failure when Neon cannot store explicit email consent
-  test('waitlist route uses try/catch and returns 500 on DB failure', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/waitlist/route.ts'), 'utf8'
-    )
-    expect(src).toContain('consent not stored')
-    expect(src).toContain('status: 500')
-    // Must NOT have a pattern of catching and continuing silently
-    expect(src).not.toContain('// Continue — do not block the signup response')
+describe('public waitlist consent contract', () => {
+  test('both public signup paths require explicit marketing email consent', () => {
+    const fs = require('fs') as typeof import('fs')
+    const path = require('path') as typeof import('path')
+    for (const route of ['waitlist', 'marketing/subscribe']) {
+      const src = fs.readFileSync(path.join(__dirname, '../../app/api', route, 'route.ts'), 'utf8')
+      expect(src).toContain('validatePublicEmailConsent')
+      expect(src).not.toContain('console.log(email)')
+    }
   })
-
-  // Item 18: Resend failure after successful Neon storage does NOT fail signup
-  test('Resend sync failure is caught separately from DB and does not return 500', () => {
-    const src = require('fs').readFileSync(
-      require('path').join(__dirname, '../../app/api/waitlist/route.ts'), 'utf8'
-    )
-    // Resend error is caught in a try/catch that does NOT re-throw or return error
-    expect(src).toContain('Resend sync failed (non-fatal)')
+  test('public form never directly calls Resend', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../app/api/waitlist/route.ts'), 'utf8')
+    expect(src).not.toContain('syncSubscribeToResend')
   })
 })
 
@@ -351,6 +384,7 @@ describe('RESEND_MARKETING_API_KEY vs RESEND_API_KEY separation', () => {
   test('401 from Resend returns ok=false (retryable, not thrown)', async () => {
     process.env.RESEND_MARKETING_API_KEY    = 'test-mkt-key'
     process.env.RESEND_MARKETING_SEGMENT_ID = 'seg-123'
+    process.env.RESEND_MARKETING_TOPIC_ID = 'topic-456'
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({}) }) as any
     const r = await syncSubscribeToResend({ email: 'a@b.com', firstName: null, lastName: null })
     expect(r.ok).toBe(false)

@@ -166,7 +166,7 @@ export function ReturnsClient() {
           </AdminNotice>
           <AdminSectionHeader title={`Refunds awaiting processing-fee return (${awaitingFee.length})`}
             info="Independent of the merchandise / shipping / tax split and of any return." />
-          <AdminTable minWidth={720} caption="Refunds awaiting processing-fee return">
+          <AdminTable minWidth={720} caption="Refunds awaiting processing-fee return" stack>
             <thead>
               <tr>
                 {['Order', 'Refund', 'Original Stripe fee', 'Fee returned', 'Fee returned $'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
@@ -217,7 +217,7 @@ export function ReturnsClient() {
           <AdminSectionHeader title={`Refunds awaiting breakdown (${awaiting.length})`}
             description="Derive when the refund equals the order total; otherwise enter a split that totals the refund." />
 
-          <AdminTable minWidth={760} caption="Refunds awaiting breakdown">
+          <AdminTable minWidth={760} caption="Refunds awaiting breakdown" stack>
             <thead>
               <tr>
                 {['Order', 'Refund', 'Merchandise $', 'Shipping $', 'Tax $', 'Total'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
@@ -273,7 +273,7 @@ export function ReturnsClient() {
       <AdminSectionHeader title="Returns"
         info="COGS is credited back only when a unit is sellable AND restocked. Damaged or lost units keep their original cost." />
       {loading ? <AdminLoading /> : returns.length === 0 ? <AdminEmpty title="No returns recorded." /> : (
-        <AdminTable minWidth={720} caption="Returns">
+        <AdminTable minWidth={720} caption="Returns" stack>
           <thead>
             <tr>
               {['Return', 'Order', 'Status', 'Units', 'Return shipping', 'KVRN label cost', 'Requested'].map(h => <AdminTh key={h}>{h}</AdminTh>)}

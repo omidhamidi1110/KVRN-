@@ -78,7 +78,11 @@ export function ListEditor<T>({ items, onChange, render, makeNew, addLabel, max,
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
-export function entityStatusBadge(status: string, hasDraft: boolean, isLive: boolean): ReactNode {
+export function entityStatusBadge(status: string, hasDraft: boolean, isLive: boolean, placeholderSeed = false): ReactNode {
+  // The unchanged migration placeholder is stored as "published" but the storefront ignores it (the coded page is shown), so "Live" would mislead.
+  if (placeholderSeed && !hasDraft && status === 'published') {
+    return <span className="inline-flex flex-wrap items-center gap-1.5"><StatusBadge status="Inactive" label="Placeholder — not live" /></span>
+  }
   const map: Record<string, [StatusLabel, string?]> = {
     published: ['Live'], draft: ['Draft'], scheduled: ['Scheduled'], unpublished: ['Inactive', 'Unpublished'], archived: ['Archived'],
   }

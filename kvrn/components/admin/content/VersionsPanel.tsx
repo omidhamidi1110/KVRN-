@@ -3,6 +3,7 @@
 // the older content, so history is never rewritten.
 
 import { useCallback, useEffect, useState } from 'react'
+import { SEED_ACTOR } from '@/lib/content-seed-actor'
 import { AdminButton, AdminLoading, AdminError, AdminTable, AdminTh, AdminTd, StatusBadge, AdminNotice, useConfirm } from '@/components/admin/ui/AdminUI'
 import { api, BASE, type ApiResult } from './api'
 import { ErrorNotice, InvalidationNotice } from './ui'
@@ -48,7 +49,7 @@ export function VersionsPanel({ kind, id, revision, onRolledBack }: { kind: Kind
       {node}
       <ErrorNotice result={last} title="Could not restore that version." />
       {last?.ok && <><AdminNotice tone="success">Restored. It is now the live version.</AdminNotice><InvalidationNotice result={last.invalidation} /></>}
-      <AdminTable caption="Version history">
+      <AdminTable caption="Version history" stack>
         <thead><tr><AdminTh>Version</AdminTh><AdminTh>State</AdminTh><AdminTh>Saved</AdminTh><AdminTh>By</AdminTh><AdminTh>Note</AdminTh><AdminTh /></tr></thead>
         <tbody>
           {rows.map(v => {
@@ -58,8 +59,8 @@ export function VersionsPanel({ kind, id, revision, onRolledBack }: { kind: Kind
                 <AdminTd>v{v.version_no}</AdminTd>
                 <AdminTd><StatusBadge status={st} label={lbl} /></AdminTd>
                 <AdminTd>{when(v.published_at ?? v.created_at)}</AdminTd>
-                <AdminTd>{v.published_by ?? v.created_by ?? '—'}</AdminTd>
-                <AdminTd>{v.rolled_back_from ? `Restored from v${v.rolled_back_from}` : (v.change_note ?? '')}</AdminTd>
+                <AdminTd>{(v.published_by ?? v.created_by) === SEED_ACTOR ? 'Installed by migration' : (v.published_by ?? v.created_by ?? '—')}</AdminTd>
+                <AdminTd>{v.rolled_back_from ? `Restored from v${v.rolled_back_from}` : v.created_by === SEED_ACTOR ? 'Original text installed by the migration (not a person’s edit)' : (v.change_note ?? '')}</AdminTd>
                 <AdminTd className="whitespace-nowrap text-right">
                   <AdminButton size="sm" variant="ghost" onClick={() => open(v.version_no)}>View</AdminButton>
                   {v.state !== 'published' && v.state !== 'draft' && <AdminButton size="sm" loading={busy === v.version_no} onClick={() => rollback(v.version_no)}>Restore</AdminButton>}

@@ -7,6 +7,7 @@ import { createContentPublic, type ContentPublic } from '../content-public'
 import { para, heading } from '../content-richtext'
 import { activeAnnouncementMessages } from '../content-shell'
 import { DEFAULT_ANNOUNCEMENT } from '../content-defaults'
+import { adoptSeeds } from './helpers/cms-adopt'
 
 const A = 'editor@kvrn.test'
 const d = HAVE_DB ? describe : describe.skip
@@ -176,7 +177,17 @@ d('collections, SEO and public loaders (real PG)', () => {
   describe('public loaders return published content only', () => {
     const body = (t: string) => ({ v: 1, blocks: [heading('H'), para(t)] })
 
-    test('seeded policies are public; a new draft is not; an edited draft does not change the live text', async () => {
+    test('seed-published content is NOT served (it would override the Oct 6 coded copy); a human publish/adoption makes it live', async () => {
+      expect(await pub.getPolicyById('terms')).toBeNull()
+      expect(await pub.getPolicyBySlug('privacy')).toBeNull()
+      expect(await pub.getFaq()).toBeNull()
+      const sh = await pub.getShell()
+      expect(sh.navigation).toBeNull(); expect(sh.footer).toBeNull()
+      expect((await pub.getSitemapEntries()).map(e => e.path)).not.toContain('/terms')
+      expect(await adoptSeeds(db.q)).toBeGreaterThan(0)
+    })
+
+    test('after adoption policies are public; a new draft is not; an edited draft does not change the live text', async () => {
       const terms = await pub.getPolicyById('terms')
       expect(terms?.path).toBe('/terms')
       const before = JSON.stringify(terms!.variants.en.data)
@@ -226,7 +237,7 @@ d('collections, SEO and public loaders (real PG)', () => {
       expect(await pub.getSizeGuideForProduct(p2)).toBeNull()
     })
 
-    test('shell: seeded navigation/footer/announcement are returned; announcement window and disabled state are honoured', async () => {
+    test('shell: (adopted) navigation/footer/announcement are returned; announcement window and disabled state are honoured', async () => {
       const sh = await pub.getShell()
       expect(sh.navigation?.desktop.length).toBeGreaterThan(0)
       expect(sh.footer?.groups.length).toBeGreaterThan(0)

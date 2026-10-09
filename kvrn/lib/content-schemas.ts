@@ -144,8 +144,10 @@ export const LEGACY_POLICY_PATHS: Record<string, { slug: string; path: string }>
   'privacy':          { slug: 'privacy',          path: '/privacy' },
   'cookies':          { slug: 'cookies',          path: '/cookies' },
   'shipping-returns': { slug: 'shipping-returns', path: '/support/shipping-returns' },
+  'messaging-terms':   { slug: 'messaging-terms',   path: '/messaging-terms' },
+  'messaging-privacy': { slug: 'messaging-privacy', path: '/messaging-privacy' },
 }
-export const RESERVED_POLICY_SLUGS: ReadonlySet<string> = new Set(['terms', 'privacy', 'cookies', 'shipping-returns', 'size-guide', 'faq', 'track'])
+export const RESERVED_POLICY_SLUGS: ReadonlySet<string> = new Set(['terms', 'privacy', 'cookies', 'shipping-returns', 'size-guide', 'faq', 'track', 'messaging-terms', 'messaging-privacy'])
 
 /** Public path of a policy: its legacy URL while it keeps the legacy slug, else /legal/<slug>. */
 export function policyPath(entityId: string, slug: string): string {

@@ -96,7 +96,7 @@ export function orgSchema(g: GlobalSeo = DEFAULT_GLOBAL_SEO) {
 /** JSON for a <script type="application/ld+json"> body: '<' is escaped so content can never close the tag. */
 export const jsonLd = (v: unknown): string => JSON.stringify(v).replace(/</g, '\\u003c')
 
-export interface CodedMeta { title: string; description?: string; robots?: Metadata['robots'] }
+export interface CodedMeta { title: string; description?: string; robots?: Metadata['robots']; /** Site-relative canonical path, e.g. '/collections/winter' (resolved against metadataBase). */ canonical?: string }
 
 /**
  * Per-page metadata. `coded` is what the page used before the CMS, so a page with no
@@ -109,6 +109,7 @@ export function pageMetadata(coded: CodedMeta, seo: SeoFields | undefined, share
   const md: Metadata = { title }
   if (description) md.description = description
   md.robots = seo?.noindex ? { index: false, follow: false } : coded.robots
+  if (coded.canonical && coded.canonical.startsWith('/') && !seo?.noindex) md.alternates = { canonical: coded.canonical }
   if (md.robots === undefined) delete md.robots
   const img = shareImageUrl || null
   if (seo?.shareTitle || img) {
