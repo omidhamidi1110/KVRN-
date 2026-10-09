@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AdminButton, AdminCard, AdminField, AdminNotice, AdminPageHeader, adminInputClass } from '@/components/admin/ui/AdminUI'
+import { AdminPage, AdminButton, AdminCard, AdminField, AdminNotice, AdminPageHeader, adminInputClass } from '@/components/admin/ui/AdminUI'
 import { slugify } from '@/lib/product-model'
 
 export function NewProductClient() {

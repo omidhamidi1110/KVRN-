@@ -112,7 +112,7 @@ export function SystemClient() {
             </div>
           )}
           <AdminNotice tone="info" className="mt-3">
-            USD checkout and manual affiliate payouts are intentional. "On" is a deployed Worker setting, not proof of production readiness. Public CMS, transactional email and fraud holds need their prerequisites confirmed.
+            USD checkout and manual affiliate payouts are intentional. &quot;On&quot; is a deployed Worker setting, not proof of production readiness. Public CMS, transactional email and fraud holds need their prerequisites confirmed.
           </AdminNotice>
           {otherControls.length > 0 && (
             <div className="mt-4 rounded-xl border border-black/10 bg-white p-3 sm:p-4">

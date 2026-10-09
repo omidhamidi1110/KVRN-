@@ -61,7 +61,7 @@ export function AdminSmsClient() {
 
           <div className="rounded-xl border border-[#DEDCD7] bg-[#FAF9F6] p-4 sm:p-5 space-y-3">
             <h2 className="font-semibold text-[#1B1B1A]">Legacy SMS import — consent review</h2>
-            <p className="text-sm leading-relaxed text-[#666660]">Legacy provider exports are quarantined. Their "active" label or past keyword alone is not proof of current marketing consent. No imported active contact is eligible for sends. Known opt-outs are suppressed in the canonical list.</p>
+            <p className="text-sm leading-relaxed text-[#666660]">Legacy provider exports are quarantined. Their &quot;active&quot; label or past keyword alone is not proof of current marketing consent. No imported active contact is eligible for sends. Known opt-outs are suppressed in the canonical list.</p>
             {data.legacy ? (
               <AdminStatGrid min={130}>
                 <AdminStat label="Legacy records" value={data.legacy.total} />

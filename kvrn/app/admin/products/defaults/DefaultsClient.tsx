@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { AdminButton, AdminCard, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, adminInputClass } from '@/components/admin/ui/AdminUI'
+import { AdminPage, AdminButton, AdminCard, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, adminInputClass } from '@/components/admin/ui/AdminUI'
 
 interface Defaults { shippingReturns: { lines: string[]; linkLabel: string; href: string } }
 
