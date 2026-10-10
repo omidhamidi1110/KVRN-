@@ -137,25 +137,26 @@ export function IntegrityClient() {
         title="Reconciliation"
         description="Money checks against source records."
         info={<><p>Every money path is re-checked from the source rows each time.</p><div className="mt-2">{stateInfo}</div></>}
+        actionsFull
         actions={
-          <>
-            <AdminButton onClick={load} disabled={loading}>Re-check now</AdminButton>
-            <AdminButton variant="primary" onClick={recordRun} loading={running}>Record run to history</AdminButton>
-            <a href={`/api/admin/financials/integrity/export?${query()}`} className={adminButtonClass('secondary', 'md')}>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <AdminButton onClick={load} disabled={loading} className="order-1 w-full sm:order-none sm:w-auto">Re-check now</AdminButton>
+            <AdminButton variant="primary" onClick={recordRun} loading={running} className="order-3 col-span-2 w-full sm:order-none sm:col-span-1 sm:w-auto">Record run to history</AdminButton>
+            <a href={`/api/admin/financials/integrity/export?${query()}`} className={adminButtonClass('secondary', 'md', 'order-2 w-full sm:order-none sm:w-auto')}>
               Export CSV
             </a>
             {/* Tax-year bookkeeping summary: not a tax return. Server validates the year. */}
-            <span className="inline-flex items-center gap-1.5">
+            <div className="order-4 col-span-2 grid grid-cols-[88px_minmax(0,1fr)] items-center gap-2 sm:order-none sm:col-span-1 sm:flex sm:gap-1.5">
               <select value={taxYear} onChange={e => setTaxYear(e.target.value)}
-                      aria-label="Tax year" className={`${adminSelectClass} !w-auto`}>
+                      aria-label="Tax year" className={`${adminSelectClass} !w-full sm:!w-auto`}>
                 {taxYears.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
               <a href={`/api/admin/financials/tax-export?year=${encodeURIComponent(taxYear)}`}
-                 className={adminButtonClass('secondary', 'md')}>
+                 className={adminButtonClass('secondary', 'md', 'w-full sm:w-auto')}>
                 Tax summary CSV
               </a>
-            </span>
-          </>
+            </div>
+          </div>
         }
       />
 

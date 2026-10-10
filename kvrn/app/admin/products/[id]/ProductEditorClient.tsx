@@ -244,12 +244,12 @@ export function ProductEditorClient({ id }: { id: string }) {
 
       <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1fr)_minmax(460px,42%)]">
         <div className="min-w-0">
-          <div className="kv-product-tabs"><AdminTabs<TabId> ariaLabel="Product sections" value={tab} onChange={setTab} tabs={[
+          <AdminTabs<TabId> ariaLabel="Product sections" value={tab} onChange={setTab} tabs={[
             { id: 'basics', label: 'Basics', count: tabCounts.basics }, { id: 'media', label: 'Images', count: tabCounts.media },
             { id: 'variants', label: 'Colours & sizes', count: tabCounts.variants }, { id: 'content', label: 'Content', count: tabCounts.content },
             { id: 'pairing', label: 'Complete the Set', count: tabCounts.pairing }, { id: 'price', label: 'Price & shipping', count: tabCounts.price },
             { id: 'seo', label: 'SEO', count: tabCounts.seo }, { id: 'publish', label: 'Publish', count: blockers.length || undefined }, { id: 'history', label: 'History' },
-          ]} /></div>
+          ]} />
           {tab === 'basics' && <BasicsSection {...section} />}
           {tab === 'media' && <MediaSection {...section} />}
           {tab === 'variants' && <VariantsSection {...section} />}

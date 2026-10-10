@@ -239,7 +239,7 @@ export function Nav({ shell }: { shell?: ShellData | null; affiliatePortalEnable
               <LanguageSelector align="right" />
             </div>
             <Link href="/affiliate-sign-in"
-              className="hidden lg:inline-flex text-[11px] font-light tracking-[0.09em] uppercase hover:opacity-50 focus-visible:opacity-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 transition-opacity whitespace-nowrap">
+              className="hidden lg:inline-flex text-[11px] font-light tracking-[0.04em] normal-case hover:opacity-50 focus-visible:opacity-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 transition-opacity whitespace-nowrap">
               {t['nav.affiliateLogin']}
             </Link>
 
@@ -326,6 +326,11 @@ export function Nav({ shell }: { shell?: ShellData | null; affiliatePortalEnable
               {l.label}
             </Link>
           ))}
+          {/* Creator Portal: a regular menu row (same size, weight and tone as its neighbours), title case. The sign-in page itself states whether access is open. */}
+          <Link href="/affiliate-sign-in" onClick={() => setDrawerOpen(false)}
+            className="block py-3.5 text-[16px] font-light normal-case border-t border-[#F0EDE8]/10 text-[#F0EDE8] hover:text-[#F0EDE8]/50 focus-visible:text-[#F0EDE8]/50 transition-colors">
+            {t['nav.affiliateLogin']}
+          </Link>
         </nav>
 
         {/* Drawer footer */}
@@ -347,10 +352,6 @@ export function Nav({ shell }: { shell?: ShellData | null; affiliatePortalEnable
             >
               {t['nav.cookiePreferences']}
             </button>
-            <Link href="/affiliate-sign-in" onClick={() => setDrawerOpen(false)}
-              className="text-right text-[11px] font-light text-[#F0EDE8]/80 hover:text-[#F0EDE8] focus-visible:text-[#F0EDE8] transition-colors tracking-wide">
-              {t['nav.affiliateLogin']}
-            </Link>
           </div>
         </div>
       </div>

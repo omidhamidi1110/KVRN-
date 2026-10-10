@@ -31,7 +31,7 @@ export function AdminPage({ children, width = 'default', className = '' }: {
 // ── Page + section headers ────────────────────────────────────────────────────
 
 export function AdminPageHeader({
-  title, description, eyebrow, info, actions,
+  title, description, eyebrow, info, actions, actionsFull,
 }: {
   title: string
   /** Usually 3–8 words. */
@@ -39,6 +39,8 @@ export function AdminPageHeader({
   eyebrow?: string
   info?: ReactNode
   actions?: ReactNode
+  /** Phones: let the actions use the full row (own toolbar layout) instead of sitting beside the title. */
+  actionsFull?: boolean
 }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -49,7 +51,7 @@ export function AdminPageHeader({
         </h1>
         {description && <p className="mt-1 text-[12px] text-[#6B6B66]">{description}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className={cx('flex flex-wrap items-center gap-2', actionsFull && 'w-full sm:w-auto')}>{actions}</div>}
     </header>
   )
 }
@@ -149,9 +151,20 @@ export function AdminField({ label, htmlFor, info, hint, error, children, classN
 
 /** Shared form grid: equal tracks, 14/16px gutters, container-aware columns (1 → 2 → `cols`). Use `className="kv-span-all"` for full-width children. */
 export function AdminFieldGrid({ cols = 3, children, className = '' }: { cols?: 2 | 3 | 4; children: ReactNode; className?: string }) {
+  // An incomplete last row stretches its final field across the free tracks (no empty slot beside it). Skipped when a child
+  // opts into kv-span-all, since the row arithmetic is then ambiguous.
+  const kids = Children.toArray(children).filter(Boolean)
+  const manual = kids.some(k => typeof k === 'object' && k !== null && 'props' in k && String((k as { props?: { className?: string } }).props?.className ?? '').includes('kv-span-all'))
+  const span = (k: number) => (manual || kids.length % k === 0 ? 1 : k - (kids.length % k) + 1)
+  const style = {
+    ['--kv-cols' as string]: cols,
+    ['--kv-span-2' as string]: span(2),
+    ['--kv-span-mid' as string]: span(Math.min(cols, 3)),
+    ['--kv-span-wide' as string]: span(cols),
+  } as CSSProperties
   return (
     <div className={cx('kv-field-wrap', className)}>
-      <div className="kv-field-grid" style={{ ['--kv-cols' as string]: cols } as CSSProperties}>{children}</div>
+      <div className="kv-field-grid" style={style}>{children}</div>
     </div>
   )
 }
@@ -214,11 +227,11 @@ export function AdminStat({ label, value, sub, tone = 'default', info, flag, cla
   info?: ReactNode; flag?: ReactNode; className?: string
 }) {
   return (
-    <div className={cx('min-w-0 rounded-[14px] border border-black/[0.08] bg-white px-4 py-3.5', className)}>
-      <p className="flex items-center gap-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8A8A85]">
-        <span className="min-w-0">{label}</span>{info && <InfoTip label={`About ${label}`}>{info}</InfoTip>}
+    <div className={cx('min-w-0 rounded-[14px] border border-black/[0.08] bg-white px-3.5 py-3 sm:px-4 sm:py-3.5', className)}>
+      <p className="flex min-h-[16px] items-center gap-0.5 text-[10px] font-medium uppercase leading-4 tracking-[0.1em] text-[#8A8A85]">
+        <span className="min-w-0">{label}</span>{info && <span className="-my-2 flex shrink-0"><InfoTip label={`About ${label}`}>{info}</InfoTip></span>}
       </p>
-      <p className={cx('mt-1.5 break-words text-[20px] font-medium leading-tight tracking-[-0.01em]', STAT_TONE[tone])}>{value}</p>
+      <p className={cx('mt-1 break-words text-[18px] sm:mt-1.5 sm:text-[20px] font-medium leading-tight tracking-[-0.01em]', STAT_TONE[tone])}>{value}</p>
       {sub && <p className="mt-1 text-[11px] text-[#6B6B66]">{sub}</p>}
       {flag && <p className="mt-1 text-[11px] font-medium text-[#92400E]">{flag}</p>}
     </div>
@@ -244,7 +257,7 @@ export function AdminStatGrid({ children, maxCols = 6, midCols = 4, className = 
   const md = balancedCols(n, Math.min(midCols, lg))
   return (
     <div className={cx('kv-stat-wrap', className)}>
-      <div className="kv-stat-grid" style={{ ['--kv-lg' as string]: lg, ['--kv-md' as string]: md } as CSSProperties}>
+      <div className="kv-stat-grid" style={{ ['--kv-lg' as string]: lg, ['--kv-md' as string]: md, ['--kv-span-lg' as string]: n % lg ? lg - (n % lg) + 1 : 1, ['--kv-span-md' as string]: n % md ? md - (n % md) + 1 : 1 } as CSSProperties}>
         {children}
       </div>
     </div>
@@ -289,10 +302,39 @@ export function AdminDisclosure({ summary, children, className = '' }: { summary
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
+/**
+ * ONE tab control for the whole Admin: a rounded pill strip. Labels never shrink or overlap (every pill is `shrink-0`
+ * with an explicit min-width:auto); when they do not fit the strip scrolls horizontally with edge fades as the
+ * affordance, the active tab is kept in view, and arrow/Home/End keyboard navigation + focus rings are kept.
+ */
 export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }: {
   tabs: Array<{ id: T; label: string; count?: number }>; value: T; onChange: (id: T) => void; ariaLabel: string
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([])
+  const scroller = useRef<HTMLDivElement | null>(null)
+  const [edges, setEdges] = useState({ left: false, right: false })
+  const measure = () => {
+    const el = scroller.current
+    if (!el) return
+    setEdges({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 })
+  }
+  useEffect(() => {
+    measure()
+    const el = scroller.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [tabs.length])
+  useEffect(() => {
+    const i = tabs.findIndex(t => t.id === value)
+    const el = refs.current[i]
+    const box = scroller.current
+    if (!el || !box) return
+    const l = el.offsetLeft, r = l + el.offsetWidth
+    if (l < box.scrollLeft + 8) box.scrollTo({ left: Math.max(0, l - 12), behavior: 'smooth' })
+    else if (r > box.scrollLeft + box.clientWidth - 8) box.scrollTo({ left: r - box.clientWidth + 12, behavior: 'smooth' })
+  }, [value]) // eslint-disable-line react-hooks/exhaustive-deps
   const onKeyDown = (e: ReactKeyboardEvent, i: number) => {
     const last = tabs.length - 1
     const next = e.key === 'ArrowRight' ? (i === last ? 0 : i + 1)
@@ -304,18 +346,21 @@ export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }
     onChange(tabs[next].id)
   }
   return (
-    <div role="tablist" aria-label={ariaLabel} className="relative mb-4 flex gap-1 overflow-x-auto overscroll-x-contain border-b border-black/[0.08]">
-      {tabs.map((t, i) => {
-        const active = t.id === value
-        return (
-          <button key={t.id} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
-            ref={el => { refs.current[i] = el }} onKeyDown={e => onKeyDown(e, i)} onClick={() => onChange(t.id)}
-            className={cx('-mb-px min-h-[40px] whitespace-nowrap border-b-2 px-3 py-2 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40',
-              active ? 'border-[#171717] text-[#171717]' : 'border-transparent text-[#6B6B66] hover:text-[#171717]')}>
-            {t.label}{typeof t.count === 'number' && <span className="ml-1.5 text-[10px] text-[#8A8A85]">{t.count}</span>}
-          </button>
-        )
-      })}
+    <div className="kv-tabs relative mb-4 min-w-0 max-w-full" data-left={edges.left || undefined} data-right={edges.right || undefined}>
+      <div ref={scroller} onScroll={measure} role="tablist" aria-label={ariaLabel}
+        className="kv-tabs-strip flex gap-1.5 overflow-x-auto overscroll-x-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {tabs.map((t, i) => {
+          const active = t.id === value
+          return (
+            <button key={t.id} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+              ref={el => { refs.current[i] = el }} onKeyDown={e => onKeyDown(e, i)} onClick={() => onChange(t.id)}
+              className={cx('inline-flex h-10 min-w-max shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-4 text-[12px] font-medium leading-none transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 focus-visible:ring-offset-1 sm:h-9',
+                active ? 'border-[#171717] bg-[#171717] text-white' : 'border-black/[0.10] bg-white text-[#4A4A46] hover:border-black/25 hover:text-[#171717]')}>
+              {t.label}{typeof t.count === 'number' && <span className={cx('ml-1.5 text-[10px]', active ? 'text-white/70' : 'text-[#8A8A85]')}>{t.count}</span>}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -366,6 +411,9 @@ export function labelStackCells(table: HTMLTableElement): void {
           if (l) { if (td.getAttribute('data-label') !== l) td.setAttribute('data-label', l); td.setAttribute('data-auto-label', '1') }
           else if (auto) { td.removeAttribute('data-label'); td.removeAttribute('data-auto-label') }
         }
+        // Long values (product names, emails, provider refs) and anything interactive take the full card width; short values pair up two per row.
+        const wide = col === 0 || (td.textContent ?? '').trim().length > 18 || td.querySelector('button, a, input, select, textarea, form') !== null
+        if (wide !== td.hasAttribute('data-wide')) { if (wide) td.setAttribute('data-wide', '1'); else td.removeAttribute('data-wide') }
         col += Math.max(1, td.colSpan)
       }
     }

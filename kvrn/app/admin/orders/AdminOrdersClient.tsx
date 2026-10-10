@@ -300,7 +300,7 @@ export function AdminOrdersClient() {
             onKeyDown={e => e.key === 'Enter' && fetchOrders(0)}
             placeholder="Order #, customer name, or email"
             aria-label="Search orders"
-            className={`${adminInputClass} min-w-0 flex-1`}
+            className={`${adminInputClass} min-w-0 lg:flex-1`}
           />
           <select aria-label="Payment status" value={payFilter} onChange={e => setPayFilter(e.target.value)} className={sel}>
             <option value="">All payments</option>
@@ -318,8 +318,10 @@ export function AdminOrdersClient() {
             <option value="">All tags</option>
             {allTags.map(t => <option key={t.id} value={t.id}>{t.name}{t.archived ? ' (archived)' : ''}</option>)}
           </select>
-          <AdminButton variant="primary" onClick={() => fetchOrders(0)}>Search</AdminButton>
-          <AdminButton onClick={() => { setSearch(''); setPayFilter(''); setFulFilter(''); setTagFilter('') }}>Clear</AdminButton>
+          <div className="grid grid-cols-2 gap-2 lg:contents">
+            <AdminButton variant="primary" onClick={() => fetchOrders(0)}>Search</AdminButton>
+            <AdminButton onClick={() => { setSearch(''); setPayFilter(''); setFulFilter(''); setTagFilter('') }}>Clear</AdminButton>
+          </div>
         </div>
         {allTags.length > 0 && (
           <div className="border-t border-black/[0.06] px-3 py-1">

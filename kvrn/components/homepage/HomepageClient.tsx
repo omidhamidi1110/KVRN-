@@ -276,7 +276,7 @@ function VideoSlide({ activeSlide, slideIndex }: { activeSlide: number; slideInd
         loop
         playsInline
         preload="metadata"
-        poster="/images-r/1536/campaign/hero-main.webp"
+        poster="/images/campaign/hero-video-poster.webp"   // the video's own first frame (hero-main.webp is the NEXT slide's photo and used to bleed through as the placeholder)
         onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none' }}
         style={{
           position:  'absolute',

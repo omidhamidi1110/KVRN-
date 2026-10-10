@@ -3,14 +3,20 @@
    in the accessibility tree (visually hidden), and the table's scroller remains as a safety net. From 640px up: the normal table.
    Works for <AdminTr>/<AdminTd> and for plain <tr>/<td> alike (labels are applied by AdminTable at runtime). */
 @media (max-width: 639px) {
+  /* CP70: compact card — a two-column grid of label-over-value pairs. Short values pair up; long values, the first cell and
+     anything interactive (data-wide, set by labelStackCells) span the full card. Replaces the one-row-per-field layout. */
   .kv-stack { display: block; min-width: 0 !important; }
   .kv-stack thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .kv-stack tbody, .kv-stack tbody tr { display: block; }
-  .kv-stack tbody tr { padding: 8px 12px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+  .kv-stack tbody { display: block; }
+  .kv-stack tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 10px 12px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
   .kv-stack tbody tr:last-child { border-bottom: 0; }
-  .kv-stack tbody td { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 6px 0; border: 0; text-align: right; max-width: none !important; white-space: normal !important; }
-  .kv-stack tbody td[data-label]::before { content: attr(data-label); flex: none; text-align: left; font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #8a8a85; }
-  .kv-stack tbody td[colspan] { display: block; text-align: left; }
+  .kv-stack tbody td { display: block; min-width: 0; padding: 0; border: 0; text-align: left; line-height: 1.35; max-width: none !important; white-space: normal !important; overflow-wrap: anywhere; word-break: break-word; }
+  .kv-stack tbody td[data-wide], .kv-stack tbody td[colspan] { grid-column: 1 / -1; }
+  .kv-stack tbody td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 1px; font-size: 10px; font-weight: 500; line-height: 1.3; letter-spacing: 0.08em; text-transform: uppercase; color: #8a8a85; }
+  .kv-stack tbody td[data-label=""]::before, .kv-stack tbody td[data-label="Actions" i]::before, .kv-stack tbody td[data-label="Action" i]::before { content: none; }
+  .kv-stack tbody td:has(button, a) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+  .kv-stack tbody td:has(button, a)::before { flex: 0 0 100%; }
+  .kv-stat-grid { gap: 12px; }
 }
 
 
@@ -20,7 +26,7 @@
    value box is top-aligned. Fix: drop the native chrome (appearance:none), size the field like every other control
    (height set by adminInputClass), centre the inner value, and let every grid/flex child shrink (min-width:0). */
 #admin-main { overflow-x: clip; }
-:where(#admin-main) .grid > *, :where(#admin-main) .flex > * { min-width: 0; }
+:where(#admin-main) .grid > * { min-width: 0; }   /* grid tracks only: a blanket flex rule let tab labels shrink and overlap */
 :where(#admin-main) label, :where(#admin-main) fieldset { min-width: 0; max-width: 100%; }
 :where(#admin-main) input:not([type="checkbox"]):not([type="radio"]), :where(#admin-main) select, :where(#admin-main) textarea {
   box-sizing: border-box; min-width: 0; max-width: 100%;   /* zero specificity: utility classes (e.g. sm:max-w-[160px]) still win */
@@ -65,9 +71,9 @@
 .kv-field-grid { display: grid; gap: 14px 16px; align-items: start; grid-template-columns: minmax(0, 1fr); }
 .kv-field-grid > * { min-width: 0; }
 .kv-field-grid > .kv-span-all { grid-column: 1 / -1; }
-@container (min-width: 480px) { .kv-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container (min-width: 760px) { .kv-field-grid { grid-template-columns: repeat(min(var(--kv-cols, 3), 3), minmax(0, 1fr)); } }
-@container (min-width: 980px) { .kv-field-grid { grid-template-columns: repeat(var(--kv-cols, 3), minmax(0, 1fr)); } }
+@container (min-width: 480px) { .kv-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kv-field-grid > :last-child:not(.kv-span-all) { grid-column: span var(--kv-span-2, 1); } }
+@container (min-width: 760px) { .kv-field-grid { grid-template-columns: repeat(min(var(--kv-cols, 3), 3), minmax(0, 1fr)); } .kv-field-grid > :last-child:not(.kv-span-all) { grid-column: span var(--kv-span-mid, 1); } }
+@container (min-width: 980px) { .kv-field-grid { grid-template-columns: repeat(var(--kv-cols, 3), minmax(0, 1fr)); } .kv-field-grid > :last-child:not(.kv-span-all) { grid-column: span var(--kv-span-wide, 1); } }
 @supports not (container-type: inline-size) {
   @media (min-width: 640px) { .kv-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1100px) { .kv-field-grid { grid-template-columns: repeat(var(--kv-cols, 3), minmax(0, 1fr)); } }
@@ -109,25 +115,18 @@
 @container (max-width: 319px) { .kv-stat-grid { grid-template-columns: minmax(0, 1fr); } }
 @container (min-width: 560px) {
   .kv-stat-grid { grid-template-columns: repeat(var(--kv-md, 3), minmax(0, 1fr)); }
-  .kv-stat-grid > :last-child:nth-child(odd) { grid-column: auto; }
+  .kv-stat-grid > :last-child { grid-column: span var(--kv-span-md, 1); }   /* a short last row stretches its final card: no empty slot, no invented card */
 }
-@container (min-width: 900px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-lg, 6), minmax(0, 1fr)); } }
+@container (min-width: 900px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-lg, 6), minmax(0, 1fr)); } .kv-stat-grid > :last-child { grid-column: span var(--kv-span-lg, 1); } }
 @supports not (container-type: inline-size) {
   @media (min-width: 640px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-md, 3), minmax(0, 1fr)); } .kv-stat-grid > :last-child:nth-child(odd) { grid-column: auto; } }
   @media (min-width: 1280px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-lg, 6), minmax(0, 1fr)); } }
 }
 
-/* Product tabs wrap at natural word boundaries rather than colliding in a narrow preview split. */
-.kv-product-tabs [role="tablist"], .kv-content-tabs [role="tablist"] {
-  display: flex;
-  flex-wrap: wrap;
-  overflow: visible;
-  column-gap: 6px;
-  row-gap: 3px;
-  border-bottom: 1px solid rgba(0,0,0,.09);
-}
-.kv-product-tabs [role="tab"], .kv-content-tabs [role="tab"] {
-  white-space: nowrap;
-  max-width: 100%;
-  padding-inline: 9px;
-}
+/* Tab strip: scroll affordance (edge fades) — see AdminTabs. */
+.kv-tabs::before, .kv-tabs::after { content: ""; position: absolute; top: 0; bottom: 0; width: 28px; pointer-events: none; z-index: 1; opacity: 0; transition: opacity .15s; }
+.kv-tabs::before { left: 0; background: linear-gradient(to right, #F5F5F3, rgba(245,245,243,0)); }
+.kv-tabs::after { right: 0; background: linear-gradient(to left, #F5F5F3, rgba(245,245,243,0)); }
+.kv-tabs[data-left]::before, .kv-tabs[data-right]::after { opacity: 1; }
+.kv-tabs-strip { scroll-snap-type: x proximity; }
+.kv-tabs-strip > * { scroll-snap-align: start; }

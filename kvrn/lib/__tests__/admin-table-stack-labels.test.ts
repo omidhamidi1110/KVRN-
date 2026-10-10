@@ -12,10 +12,10 @@ const js: string = ts.transpileModule(m[0].replace('export function', 'function'
 // eslint-disable-next-line no-new-func
 const labelStackCells: (t: any) => void = new Function(`${js}; return labelStackCells`)()
 
-type Cell = { textContent: string; colSpan: number; attrs: Record<string, string>; getAttribute(k: string): string | null; setAttribute(k: string, v: string): void; removeAttribute(k: string): void; hasAttribute(k: string): boolean }
+type Cell = { textContent: string; colSpan: number; attrs: Record<string, string>; getAttribute(k: string): string | null; setAttribute(k: string, v: string): void; removeAttribute(k: string): void; hasAttribute(k: string): boolean; querySelector(sel: string): unknown }
 const cell = (text: string, colSpan = 1, attrs: Record<string, string> = {}): Cell => {
   const c: Cell = { textContent: text, colSpan, attrs: { ...attrs },
-    getAttribute: k => (k in c.attrs ? c.attrs[k] : null), setAttribute: (k, v) => { c.attrs[k] = v }, removeAttribute: k => { delete c.attrs[k] }, hasAttribute: k => k in c.attrs }
+    getAttribute: k => (k in c.attrs ? c.attrs[k] : null), setAttribute: (k, v) => { c.attrs[k] = v }, removeAttribute: k => { delete c.attrs[k] }, hasAttribute: k => k in c.attrs, querySelector: () => null }
   return c
 }
 const table = (head: Cell[], rows: Cell[][]) => ({ tHead: { rows: [{ cells: head }] }, tBodies: [{ rows: rows.map(cells => ({ cells })) }] })
@@ -25,6 +25,11 @@ describe('labelStackCells', () => {
     const r = [cell('1'), cell('Paid'), cell('$5')]
     labelStackCells(table([cell(' Order '), cell('Status'), cell('Total')], [r]))
     expect(r.map(c => c.attrs['data-label'])).toEqual(['Order', 'Status', 'Total'])
+  })
+  test('the first cell and long values span the card (data-wide); short values pair up', () => {
+    const r = [cell('SKU-1'), cell('Project KVRN Heavyweight Hoodie'), cell('10')]
+    labelStackCells(table([cell('SKU'), cell('Product'), cell('On hand')], [r]))
+    expect(r.map(c => 'data-wide' in c.attrs)).toEqual([true, true, false])
   })
   test('full-width cells (empty / detail rows) are never labelled, and do not shift later cells', () => {
     const empty = [cell('No rows', 3)]

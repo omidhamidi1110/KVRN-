@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { AdminTabs } from '@/components/admin/ui/AdminUI'
 
 type Agent = {
   id: string
@@ -382,9 +383,8 @@ export function AiOperationsClient() {
 
       {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700">{error}</div>}
 
-      <div className="mb-7 flex gap-1 overflow-x-auto rounded-xl border border-black/[0.07] bg-white p-1.5">
-        {tabs.map(([id,label]) => <button key={id} onClick={()=>setTab(id)} className={`min-w-max rounded-lg px-3.5 py-2 text-[11px] font-medium transition ${tab===id ? 'bg-[#111] text-white' : 'text-black/45 hover:bg-black/[0.04] hover:text-black'}`}>{label}{id==='approvals' && data?.overview.approvals ? ` (${data.overview.approvals})` : ''}</button>)}
-      </div>
+      <AdminTabs ariaLabel="AI Operations sections" value={tab} onChange={setTab}
+        tabs={tabs.map(([id, label]) => ({ id, label, count: id === 'approvals' && data?.overview.approvals ? data.overview.approvals : undefined }))} />
 
       {data && tab === 'overview' && <>
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">

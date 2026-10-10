@@ -29,7 +29,7 @@ export function BasicsSection({ snap, update, state, options, issues, locked }: 
               <IssueList issues={pick(issues, 'eyebrow')} tone="warning" />
             </AdminField>
           </Row>
-          <Row cols={3}>
+          <Row cols={2}>
             <AdminField label="Product code" info="Fixed once created. Used in SKUs (KVRN-CODE-COLOR-SIZE) and shipping lookups.">
               <input className={adminInputClass} value={state.productCode ?? ''} disabled readOnly />
             </AdminField>
@@ -39,15 +39,15 @@ export function BasicsSection({ snap, update, state, options, issues, locked }: 
               <datalist id="p-types">{(options?.types ?? []).map(t => <option key={t} value={t} />)}</datalist>
               <IssueList issues={pick(issues, 'productType')} />
             </AdminField>
-            <AdminField label="URL" htmlFor="p-slug" info={published ? 'Changing the URL of a live product keeps the old link working with a redirect.' : 'The page address. Lowercase letters, numbers and hyphens.'}>
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] text-[#8A8A85]">/products/</span>
-                <input id="p-slug" className={adminInputClass} value={snap.slug} disabled={locked} maxLength={LIMITS.slug}
+          </Row>
+          <AdminField label="URL" htmlFor="p-slug" info={published ? 'Changing the URL of a live product keeps the old link working with a redirect.' : 'The page address. Lowercase letters, numbers and hyphens.'}>
+              <div className={`flex h-10 min-w-0 items-stretch overflow-hidden rounded-[9px] border border-black/[0.14] focus-within:border-[#171717] focus-within:ring-1 focus-within:ring-[#171717] sm:h-9 ${locked ? 'bg-black/[0.03]' : 'bg-white'}`}>
+                <span aria-hidden="true" className="flex shrink-0 select-none items-center border-r border-black/[0.10] bg-[#F5F5F3] px-2.5 text-[11px] text-[#6B6B66]">/products/</span>
+                <input id="p-slug" className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 text-[12px] text-[#171717] outline-none disabled:text-[#8A8A85]" value={snap.slug} disabled={locked} maxLength={LIMITS.slug}
                   onChange={e => { setSlugTouched(true); update(s => { s.slug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }) }} />
               </div>
               <IssueList issues={pick(issues, 'slug')} />
-            </AdminField>
-          </Row>
+          </AdminField>
           <AdminField label="Short description" htmlFor="p-short" info="One line used in listings and as the search fallback.">
             <input id="p-short" className={adminInputClass} value={snap.shortDescription} disabled={locked} maxLength={LIMITS.shortDescription}
               onChange={e => update(s => { s.shortDescription = e.target.value })} />
