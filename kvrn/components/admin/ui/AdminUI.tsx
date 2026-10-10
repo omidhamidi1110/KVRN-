@@ -6,7 +6,7 @@
 // Copy rules: short, decision-useful. Put background/method/units in <InfoTip>, but keep
 // warnings and Exception/Incomplete/Failed/Unresolved states visible (see StatusBadge, Notice).
 
-import { type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react'
+import { Children, type CSSProperties, type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react'
 import { InfoTip } from './InfoTip'
 import './admin-stack.css'
 
@@ -137,12 +137,21 @@ export function AdminField({ label, htmlFor, info, hint, error, children, classN
 }) {
   return (
     <div className={cx("w-full min-w-0 max-w-full", className)}>
-      <label htmlFor={htmlFor} className="mb-1 flex items-center gap-0.5 text-[11px] font-medium text-[#4A4A46]">
-        {label}{info && <InfoTip label={`About ${label}`}>{info}</InfoTip>}
+      <label htmlFor={htmlFor} className="mb-1 flex min-h-[18px] items-center gap-0.5 text-[11px] font-medium leading-[1.3] text-[#4A4A46]">
+        {label}{info && <span className="-my-1.5 inline-flex"><InfoTip label={`About ${label}`}>{info}</InfoTip></span>}
       </label>
       {children}
       {error ? <p role="alert" className="mt-1 text-[11px] text-[#B91C1C]">{error}</p>
              : hint ? <p className="mt-1 text-[11px] text-[#8A8A85]">{hint}</p> : null}
+    </div>
+  )
+}
+
+/** Shared form grid: equal tracks, 14/16px gutters, container-aware columns (1 → 2 → `cols`). Use `className="kv-span-all"` for full-width children. */
+export function AdminFieldGrid({ cols = 3, children, className = '' }: { cols?: 2 | 3 | 4; children: ReactNode; className?: string }) {
+  return (
+    <div className={cx('kv-field-wrap', className)}>
+      <div className="kv-field-grid" style={{ ['--kv-cols' as string]: cols } as CSSProperties}>{children}</div>
     </div>
   )
 }
@@ -215,11 +224,29 @@ export function AdminStat({ label, value, sub, tone = 'default', info, flag, cla
     </div>
   )
 }
-/** Responsive grid for stat cards / small cards (no horizontal page overflow). */
-export function AdminStatGrid({ children, min = 180, className = '' }: { children: ReactNode; min?: number; className?: string }) {
+/** Largest divisor of n that is <= max (and >= 2); falls back to an even split so no card is left alone. */
+function balancedCols(n: number, max: number): number {
+  if (n <= 1) return 1
+  if (n <= max) return n
+  for (let d = max; d >= 2; d--) if (n % d === 0) return d
+  return Math.ceil(n / Math.ceil(n / max))
+}
+/**
+ * Responsive, balanced grid for stat cards. Columns are derived from the number of cards so there is never an
+ * orphan row: 6 cards → 6 across on wide containers, 3+3 mid, 2+2+2 narrow; 12 → 6+6 / 4+4+4 / 2×6.
+ * `maxCols` caps the widest layout, `midCols` caps the mid layout. `min` is kept for call-site compatibility only.
+ */
+export function AdminStatGrid({ children, maxCols = 6, midCols = 4, className = '' }: {
+  children: ReactNode; min?: number; maxCols?: number; midCols?: number; className?: string
+}) {
+  const n = Children.toArray(children).filter(Boolean).length
+  const lg = balancedCols(n, maxCols)
+  const md = balancedCols(n, Math.min(midCols, lg))
   return (
-    <div className={cx('grid gap-2.5', className)} style={{ gridTemplateColumns: `repeat(auto-fit,minmax(min(${min}px,100%),1fr))` }}>
-      {children}
+    <div className={cx('kv-stat-wrap', className)}>
+      <div className="kv-stat-grid" style={{ ['--kv-lg' as string]: lg, ['--kv-md' as string]: md } as CSSProperties}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -230,12 +257,12 @@ export function AdminSegmented<T extends string>({ options, value, onChange, ari
   options: ReadonlyArray<{ id: T; label: string }>; value: T; onChange: (id: T) => void; ariaLabel: string
 }) {
   return (
-    <div role="group" aria-label={ariaLabel} className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-0.5 rounded-[10px] border border-black/[0.10] bg-white p-0.5 sm:inline-flex sm:w-auto sm:flex-wrap sm:justify-start sm:gap-1">
+    <div role="group" aria-label={ariaLabel} className="flex w-full min-w-0 flex-nowrap items-center justify-between gap-0.5 rounded-[10px] border border-black/[0.10] bg-white p-0.5 sm:inline-flex sm:min-h-9 sm:w-auto sm:flex-wrap sm:justify-start sm:gap-1">
       {options.map(o => {
         const active = o.id === value
         return (
           <button key={o.id} type="button" aria-pressed={active} onClick={() => onChange(o.id)} aria-label={o.label}
-            className={cx('h-9 min-w-0 flex-1 whitespace-nowrap rounded-[8px] px-1.5 text-[10px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:h-8 sm:flex-none sm:px-3 sm:text-[12px]',
+            className={cx('h-9 min-w-0 flex-1 whitespace-nowrap rounded-[8px] px-1.5 text-[10px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 sm:h-[30px] sm:flex-none sm:px-3 sm:text-[12px]',
               active ? 'bg-[#171717] text-white' : 'text-[#4A4A46] hover:bg-black/[0.05]')}>
             <span className="sm:hidden">{ariaLabel === 'Date range' ? ({ Today: 'Today', '7 days': '7d', '30 days': '30d', 'Month to date': 'MTD', 'Year to date': 'YTD' } as Record<string,string>)[o.label] ?? o.label : o.label}</span>
             <span className="hidden sm:inline">{o.label}</span>

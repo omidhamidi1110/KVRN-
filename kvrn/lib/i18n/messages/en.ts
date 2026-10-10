@@ -141,7 +141,7 @@ export const en = {
   'nav.closeMenu':      'Close menu',
   'nav.menuDialog':     'Navigation menu',
   'nav.cookiePreferences': 'Cookie preferences',
-  'nav.affiliateLogin': 'Affiliate Login',
+  'nav.affiliateLogin': 'Creator Portal',
   'nav.language':       'Language',
   'nav.currency':       'Currency',
   'nav.selectLanguage': 'Select language',

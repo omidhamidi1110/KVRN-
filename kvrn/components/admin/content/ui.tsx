@@ -2,7 +2,7 @@
 // Small shared form pieces for the content editors (built on the shared Admin primitives).
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { AdminButton, AdminField, AdminNotice, StatusBadge, adminInputClass, type StatusLabel } from '@/components/admin/ui/AdminUI'
+import { AdminButton, AdminField, AdminNotice, StatusBadge, adminInputClass, adminSelectClass, adminCheckboxClass, type StatusLabel } from '@/components/admin/ui/AdminUI'
 import { MediaPicker, type PickedMedia } from '@/components/admin/media/MediaPicker'
 import { api, type Invalidation, type ApiResult, detailList } from './api'
 import type { SeoFields } from '@/lib/content-schemas'
@@ -39,10 +39,74 @@ export function Select<T extends string>({ label, value, onChange, options, hint
   const fid = `s-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   return (
     <AdminField label={label} htmlFor={fid} hint={hint}>
-      <select id={fid} value={value} onChange={e => onChange(e.target.value as T)} className={adminInputClass}>
+      <select id={fid} value={value} onChange={e => onChange(e.target.value as T)} className={adminSelectClass}>
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </AdminField>
+  )
+}
+
+/** A checkbox that sits on the same baseline as the inputs next to it inside an AdminFieldGrid (aligns with the control row, not the label row). */
+export function InlineToggle({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
+  return (
+    <div className="mt-[22px] flex min-h-10 items-center sm:min-h-9">
+      <Toggle label={label} checked={checked} onChange={onChange} hint={hint} />
+    </div>
+  )
+}
+
+/**
+ * ONE compact row per link — used by the Navigation and Footer editors.
+ * Wide: [Label][Address][New tab][↑ ↓ Remove] on a single aligned line with one shared header; narrow: label/address stack,
+ * new-tab + actions share the next line. Character limits are enforced (maxLength) and the counter appears when a field nears its limit.
+ */
+export function LinkListEditor<L extends { id?: string; label: string; href: string; newTab?: boolean }>({
+  links, onChange, makeNew, max, addLabel = 'Add link', empty = 'No links yet.', labelMax = 60, noun = 'link',
+}: {
+  links: L[]; onChange: (l: L[]) => void; makeNew: () => L; max?: number; addLabel?: string; empty?: string; labelMax?: number; noun?: string
+}) {
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= links.length) return
+    const next = links.slice(); const [x] = next.splice(from, 1); next.splice(to, 0, x); onChange(next)
+  }
+  const patch = (i: number, p: Partial<L>) => onChange(links.map((x, j) => (j === i ? { ...x, ...p } : x)))
+  return (
+    <div className="kv-linkrows">
+      {links.length === 0 && <p className="text-[12px] text-[#8A8A85]">{empty}</p>}
+      {links.length > 0 && (
+        <div className="kv-linkrow kv-linkrow-head" aria-hidden="true">
+          <span>Label <span className="kv-lr-max">max {labelMax}</span></span><span>Address</span><span>New tab</span><span className="kv-lr-actions-h">Order</span>
+        </div>
+      )}
+      <ul className="kv-linkrow-list" aria-label={`${noun}s`}>
+        {links.map((l, i) => (
+          <li key={l.id ?? i} className="kv-linkrow">
+            <div className="kv-lr-cell">
+              <span className="kv-lr-cap">Label</span>
+              <input aria-label={`${noun} ${i + 1} label`} value={l.label} maxLength={labelMax} onChange={e => patch(i, { label: e.target.value } as Partial<L>)}
+                className={adminInputClass} placeholder="Label" />
+              {l.label.length >= labelMax * 0.85 && <span className="kv-lr-count">{l.label.length}/{labelMax}</span>}
+            </div>
+            <div className="kv-lr-cell">
+              <span className="kv-lr-cap">Address</span>
+              <input aria-label={`${noun} ${i + 1} address`} value={l.href} onChange={e => patch(i, { href: e.target.value } as Partial<L>)}
+                className={adminInputClass} placeholder="/shop or https://…" />
+            </div>
+            <label className="kv-lr-tab">
+              <input type="checkbox" className={adminCheckboxClass} checked={!!l.newTab} aria-label={`${noun} ${i + 1} opens in a new tab`}
+                onChange={e => patch(i, { newTab: e.target.checked || undefined } as Partial<L>)} />
+              <span>New tab</span>
+            </label>
+            <div className="kv-lr-actions">
+              <AdminButton size="sm" variant="ghost" aria-label={`Move ${noun} ${i + 1} up`} disabled={i === 0} onClick={() => move(i, i - 1)}>↑</AdminButton>
+              <AdminButton size="sm" variant="ghost" aria-label={`Move ${noun} ${i + 1} down`} disabled={i === links.length - 1} onClick={() => move(i, i + 1)}>↓</AdminButton>
+              <AdminButton size="sm" variant="ghost" aria-label={`Remove ${noun} ${i + 1}`} onClick={() => onChange(links.filter((_, j) => j !== i))}>Remove</AdminButton>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {(max === undefined || links.length < max) && <AdminButton size="sm" onClick={() => onChange([...links, makeNew()])}>{addLabel}</AdminButton>}
+    </div>
   )
 }
 

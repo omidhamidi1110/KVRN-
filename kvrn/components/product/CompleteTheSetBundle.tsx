@@ -135,9 +135,9 @@ export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: Publ
     <section style={{ background: '#F3F0EA' }} data-bundle-section={bundle.bundleId}>
       <div className="mx-auto w-full max-w-[1380px] px-6 py-12 sm:px-7 sm:py-16">
         <div className="flex flex-col lg:grid gap-8 lg:gap-12"
-          style={{ gridTemplateColumns: 'minmax(240px,0.8fr) minmax(0,2.2fr)', alignItems: 'start' } as React.CSSProperties}>
+          style={{ gridTemplateColumns: 'minmax(0,0.8fr) minmax(0,2.2fr)', alignItems: 'start' } as React.CSSProperties}>
 
-          <div>
+          <div style={{ minWidth: 0, width: '100%' }}>
             <p style={{ ...LABEL, letterSpacing: '0.22em', marginBottom: 16 }}>{eyebrow}</p>
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 300, fontSize: 'clamp(26px,2.4vw,32px)',
                          lineHeight: 1.1, letterSpacing: '-0.025em', color: '#1A1A1A', marginBottom: 16 }}>
@@ -161,9 +161,9 @@ export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: Publ
             </div>
 
             <button disabled={!ready || preview} onClick={onAdd} data-bundle-cta
-              style={{ width: '100%', minHeight: 60, fontSize: 11, fontWeight: 300, letterSpacing: '0.08em', textTransform: 'uppercase',
+              style={{ width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box', minHeight: 60, fontSize: 11, fontWeight: 300, letterSpacing: '0.08em', textTransform: 'uppercase', overflowWrap: 'anywhere', textAlign: 'center', transition: 'background-color 200ms, color 200ms',
                        background: ready ? '#1A1A1A' : '#E8E5E0', color: ready ? '#fff' : '#9B9B9B', border: 'none',
-                       cursor: ready && !preview ? 'pointer' : 'default', padding: '0 12px', marginBottom: 14, lineHeight: 1.3 }}>
+                       cursor: ready && !preview ? 'pointer' : 'default', padding: '8px 12px', marginBottom: 14, lineHeight: 1.3 }}>
               {label}
             </button>
             {error && <p role="alert" style={{ fontSize: 12, color: '#B91C1C', marginBottom: 12 }}>{error}</p>}
@@ -176,7 +176,7 @@ export function CompleteTheSetBundle({ bundle, preview = false }: { bundle: Publ
             ))}
           </div>
 
-          <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))' }}>
+          <div style={{ display: 'grid', gap: 24, minWidth: 0, gridTemplateColumns: 'repeat(auto-fit,minmax(min(200px,100%),1fr))' }}>
             {comps.map(c => (
               <ComponentCard key={c.productId} c={c}
                 colorCode={colorCodes[c.productId] ?? c.colors[0]?.code ?? ''}

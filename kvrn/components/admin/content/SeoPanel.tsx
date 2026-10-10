@@ -3,7 +3,7 @@
 // Per-page overrides live in each page's own editor; this is the fallback.
 
 import { useEffect, useState } from 'react'
-import { AdminButton, AdminCard, AdminError, AdminLoading, AdminNotice, AdminSectionHeader } from '@/components/admin/ui/AdminUI'
+import { AdminButton, AdminCard, AdminError, AdminLoading, AdminNotice, AdminSectionHeader, AdminFieldGrid } from '@/components/admin/ui/AdminUI'
 import { api, BASE, type ApiResult } from './api'
 import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import { ErrorNotice, InvalidationNotice, MediaField, Select, TextInput } from './ui'
@@ -47,11 +47,11 @@ export function SeoPanel() {
       <AdminNotice tone="info">These are the defaults for every page. A page’s own search title, description and share image override them. Saving applies immediately.</AdminNotice>
       <AdminCard>
         <AdminSectionHeader title="Site" />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Site name" value={val.siteName} onChange={v => set({ siteName: v })} max={60} />
           <TextInput label="Default title" value={val.titleDefault} onChange={v => set({ titleDefault: v })} max={90} hint="Shown for the home page and pages with no title." />
           <TextInput label="Title template" value={val.titleTemplate} onChange={v => set({ titleTemplate: v })} max={120} hint="Use %s where the page title goes, e.g. “%s | KVRN”." />
-        </div>
+        </AdminFieldGrid>
         <div className="mt-3 space-y-3">
           <TextInput label="Default description" value={val.description} onChange={v => set({ description: v })} multiline rows={3} max={320} />
           <TextInput label="Keywords" value={val.keywords.join(', ')} onChange={v => set({ keywords: v.split(',').map(s => s.trim()).filter(Boolean) })} hint="Separate with commas." />
@@ -62,17 +62,17 @@ export function SeoPanel() {
 
       <AdminCard>
         <AdminSectionHeader title="Social sharing text" />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Facebook / link preview title" value={val.ogTitle} onChange={v => set({ ogTitle: v })} max={120} />
           <TextInput label="Twitter / X title" value={val.twitterTitle} onChange={v => set({ twitterTitle: v })} max={120} />
           <TextInput label="Facebook / link preview description" value={val.ogDescription} onChange={v => set({ ogDescription: v })} multiline rows={2} max={320} />
           <TextInput label="Twitter / X description" value={val.twitterDescription} onChange={v => set({ twitterDescription: v })} multiline rows={2} max={320} />
-        </div>
+        </AdminFieldGrid>
       </AdminCard>
 
       <AdminCard>
         <AdminSectionHeader title="Business details" description="Structured data that helps search engines show your business correctly." />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <Select label="Type" value={val.organization.type} onChange={v => setOrg({ type: v })}
             options={[{ value: 'ClothingStore', label: 'Clothing store' }, { value: 'Store', label: 'Store' }, { value: 'Organization', label: 'Organization' }]} />
           <TextInput label="Name" value={val.organization.name} onChange={v => setOrg({ name: v })} max={80} />
@@ -80,7 +80,7 @@ export function SeoPanel() {
           <TextInput label="Contact email" value={val.organization.email} onChange={v => setOrg({ email: v })} type="email" max={120} />
           <TextInput label="Contact type" value={val.organization.contactType} onChange={v => setOrg({ contactType: v })} max={60} />
           <TextInput label="Languages" value={val.organization.availableLanguage} onChange={v => setOrg({ availableLanguage: v })} max={60} />
-        </div>
+        </AdminFieldGrid>
         <div className="mt-3 space-y-3">
           <TextInput label="Description" value={val.organization.description} onChange={v => setOrg({ description: v })} multiline rows={2} max={400} />
           <ListEditor<{ u: string }> items={val.organization.sameAs.map(u => ({ u }))} addLabel="Add social profile" max={10}

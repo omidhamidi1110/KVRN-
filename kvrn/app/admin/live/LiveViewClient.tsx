@@ -1,6 +1,6 @@
 'use client'
 import {useCallback,useEffect,useState} from 'react'
-import {AdminPage,AdminPageHeader,AdminCard,AdminNotice} from '@/components/admin/ui/AdminUI'
+import {AdminPage,AdminPageHeader,AdminCard,AdminNotice,AdminStat,AdminStatGrid} from '@/components/admin/ui/AdminUI'
 import type {LiveAnalyticsSummary} from '@/lib/live-analytics'
 
 const num=(value:number)=>value.toLocaleString('en-US')
@@ -35,9 +35,9 @@ export function LiveViewClient(){
     ['Paid orders today',num(report.ordersPaidToday),'All paid orders, Pacific time'],
     ['Gross paid today',report.grossPaidTodayCents===null?'Unknown':`$${(report.grossPaidTodayCents/100).toFixed(2)}`,'Before refunds, fees, COGS and expenses'],
   ]:[]
-  return <AdminPage>
+  return <AdminPage className="[&>*+*]:!mt-4">
     <AdminPageHeader title="Live View" description="Privacy-aware, near-live first-party store activity. No personal visitor information or exact locations."/>
-    <div className="mb-4 flex flex-wrap items-center gap-3 text-xs">
+    <div className="flex flex-wrap items-center gap-3 text-xs">
       <button type="button" onClick={()=>void load()} disabled={refreshing}
         aria-busy={refreshing} className="rounded border border-neutral-300 px-3 py-2 disabled:opacity-50">
         {refreshing ? 'Refreshing…' : 'Refresh now'}
@@ -48,24 +48,22 @@ export function LiveViewClient(){
       </span>
     </div>
     {error&&<AdminNotice tone="danger">{error}</AdminNotice>}
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map(([label,value,subtitle])=><AdminCard key={label}><p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p><p className="mt-2 text-xs text-neutral-500">{subtitle}</p></AdminCard>)}
-    </div>
+    <AdminStatGrid maxCols={4} midCols={4}>
+      {cards.map(([label,value,subtitle])=><AdminStat key={label} label={label} value={value} sub={subtitle} />)}
+    </AdminStatGrid>
     {report&&<>
       <AdminCard>
         <h2 className="font-semibold">Observed shopping activity (last 30 minutes)</h2>
         <p className="mt-1 text-xs text-neutral-500">Counts use unique consenting tracked sessions, except purchase events deduplicated by authoritative order ID. Stages do not represent a verified conversion cohort.</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">{([
+        <AdminStatGrid maxCols={5} midCols={3} className="mt-3">{([
           ['Sessions with activity',report.observedFunnel30m.sessionsWithEvents],
           ['Viewed a product',report.observedFunnel30m.productViewSessions],
           ['Added to cart',report.observedFunnel30m.addToCartSessions],
           ['Started checkout',report.observedFunnel30m.checkoutStartSessions],
           ['Tracked purchases',report.observedFunnel30m.authoritativePurchaseEvents],
-        ] as const).map(([title,n])=><div key={title} className="min-w-0 rounded border border-neutral-200 p-3">
-          <p className="text-xs text-neutral-500">{title}</p><p className="mt-2 text-xl font-semibold tabular-nums">{num(n)}</p>
-        </div>)}</div>
+        ] as const).map(([title,n])=><AdminStat key={title} label={title} value={num(n)} />)}</AdminStatGrid>
       </AdminCard>
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {([
           ['Devices',report.devices.map(v=>[v.device,v.sessions] as const)],
           ['Top viewed products (30m)',report.products.map(v=>[v.name,v.views] as const)],
@@ -81,7 +79,7 @@ export function LiveViewClient(){
               <span>{row.region}</span><span className="tabular-nums">{num(row.paidOrders)} paid orders</span>
             </div>)}</div>
       </AdminCard>
-      <div className="mt-5 text-xs text-neutral-500"><h2 className="font-semibold">Data limitations</h2><ul className="mt-2 list-inside list-disc space-y-1">{report.limitations.map(s=><li key={s}>{s}</li>)}</ul></div>
+      <div className="text-xs text-neutral-500"><h2 className="font-semibold">Data limitations</h2><ul className="mt-2 list-inside list-disc space-y-1">{report.limitations.map(s=><li key={s}>{s}</li>)}</ul></div>
     </>}
   </AdminPage>
 }

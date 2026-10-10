@@ -13,7 +13,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
 import {
-  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminFieldGrid, AdminStat, AdminStatGrid,
   AdminTabs, AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, InfoTip, StatusBadge,
   adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
@@ -255,7 +255,7 @@ export function InventoryClient() {
                 the same total as one received all at once — remainder cents are carried on a small
                 premium layer, never rounded away. Cost is derived from the batch; nothing here
                 accepts a cost from the browser.</>} />
-            <div className="grid gap-3 sm:grid-cols-3">
+            <AdminFieldGrid cols={3}>
               <AdminField label="Cost batch" htmlFor="rc-batch">
                 <select id="rc-batch" value={rcForm.costBatchId}
                   onChange={e => setRcForm({ ...rcForm, costBatchId: e.target.value })}
@@ -282,7 +282,7 @@ export function InventoryClient() {
                   onChange={e => setRcForm({ ...rcForm, quantity: e.target.value })}
                   className={adminInputClass} />
               </AdminField>
-            </div>
+            </AdminFieldGrid>
             <p className="mt-3 text-[11px] text-[#6B6B66]">
               The variant must belong to this batch. Receiving more than the batch was created
               for is rejected.
@@ -401,7 +401,7 @@ export function InventoryClient() {
           <AdminCard className="mb-6">
             <AdminSectionHeader title="Record a write-off"
               info="Cost is computed server-side from FIFO layers. Promotional use is a marketing cost; damage and loss are not. Neither creates sales revenue." />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <AdminFieldGrid cols={4}>
               <AdminField label="Variant" htmlFor="wo-variant">
                 <select id="wo-variant" value={woForm.variantId}
                   onChange={e => setWoForm({ ...woForm, variantId: e.target.value })}
@@ -429,7 +429,7 @@ export function InventoryClient() {
                   onChange={e => setWoForm({ ...woForm, notes: e.target.value })}
                   className={adminInputClass} />
               </AdminField>
-            </div>
+            </AdminFieldGrid>
             <AdminNotice tone="warning" className="mt-4">This permanently removes stock.</AdminNotice>
             <AdminButton variant="danger" className="mt-3" onClick={submitWriteOff}
               loading={saving} disabled={!woForm.variantId || !woForm.quantity}>

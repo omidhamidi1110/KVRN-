@@ -4,7 +4,7 @@
 // History is append-only: nothing here deletes or rewrites a past entry.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminSectionHeader,
+  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminFieldGrid, AdminLoading, AdminNotice, AdminSectionHeader,
   AdminTable, AdminTd, AdminTh, StatusBadge, adminInputClass, useConfirm, type StatusLabel,
 } from '@/components/admin/ui/AdminUI'
 import { adminApi, day } from '@/lib/affiliate-admin-client'
@@ -139,12 +139,12 @@ function Posts({ items, busy, onAdd, onStatus }: { items: any[]; busy: boolean; 
   return (
     <section>
       <AdminSectionHeader title="Saved posts" info="Promotional posts you want to keep an eye on. Links must be https. Notes here are internal only." />
-      <div className="grid gap-2 md:grid-cols-5">
+      <AdminFieldGrid cols={4}>
         <AdminField label="Link" htmlFor="ci-url" className="md:col-span-2"><input id="ci-url" className={adminInputClass} placeholder="https://" maxLength={500} value={url} onChange={e => setUrl(e.target.value)} /></AdminField>
         <AdminField label="Platform" htmlFor="ci-pl"><input id="ci-pl" className={adminInputClass} maxLength={40} value={platform} onChange={e => setPlatform(e.target.value)} /></AdminField>
         <AdminField label="Title" htmlFor="ci-t"><input id="ci-t" className={adminInputClass} maxLength={160} value={title} onChange={e => setTitle(e.target.value)} /></AdminField>
         <AdminField label="Internal note" htmlFor="ci-n"><input id="ci-n" className={adminInputClass} maxLength={1000} value={note} onChange={e => setNote(e.target.value)} /></AdminField>
-      </div>
+      </AdminFieldGrid>
       <AdminButton className="mt-2" size="sm" variant="primary" loading={busy} disabled={url.trim().length < 8} onClick={() => { onAdd({ url, platform, title, note }); setUrl(''); setPlatform(''); setTitle(''); setNote('') }}>Save post</AdminButton>
       {items.length === 0 ? <p className="mt-3 text-[12px] text-[#6B6B66]">No saved posts.</p> : (
         <ul className="mt-3 divide-y divide-black/[0.06]">{items.map(i => (
@@ -165,13 +165,13 @@ function Warnings({ warnings, items, busy, onIssue, onResolve }: { warnings: any
   return (
     <section className="mt-6">
       <AdminSectionHeader title="Warnings" info="The message is what the affiliate sees (and is emailed when 'Notify' is on). The internal note is never shown to them. Warnings are never deleted; resolving one keeps the record." />
-      <div className="grid gap-2 md:grid-cols-4">
+      <AdminFieldGrid cols={4}>
         <AdminField label="Severity" htmlFor="w-sev"><select id="w-sev" className={adminInputClass} value={severity} onChange={e => setSeverity(e.target.value)}><option value="notice">Notice</option><option value="warning">Warning</option><option value="final">Final</option></select></AdminField>
         <AdminField label="Category" htmlFor="w-cat"><select id="w-cat" className={adminInputClass} value={category} onChange={e => setCategory(e.target.value)}>{['disclosure', 'brand', 'paid_ads', 'email_sms', 'claims', 'self_referral', 'other'].map(c => <option key={c} value={c}>{pretty(c)}</option>)}</select></AdminField>
         <AdminField label="Related post" htmlFor="w-item" className="md:col-span-2"><select id="w-item" className={adminInputClass} value={itemId} onChange={e => setItemId(e.target.value)}><option value="">None</option>{items.map(i => <option key={i.id} value={i.id}>{(i.title || i.url).slice(0, 60)}</option>)}</select></AdminField>
         <AdminField label="Message to the affiliate" htmlFor="w-sum" className="md:col-span-2"><input id="w-sum" className={adminInputClass} maxLength={500} value={summary} onChange={e => setSummary(e.target.value)} /></AdminField>
         <AdminField label="Internal note" htmlFor="w-int" className="md:col-span-2"><input id="w-int" className={adminInputClass} maxLength={1000} value={internalNote} onChange={e => setInternalNote(e.target.value)} /></AdminField>
-      </div>
+      </AdminFieldGrid>
       <label className="mt-2 flex items-center gap-2 text-[12px]"><input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} /> Notify the affiliate</label>
       <AdminButton className="mt-2" size="sm" variant="primary" loading={busy} disabled={summary.trim().length < 3} onClick={() => { onIssue({ severity, category, summary, internalNote, notifyAffiliate: notify, itemId: itemId || null }); setSummary(''); setInternalNote('') }}>Record warning</AdminButton>
       {warnings.length === 0 ? <p className="mt-3 text-[12px] text-[#6B6B66]">No warnings issued.</p> : (
@@ -193,11 +193,11 @@ function Flags({ flags, busy, onOpen, onUpdate }: { flags: any[]; busy: boolean;
   return (
     <section className="mt-6">
       <AdminSectionHeader title="Fraud and abuse flags" info="Automatic checks only raise a question. Freezing is your decision: it blocks payouts for this affiliate but never edits a commission or the ledger. Resolving or dismissing needs a written note." />
-      <div className="grid gap-2 md:grid-cols-4">
+      <AdminFieldGrid cols={4}>
         <AdminField label="Signal" htmlFor="f-sig"><select id="f-sig" className={adminInputClass} value={signal} onChange={e => setSignal(e.target.value)}>{['customer_email_matches_affiliate', 'customer_email_similar_to_affiliate', 'suspected_coupon_leakage', 'suspected_cookie_stuffing', 'suspected_duplicate_account', 'suspected_manipulated_attribution', 'other'].map(s => <option key={s} value={s}>{pretty(s)}</option>)}</select></AdminField>
         <AdminField label="Note" htmlFor="f-note" className="md:col-span-2"><input id="f-note" className={adminInputClass} maxLength={1000} value={note} onChange={e => setNote(e.target.value)} /></AdminField>
         <div className="flex items-end"><AdminButton size="sm" variant="primary" loading={busy} onClick={() => { onOpen({ signal, note }); setNote('') }}>Open flag</AdminButton></div>
-      </div>
+      </AdminFieldGrid>
       {flags.length === 0 ? <p className="mt-3 text-[12px] text-[#6B6B66]">No flags.</p> : (
         <ul className="mt-3 divide-y divide-black/[0.06]">{flags.map(f => {
           const open = f.status === 'open' || f.status === 'investigating'
@@ -258,13 +258,13 @@ function Ugc({ licenses, busy, onGrant, onRevoke }: { licenses: any[] | null; bu
       <AdminSectionHeader title="Content rights (UGC)" info="Being an affiliate, or receiving product, gives KVRN no right to reuse their content. A right exists only when you record a license here. Licenses cannot be edited; revoke and record a new one." />
       <AdminNotice tone="info">Nothing is granted by default.</AdminNotice>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">{RIGHTS.map(([k, label]) => <label key={k} className="flex items-center gap-1.5 text-[12px]"><input type="checkbox" checked={!!rights[k]} onChange={e => setRights({ ...rights, [k]: e.target.checked })} />{label}</label>)}</div>
-      <div className="mt-2 grid gap-2 md:grid-cols-5">
+      <AdminFieldGrid cols={4}>
         <AdminField label="Version" htmlFor="u-v"><input id="u-v" className={adminInputClass} maxLength={40} value={version} onChange={e => setVersion(e.target.value)} /></AdminField>
         <AdminField label="Territory" htmlFor="u-t"><input id="u-t" className={adminInputClass} maxLength={80} value={territory} onChange={e => setTerritory(e.target.value)} /></AdminField>
         <AdminField label="Months" htmlFor="u-m" hint="Blank = no end"><input id="u-m" className={adminInputClass} inputMode="numeric" value={months} onChange={e => setMonths(e.target.value.replace(/\D/g, ''))} /></AdminField>
         <AdminField label="Agreement reference" htmlFor="u-e" hint="Where the signed copy lives"><input id="u-e" className={adminInputClass} maxLength={200} value={evidence} onChange={e => setEvidence(e.target.value)} /></AdminField>
         <AdminField label="Compensation" htmlFor="u-c"><input id="u-c" className={adminInputClass} maxLength={500} value={comp} onChange={e => setComp(e.target.value)} /></AdminField>
-      </div>
+      </AdminFieldGrid>
       <AdminButton className="mt-2" size="sm" variant="primary" loading={busy} disabled={!Object.values(rights).some(Boolean)}
         onClick={async () => { const ok = await onGrant({ licenseVersion: version, rights, territory, durationMonths: months ? Number(months) : null, evidenceRef: evidence || null, compensationNote: comp || null, channels: [] }); if (ok) setRights({}) }}>Record license</AdminButton>
       {licenses === null ? <AdminLoading /> : licenses.length === 0 ? <p className="mt-3 text-[12px] text-[#6B6B66]">No licenses. No content rights.</p> : (

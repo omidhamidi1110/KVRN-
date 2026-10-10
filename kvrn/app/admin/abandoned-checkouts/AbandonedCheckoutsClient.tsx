@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AdminPageHeader, AdminSectionHeader, AdminCard, AdminButton, AdminNotice, AdminField, adminInputClass,
+  AdminPageHeader, AdminSectionHeader, AdminCard, AdminButton, AdminNotice, AdminField, AdminFieldGrid, adminInputClass, adminSelectClass,
   AdminTable, AdminTh, AdminTd, AdminTabs, StatusBadge, AdminEmpty, AdminLoading, AdminError, InfoTip, useConfirm,
 } from '@/components/admin/ui/AdminUI'
 import {
@@ -180,9 +180,9 @@ export function AbandonedCheckoutsClient() {
               <AdminSectionHeader title="Recovery settings"
                 info={<>One email per abandoned checkout, never more. It is sent after the delay, only if no order was placed and the window is still open. The recovery switch itself is not changed here.</>} />
               <AdminCard>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <AdminFieldGrid cols={4}>
                   <AdminField label="Send reminders" htmlFor="ab-enabled">
-                    <select id="ab-enabled" className={adminInputClass} value={draft.enabled ? 'on' : 'off'}
+                    <select id="ab-enabled" className={adminSelectClass} value={draft.enabled ? 'on' : 'off'}
                       onChange={e => setDraft({ ...draft, enabled: e.target.value === 'on' })}>
                       <option value="on">On</option><option value="off">Off</option>
                     </select>
@@ -199,13 +199,13 @@ export function AbandonedCheckoutsClient() {
                   </AdminField>
                   <AdminField label="Who can receive it" htmlFor="ab-consent" error={fieldErrors.consent_mode}
                     info="Opt-in required: only people already subscribed to marketing. Cart reminder: also people who never opted in. Unsubscribed addresses are always excluded.">
-                    <select id="ab-consent" className={adminInputClass} value={draft.consent_mode}
+                    <select id="ab-consent" className={adminSelectClass} value={draft.consent_mode}
                       onChange={e => setDraft({ ...draft, consent_mode: e.target.value as Config['consent_mode'] })}>
                       <option value="require_opt_in">Opt-in required</option>
                       <option value="cart_reminder_no_consent">Cart reminder, no opt-in</option>
                     </select>
                   </AdminField>
-                </div>
+                </AdminFieldGrid>
                 {draft.consent_mode === 'cart_reminder_no_consent' && (
                   <AdminNotice tone="warning" className="mt-4" title="Legal decision.">
                     This sends to people who never opted in to marketing. Rules differ by country. Confirm it is allowed where you sell before using it.

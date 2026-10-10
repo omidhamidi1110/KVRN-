@@ -112,7 +112,7 @@ export const es: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'Cerrar menú',
   'nav.menuDialog': 'Menú de navegación',
   'nav.cookiePreferences': 'Preferencias de cookies',
-  'nav.affiliateLogin': 'Acceso de afiliados',
+  'nav.affiliateLogin': 'Portal de creadores',
   'nav.language': 'Idioma',
   'nav.currency': 'Moneda',
   'nav.selectLanguage': 'Elegir idioma',

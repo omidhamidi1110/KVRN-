@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { allowPublicApiRequest } from '@/lib/public-api-rate-limit'
+import { validateReview } from '@/lib/review-policy'
 
 export const dynamic = 'force-dynamic'
 const NO_STORE = { 'Cache-Control': 'no-store' }
@@ -41,10 +42,10 @@ export async function POST(req: NextRequest) {
   const text = typeof b.text === 'string' ? b.text.trim() : ''
   const item = typeof b.item === 'string' ? b.item : ''
   const rating = b.rating
-  if (name.length < 2 || name.length > 70 || headline.length < 3 || headline.length > 120 ||
-      text.length < 20 || text.length > 2000 || !['Hoodie','Sweatpants','Other KVRN item'].includes(item) ||
-      !Number.isInteger(rating) || typeof rating !== 'number' || rating < 1 || rating > 5) {
-    return NextResponse.json({ error: 'Please check the review fields.' }, { status: 400, headers: NO_STORE })
+  // Same policy module as the browser form: field-specific messages, identical bounds (mirror migration 067's CHECKs).
+  const fields = validateReview({ name, item, rating, headline, text })
+  if (Object.keys(fields).length > 0) {
+    return NextResponse.json({ error: 'Please fix the highlighted fields.', fields }, { status: 400, headers: NO_STORE })
   }
   try {
     const allowed = await allowPublicApiRequest(sql, { bucket: 'shared_reviews', headers: req.headers, limit: 3, windowSeconds: 86400 })

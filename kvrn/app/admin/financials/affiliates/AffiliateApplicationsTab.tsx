@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminSectionHeader,
+  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminFieldGrid, AdminLoading, AdminNotice, AdminSectionHeader,
   AdminTable, AdminTd, AdminTh, InfoTip, StatusBadge, adminInputClass, useConfirm,
 } from '@/components/admin/ui/AdminUI'
 import { safeExternalHref } from '@/lib/affiliate-application-input'
@@ -168,14 +168,14 @@ function InvitePanel({ onDone }: { onDone: (msg: string) => void }) {
     <AdminCard>
       <AdminSectionHeader title="Invite a creator" info="Proposed terms are suggestions shown to you at approval. They are not offered to the creator until you approve." />
       {err && <AdminNotice tone="danger" className="mb-3">{err}</AdminNotice>}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <AdminFieldGrid cols={2}>
         <AdminField label="Email" htmlFor="inv-email"><input id="inv-email" type="email" className={adminInputClass} value={f.email} onChange={e => set('email', e.target.value)} /></AdminField>
         <AdminField label="Name" htmlFor="inv-name"><input id="inv-name" className={adminInputClass} value={f.displayName} onChange={e => set('displayName', e.target.value)} /></AdminField>
         <AdminField label="Social links" htmlFor="inv-social" hint="Separate with spaces."><input id="inv-social" className={adminInputClass} value={f.social} onChange={e => set('social', e.target.value)} /></AdminField>
         <AdminField label="Proposed code" htmlFor="inv-code"><input id="inv-code" className={adminInputClass} value={f.proposedCode} onChange={e => set('proposedCode', e.target.value.toUpperCase())} /></AdminField>
         <AdminField label="Proposed commission (%)" htmlFor="inv-rate" info="Percent of net merchandise. Entered as a percent and stored in basis points (1% = 100)."><input id="inv-rate" inputMode="decimal" className={adminInputClass} value={f.rate} onChange={e => set('rate', e.target.value)} /></AdminField>
         <AdminField label="Internal note" htmlFor="inv-note" hint="Never sent to the creator."><input id="inv-note" className={adminInputClass} value={f.note} onChange={e => set('note', e.target.value)} /></AdminField>
-      </div>
+      </AdminFieldGrid>
       <div className="mt-4"><AdminButton variant="primary" loading={busy} onClick={() => void submit()}>Create invitation</AdminButton></div>
     </AdminCard>
   )
@@ -309,7 +309,7 @@ function ApplicationDetail({ id, onChanged, onClose }: { id: string; onChanged: 
           <AdminNotice title="Approving creates the affiliate in onboarding">
             The discount code stays off until you activate. Activation needs the affiliate to have accepted the current terms and disclosure policy (recorded from this application) and the start date to have passed.
           </AdminNotice>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <AdminFieldGrid cols={2}>
             <AdminField label="Discount code" htmlFor="ap-code" info="Letters, numbers, hyphen or underscore, 2–32 characters. Customers type this at checkout. It cannot clash with an existing discount code."><input id="ap-code" className={adminInputClass} value={form.code} onChange={e => upd('code', e.target.value.toUpperCase())} /></AdminField>
             <AdminField label="Referral link name" htmlFor="ap-slug" hint="Optional. Lowercase letters, numbers, hyphens."><input id="ap-slug" className={adminInputClass} value={form.linkSlug} onChange={e => upd('linkSlug', e.target.value.toLowerCase())} /></AdminField>
             <AdminField label="Commission type" htmlFor="ap-ctype">
@@ -334,7 +334,7 @@ function ApplicationDetail({ id, onChanged, onClose }: { id: string; onChanged: 
             </AdminField>
             <AdminField label="Start date" htmlFor="ap-start" hint="Optional. Activation waits until this date."><input id="ap-start" type="date" className={adminInputClass} value={form.startAt} onChange={e => upd('startAt', e.target.value)} /></AdminField>
             <AdminField label="End date" htmlFor="ap-end" hint="Optional. The affiliate is terminated automatically after this date."><input id="ap-end" type="date" className={adminInputClass} value={form.endAt} onChange={e => upd('endAt', e.target.value)} /></AdminField>
-          </div>
+          </AdminFieldGrid>
           <AdminField label="Message to the applicant (optional)" htmlFor="ap-msg"><textarea id="ap-msg" rows={2} className={`${adminInputClass} h-auto py-2`} value={form.approvalMessage} onChange={e => upd('approvalMessage', e.target.value)} /></AdminField>
           <AdminField label="Internal note (optional)" htmlFor="ap-note" hint="Never emailed."><textarea id="ap-note" rows={2} className={`${adminInputClass} h-auto py-2`} value={form.internalNote} onChange={e => upd('internalNote', e.target.value)} /></AdminField>
           <label className="flex items-start gap-2 text-[12px]"><input type="checkbox" className="mt-0.5" checked={form.activateNow} onChange={e => upd('activateNow', e.target.checked)} /><span>Activate immediately after approval (only if every requirement is met).</span></label>

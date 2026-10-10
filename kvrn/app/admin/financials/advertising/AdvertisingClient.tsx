@@ -14,7 +14,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { money } from '@/components/admin/FinancialUI'
 import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import {
-  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminFieldGrid, AdminStat, AdminStatGrid,
   AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, StatusBadge, adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
 
@@ -142,7 +142,7 @@ export function AdvertisingClient() {
             <AdminButton variant="ghost" size="sm" onClick={redo} disabled={!canRedo || saving}>↷ Redo</AdminButton>
           </div>
         </div>
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+        <AdminFieldGrid cols={4}>
           <AdminField label="Platform" htmlFor="ad-platform">
             <select id="ad-platform" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}
                     className={adminSelectClass}>
@@ -187,7 +187,7 @@ export function AdvertisingClient() {
               {PROVIDER_SOURCES.map(s2 => <option key={s2} value={s2}>{s2}</option>)}
             </select>
           </AdminField>
-        </div>
+        </AdminFieldGrid>
         <AdminButton variant="primary" className="mt-4" onClick={save} loading={saving} disabled={!form.spend}>
           Add spend
         </AdminButton>

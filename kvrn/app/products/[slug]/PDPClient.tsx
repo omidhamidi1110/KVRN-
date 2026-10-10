@@ -19,7 +19,7 @@ import { CompleteTheSetBundle } from '@/components/product/CompleteTheSetBundle'
 import { SharedKvrnReviews } from '@/components/reviews/SharedKvrnReviews'
 import type { PublicBundle } from '@/lib/bundle-types'
 
-const NAV = 84 // announcement bar (28) + nav (56)
+const NAV = 92 // announcement bar (36) + nav (56) = --header-total
 
 // `preview` renders the DRAFT inside the admin editor: no analytics, no inventory fetch (all sizes
 // shown available), and adding to the bag is a no-op. It never reads or writes the real cart.
@@ -1557,7 +1557,7 @@ function CompleteSet({ product, related, onAddBoth }: any) {
 
         {/* Responsive: stacked on mobile, 4-col grid on desktop */}
         <div className="flex flex-col lg:grid gap-8 lg:gap-10"
-          style={{ gridTemplateColumns:'minmax(200px,0.85fr) minmax(260px,1fr) minmax(260px,1fr) minmax(230px,0.9fr)',
+          style={{ gridTemplateColumns:'minmax(0,0.85fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.9fr)',
                    alignItems:'center' } as any}>
 
           {/* 1. Intro */}
@@ -1587,7 +1587,7 @@ function CompleteSet({ product, related, onAddBoth }: any) {
             onSize={setRelSize} />
 
           {/* 4. Bundle CTA */}
-          <div style={{ display:'flex', flexDirection:'column' }}>
+          <div style={{ display:'flex', flexDirection:'column', minWidth:0, width:'100%' }}>
             <svg width="34" height="34" viewBox="0 0 34 34" fill="none" style={{ marginBottom:20, opacity:.45 }}>
               <rect x="3" y="10" width="28" height="21" rx="1" stroke="#1A1A1A" strokeWidth="1.2"/>
               <path d="M3 15h28" stroke="#1A1A1A" strokeWidth="1.2"/>
@@ -1615,15 +1615,17 @@ function CompleteSet({ product, related, onAddBoth }: any) {
                 <button
                   disabled={!bundleReady}
                   onClick={() => bundleReady && onAddBoth(mySize!, relSize!)}
-                  style={{ width:'100%', minWidth:0, minHeight:60, fontSize:11, fontWeight:300,
+                  // Invariant width: the button always equals its column (100% of the size/image container). The label may wrap to a
+                  // second line but can never widen the button or the grid track, so disabled→enabled never shifts the layout sideways.
+                  style={{ width:'100%', minWidth:0, maxWidth:'100%', minHeight:60, fontSize:11, fontWeight:300,
                            letterSpacing:'0.08em', textTransform:'uppercase',
                            background: bundleReady ? '#1A1A1A' : '#E8E5E0',
                            color: bundleReady ? '#fff' : '#9B9B9B',
                            border:'none', cursor: bundleReady ? 'pointer' : 'default',
-                           transition:'background 200ms', marginBottom:14, padding:'0 12px',
+                           transition:'background-color 200ms, color 200ms', marginBottom:14, padding:'8px 12px',
                            display:'flex', alignItems:'center', justifyContent:'center',
-                           boxSizing:'border-box', overflow:'hidden',
-                           whiteSpace:'nowrap', textAlign:'center', lineHeight:1 }}>
+                           boxSizing:'border-box', overflow:'hidden', flex:'none',
+                           whiteSpace:'normal', overflowWrap:'anywhere', textAlign:'center', lineHeight:1.3 }}>
                   {label}
                 </button>
               )

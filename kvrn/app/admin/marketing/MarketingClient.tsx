@@ -2,7 +2,7 @@
 /** Marketing editorial workspace. There is intentionally NO send, dispatch, recipient export,
  * provider sync, or AI autopublish action in this component. */
 import { useCallback, useEffect, useState } from 'react'
-import { AdminPage, AdminPageHeader, AdminCard, AdminNotice, AdminButton, adminButtonClass } from '@/components/admin/ui/AdminUI'
+import { AdminPage, AdminPageHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminFieldGrid, AdminStat, AdminStatGrid, adminButtonClass, adminInputClass, adminSelectClass, adminTextareaClass } from '@/components/admin/ui/AdminUI'
 import Link from 'next/link'
 import type { CampaignDraft, DraftInput, CampaignChannel, CampaignAudience } from '@/lib/marketing-campaign-drafts'
 import type { MarketingOverview } from '@/lib/marketing-overview'
@@ -291,7 +291,7 @@ export function MarketingClient() {
       : action === 'reopen' ? 'Draft reopened for editing.' : 'Campaign draft archived.'
     void mutate('PATCH', { id: d.id, version: d.version, action }, message)
   }
-  return <AdminPage>
+  return <AdminPage className="[&>*+*]:!mt-4">
     <AdminPageHeader title="Marketing Suite" description="Draft and review KVRN campaigns. All broadcasts and autonomous AI sends are disabled." actions={<Link href="/admin/marketing/templates" className={adminButtonClass('secondary')}>Copy templates</Link>} />
     <AdminNotice tone="warning" title="No marketing sends enabled">
       Review and planning do not send messages, verify opt-in, reserve budget, or enable AI autonomy. SMS and email delivery remain disabled until consent, provider, opt-out, budget, and owner release checks pass.
@@ -311,18 +311,15 @@ export function MarketingClient() {
         </li>)}
       </ul></details>
     </AdminCard>}
-    {overview && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    {overview && <AdminStatGrid maxCols={5} midCols={3}>
       {([
         ['Email locally subscribed', overview.email.subscribed],
         ['Email checkbox assertions', overview.email.affirmativeCheckboxRecords],
         ['Email suppressed', overview.email.unsubscribed],
         ['SMS locally subscribed', overview.sms.subscribed],
         ['SMS confirmed keyword', overview.sms.confirmedKeyword],
-      ] as const).map(([label, count]) => <AdminCard key={label}>
-        <p className="text-xs text-neutral-500">{label}</p>
-        <p className="mt-1 text-2xl font-medium tabular-nums">{count == null ? 'Unknown' : count.toLocaleString()}</p>
-      </AdminCard>)}
-    </div>}
+      ] as const).map(([label, count]) => <AdminStat key={label} label={label} value={count == null ? 'Unknown' : count.toLocaleString()} />)}
+    </AdminStatGrid>}
     <details className="mt-3 rounded border border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-500"><summary className="cursor-pointer font-medium text-neutral-700">How subscriber counts and marketing budgets work</summary>
     <p className="mt-2">Subscriber counts are local records, NOT proof of mailbox ownership, deliverability, or valid migrated consent. An email checkbox assertion does not prove inbox control or permission for a broadcast. Draft budget assumptions: SMS $15/month, $3/day; email $10/month, $2/day. Actual dispatch remains disabled until price and atomic reservation gates pass.
     </p>
@@ -338,11 +335,11 @@ export function MarketingClient() {
     <AdminCard>
       <h2 className="text-sm font-semibold">Record an email marketing opt-out received by Support</h2>
       <p className="mt-1 text-xs text-neutral-600">Suppression only. This does not add or reactivate subscriptions or change transactional order emails. Record requests only when the customer has actually revoked consent.</p>
-      <div className="mt-3 flex min-w-0 flex-wrap items-end gap-3">
-        <label className="min-w-0 flex-1 text-xs">Customer email
-          <input type="email" className="mt-1 block w-full rounded border p-2" autoComplete="off" maxLength={254} value={suppressionEmail} disabled={suppressionBusy}
+      <div className="mt-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+        <AdminField label="Customer email" htmlFor="mk-suppress-email" className="sm:flex-1">
+          <input id="mk-suppress-email" type="email" className={adminInputClass} autoComplete="off" maxLength={254} value={suppressionEmail} disabled={suppressionBusy}
             onChange={e=>{setSuppressionEmail(e.target.value);setSuppressionConfirmed(false);setSuppressionMessage('')}}/>
-        </label>
+        </AdminField>
         <AdminButton disabled={suppressionBusy || !suppressionConfirmed || !suppressionEmail.trim()} onClick={()=>void suppressEmail()}>
           {suppressionBusy ? 'Saving…' : 'Record opt-out'}
         </AdminButton>
@@ -364,32 +361,34 @@ export function MarketingClient() {
         </div>}
 
         <div className="space-y-3 text-xs">
-          <label className="block">Channel
-            <select className="mt-1 block w-full rounded border p-2" value={form.channel} disabled={!!selected || loading}
-              onChange={e => setForm(f => ({ ...f, channel: e.target.value as CampaignChannel, subject: e.target.value === 'sms' ? null : '' }))}>
-              <option value="email">Email</option><option value="sms">SMS / MMS</option>
-            </select>
-          </label>
-          <label className="block">Internal campaign title
-            <input className="mt-1 block w-full rounded border p-2" maxLength={120} value={form.title} disabled={loading}
+          <AdminFieldGrid cols={2}>
+            <AdminField label="Channel" htmlFor="mk-channel">
+              <select id="mk-channel" className={adminSelectClass} value={form.channel} disabled={!!selected || loading}
+                onChange={e => setForm(f => ({ ...f, channel: e.target.value as CampaignChannel, subject: e.target.value === 'sms' ? null : '' }))}>
+                <option value="email">Email</option><option value="sms">SMS / MMS</option>
+              </select>
+            </AdminField>
+            <AdminField label="Audience concept (not a recipient list)" htmlFor="mk-audience">
+              <select id="mk-audience" className={adminSelectClass} value={form.audience} disabled={loading}
+                onChange={e => setForm(f => ({ ...f, audience: e.target.value as CampaignAudience }))}>
+                <option value="all-consenting">All consenting</option>
+                <option value="recent-opt-ins">Recent opt-ins</option>
+                <option value="existing-customers">Existing customers with separate marketing consent</option>
+              </select>
+            </AdminField>
+          </AdminFieldGrid>
+          <AdminField label="Internal campaign title" htmlFor="mk-title" hint={`${form.title.length}/120`}>
+            <input id="mk-title" className={adminInputClass} maxLength={120} value={form.title} disabled={loading}
               onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-          </label>
-          {form.channel === 'email' && <label className="block">Email subject
-            <input className="mt-1 block w-full rounded border p-2" maxLength={140} value={form.subject || ''} disabled={loading}
+          </AdminField>
+          {form.channel === 'email' && <AdminField label="Email subject" htmlFor="mk-subject" hint={`${(form.subject || '').length}/140`}>
+            <input id="mk-subject" className={adminInputClass} maxLength={140} value={form.subject || ''} disabled={loading}
               onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} />
-          </label>}
-          <label className="block">Audience concept (not a recipient list)
-            <select className="mt-1 block w-full rounded border p-2" value={form.audience} disabled={loading}
-              onChange={e => setForm(f => ({ ...f, audience: e.target.value as CampaignAudience }))}>
-              <option value="all-consenting">All consenting</option>
-              <option value="recent-opt-ins">Recent opt-ins</option>
-              <option value="existing-customers">Existing customers with separate marketing consent</option>
-            </select>
-          </label>
-          <label className="block">Message content
-            <textarea className="mt-1 block min-h-[150px] w-full rounded border p-2" maxLength={10000} value={form.body} disabled={loading}
+          </AdminField>}
+          <AdminField label="Message content" htmlFor="mk-body" hint={`${form.body.length.toLocaleString()}/10,000`}>
+            <textarea id="mk-body" className={adminTextareaClass + ' block min-h-[150px]'} maxLength={10000} value={form.body} disabled={loading}
               onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
-          </label>
+          </AdminField>
           <div className="flex flex-wrap gap-2">
             <AdminButton disabled={loading || refreshing || (!!selected && (selected.state !== 'draft' || staleDraftId === selected.id))} onClick={save}>
               {loading ? 'Saving…' : selected ? 'Save draft edits' : 'Create draft'}
@@ -431,7 +430,7 @@ export function MarketingClient() {
           </li>)}</ul>}
       </AdminCard>
     </div>
-    <div className="mt-4 grid min-w-0 items-start gap-4 xl:grid-cols-2">
+    <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-2 [&>section]:h-full">
     <AdminCard>
       <h2 className="text-sm font-semibold">Frozen audience references (no dispatch)</h2>
       <p className="mt-2 text-xs text-neutral-600">Preparing a snapshot stores only eligible subscriber IDs in the private database. Revoked consent, provider suppression, geography and costs must be rechecked before any actual delivery. Nothing here sends or queues messages.</p>
@@ -496,9 +495,9 @@ export function MarketingClient() {
         <span className="break-words">{c.title} · {new Date(c.plannedFor).toLocaleString()} · {c.state}{!c.copyCurrent?' · copy review is stale':''}</span>
         {c.state==='planned'&&<AdminButton variant="secondary" disabled={calendarBusy} onClick={()=>void calendarAction('DELETE',{id:c.id})}>Cancel plan</AdminButton>}
       </li>):<li>No editorial plans recorded.</li>}</ul>}
-      <label className="mt-3 block text-xs">Planned local time (reviewed campaign required)
-        <input type="datetime-local" className="mt-1 block w-full min-w-0 max-w-full rounded border p-2" value={planFor} onChange={e=>setPlanFor(e.target.value)}/>
-      </label>
+      <AdminField label="Planned local time (reviewed campaign required)" htmlFor="mk-plan-for" className="mt-3 sm:max-w-[320px]">
+        <input id="mk-plan-for" type="datetime-local" className={adminInputClass} value={planFor} onChange={e=>setPlanFor(e.target.value)}/>
+      </AdminField>
       <p className="mt-2 text-xs text-neutral-500">Select a reviewed campaign below to add its copy to this editorial calendar. The time must be at least 15 minutes ahead and within one year.</p>
     </AdminCard>
     </div>

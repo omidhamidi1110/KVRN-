@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import {
-  AdminPage, AdminPageHeader, AdminCard, AdminSectionHeader, AdminButton, AdminNotice, AdminField,
+  AdminPage, AdminPageHeader, AdminCard, AdminSectionHeader, AdminButton, AdminNotice, AdminField, AdminFieldGrid,
   AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading, AdminError, StatusBadge,
   adminInputClass, adminSelectClass, adminCheckboxClass,
 } from '@/components/admin/ui/AdminUI'
@@ -118,7 +118,7 @@ export function AdminDiscountsClient() {
       {showForm && (
         <AdminCard className="mb-5">
           <AdminSectionHeader title="Create discount" />
-          <div className="mb-3 grid gap-3 sm:grid-cols-3">
+          <AdminFieldGrid cols={3}>
             <AdminField label="Code *" htmlFor="dc-code">
               <input id="dc-code" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} className={adminInputClass} placeholder="KVRN10" />
             </AdminField>
@@ -132,7 +132,7 @@ export function AdminDiscountsClient() {
                 <option value="shipping">Shipping</option>
               </select>
             </AdminField>
-          </div>
+          </AdminFieldGrid>
           <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {form.type === 'fixed_amount' && (
               <AdminField label="Amount (cents)" htmlFor="dc-amount"

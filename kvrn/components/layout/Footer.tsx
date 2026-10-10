@@ -88,15 +88,18 @@ export function Footer({ shell }: { shell?: ShellData | null } = {}) {
         </div>
 
         {/* ── Bottom bar ────────────────────────────────────────────── */}
-        <div className="py-4 border-t border-[#E8E5E0] flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[11px] text-[#9B9B9B]">{view.copyright}</p>
-          <Link href="/privacy-choices" className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors">Your Privacy Choices</Link>
-          <button
-            onClick={openPreferences}
-            className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors flex-shrink-0"
-          >
+        {/* One compact horizontal row at every width (320px up): © · Cookie Preferences · Your Privacy Choices. Phones show the
+            short © line; the full line returns from 640px. whitespace-nowrap + min-w-0 + small gaps keep it inside 320–390px. */}
+        <div className="flex flex-nowrap items-center justify-between gap-x-3 border-t border-[#E8E5E0] py-4 text-[10px] text-[#9B9B9B] min-[390px]:text-[11px] sm:gap-x-6">
+          <p className="min-w-0 whitespace-nowrap">
+            <span className="sm:hidden">{view.copyright.split(/(?<=\.)\s/)[0].replace(/\.$/, '')}</span>
+            <span className="hidden sm:inline">{view.copyright}</span>
+          </p>
+          <button type="button" onClick={openPreferences}
+            className="flex-shrink-0 whitespace-nowrap transition-colors hover:text-[#6B6B6B] focus-visible:text-[#1A1A1A]">
             {t['nav.cookiePreferences']}
           </button>
+          <Link href="/privacy-choices" className="flex-shrink-0 whitespace-nowrap transition-colors hover:text-[#6B6B6B] focus-visible:text-[#1A1A1A]">Your Privacy Choices</Link>
         </div>
       </div>
     </footer>

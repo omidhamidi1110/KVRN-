@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminSectionHeader,
+  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminFieldGrid, AdminLoading, AdminNotice, AdminSectionHeader,
   AdminTable, AdminTd, AdminTh, InfoTip, StatusBadge, adminInputClass, useConfirm,
 } from '@/components/admin/ui/AdminUI'
 import {
@@ -88,14 +88,14 @@ function CreateAffiliate({ onDone }: { onDone: (m: string) => void }) {
     <AdminCard>
       <AdminSectionHeader title="Add an affiliate manually" info="This is for people you already work with. It skips the application, so there are no recorded acceptances for them." />
       {err && <AdminNotice tone="danger" className="mb-3">{err}</AdminNotice>}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <AdminFieldGrid cols={3}>
         <AdminField label="Code" htmlFor="mc-code"><input id="mc-code" className={adminInputClass} value={f.code} onChange={e => set('code', e.target.value.toUpperCase())} /></AdminField>
         <AdminField label="Name" htmlFor="mc-name"><input id="mc-name" className={adminInputClass} value={f.name} onChange={e => set('name', e.target.value)} /></AdminField>
         <AdminField label="Email" htmlFor="mc-email"><input id="mc-email" type="email" className={adminInputClass} value={f.email} onChange={e => set('email', e.target.value)} /></AdminField>
         <AdminField label="Commission (%)" htmlFor="mc-rate"><input id="mc-rate" inputMode="decimal" className={adminInputClass} value={f.rate} onChange={e => set('rate', e.target.value)} /></AdminField>
         <AdminField label="Window (days)" htmlFor="mc-win"><input id="mc-win" inputMode="numeric" className={adminInputClass} value={f.window} onChange={e => set('window', e.target.value)} /></AdminField>
         <AdminField label="Hold (days)" htmlFor="mc-hold"><input id="mc-hold" inputMode="numeric" className={adminInputClass} value={f.hold} onChange={e => set('hold', e.target.value)} /></AdminField>
-      </div>
+      </AdminFieldGrid>
       <div className="mt-4"><AdminButton variant="primary" loading={busy} onClick={() => void submit()}>Add affiliate</AdminButton></div>
     </AdminCard>
   )
@@ -149,10 +149,10 @@ function ProfileDetail({ p, onChanged, setFlash }: { p: any; onChanged: () => vo
       {actions.length > 0 && (
         <div className="mt-4 space-y-3 rounded-[12px] border border-black/[0.08] p-4">
           <h4 className="text-[12px] font-medium">Change status</h4>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <AdminFieldGrid cols={2}>
             <AdminField label="Reason" htmlFor="pf-reason" hint="Required to terminate or to reinstate a terminated affiliate. Stored in the audit log."><input id="pf-reason" className={adminInputClass} value={reason} onChange={e => setReason(e.target.value)} /></AdminField>
             <AdminField label="Message to the affiliate (optional)" htmlFor="pf-msg"><input id="pf-msg" className={adminInputClass} value={message} onChange={e => setMessage(e.target.value)} /></AdminField>
-          </div>
+          </AdminFieldGrid>
           <div className="flex flex-wrap gap-4 text-[12px]">
             <label className="flex items-center gap-2"><input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} />Email the affiliate</label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={revoke} onChange={e => setRevoke(e.target.checked)} />Sign them out of the portal</label>
@@ -174,10 +174,10 @@ function ProfileDetail({ p, onChanged, setFlash }: { p: any; onChanged: () => vo
           <AdminField label="Paid ads" htmlFor="ps-ads">
             <select id="ps-ads" className={adminInputClass} value={s.ads} onChange={e => setS(x => ({ ...x, ads: e.target.value }))}><option value="not_permitted">Not permitted</option><option value="written_approval">Written approval needed</option><option value="approved">Approved</option></select>
           </AdminField>
-          <div className="grid grid-cols-2 gap-3">
+          <AdminFieldGrid cols={2}>
             <AdminField label="Start date" htmlFor="ps-start"><input id="ps-start" type="date" className={adminInputClass} value={s.start} onChange={e => setS(x => ({ ...x, start: e.target.value }))} /></AdminField>
             <AdminField label="End date" htmlFor="ps-end"><input id="ps-end" type="date" className={adminInputClass} value={s.end} onChange={e => setS(x => ({ ...x, end: e.target.value }))} /></AdminField>
-          </div>
+          </AdminFieldGrid>
           <AdminButton variant="primary" loading={busy} onClick={() => {
             const thr = dollarsToCents(s.threshold)
             if (Number.isNaN(thr)) { setErr('Payout threshold is not valid.'); return }
@@ -213,7 +213,7 @@ function ProfileDetail({ p, onChanged, setFlash }: { p: any; onChanged: () => vo
 
       <div className="mt-6 space-y-3 rounded-[12px] border border-black/[0.08] p-4">
         <h4 className="flex items-center text-[12px] font-medium">New commission terms<InfoTip label="About new terms">New terms apply to orders from the effective date forward. Earlier orders keep the terms that applied when they were placed. Nothing already earned changes.</InfoTip></h4>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <AdminFieldGrid cols={3}>
           <AdminField label="Type" htmlFor="pt-type"><select id="pt-type" className={adminInputClass} value={t.type} onChange={e => setT(x => ({ ...x, type: e.target.value }))}><option value="percentage">Percentage</option><option value="fixed">Fixed per order</option></select></AdminField>
           {t.type === 'percentage'
             ? <AdminField label="Commission (%)" htmlFor="pt-rate"><input id="pt-rate" inputMode="decimal" className={adminInputClass} value={t.rate} onChange={e => setT(x => ({ ...x, rate: e.target.value }))} /></AdminField>
@@ -222,7 +222,7 @@ function ProfileDetail({ p, onChanged, setFlash }: { p: any; onChanged: () => vo
           <AdminField label="Hold (days)" htmlFor="pt-hold"><input id="pt-hold" inputMode="numeric" className={adminInputClass} value={t.hold} onChange={e => setT(x => ({ ...x, hold: e.target.value }))} /></AdminField>
           <AdminField label="Effective from" htmlFor="pt-eff" hint="Blank = now. Cannot be in the future."><input id="pt-eff" type="date" className={adminInputClass} value={t.effectiveAt} onChange={e => setT(x => ({ ...x, effectiveAt: e.target.value }))} /></AdminField>
           <AdminField label="Reason" htmlFor="pt-reason"><input id="pt-reason" className={adminInputClass} value={t.reason} onChange={e => setT(x => ({ ...x, reason: e.target.value }))} /></AdminField>
-        </div>
+        </AdminFieldGrid>
         <AdminButton loading={busy} onClick={async () => {
           const bps = percentToBps(t.rate), fixed = dollarsToCents(t.fixed)
           if (t.type === 'percentage' ? (bps === null || Number.isNaN(bps)) : (fixed === null || Number.isNaN(fixed))) { setErr('Enter a valid commission.'); return }

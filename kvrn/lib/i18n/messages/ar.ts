@@ -112,7 +112,7 @@ export const ar: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'إغلاق القائمة',
   'nav.menuDialog': 'قائمة التنقل',
   'nav.cookiePreferences': 'تفضيلات ملفات تعريف الارتباط',
-  'nav.affiliateLogin': 'تسجيل دخول الشركاء',
+  'nav.affiliateLogin': 'بوابة المبدعين',
   'nav.language': 'اللغة',
   'nav.currency': 'العملة',
   'nav.selectLanguage': 'اختر اللغة',

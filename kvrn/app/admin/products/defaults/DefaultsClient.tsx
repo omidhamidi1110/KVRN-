@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { AdminPage, AdminButton, AdminCard, AdminError, AdminField, AdminLoading, AdminNotice, AdminPageHeader, adminInputClass } from '@/components/admin/ui/AdminUI'
+import { AdminPage, AdminButton, AdminCard, AdminError, AdminField, AdminFieldGrid, AdminLoading, AdminNotice, AdminPageHeader, adminInputClass } from '@/components/admin/ui/AdminUI'
 
 interface Defaults { shippingReturns: { lines: string[]; linkLabel: string; href: string } }
 
@@ -46,10 +46,10 @@ export function DefaultsClient() {
             <textarea id="df-lines" rows={5} className="w-full rounded-[9px] border border-black/[0.14] bg-white px-3 py-2 text-[12px] focus:border-[#171717] focus:outline-none focus:ring-1 focus:ring-[#171717]"
               value={sr.lines.join('\n')} onChange={e => setD({ shippingReturns: { ...sr, lines: e.target.value.split('\n') } })} />
           </AdminField>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AdminFieldGrid cols={2}>
             <AdminField label="Link text" htmlFor="df-label"><input id="df-label" className={adminInputClass} value={sr.linkLabel} maxLength={60} onChange={e => setD({ shippingReturns: { ...sr, linkLabel: e.target.value } })} /></AdminField>
             <AdminField label="Link to" htmlFor="df-href" hint="A page on this site."><input id="df-href" className={adminInputClass} value={sr.href} onChange={e => setD({ shippingReturns: { ...sr, href: e.target.value } })} /></AdminField>
-          </div>
+          </AdminFieldGrid>
           <AdminButton variant="primary" loading={busy} onClick={() => void save()}>Save</AdminButton>
         </div>
       </AdminCard>

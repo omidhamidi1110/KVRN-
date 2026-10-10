@@ -8,8 +8,7 @@ import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import { useCallback, useEffect, useState } from 'react'
 import {
   AdminButton, AdminCard, AdminEmpty, AdminError, AdminLoading, AdminNotice, AdminSectionHeader, AdminTabs, AdminTable, AdminTh, AdminTd,
-  StatusBadge, adminInputClass, useConfirm,
-} from '@/components/admin/ui/AdminUI'
+  StatusBadge, adminInputClass, useConfirm, AdminFieldGrid } from '@/components/admin/ui/AdminUI'
 import { api, BASE, type ApiResult } from './api'
 import { ErrorNotice, InvalidationNotice, MediaField, SeoForm, TextInput, Toggle } from './ui'
 import { TranslationsPanel } from './TranslationsPanel'
@@ -229,10 +228,10 @@ function CollectionEditor({ id, onClose, onCreated }: { id: string; onClose: () 
                 hint={`Shown as /collections/${d.slug || 'address'}. Changing it later keeps the old link working with a redirect.`} />
               <TextInput label="Description" value={d.description} multiline rows={4} max={2000} onChange={v => edit({ description: v })} />
               <MediaField label="Hero image" assetId={d.heroMediaId} onChange={v => edit({ heroMediaId: v ?? null })} hint="Shown at the top of the collection page." />
-              <div className="grid gap-3 sm:grid-cols-2">
+              <AdminFieldGrid cols={2}>
                 <Toggle label="Show on the site" checked={d.isActive} onChange={v => edit({ isActive: v })} hint="Off keeps the collection saved but hidden." />
                 <TextInput label="Order" type="number" value={String(d.sortOrder)} onChange={v => edit({ sortOrder: Math.min(9999, Math.max(0, parseInt(v, 10) || 0)) })} hint="Lower numbers come first." />
-              </div>
+              </AdminFieldGrid>
             </div>
           </AdminCard>
           <AdminCard>

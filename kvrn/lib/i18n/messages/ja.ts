@@ -112,7 +112,7 @@ export const ja: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'メニューを閉じる',
   'nav.menuDialog': 'ナビゲーションメニュー',
   'nav.cookiePreferences': 'Cookie設定',
-  'nav.affiliateLogin': 'アフィリエイトログイン',
+  'nav.affiliateLogin': 'クリエイターポータル',
   'nav.language': '言語',
   'nav.currency': '通貨',
   'nav.selectLanguage': '言語を選択',

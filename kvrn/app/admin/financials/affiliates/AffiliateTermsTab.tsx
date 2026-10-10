@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminSectionHeader,
+  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminFieldGrid, AdminLoading, AdminNotice, AdminSectionHeader,
   AdminTable, AdminTd, AdminTh, InfoTip, StatusBadge, adminInputClass, useConfirm,
 } from '@/components/admin/ui/AdminUI'
 import { bpsToPercent, centsToDollars, dollarsToCents, formatDate, formatDateTime, percentToBps, readinessMessage } from '@/lib/affiliate-program-ui'
@@ -240,7 +240,7 @@ function SettingsSection() {
       {flash && <AdminNotice tone="success" className="mb-3">{flash}</AdminNotice>}
       {err && <AdminNotice tone="danger" className="mb-3">{err}</AdminNotice>}
       <AdminCard>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <AdminFieldGrid cols={3}>
           <AdminField label="Eligible countries" htmlFor="st-countries" info="Two-letter country codes, separated by commas. Applicants from other countries are turned away."><input id="st-countries" className={adminInputClass} value={f.countries} onChange={e => set('countries', e.target.value)} /></AdminField>
           <AdminField label="Invitation lifetime (days)" htmlFor="st-inv"><input id="st-inv" inputMode="numeric" className={adminInputClass} value={f.inviteExpiryDays} onChange={e => set('inviteExpiryDays', e.target.value)} /></AdminField>
           <AdminField label="Applications per hour, per visitor" htmlFor="st-iph" info="Limits are keyed on a one-way hash of the visitor’s network address, never the address itself."><input id="st-iph" inputMode="numeric" className={adminInputClass} value={f.perIpPerHour} onChange={e => set('perIpPerHour', e.target.value)} /></AdminField>
@@ -253,7 +253,7 @@ function SettingsSection() {
           <AdminField label="Default payout threshold ($)" htmlFor="st-thr"><input id="st-thr" inputMode="decimal" className={adminInputClass} value={f.threshold} onChange={e => set('threshold', e.target.value)} /></AdminField>
           <AdminField label="Default payout schedule" htmlFor="st-sched"><select id="st-sched" className={adminInputClass} value={f.schedule} onChange={e => set('schedule', e.target.value)}><option value="">Not set</option><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="manual">Manual</option></select></AdminField>
           <AdminField label="Default paid ads" htmlFor="st-ads"><select id="st-ads" className={adminInputClass} value={f.ads} onChange={e => set('ads', e.target.value)}><option value="not_permitted">Not permitted</option><option value="written_approval">Written approval needed</option><option value="approved">Approved</option></select></AdminField>
-        </div>
+        </AdminFieldGrid>
         <label className="mt-4 flex items-start gap-2 text-[12px]">
           <input type="checkbox" className="mt-0.5" checked={f.allowPlaceholderDocuments} onChange={e => set('allowPlaceholderDocuments', e.target.checked)} />
           <span>Testing only: open the form even though the documents are placeholders.</span>

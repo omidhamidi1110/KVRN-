@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminButton, AdminNotice, AdminField, AdminStat, AdminStatGrid,
-  AdminTable, AdminTr, AdminTh, AdminTd, AdminEmpty, AdminLoading, AdminError, StatusBadge, AdminTag,
+  InfoTip, AdminEmpty, AdminLoading, AdminError, StatusBadge, AdminTag,
   adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
 
@@ -134,59 +134,79 @@ export default function AdminInventoryClient() {
           {variants.length === 0 ? (
             <AdminEmpty title="No inventory variants." />
           ) : (
-            <div className="kv-inventory-table"><AdminTable stack minWidth={0} caption="Stock by variant">
-              <thead>
-                <AdminTr>
-                  <AdminTh>Product</AdminTh>
-                  <AdminTh>Size</AdminTh>
-                  <AdminTh>SKU</AdminTh>
-                  <AdminTh info={onHandInfo}>On hand</AdminTh>
-                  <AdminTh info={reservedInfo}>Reserved</AdminTh>
-                  <AdminTh info={availableInfo}>Available</AdminTh>
-                  <AdminTh>Status</AdminTh>
-                  <AdminTh>Updated</AdminTh>
-                  <AdminTh><span className="sr-only">Manage</span></AdminTh>
-                </AdminTr>
-              </thead>
-              <tbody>
+            <>
+              {/* ≥640px: dense two-line rows. Seven columns, no horizontal scroll, Manage always visible (~64px/row). */}
+              <div className="hidden overflow-hidden rounded-[14px] border border-black/[0.08] bg-white sm:block">
+                <table className="w-full table-fixed border-collapse text-[12px]">
+                  <caption className="sr-only">Stock by variant</caption>
+                  <colgroup>
+                    <col /><col className="w-[56px]" /><col className="w-[92px]" /><col className="w-[100px]" /><col className="w-[104px]" /><col className="w-[92px]" /><col className="w-[96px]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b border-black/[0.08] bg-[#FAFAF8] text-left text-[10px] font-medium uppercase tracking-[0.08em] text-[#8A8A85]">
+                      <th scope="col" className="px-4 py-2.5 font-medium">Product / SKU</th>
+                      <th scope="col" className="px-2 py-2.5 font-medium">Size</th>
+                      <th scope="col" className="px-2 py-2.5 text-right font-medium"><span className="inline-flex items-center justify-end gap-0.5 whitespace-nowrap">On hand<InfoTip label="About On hand">{onHandInfo}</InfoTip></span></th>
+                      <th scope="col" className="px-2 py-2.5 text-right font-medium"><span className="inline-flex items-center justify-end gap-0.5 whitespace-nowrap">Reserved<InfoTip label="About Reserved">{reservedInfo}</InfoTip></span></th>
+                      <th scope="col" className="px-2 py-2.5 text-right font-medium"><span className="inline-flex items-center justify-end gap-0.5 whitespace-nowrap">Available<InfoTip label="About Available">{availableInfo}</InfoTip></span></th>
+                      <th scope="col" className="px-3 py-2.5 font-medium">Status</th>
+                      <th scope="col" className="px-3 py-2.5 text-right font-medium"><span className="sr-only">Manage</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variants.map(v => {
+                      const available = Number(v.available_quantity)
+                      const isSoldOut = v.active && available <= 0
+                      return (
+                        <tr key={v.id} onClick={() => selectVariant(v.id)}
+                          className={['cursor-pointer border-b border-black/[0.06] align-middle transition last:border-b-0 hover:bg-black/[0.018]', selected === v.id ? 'bg-black/[0.03]' : ''].join(' ')}>
+                          <td className="min-w-0 px-4 py-2.5">
+                            <p className="truncate font-medium text-[#171717]" title={v.product_name}>{v.product_name}</p>
+                            <p className="mt-0.5 truncate text-[10.5px] text-[#6B6B66]">{v.color_name ? `${v.color_name} · ` : ''}<span className="font-mono">{v.sku}</span> · Updated {new Date(v.updated_at).toLocaleDateString()}</p>
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2.5 text-[#4A4A46]">{v.size}</td>
+                          <td className="px-2 py-2.5 text-right font-medium tabular-nums">{v.stock_on_hand}</td>
+                          <td className="px-2 py-2.5 text-right tabular-nums text-[#4A4A46]">{v.reserved_quantity}</td>
+                          <td className={['px-2 py-2.5 text-right font-medium tabular-nums', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</td>
+                          <td className="px-3 py-2.5">
+                            <span className="flex flex-col items-start gap-1"><StatusBadge status={v.active ? 'Active' : 'Inactive'} />{isSoldOut && <AdminTag tone="danger">Sold out</AdminTag>}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <AdminButton size="sm" variant="secondary" aria-label={`Manage ${v.sku}`}
+                              onClick={e => { e.stopPropagation(); selectVariant(v.id) }}>Manage</AdminButton>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* <640px: compact two-column cards — name/status on top, a 3-up count strip, Manage full width. */}
+              <ul className="grid gap-2 sm:hidden" aria-label="Stock by variant">
                 {variants.map(v => {
                   const available = Number(v.available_quantity)
                   const isSoldOut = v.active && available <= 0
-
                   return (
-                    <AdminTr
-                      key={v.id}
-                      onClick={() => selectVariant(v.id)}
-                      className={[
-                        'cursor-pointer transition hover:bg-black/[0.018]',
-                        selected === v.id ? 'bg-black/[0.03]' : '',
-                      ].join(' ')}
-                    >
-                      <AdminTd label="Product" className="max-sm:!block max-sm:!text-left">
-                        <p className="max-w-full break-words font-medium">{v.product_name}</p>
-                        {v.color_name && <p className="mt-0.5 text-[11px] text-[#8A8A85]">{v.color_name}</p>}
-                      </AdminTd>
-                      <AdminTd label="Size" className="whitespace-nowrap text-[#4A4A46]">{v.size}</AdminTd>
-                      <AdminTd label="SKU" className="min-w-0"><span className="break-all font-mono text-[10px] text-[#4A4A46]">{v.sku}</span></AdminTd>
-                      <AdminTd label="On hand" className="font-medium">{v.stock_on_hand}</AdminTd>
-                      <AdminTd label="Reserved" className="text-[#4A4A46]">{v.reserved_quantity}</AdminTd>
-                      <AdminTd label="Available" className={['font-medium', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</AdminTd>
-                      <AdminTd label="Status">
-                        <span className="flex flex-wrap items-center gap-1 max-sm:justify-end">
-                          <StatusBadge status={v.active ? 'Active' : 'Inactive'} />
-                          {isSoldOut && <AdminTag tone="danger">Sold out</AdminTag>}
-                        </span>
-                      </AdminTd>
-                      <AdminTd label="Updated" className="text-[10px] text-[#6B6B66]">{new Date(v.updated_at).toLocaleString()}</AdminTd>
-                      <AdminTd className="whitespace-nowrap text-right max-sm:!justify-end">
-                        <AdminButton size="sm" variant="ghost" aria-label={`Manage ${v.sku}`}
-                          onClick={e => { e.stopPropagation(); selectVariant(v.id) }}>Manage →</AdminButton>
-                      </AdminTd>
-                    </AdminTr>
+                    <li key={v.id} className={['min-w-0 rounded-[12px] border border-black/[0.08] bg-white p-3', selected === v.id ? 'bg-black/[0.03]' : ''].join(' ')}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="break-words text-[12px] font-medium leading-tight">{v.product_name}{v.color_name ? <span className="font-normal text-[#8A8A85]"> · {v.color_name}</span> : null}</p>
+                          <p className="mt-0.5 text-[10.5px] text-[#6B6B66]">{v.size} · <span className="break-all font-mono">{v.sku}</span></p>
+                        </div>
+                        <span className="flex shrink-0 flex-col items-end gap-1"><StatusBadge status={v.active ? 'Active' : 'Inactive'} />{isSoldOut && <AdminTag tone="danger">Sold out</AdminTag>}</span>
+                      </div>
+                      <dl className="mt-2 grid grid-cols-3 gap-2 border-t border-black/[0.06] pt-2 text-center">
+                        <div><dt className="text-[9.5px] uppercase tracking-[0.08em] text-[#8A8A85]">On hand</dt><dd className="text-[13px] font-medium tabular-nums">{v.stock_on_hand}</dd></div>
+                        <div><dt className="text-[9.5px] uppercase tracking-[0.08em] text-[#8A8A85]">Reserved</dt><dd className="text-[13px] tabular-nums text-[#4A4A46]">{v.reserved_quantity}</dd></div>
+                        <div><dt className="text-[9.5px] uppercase tracking-[0.08em] text-[#8A8A85]">Available</dt><dd className={['text-[13px] font-medium tabular-nums', available > 0 ? 'text-[#047857]' : 'text-[#B91C1C]'].join(' ')}>{available}</dd></div>
+                      </dl>
+                      <AdminButton size="sm" className="mt-2 w-full" aria-label={`Manage ${v.sku}`} onClick={() => selectVariant(v.id)}>Manage</AdminButton>
+                    </li>
                   )
                 })}
-              </tbody>
-            </AdminTable></div>
+              </ul>
+            </>
           )}
         </section>
 

@@ -112,7 +112,7 @@ export const ko: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': '메뉴 닫기',
   'nav.menuDialog': '내비게이션 메뉴',
   'nav.cookiePreferences': '쿠키 설정',
-  'nav.affiliateLogin': '제휴 파트너 로그인',
+  'nav.affiliateLogin': '크리에이터 포털',
   'nav.language': '언어',
   'nav.currency': '통화',
   'nav.selectLanguage': '언어 선택',

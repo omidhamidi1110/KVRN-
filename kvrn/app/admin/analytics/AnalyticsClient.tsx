@@ -141,16 +141,20 @@ export function AnalyticsClient({ ga }: { ga: GaAdminStatus }) {
 
       {data && s && r && (
         <>
-          <AdminStatGrid min={180} className="mb-6">
-            <Metric label="Visits / sessions" value={String(s.visits)} />
+          <AdminStatGrid className="mb-2">
+            <Metric label="Visits / sessions" value={String(s.visits)} sub="sessions that started" />
             <Metric label="Product views" value={String(data.events.productViews)} sub="unique per session and product" />
-            <Metric label="Add-to-cart events" value={String(data.events.addToCarts)} />
-            <Metric label="Checkout starts" value={String(data.events.checkoutStarts)} />
+            <Metric label="Add-to-cart events" value={String(data.events.addToCarts)} sub="recorded events" />
+            <Metric label="Checkout starts" value={String(data.events.checkoutStarts)} sub="recorded events" />
             <Metric label="Purchases" value={String(data.events.purchases)}
                     sub={data.events.purchaseValueCents === null ? 'order value unknown'
                          : `${money(data.events.purchaseValueCents)} charged (incl. shipping and tax; not revenue)`} />
             <Metric label="Visit → purchase" value={pctOrDash(r.visitToPurchase)} />
           </AdminStatGrid>
+          <p className="mb-6 text-[11px] text-[#6B6B66]">
+            The cards above count <strong className="font-medium">recorded events</strong>. The funnel below counts <strong className="font-medium">sessions that reached each stage or any later one</strong>,
+            so the two can differ — for example when a session has a later event but its earlier event was not recorded.
+          </p>
 
           <AdminSectionHeader title="Funnel"
             info="Sessions that reached each stage or any later one, so each step is never larger than the one before. The gap between two steps means no later event was recorded for those sessions — not proof they skipped or abandoned that step." />

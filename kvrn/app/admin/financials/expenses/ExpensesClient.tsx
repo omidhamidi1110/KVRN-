@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
 import { useDraftHistory } from '@/lib/admin/use-draft-history'
 import {
-  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField,
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminFieldGrid,
   AdminStat, AdminStatGrid, AdminTabs, AdminTable, AdminTh, AdminTd, AdminEmpty, AdminLoading,
   StatusBadge, AdminTag, useConfirm, adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
@@ -234,7 +234,7 @@ export function ExpensesClient() {
               <AdminButton variant="ghost" size="sm" onClick={undoTx} disabled={!canUndoTx || saving}>↶ Undo</AdminButton>
               <AdminButton variant="ghost" size="sm" onClick={redoTx} disabled={!canRedoTx || saving}>↷ Redo</AdminButton>
             </div>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            <AdminFieldGrid cols={3}>
               <AdminField label="Settles obligation" htmlFor="tx-def">
                 <select id="tx-def" value={txForm.expenseDefinitionId} className={adminSelectClass}
                   onChange={e => {
@@ -295,7 +295,7 @@ export function ExpensesClient() {
                   {SOURCES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                 </select>
               </AdminField>
-            </div>
+            </AdminFieldGrid>
             {txForm.category === 'packaging' && (
               <AdminNotice tone="warning" className="mt-3">{PACKAGING_WARNING}</AdminNotice>
             )}
@@ -369,7 +369,7 @@ export function ExpensesClient() {
               <AdminButton variant="ghost" size="sm" onClick={undoDef} disabled={!canUndoDef || saving}>↶ Undo</AdminButton>
               <AdminButton variant="ghost" size="sm" onClick={redoDef} disabled={!canRedoDef || saving}>↷ Redo</AdminButton>
             </div>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            <AdminFieldGrid cols={3}>
               <AdminField label="Provider *" htmlFor="def-provider">
                 <input id="def-provider" className={adminInputClass} value={defForm.provider}
                   onChange={e => setDefForm({ ...defForm, provider: e.target.value })} placeholder="Neon" />
@@ -399,7 +399,7 @@ export function ExpensesClient() {
                 <input id="def-renewal" type="date" className={adminInputClass} value={defForm.renewalDate}
                   onChange={e => setDefForm({ ...defForm, renewalDate: e.target.value })} />
               </AdminField>
-            </div>
+            </AdminFieldGrid>
             {defForm.category === 'packaging' && (
               <AdminNotice tone="warning" className="mt-3">{PACKAGING_WARNING}</AdminNotice>
             )}

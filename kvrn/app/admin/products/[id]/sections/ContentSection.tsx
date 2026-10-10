@@ -1,5 +1,5 @@
 'use client'
-import { AdminField, AdminCard, AdminSectionHeader, AdminButton, adminInputClass } from '@/components/admin/ui/AdminUI'
+import { AdminField, AdminFieldGrid, AdminCard, AdminSectionHeader, AdminButton, adminInputClass } from '@/components/admin/ui/AdminUI'
 import { LIMITS, GUIDANCE } from '@/lib/product-model'
 import { type SectionProps, IssueList, Toggle, textareaClass, CharCount } from '../editor-shared'
 
@@ -81,13 +81,13 @@ export function ContentSection({ snap, update, state, issues, locked }: SectionP
 
       <AdminCard>
         <AdminSectionHeader title="Page sections" description="Hide what this product does not need." />
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <Toggle label="Description" checked={sec.description} disabled={locked} onChange={v => update(s => { s.sections.description = v })} />
           <Toggle label="Details" checked={sec.details} disabled={locked} onChange={v => update(s => { s.sections.details = v })} />
           <Toggle label="Shipping & Returns" checked={sec.shippingReturns} disabled={locked} onChange={v => update(s => { s.sections.shippingReturns = v })} />
           <Toggle label="Size guide link" checked={sec.sizeGuideLink} disabled={locked} onChange={v => update(s => { s.sections.sizeGuideLink = v })} />
           <Toggle label="Sticky add to bag (mobile)" checked={sec.stickyAddToBag} disabled={locked} onChange={v => update(s => { s.sections.stickyAddToBag = v })} />
-        </div>
+        </AdminFieldGrid>
       </AdminCard>
 
       <AdminCard>

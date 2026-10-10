@@ -38,7 +38,7 @@ export function CollectionHero({
   mobileLinks,
 }: CollectionHeroProps) {
   const t = fillMessages(useI18n().t)
-  const NAV_H = 84 // announcement bar 28px + navbar 56px
+  const NAV_H = 92 // announcement bar 36px + navbar 56px = --header-total
 
   return (
     <>

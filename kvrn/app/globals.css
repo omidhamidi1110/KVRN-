@@ -35,9 +35,9 @@ body {
   --color-success:       #166534;
 
   /* Header heights */
-  --bar-height:    28px;   /* Announcement bar */
+  --bar-height:    36px;   /* Announcement bar */
   --nav-height:    56px;   /* Navigation */
-  --header-total:  84px;   /* Bar + nav total */
+  --header-total:  92px;   /* Bar + nav total */
 
   /* Z-index scale */
   --z-base:     0;
@@ -48,7 +48,7 @@ body {
   --z-modal:    400;
   --z-toast:    500;
 
-  /* Navbar geometry is 56px; announcement is 28px. Keep one definition. */
+  /* Navbar geometry is 56px; announcement bar is 36px (the original, owner-preferred height). ONE definition: --bar-height / --header-total. */
 }
 
 /* ─── BASE ───────────────────────────────────────────────────────────────── */

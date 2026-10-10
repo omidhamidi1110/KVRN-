@@ -13,69 +13,110 @@
   .kv-stack tbody td[colspan] { display: block; text-align: left; }
 }
 
-/* Inventory remains usable without horizontal scrolling on mid-width screens. */
-@media (min-width: 640px) and (max-width: 1550px) {
-  .kv-inventory-table .kv-stack { display: block; min-width: 0 !important; }
-  .kv-inventory-table .kv-stack thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .kv-inventory-table .kv-stack tbody, .kv-inventory-table .kv-stack tbody tr { display: block; }
-  .kv-inventory-table .kv-stack tbody tr { padding: 8px 12px; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
-  .kv-inventory-table .kv-stack tbody tr:last-child { border-bottom: 0; }
-  .kv-inventory-table .kv-stack tbody td { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 6px 0; border: 0; text-align: right; max-width: none !important; white-space: normal !important; }
-  .kv-inventory-table .kv-stack tbody td[data-label]::before { content: attr(data-label); flex: none; text-align: left; font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: #8a8a85; }
-  .kv-inventory-table .kv-stack tbody td[colspan] { display: block; text-align: left; }
+
+/* CP69: ONE shared control-containment + native date/time rule set (root-cause fix).
+   Root cause of the iPad/Safari overflow and top-aligned date text: Safari renders <input type=date> with its native
+   (appearance:auto) widget, whose intrinsic min-content width ignores width/min-width on grid tracks and whose inner
+   value box is top-aligned. Fix: drop the native chrome (appearance:none), size the field like every other control
+   (height set by adminInputClass), centre the inner value, and let every grid/flex child shrink (min-width:0). */
+#admin-main { overflow-x: clip; }
+:where(#admin-main) .grid > *, :where(#admin-main) .flex > * { min-width: 0; }
+:where(#admin-main) label, :where(#admin-main) fieldset { min-width: 0; max-width: 100%; }
+:where(#admin-main) input:not([type="checkbox"]):not([type="radio"]), :where(#admin-main) select, :where(#admin-main) textarea {
+  box-sizing: border-box; min-width: 0; max-width: 100%;   /* zero specificity: utility classes (e.g. sm:max-w-[160px]) still win */
 }
-
-/* iOS date/number inputs may carry an intrinsic width wider than their grid column. */
-#admin-main input, #admin-main select, #admin-main textarea { box-sizing: border-box; max-width: 100%; min-width: 0; }
-#admin-main input[type="date"] { display: block; width: 100%; min-height: 40px; }
-#admin-main input[type="date"]::-webkit-date-and-time-value { text-align: left; min-width: 0; }
-#admin-main .grid > *, #admin-main .flex > * { min-width: 0; }
-
-/* CP67: Safari tablet date fields must not paint over adjacent grid columns. */
-#admin-main .grid { min-width: 0; }
-#admin-main input[type="date"], #admin-main input[type="datetime-local"] {
-  box-sizing: border-box !important;
-  min-inline-size: 0 !important;
-  max-inline-size: 100% !important;
-  inline-size: 100% !important;
-  overflow: hidden;
+#admin-main input[type="date"], #admin-main input[type="datetime-local"], #admin-main input[type="time"], #admin-main input[type="month"] {
+  -webkit-appearance: none; appearance: none;
+  display: flex; align-items: center;
+  box-sizing: border-box; margin: 0;
+  line-height: 1.2; font-family: inherit; font-size: 12px; color: #171717;
+  background-color: #fff;
+  /* calendar affordance replaces the removed native one; the native picker still opens on tap */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238A8A85' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='18' rx='2'/><path d='M16 2v4M8 2v4M3 10h18'/></svg>");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+  text-align: left; overflow: hidden;
 }
 #admin-main input[type="date"]::-webkit-datetime-edit,
-#admin-main input[type="date"]::-webkit-date-and-time-value {
-  min-width: 0 !important;
-  max-width: 100%;
+#admin-main input[type="datetime-local"]::-webkit-datetime-edit { padding: 0; min-width: 0; max-width: 100%; line-height: 1.2; }
+#admin-main input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+#admin-main input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper { padding: 0; min-width: 0; }
+#admin-main input[type="date"]::-webkit-date-and-time-value,
+#admin-main input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left; margin: 0; min-width: 0; min-height: 1.2em; display: flex; align-items: center;
 }
-/* No inventory ledger sideways scrolling at standard desktop/tablet widths. */
-.kv-inventory-table { min-width: 0; max-width: 100%; overflow-x: hidden; }
-.kv-inventory-table table { table-layout: fixed; min-width: 0 !important; }
-.kv-inventory-table th, .kv-inventory-table td { overflow-wrap: anywhere; }
-@media (max-width:1550px) {
-  .kv-inventory-table table { table-layout: auto; }
-  .kv-inventory-table tbody tr { border-bottom: 1px solid #e8e5e0; }
-  .kv-inventory-table tbody td:last-child button { font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+#admin-main input[type="date"]::-webkit-calendar-picker-indicator,
+#admin-main input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  position: absolute; inset: 0 0 0 auto; width: 32px; height: 100%; opacity: 0; cursor: pointer;
+}
+#admin-main input[type="date"], #admin-main input[type="datetime-local"] { position: relative; }
+#admin-main input[type="date"]:empty, #admin-main input[type="date"]:invalid { color: #6B6B66; }
+
+/* Native selects: identical box to inputs on iOS/iPadOS Safari (which otherwise draws its own taller, grey control). */
+#admin-main select:not([multiple]) {
+  -webkit-appearance: none; appearance: none; line-height: 1.2; text-overflow: ellipsis;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A8A85' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
 }
 
-/* CP68: Control containment for all financial/admin forms, including Safari native picker internals. */
-#admin-main { overflow-x: clip; }
-#admin-main .grid > *, #admin-main .flex > * { min-width: 0; }
-#admin-main label, #admin-main fieldset { min-width: 0; max-width: 100%; }
-#admin-main input:not([type="checkbox"]):not([type="radio"]),
-#admin-main select, #admin-main textarea {
-  box-sizing: border-box;
-  min-inline-size: 0;
-  max-inline-size: 100%;
+/* Reusable field grid: container-width aware (permanent admin sidebar), equal tracks, even gutters, no overflow.
+   1 column on phones → 2 → up to --kv-cols (3/4) when the container is wide. Peers share one control height via adminInputClass. */
+.kv-field-wrap { container-type: inline-size; min-width: 0; max-width: 100%; }
+.kv-field-grid { display: grid; gap: 14px 16px; align-items: start; grid-template-columns: minmax(0, 1fr); }
+.kv-field-grid > * { min-width: 0; }
+.kv-field-grid > .kv-span-all { grid-column: 1 / -1; }
+@container (min-width: 480px) { .kv-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (min-width: 760px) { .kv-field-grid { grid-template-columns: repeat(min(var(--kv-cols, 3), 3), minmax(0, 1fr)); } }
+@container (min-width: 980px) { .kv-field-grid { grid-template-columns: repeat(var(--kv-cols, 3), minmax(0, 1fr)); } }
+@supports not (container-type: inline-size) {
+  @media (min-width: 640px) { .kv-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1100px) { .kv-field-grid { grid-template-columns: repeat(var(--kv-cols, 3), minmax(0, 1fr)); } }
 }
-#admin-main input[type="date"], #admin-main input[type="datetime-local"] {
-  display: block;
-  width: 100% !important;
-  font-size: 12px;
-  -webkit-min-logical-width: 0;
+
+/* Compact link rows (Navigation / Footer editors): one aligned grid for header + every row. */
+.kv-linkrows { container-type: inline-size; display: grid; gap: 8px; min-width: 0; }
+.kv-linkrow-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.kv-linkrow { display: grid; gap: 6px 10px; align-items: center; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px; border: 1px solid rgba(0,0,0,.08); border-radius: 10px; background: #FAFAF8; }
+.kv-linkrow-head { display: none; }
+.kv-lr-cell { position: relative; min-width: 0; }
+.kv-lr-cap { display: block; margin-bottom: 3px; font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: #8A8A85; }
+.kv-lr-count { position: absolute; right: 8px; bottom: 100%; margin-bottom: 3px; font-size: 10px; color: #8A8A85; }
+.kv-lr-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 12px; color: #171717; white-space: nowrap; cursor: pointer; }
+.kv-lr-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.kv-lr-max { font-weight: 400; text-transform: none; letter-spacing: 0; color: #A5A5A0; }
+@container (max-width: 639px) {
+  .kv-lr-cell { grid-column: 1 / -1; }
+  .kv-lr-tab { grid-column: 1; }
+  .kv-lr-actions { grid-column: 2; }
 }
-#admin-main input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-#admin-main input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper {
-  min-width: 0;
-  padding: 0;
+@container (min-width: 640px) {
+  .kv-linkrow, .kv-linkrow-head { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) 86px 156px; padding: 6px 8px; }
+  .kv-linkrow-head { display: grid; padding-block: 0; border: 0; background: none; font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: #8A8A85; }
+  .kv-lr-cap { display: none; }
+  .kv-lr-count { bottom: auto; top: 50%; right: 8px; margin: 0; transform: translateY(-50%); background: #fff; padding-left: 4px; }
+  .kv-lr-tab { min-height: 36px; }
+  .kv-lr-actions-h { text-align: right; }
+  .kv-lr-actions button { padding-inline: 8px; }
 }
+
+/* Reusable stat grid (container-width aware, never an orphan row):
+   <AdminStatGrid> counts its cards and picks balanced columns per breakpoint, e.g. 6 → 6 | 3+3 | 2+2+2, 12 → 6+6 | 4+4+4.
+   Breakpoints use the CONTAINER width (the admin has a permanent sidebar), not the viewport. */
+.kv-stat-wrap { container-type: inline-size; min-width: 0; max-width: 100%; }
+.kv-stat-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kv-stat-grid > * { min-width: 0; }
+.kv-stat-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+@container (max-width: 319px) { .kv-stat-grid { grid-template-columns: minmax(0, 1fr); } }
+@container (min-width: 560px) {
+  .kv-stat-grid { grid-template-columns: repeat(var(--kv-md, 3), minmax(0, 1fr)); }
+  .kv-stat-grid > :last-child:nth-child(odd) { grid-column: auto; }
+}
+@container (min-width: 900px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-lg, 6), minmax(0, 1fr)); } }
+@supports not (container-type: inline-size) {
+  @media (min-width: 640px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-md, 3), minmax(0, 1fr)); } .kv-stat-grid > :last-child:nth-child(odd) { grid-column: auto; } }
+  @media (min-width: 1280px) { .kv-stat-grid { grid-template-columns: repeat(var(--kv-lg, 6), minmax(0, 1fr)); } }
+}
+
 /* Product tabs wrap at natural word boundaries rather than colliding in a narrow preview split. */
 .kv-product-tabs [role="tablist"], .kv-content-tabs [role="tablist"] {
   display: flex;
@@ -89,8 +130,4 @@
   white-space: nowrap;
   max-width: 100%;
   padding-inline: 9px;
-}
-.kv-inventory-table table { width: 100%; }
-.kv-inventory-table td:last-child, .kv-inventory-table th:last-child {
-  white-space: nowrap;
 }

@@ -112,7 +112,7 @@ export const zh: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': '关闭菜单',
   'nav.menuDialog': '导航菜单',
   'nav.cookiePreferences': 'Cookie 偏好设置',
-  'nav.affiliateLogin': '联盟伙伴登录',
+  'nav.affiliateLogin': '创作者门户',
   'nav.language': '语言',
   'nav.currency': '货币',
   'nav.selectLanguage': '选择语言',

@@ -93,37 +93,38 @@ export function RangePicker({
   onCustom: (c: { start: string; end: string }) => void
 }) {
   const canApply = Boolean(custom.start && custom.end)
+  // One aligned toolbar: [presets][start] to [end][Apply]. Every control is the same height (40px touch / 36px desktop).
+  // Phones: the presets get their own compact 5-up row, then the date pair, then Apply.
   return (
-    <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
-      {/* Compact 5-column selector: no wrap and no wasted second row on mobile. */}
+    <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
       <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-5 gap-1 sm:hidden">
         {RANGE_OPTIONS.map(o => (
           <button key={o.value} type="button" aria-label={o.label} aria-pressed={range === o.value}
             onClick={() => onRange(o.value)}
-            className={`min-w-0 rounded-md border px-1 py-2 text-[11px] font-medium tabular-nums ${range === o.value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700'}`}>
+            className={`h-10 min-w-0 rounded-[9px] border px-1 text-[11px] font-medium tabular-nums ${range === o.value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-black/[0.14] bg-white text-neutral-700'}`}>
             {({ today: 'Today', '7d': '7D', '30d': '30D', mtd: 'MTD', ytd: 'YTD' } as Record<string, string>)[o.value]}
           </button>
         ))}
       </div>
-      <div className="hidden min-w-0 sm:block">
+      <div className="hidden min-w-0 shrink-0 sm:block">
         <AdminSegmented ariaLabel="Date range" value={range}
           options={RANGE_OPTIONS.map(o => ({ id: o.value as string, label: o.label }))}
           onChange={onRange} />
       </div>
-      <span className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
+      <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:min-w-0 sm:flex-1 sm:flex-nowrap sm:justify-start">
         <input type="date" value={custom.start} aria-label="Start date"
           onChange={e => onCustom({ ...custom, start: e.target.value })}
-          className={`${adminInputClass} !w-full min-w-0 sm:!w-[155px]`} />
-        <span className="text-[11px] text-[#6B6B66]">to</span>
+          className={`${adminInputClass} sm:min-w-[132px] sm:max-w-[160px] sm:flex-1`} />
+        <span aria-hidden="true" className="text-[11px] text-[#6B6B66]">to</span>
         <input type="date" value={custom.end} aria-label="End date"
           onChange={e => onCustom({ ...custom, end: e.target.value })}
-          className={`${adminInputClass} !w-full min-w-0 sm:!w-[155px]`} />
+          className={`${adminInputClass} sm:min-w-[132px] sm:max-w-[160px] sm:flex-1`} />
         <button type="button" onClick={() => onRange('custom')} disabled={!canApply}
           aria-pressed={range === 'custom'}
-          className={adminButtonClass(range === 'custom' ? 'primary' : 'secondary', 'md', 'col-span-3 justify-self-start sm:col-span-1')}>
+          className={adminButtonClass(range === 'custom' ? 'primary' : 'secondary', 'md', 'col-span-3 w-full sm:col-span-1 sm:w-auto sm:shrink-0')}>
           Apply
         </button>
-      </span>
+      </div>
     </div>
   )
 }

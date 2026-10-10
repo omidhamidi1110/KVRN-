@@ -112,7 +112,7 @@ export const hi: { readonly [K in keyof typeof en]: string } = {
   'nav.closeMenu': 'मेनू बंद करें',
   'nav.menuDialog': 'नेविगेशन मेनू',
   'nav.cookiePreferences': 'कुकी प्राथमिकताएँ',
-  'nav.affiliateLogin': 'एफ़िलिएट लॉगिन',
+  'nav.affiliateLogin': 'क्रिएटर पोर्टल',
   'nav.language': 'भाषा',
   'nav.currency': 'मुद्रा',
   'nav.selectLanguage': 'भाषा चुनें',

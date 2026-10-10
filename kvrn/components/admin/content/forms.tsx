@@ -2,9 +2,10 @@
 // One form per content kind. Each receives the working snapshot and reports the whole next
 // snapshot; the editor shell owns autosave, publishing, versions and translations.
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { AdminCard, AdminSectionHeader, AdminNotice, AdminButton, adminInputClass } from '@/components/admin/ui/AdminUI'
-import { TextInput, Toggle, Select, ListEditor, MediaField, SeoForm, cx } from './ui'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMessageRotator } from '@/components/ui/useMessageRotator'
+import { AdminCard, AdminSectionHeader, AdminNotice, AdminButton, adminInputClass, AdminFieldGrid } from '@/components/admin/ui/AdminUI'
+import { TextInput, Toggle, InlineToggle, Select, ListEditor, LinkListEditor, MediaField, SeoForm, cx } from './ui'
 import { RichTextEditor, type BlockChoice } from './RichTextEditor'
 import { newId, type Kind } from './api'
 import { slugify } from '@/lib/content-urls'
@@ -47,20 +48,22 @@ export function PolicyForm({ value: v, onChange, blockChoices, entityId, isNew }
   return (
     <div className="space-y-4">
       <Section title="Page" description="Where it lives and what it is called.">
-        <TextInput label="Title" value={v.title} onChange={t => set({ title: t, ...(isNew && !v.slug ? { slug: slugify(t) } : {}) })} max={140} />
-        <TextInput label="Web address (slug)" value={v.slug} onChange={s => set({ slug: s.toLowerCase() })} max={80}
-          hint={`Public address: ${path}`}
-          info={<>Changing the address of a live policy creates a permanent redirect from the old address, so existing links keep working.{legacy ? ` ${legacy.path} is a required address for this policy; keep the slug "${legacy.slug}" to stay there.` : ''}</>} />
+        <AdminFieldGrid cols={2}>
+          <TextInput label="Title" value={v.title} onChange={t => set({ title: t, ...(isNew && !v.slug ? { slug: slugify(t) } : {}) })} max={140} />
+          <TextInput label="Web address (slug)" value={v.slug} onChange={s => set({ slug: s.toLowerCase() })} max={80}
+            hint={`Public address: ${path}`}
+            info={<>Changing the address of a live policy creates a permanent redirect from the old address, so existing links keep working.{legacy ? ` ${legacy.path} is a required address for this policy; keep the slug "${legacy.slug}" to stay there.` : ''}</>} />
+        </AdminFieldGrid>
         {legacy && v.slug !== legacy.slug && <AdminNotice tone="warning">This policy normally lives at {legacy.path}. Changing the slug moves it to /legal/{v.slug || '…'} (with a redirect).</AdminNotice>}
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Banner title" value={v.heroTitle ?? ''} onChange={t => set({ heroTitle: t || undefined })} max={140} hint="The dark banner at the top. Blank = the title." />
           <TextInput label="Breadcrumb label" value={v.heroBreadcrumb ?? ''} onChange={t => set({ heroBreadcrumb: t || undefined })} max={80} hint="Blank = the title." />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        </AdminFieldGrid>
+        <AdminFieldGrid cols={3}>
           <TextInput label="Last updated date" type="date" value={v.effectiveDate ?? ''} onChange={d => set({ effectiveDate: d || null })} hint="Shown on the page. Update it when the terms change." />
           <TextInput label="Date label" value={v.lastUpdatedLabel ?? ''} onChange={t => set({ lastUpdatedLabel: t || undefined })} max={60} hint="Blank = “Last updated”." />
           <Select label="Layout" value={v.style} onChange={s => set({ style: s })} options={[{ value: 'legal', label: 'Legal (narrow, with title)' }, { value: 'support', label: 'Support (wider sections)' }]} />
-        </div>
+        </AdminFieldGrid>
       </Section>
       <Section title="Content" description="One readable legal document for the storefront. Existing draft autosaves; only Publish makes it public.">
         <div className="rounded-[9px] border border-black/10 bg-[#FAFAF9] p-3 space-y-3">
@@ -131,20 +134,20 @@ export function SizeGuideForm({ value: v, onChange }: FormProps<SizeGuideSnapsho
   return (
     <div className="space-y-4">
       <Section title="Guide">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Name" value={v.name} onChange={name => set({ name })} max={100} hint="Shown as the table heading." />
           <TextInput label="Garment" value={v.garment} onChange={garment => set({ garment })} max={60} />
           <Select label="Measurements entered in" value={v.unit} onChange={unit => set({ unit })} options={[{ value: 'cm', label: 'Centimetres' }, { value: 'in', label: 'Inches' }]} hint="Shoppers can switch between cm and inches; numbers convert automatically." />
           <TextInput label="First column heading" value={v.rowHeader} onChange={rowHeader => set({ rowHeader })} max={40} />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        </AdminFieldGrid>
+        <AdminFieldGrid cols={2}>
           <TextInput label="Shop link label" value={v.shopLink?.label ?? ''} onChange={label => set({ shopLink: label || v.shopLink?.href ? { label, href: v.shopLink?.href ?? '' } : undefined })} max={80} />
           <TextInput label="Shop link address" value={v.shopLink?.href ?? ''} onChange={href => set({ shopLink: v.shopLink?.label || href ? { label: v.shopLink?.label ?? '', href } : undefined })} placeholder="/shop?type=hoodies" />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        </AdminFieldGrid>
+        <AdminFieldGrid cols={2}>
           <Toggle label="Show on the public Size Guide page" checked={v.showOnGuidePage} onChange={showOnGuidePage => set({ showOnGuidePage })} hint="Off keeps it available to products only." />
           <TextInput label="Order on the page" type="number" value={String(v.order)} onChange={o => set({ order: Math.max(0, Math.min(9999, Math.trunc(Number(o)) || 0)) })} />
-        </div>
+        </AdminFieldGrid>
       </Section>
       <Section title="Measurements" description="Columns are measurements; rows are sizes.">
         <ListEditor items={v.columns} onChange={columns => set({ columns, rows: v.rows.map(r => ({ ...r, values: Object.fromEntries(columns.map(c => [c.id, r.values[c.id] ?? ''])) })) })}
@@ -189,10 +192,10 @@ export function FaqForm({ value: v, onChange, blockChoices }: FormProps<FaqSnaps
           makeNew={() => ({ id: newId('cat'), heading: '', active: true, items: [] })} itemLabel={(c, i) => c.heading || `Category ${i + 1}`}
           render={(c, upC) => (
             <div className="space-y-3">
-              <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
+              <AdminFieldGrid cols={2}>
                 <TextInput label="Category heading" value={c.heading} onChange={heading => upC({ heading })} max={80} />
-                <Toggle label="Active" checked={c.active} onChange={active => upC({ active })} />
-              </div>
+                <InlineToggle label="Active" checked={c.active} onChange={active => upC({ active })} />
+              </AdminFieldGrid>
               <ListEditor items={c.items} onChange={items => upC({ items })} addLabel="Add question" max={60}
                 makeNew={() => ({ id: newId('q'), question: '', answer: emptyRich(), active: true })} itemLabel={(q, i) => q.question || `Question ${i + 1}`}
                 render={(q, upQ) => (
@@ -237,10 +240,10 @@ export function AboutForm({ value: v, onChange }: FormProps<AboutSnapshot>) {
           render={(a, up) => <div className="space-y-2"><TextInput label="Title" value={a.title} onChange={title => up({ title })} max={60} /><TextInput label="Description" value={a.description} onChange={description => up({ description })} multiline rows={2} max={300} /></div>} />
       </Section>
       <Section title="Button">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Button label" value={v.ctaLabel} onChange={ctaLabel => set({ ctaLabel })} max={60} hint="Leave empty to hide the button." />
           <TextInput label="Button address" value={v.ctaHref} onChange={ctaHref => set({ ctaHref })} placeholder="/shop" />
-        </div>
+        </AdminFieldGrid>
       </Section>
       <Section title="Search & sharing"><SeoForm value={v.seo} onChange={seo => set({ seo })} /></Section>
     </div>
@@ -276,7 +279,7 @@ export function SupportPageForm({ value: v, onChange }: FormProps<SupportPageSna
         <RichTextEditor value={v.tip} onChange={tip => set({ tip })} compact label="Fit tip (below the tables)" variant="support" />
         <ListEditor items={v.links} onChange={links => set({ links })} makeNew={() => ({ id: newId('l'), label: '', href: '' })} addLabel="Add link" max={6}
           itemLabel={(l, i) => l.label || `Link ${i + 1}`}
-          render={(l, up) => <div className="grid gap-2 sm:grid-cols-2"><TextInput label="Label" value={l.label} onChange={label => up({ label })} max={80} /><TextInput label="Address" value={l.href} onChange={href => up({ href })} placeholder="/shop?type=hoodies" /></div>} />
+          render={(l, up) => <AdminFieldGrid cols={2}><TextInput label="Label" value={l.label} onChange={label => up({ label })} max={80} /><TextInput label="Address" value={l.href} onChange={href => up({ href })} placeholder="/shop?type=hoodies" /></AdminFieldGrid>} />
       </Section>
       <Section title="Search & sharing"><SeoForm value={v.seo} onChange={seo => set({ seo })} /></Section>
     </div>
@@ -301,6 +304,48 @@ function fromLocalInput(v: string, zone: 'local' | 'utc'): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
+/** Live preview of the DRAFT: same geometry (36px), cadence, fade and order as components/ui/AnnouncementBar.tsx. */
+function AnnouncementPreview({ value: v }: { value: AnnouncementSnapshot }) {
+  const msgs = v.messages.filter(m => m.text.trim())
+  const [paused, setPaused] = useState(false)
+  const [reduced, setReduced] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduced(mq.matches)
+    on(); mq.addEventListener?.('change', on)
+    return () => mq.removeEventListener?.('change', on)
+  }, [])
+  const auto = v.enabled && msgs.length > 1 && !paused && !reduced
+  const { idx, fading, setIdx } = useMessageRotator(msgs.length, auto)
+  const cur = v.enabled && msgs.length ? msgs[idx % msgs.length] : null
+  const now = Date.now()
+  const startsLater = v.startsAt && new Date(v.startsAt).getTime() > now
+  const ended = v.endsAt && new Date(v.endsAt).getTime() < now
+  const go = (d: number) => { if (msgs.length) setIdx((idx + d + msgs.length) % msgs.length) }
+  return (
+    <div className="space-y-2">
+      <div className="flex h-[36px] items-center justify-center overflow-hidden rounded-[8px] bg-[#0E0E0E] p-0" role="img" aria-label={cur ? `Announcement preview: ${cur.text}` : 'Announcement preview: empty bar'}>
+        {cur
+          ? <p className="m-0 max-w-full truncate px-4 text-center text-[11px] font-light leading-[18px] tracking-[0.12em] text-[#F0EDE8] transition-opacity duration-500 motion-reduce:transition-none" style={{ opacity: fading ? 0 : 1 }}>{cur.text}{cur.href ? <span className="sr-only"> (links to {cur.href})</span> : null}</p>
+          : <span className="text-[11px] text-[#F0EDE8]/40">Empty bar</span>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#6B6B66]">
+        <span aria-live="polite">{cur ? `Message ${(idx % msgs.length) + 1} of ${msgs.length}${cur.href ? ` · links to ${cur.href}` : ''}` : v.enabled ? 'Add a message to preview it.' : 'The bar is switched off — the public site shows an empty strip.'}</span>
+        {msgs.length > 1 && (
+          <span className="ml-auto flex items-center gap-1">
+            <AdminButton size="sm" variant="ghost" aria-label="Previous message" onClick={() => go(-1)}>←</AdminButton>
+            <AdminButton size="sm" variant="ghost" aria-pressed={paused || reduced} disabled={reduced} onClick={() => setPaused(p => !p)}>{paused || reduced ? 'Play' : 'Pause'}</AdminButton>
+            <AdminButton size="sm" variant="ghost" aria-label="Next message" onClick={() => go(1)}>→</AdminButton>
+          </span>
+        )}
+      </div>
+      {reduced && msgs.length > 1 && <p className="text-[11px] text-[#6B6B66]">Autoplay is off because your device prefers reduced motion. Use the arrows to step through the messages.</p>}
+      {v.enabled && (startsLater || ended) && <AdminNotice tone="warning">{startsLater ? 'Scheduled for later: the public bar stays empty until the start time.' : 'The end time has passed: the public bar is empty.'} This preview still shows the draft text.</AdminNotice>}
+    </div>
+  )
+}
+
 export function AnnouncementForm({ value: v, onChange }: FormProps<AnnouncementSnapshot>) {
   const set = (p: Partial<AnnouncementSnapshot>) => onChange({ ...v, ...p })
   const [zone, setZone] = useState<'local' | 'utc'>('local')
@@ -311,20 +356,18 @@ export function AnnouncementForm({ value: v, onChange }: FormProps<AnnouncementS
         <Toggle label="Show the announcement bar" checked={v.enabled} onChange={enabled => set({ enabled })} />
         <ListEditor<AnnouncementMessage> items={v.messages} onChange={messages => set({ messages })} makeNew={() => ({ id: newId('m'), text: '' })} addLabel="Add message" max={5}
           empty="No messages yet." itemLabel={(_, i) => `Message ${i + 1}`}
-          render={(m, up) => <div className="grid gap-2 sm:grid-cols-2"><TextInput label="Text" value={m.text} onChange={text => up({ text })} max={140} /><TextInput label="Link (optional)" value={m.href ?? ''} onChange={href => up({ href: href || undefined })} placeholder="/shop" /></div>} />
+          render={(m, up) => <AdminFieldGrid cols={2}><TextInput label="Text" value={m.text} onChange={text => up({ text })} max={140} /><TextInput label="Link (optional)" value={m.href ?? ''} onChange={href => up({ href: href || undefined })} placeholder="/shop" /></AdminFieldGrid>} />
         <p className="text-[11px] text-[#8A8A85]">With several messages the bar rotates through them.</p>
       </Section>
       <Section title="Schedule (optional)" description="Leave both empty to show it whenever it is switched on.">
         <Select label="Enter times in" value={zone} onChange={setZone} options={[{ value: 'local', label: `My time zone (${tzName})` }, { value: 'utc', label: 'UTC' }]} />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Starts" type="datetime-local" value={toLocalInput(v.startsAt, zone)} onChange={s => set({ startsAt: fromLocalInput(s, zone) })} hint={v.startsAt ? `Stored as ${v.startsAt} (UTC)` : 'Shows immediately'} />
           <TextInput label="Ends" type="datetime-local" value={toLocalInput(v.endsAt, zone)} onChange={s => set({ endsAt: fromLocalInput(s, zone) })} hint={v.endsAt ? `Stored as ${v.endsAt} (UTC)` : 'No end date'} />
-        </div>
+        </AdminFieldGrid>
       </Section>
-      <Section title="Preview">
-        <div className="flex h-9 items-center justify-center rounded-[8px] bg-[#0E0E0E] px-4 text-center text-[11px] font-light tracking-[0.12em] text-[#F0EDE8]" aria-label="Announcement preview">
-          {v.enabled && v.messages[0]?.text ? v.messages[0].text : <span className="text-[#F0EDE8]/40">Empty bar</span>}
-        </div>
+      <Section title="Preview" description="Rotates through the draft messages exactly like the public bar (6 s each, 0.5 s fade, in order).">
+        <AnnouncementPreview value={v} />
       </Section>
     </div>
   )
@@ -332,15 +375,6 @@ export function AnnouncementForm({ value: v, onChange }: FormProps<AnnouncementS
 
 // ── navigation / footer ───────────────────────────────────────────────────────
 
-function LinkRow({ l, up }: { l: NavLink; up: (p: Partial<NavLink>) => void }) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-      <TextInput label="Label" value={l.label} onChange={label => up({ label })} max={60} />
-      <TextInput label="Address" value={l.href} onChange={href => up({ href })} placeholder="/shop or https://…" />
-      <Toggle label="New tab" checked={!!l.newTab} onChange={v => up({ newTab: v || undefined })} />
-    </div>
-  )
-}
 const missing = (links: NavLink[], req: readonly string[]) => req.filter(r => !links.some(l => !/[?#]/.test(l.href) && l.href.toLowerCase().replace(/\/$/, '') === r))
 
 export function NavigationForm({ value: v, onChange }: FormProps<NavigationSnapshot>) {
@@ -353,8 +387,7 @@ export function NavigationForm({ value: v, onChange }: FormProps<NavigationSnaps
         return (
           <Section key={key} title={title}>
             {miss.length > 0 && <AdminNotice tone="danger" title="Required link missing">Add a link to {miss.join(' and ')} before publishing.</AdminNotice>}
-            <ListEditor items={v[key]} onChange={links => onChange({ ...v, [key]: links })} makeNew={() => ({ id: newId('n'), label: '', href: '/' })} addLabel="Add link" max={max}
-              itemLabel={(l, i) => l.label || `Link ${i + 1}`} render={(l, up) => <LinkRow l={l} up={up} />} />
+            <LinkListEditor links={v[key]} onChange={links => onChange({ ...v, [key]: links })} makeNew={() => ({ id: newId('n'), label: '', href: '/' })} addLabel="Add link" max={max} noun={key === 'desktop' ? 'Desktop link' : 'Mobile link'} />
           </Section>
         )
       })}
@@ -372,10 +405,10 @@ export function FooterForm({ value: v, onChange }: FormProps<FooterSnapshot>) {
       <Section title="Brand">
         <TextInput label="Brand name" value={v.brandName} onChange={brandName => set({ brandName })} max={60} />
         <TextInput label="Taglines" value={v.taglines.join('\n')} onChange={t => set({ taglines: t.split('\n').filter(l => l.trim()) })} multiline rows={2} hint="One line per row (up to 4)." />
-        <div className="grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <TextInput label="Copyright holder" value={v.copyrightHolder} onChange={copyrightHolder => set({ copyrightHolder })} max={80} hint="Shown as “© year holder.”" />
           <TextInput label="Copyright text" value={v.copyrightSuffix} onChange={copyrightSuffix => set({ copyrightSuffix })} max={200} hint="Blank = “All rights reserved.” in the shopper’s language." />
-        </div>
+        </AdminFieldGrid>
       </Section>
       <Section title="Link groups" description="Columns of links. The required legal, support and shop links must stay somewhere.">
         <ListEditor items={v.groups} onChange={groups => set({ groups })} makeNew={() => ({ id: newId('g'), heading: '', links: [] })} addLabel="Add group" max={6}
@@ -383,8 +416,7 @@ export function FooterForm({ value: v, onChange }: FormProps<FooterSnapshot>) {
           render={(g, upG) => (
             <div className="space-y-3">
               <TextInput label="Heading" value={g.heading} onChange={heading => upG({ heading })} max={60} />
-              <ListEditor items={g.links} onChange={links => upG({ links })} makeNew={() => ({ id: newId('fl'), label: '', href: '/' })} addLabel="Add link" max={12}
-                itemLabel={(l, i) => l.label || `Link ${i + 1}`} render={(l, up) => <LinkRow l={l} up={up} />} />
+              <LinkListEditor links={g.links} onChange={links => upG({ links })} makeNew={() => ({ id: newId('fl'), label: '', href: '/' })} addLabel="Add link" max={12} noun={`${g.heading || 'Group'} link`} />
             </div>
           )} />
       </Section>
@@ -392,11 +424,11 @@ export function FooterForm({ value: v, onChange }: FormProps<FooterSnapshot>) {
         <ListEditor items={v.social} onChange={social => set({ social })} makeNew={() => ({ id: newId('s'), platform: 'other' as const, label: '', href: 'https://' })} addLabel="Add social link" max={8}
           itemLabel={(s, i) => s.label || `Link ${i + 1}`}
           render={(s, up) => (
-            <div className="grid gap-2 sm:grid-cols-3">
+            <AdminFieldGrid cols={3}>
               <Select label="Network" value={s.platform} onChange={platform => up({ platform })} options={[{ value: 'instagram', label: 'Instagram' }, { value: 'tiktok', label: 'TikTok' }, { value: 'other', label: 'Other' }]} />
               <TextInput label="Label" value={s.label} onChange={label => up({ label })} max={60} hint="Read by screen readers." />
               <TextInput label="Address" value={s.href} onChange={href => up({ href })} placeholder="https://…" />
-            </div>
+            </AdminFieldGrid>
           )} />
       </Section>
     </div>

@@ -8,7 +8,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { money, moneyOrUnknown } from '@/components/admin/FinancialUI'
 import {
-  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField,
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminFieldGrid,
   AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
 
@@ -120,7 +120,7 @@ export function CostsClient() {
 
       {showForm && (
         <AdminCard className="mb-7">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminFieldGrid cols={4}>
             <AdminField label="Product *" htmlFor="pc-product">
               <select id="pc-product" value={form.productId} onChange={e => setForm({ ...form, productId: e.target.value })}
                       className={adminSelectClass}>
@@ -157,7 +157,7 @@ export function CostsClient() {
                        placeholder="0.00" className={adminInputClass} />
               </AdminField>
             ))}
-          </div>
+          </AdminFieldGrid>
 
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <span className="text-[12px]">

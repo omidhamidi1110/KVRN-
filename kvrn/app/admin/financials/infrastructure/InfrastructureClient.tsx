@@ -24,7 +24,7 @@ import {
   money, moneyOrUnknown, RangePicker, buildQuery,
 } from '@/components/admin/FinancialUI'
 import {
-  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminStat, AdminStatGrid,
+  AdminPage, AdminPageHeader, AdminSectionHeader, AdminCard, AdminNotice, AdminButton, AdminField, AdminFieldGrid, AdminStat, AdminStatGrid,
   AdminSegmented, AdminTable, AdminTh, AdminTd, AdminLoading, AdminEmpty, AdminTag, adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
 import { PROVIDER_PORTALS } from '@/lib/provider-portals'
@@ -312,7 +312,7 @@ export function InfrastructureClient() {
 
           {showUsageForm && (
             <AdminCard className="mb-6">
-              <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+              <AdminFieldGrid cols={3}>
                 <AdminField label="Provider *" htmlFor="iu-provider">
                   <input id="iu-provider" list="kvrn-providers" value={usageForm.provider}
                     onChange={e => setUsageForm({ ...usageForm, provider: e.target.value })}
@@ -371,7 +371,7 @@ export function InfrastructureClient() {
                     onChange={e => setUsageForm({ ...usageForm, billingPeriodEnd: e.target.value })}
                     className={adminInputClass} />
                 </AdminField>
-              </div>
+              </AdminFieldGrid>
               <AdminButton variant="primary" className="mt-4" onClick={() => void saveUsage()} loading={savingUsage}>
                 Save reading
               </AdminButton>

@@ -444,12 +444,17 @@ function HomepageFooter() {
             ))}
           </div>
         </div>
-        <div className="border-t border-[#E8E5E0] mt-5 pt-3 pb-0 flex items-center justify-between gap-4">
-          <p className="text-[11px] text-[#9B9B9B]">© {year} KVRN. {t.allRightsReserved}</p>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))}
-            className="text-[11px] text-[#9B9B9B] hover:text-[#6B6B6B] transition-colors">
+        {/* Same single compact row as the site footer (components/layout/Footer.tsx) so every route matches. */}
+        <div className="mt-5 flex flex-nowrap items-center justify-between gap-x-3 border-t border-[#E8E5E0] pt-3 text-[10px] text-[#9B9B9B] min-[390px]:text-[11px] sm:gap-x-6">
+          <p className="min-w-0 whitespace-nowrap">
+            <span className="sm:hidden">© {year} KVRN</span>
+            <span className="hidden sm:inline">© {year} KVRN. {t.allRightsReserved}</span>
+          </p>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('kvrn-open-cookie-prefs'))}
+            className="flex-shrink-0 whitespace-nowrap transition-colors hover:text-[#6B6B6B] focus-visible:text-[#1A1A1A]">
             {t['nav.cookiePreferences']}
           </button>
+          <Link href="/privacy-choices" className="flex-shrink-0 whitespace-nowrap transition-colors hover:text-[#6B6B6B] focus-visible:text-[#1A1A1A]">Your Privacy Choices</Link>
         </div>
       </div>
     </div>

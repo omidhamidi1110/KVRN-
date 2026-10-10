@@ -4,7 +4,7 @@
 // No bank, tax, ID or date-of-birth data is entered or shown here — only statuses and short display references.
 import { useCallback, useEffect, useState } from 'react'
 import {
-  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminLoading, AdminNotice, AdminSectionHeader,
+  AdminButton, AdminCard, AdminEmpty, AdminError, AdminField, AdminFieldGrid, AdminLoading, AdminNotice, AdminSectionHeader,
   AdminTable, AdminTd, AdminTh, InfoTip, StatusBadge, adminInputClass, useConfirm, type StatusLabel,
 } from '@/components/admin/ui/AdminUI'
 import { adminApi, day, idemKey, usd } from '@/lib/affiliate-admin-client'
@@ -147,14 +147,14 @@ function AccountEditor({ accounts, busy, onSave }: { accounts: any[]; busy: bool
   const [brand, setBrand] = useState(cur?.masked?.brand ?? '')
   const [last4, setLast4] = useState(cur?.masked?.last4 ?? '')
   return (
-    <div className="grid gap-3 md:grid-cols-4">
+    <AdminFieldGrid cols={4}>
       <AdminField label="Provider" htmlFor="pa-prov"><select id="pa-prov" className={adminInputClass} value={provider} onChange={e => setProvider(e.target.value)}><option value="manual">Manual</option><option value="stripe_connect">Stripe Connect</option></select></AdminField>
       <AdminField label="Provider reference" htmlFor="pa-ref" hint="For example acct_…"><input id="pa-ref" className={adminInputClass} maxLength={120} value={ref} onChange={e => setRef(e.target.value)} /></AdminField>
       <AdminField label="Display name" htmlFor="pa-brand" hint="e.g. Bank, PayPal"><input id="pa-brand" className={adminInputClass} maxLength={40} value={brand} onChange={e => setBrand(e.target.value)} /></AdminField>
       <AdminField label="Last 4" htmlFor="pa-l4"><input id="pa-l4" className={adminInputClass} inputMode="numeric" maxLength={4} value={last4} onChange={e => setLast4(e.target.value.replace(/\D/g, ''))} /></AdminField>
       <div className="md:col-span-4"><AdminButton size="sm" variant="primary" loading={busy}
         onClick={() => onSave({ provider, providerAccountRef: ref, masked: { ...(brand ? { brand } : {}), ...(last4 ? { last4 } : {}) } })}>Save reference</AdminButton></div>
-    </div>
+    </AdminFieldGrid>
   )
 }
 

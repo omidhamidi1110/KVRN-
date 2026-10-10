@@ -127,6 +127,7 @@ describe('Product Editor BundleSection', () => {
     AdminField: ({ label, children, hint }: any) => h('div', null, h('label', null, label), hint ? h('small', null, hint) : null, children),
     AdminNotice: ({ children, title }: any) => h('div', null, title ? h('b', null, title) : null, children),
     AdminSectionHeader: ({ title }: any) => h('h2', null, title),
+    AdminFieldGrid: ({ children }: any) => h('div', null, children),
     StatusBadge: ({ label, status }: any) => h('span', null, label ?? status),
     adminInputClass: '', adminSelectClass: '',
   }

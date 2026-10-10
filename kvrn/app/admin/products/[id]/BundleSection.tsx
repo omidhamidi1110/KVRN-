@@ -8,7 +8,7 @@
 // as the storefront and checkout. Problems that would stop publishing are listed in the open.
 import { useEffect, useMemo, useState } from 'react'
 import {
-  AdminButton, AdminCard, AdminField, AdminNotice, AdminSectionHeader, StatusBadge, adminInputClass, adminSelectClass,
+  AdminButton, AdminCard, AdminField, AdminFieldGrid, AdminNotice, AdminSectionHeader, StatusBadge, adminInputClass, adminSelectClass,
 } from '@/components/admin/ui/AdminUI'
 import { InfoTip } from '@/components/admin/ui/InfoTip'
 import { IssueList, Toggle, textareaClass, type SectionProps } from './editor-shared'
@@ -173,7 +173,7 @@ export function BundleSection({ snap, update, state, issues, locked }: Pick<Sect
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AdminFieldGrid cols={2}>
               <AdminField label="Price rule" htmlFor="b-mode"
                 info="The single rule used on the page, in the bag, at checkout, on the order and in refunds. Checkout never calculates a different price.">
                 <select id="b-mode" className={adminSelectClass} value={cfg.pricing.mode} disabled={locked}
@@ -187,11 +187,11 @@ export function BundleSection({ snap, update, state, issues, locked }: Pick<Sect
                 <input id="b-value" className={adminInputClass} inputMode="decimal" value={valueText} disabled={locked}
                   onChange={e => onValue(e.target.value)} />
               </AdminField>
-            </div>
+            </AdminFieldGrid>
 
             <div className="space-y-3">
               <p className="text-[11px] font-medium text-[#4A4A46]">Wording</p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <AdminFieldGrid cols={2}>
                 <AdminField label="Eyebrow" htmlFor="b-eyebrow" hint="Defaults to “Complete the Set”.">
                   <input id="b-eyebrow" className={adminInputClass} maxLength={BUNDLE_LIMITS.eyebrow} disabled={locked} value={cfg.presentation.eyebrow ?? ''}
                     onChange={e => edit(x => { x.presentation.eyebrow = e.target.value || null })} />
@@ -200,7 +200,7 @@ export function BundleSection({ snap, update, state, issues, locked }: Pick<Sect
                   <input id="b-cta" className={adminInputClass} maxLength={BUNDLE_LIMITS.ctaLabel} disabled={locked} value={cfg.presentation.ctaLabel ?? ''}
                     onChange={e => edit(x => { x.presentation.ctaLabel = e.target.value || null })} />
                 </AdminField>
-              </div>
+              </AdminFieldGrid>
               <AdminField label="Headline" htmlFor="b-headline">
                 <input id="b-headline" className={adminInputClass} maxLength={BUNDLE_LIMITS.headline} disabled={locked} value={cfg.presentation.headline ?? ''}
                   onChange={e => edit(x => { x.presentation.headline = e.target.value || null })} />

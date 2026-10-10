@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react'
 import {
   AdminButton, AdminCard, AdminError, AdminLoading, AdminNotice, AdminSectionHeader, AdminTable, AdminTh, AdminTd,
-  AdminTag, AdminField, adminInputClass, adminSelectClass, adminCheckboxClass, AdminDisclosure,
+  AdminTag, AdminField, AdminFieldGrid, adminInputClass, adminSelectClass, adminCheckboxClass, AdminDisclosure,
 } from '@/components/admin/ui/AdminUI'
 import { api, BASE, type ApiResult } from './api'
 import { ErrorNotice } from './ui'
@@ -208,10 +208,10 @@ export function LanguagesPanel() {
           ))}
           {nonUsd.every(c => !currencies.includes(c.code)) && <p className="text-[12px] text-[#6B6B66]">Turn on a currency above to set its rate.</p>}
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <AdminFieldGrid cols={2}>
           <AdminField label="Rates taken on" htmlFor="fx-asof" hint="YYYY-MM-DD"><input id="fx-asof" className={adminInputClass} value={asOf} onChange={e => { setSaved(null); setAsOf(e.target.value) }} placeholder="2026-10-01" /></AdminField>
           <AdminField label="Source" htmlFor="fx-source" hint="Where you got them, e.g. “ECB reference rates”."><input id="fx-source" className={adminInputClass} value={source} maxLength={120} onChange={e => { setSaved(null); setSource(e.target.value) }} /></AdminField>
-        </div>
+        </AdminFieldGrid>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <AdminButton variant="primary" loading={busy === 'fx'} onClick={saveFx}>Save rates</AdminButton>
           {st.fx.value && <AdminButton loading={busy === 'fx'} onClick={clearFx}>Remove rates (show USD)</AdminButton>}
