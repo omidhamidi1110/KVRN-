@@ -151,20 +151,9 @@ export function AdminField({ label, htmlFor, info, hint, error, children, classN
 
 /** Shared form grid: equal tracks, 14/16px gutters, container-aware columns (1 → 2 → `cols`). Use `className="kv-span-all"` for full-width children. */
 export function AdminFieldGrid({ cols = 3, children, className = '' }: { cols?: 2 | 3 | 4; children: ReactNode; className?: string }) {
-  // An incomplete last row stretches its final field across the free tracks (no empty slot beside it). Skipped when a child
-  // opts into kv-span-all, since the row arithmetic is then ambiguous.
-  const kids = Children.toArray(children).filter(Boolean)
-  const manual = kids.some(k => typeof k === 'object' && k !== null && 'props' in k && String((k as { props?: { className?: string } }).props?.className ?? '').includes('kv-span-all'))
-  const span = (k: number) => (manual || kids.length % k === 0 ? 1 : k - (kids.length % k) + 1)
-  const style = {
-    ['--kv-cols' as string]: cols,
-    ['--kv-span-2' as string]: span(2),
-    ['--kv-span-mid' as string]: span(Math.min(cols, 3)),
-    ['--kv-span-wide' as string]: span(cols),
-  } as CSSProperties
   return (
     <div className={cx('kv-field-wrap', className)}>
-      <div className="kv-field-grid" style={style}>{children}</div>
+      <div className="kv-field-grid" style={{ ['--kv-cols' as string]: cols } as CSSProperties}>{children}</div>
     </div>
   )
 }
@@ -227,11 +216,11 @@ export function AdminStat({ label, value, sub, tone = 'default', info, flag, cla
   info?: ReactNode; flag?: ReactNode; className?: string
 }) {
   return (
-    <div className={cx('min-w-0 rounded-[14px] border border-black/[0.08] bg-white px-3.5 py-3 sm:px-4 sm:py-3.5', className)}>
+    <div className={cx('min-w-0 rounded-[14px] border border-black/[0.08] bg-white px-4 py-3.5', className)}>
       <p className="flex min-h-[16px] items-center gap-0.5 text-[10px] font-medium uppercase leading-4 tracking-[0.1em] text-[#8A8A85]">
         <span className="min-w-0">{label}</span>{info && <span className="-my-2 flex shrink-0"><InfoTip label={`About ${label}`}>{info}</InfoTip></span>}
       </p>
-      <p className={cx('mt-1 break-words text-[18px] sm:mt-1.5 sm:text-[20px] font-medium leading-tight tracking-[-0.01em]', STAT_TONE[tone])}>{value}</p>
+      <p className={cx('mt-1.5 break-words text-[20px] font-medium leading-tight tracking-[-0.01em]', STAT_TONE[tone])}>{value}</p>
       {sub && <p className="mt-1 text-[11px] text-[#6B6B66]">{sub}</p>}
       {flag && <p className="mt-1 text-[11px] font-medium text-[#92400E]">{flag}</p>}
     </div>
@@ -249,15 +238,35 @@ function balancedCols(n: number, max: number): number {
  * orphan row: 6 cards → 6 across on wide containers, 3+3 mid, 2+2+2 narrow; 12 → 6+6 / 4+4+4 / 2×6.
  * `maxCols` caps the widest layout, `midCols` caps the mid layout. `min` is kept for call-site compatibility only.
  */
-export function AdminStatGrid({ children, maxCols = 6, midCols = 4, className = '' }: {
+export function AdminStatGrid({ children, maxCols = 6, midCols = 4, className = '', balanced = false }: {
   children: ReactNode; min?: number; maxCols?: number; midCols?: number; className?: string
+  /** Opt-in: split an awkward count (7, 5…) into full rows of 2–4 cards with equal heights; cards in one row share one width. */
+  balanced?: boolean
 }) {
-  const n = Children.toArray(children).filter(Boolean).length
+  const kids = Children.toArray(children).filter(Boolean)
+  const n = kids.length
   const lg = balancedCols(n, maxCols)
   const md = balancedCols(n, Math.min(midCols, lg))
+  if (balanced) {
+    const rowsFor = (max: number) => {           // fewest rows with at most `max` cards, sizes as even as possible, each in {1,2,3,4,6}
+      const rows = Math.ceil(n / max), base = Math.floor(n / rows), extra = n % rows
+      return Array.from({ length: rows }, (_, r) => base + (r < extra ? 1 : 0))
+    }
+    const spans = (sizes: number[]) => sizes.flatMap(k => Array.from({ length: k }, () => 12 / k))
+    const wide = spans(rowsFor(4)), mid = spans(rowsFor(3))
+    return (
+      <div className={cx('kv-stat-wrap', className)}>
+        <div className="kv-stat-grid kv-stat-balanced">
+          {kids.map((k, i) => (
+            <div key={i} className="kv-stat-cell" style={{ ['--kv-sm' as string]: mid[i], ['--kv-sw' as string]: wide[i] } as CSSProperties}>{k}</div>
+          ))}
+        </div>
+      </div>
+    )
+  }
   return (
     <div className={cx('kv-stat-wrap', className)}>
-      <div className="kv-stat-grid" style={{ ['--kv-lg' as string]: lg, ['--kv-md' as string]: md, ['--kv-span-lg' as string]: n % lg ? lg - (n % lg) + 1 : 1, ['--kv-span-md' as string]: n % md ? md - (n % md) + 1 : 1 } as CSSProperties}>
+      <div className="kv-stat-grid" style={{ ['--kv-lg' as string]: lg, ['--kv-md' as string]: md } as CSSProperties}>
         {children}
       </div>
     </div>
@@ -307,8 +316,10 @@ export function AdminDisclosure({ summary, children, className = '' }: { summary
  * with an explicit min-width:auto); when they do not fit the strip scrolls horizontally with edge fades as the
  * affordance, the active tab is kept in view, and arrow/Home/End keyboard navigation + focus rings are kept.
  */
-export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }: {
+export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel, variant = 'default' }: {
   tabs: Array<{ id: T; label: string; count?: number }>; value: T; onChange: (id: T) => void; ariaLabel: string
+  /** 'ai' = the AI Operations segmented bar, replicated exactly. Opt-in per page; every other consumer keeps its current look. */
+  variant?: 'default' | 'ai'
 }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([])
   const scroller = useRef<HTMLDivElement | null>(null)
@@ -344,6 +355,26 @@ export function AdminTabs<T extends string>({ tabs, value, onChange, ariaLabel }
     e.preventDefault()
     refs.current[next]?.focus()
     onChange(tabs[next].id)
+  }
+  if (variant === 'ai') {
+    return (
+      <div className="mb-4 min-w-0 max-w-full">
+        <div ref={scroller} role="tablist" aria-label={ariaLabel}
+          className="flex gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-black/[0.07] bg-white p-1.5">
+          {tabs.map((t, i) => {
+            const active = t.id === value
+            return (
+              <button key={t.id} type="button" role="tab" aria-selected={active} tabIndex={active ? 0 : -1}
+                ref={el => { refs.current[i] = el }} onKeyDown={e => onKeyDown(e, i)} onClick={() => onChange(t.id)}
+                className={cx('min-w-max shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-[11px] font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40',
+                  active ? 'bg-[#111] text-white' : 'text-black/45 hover:bg-black/[0.04] hover:text-black')}>
+                {t.label}{typeof t.count === 'number' && <span className="ml-1.5 text-[10px] opacity-60">{t.count}</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
   return (
     <div className="kv-tabs relative mb-4 min-w-0 max-w-full" data-left={edges.left || undefined} data-right={edges.right || undefined}>
@@ -420,7 +451,7 @@ export function labelStackCells(table: HTMLTableElement): void {
   }
 }
 
-export function AdminTable({ children, caption, minWidth = 560, stack = false }: { children: ReactNode; caption?: string; minWidth?: number; stack?: boolean }) {
+export function AdminTable({ children, caption, minWidth = 560, stack = false, compact = false }: { children: ReactNode; caption?: string; minWidth?: number; stack?: boolean; /** Opt-in dense phone cards (two-column label-over-value). Only the named pages pass it. */ compact?: boolean }) {
   const tableRef = useRef<HTMLTableElement>(null)
   useEffect(() => {
     const t = tableRef.current
@@ -437,7 +468,7 @@ export function AdminTable({ children, caption, minWidth = 560, stack = false }:
         <table
           ref={tableRef}
           role={stack ? 'table' : undefined}
-          className={cx('w-full border-collapse text-left text-[12px]', stack && 'kv-stack')}
+          className={cx('w-full border-collapse text-left text-[12px]', stack && 'kv-stack', stack && compact && 'kv-stack-compact')}
           style={{ minWidth }}>
           {caption && <caption className="sr-only">{caption}</caption>}
           {children}

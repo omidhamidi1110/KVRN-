@@ -318,10 +318,8 @@ export function AdminOrdersClient() {
             <option value="">All tags</option>
             {allTags.map(t => <option key={t.id} value={t.id}>{t.name}{t.archived ? ' (archived)' : ''}</option>)}
           </select>
-          <div className="grid grid-cols-2 gap-2 lg:contents">
-            <AdminButton variant="primary" onClick={() => fetchOrders(0)}>Search</AdminButton>
-            <AdminButton onClick={() => { setSearch(''); setPayFilter(''); setFulFilter(''); setTagFilter('') }}>Clear</AdminButton>
-          </div>
+          <AdminButton variant="primary" onClick={() => fetchOrders(0)}>Search</AdminButton>
+          <AdminButton onClick={() => { setSearch(''); setPayFilter(''); setFulFilter(''); setTagFilter('') }}>Clear</AdminButton>
         </div>
         {allTags.length > 0 && (
           <div className="border-t border-black/[0.06] px-3 py-1">
@@ -349,7 +347,7 @@ export function AdminOrdersClient() {
           ) : orders.length === 0 && !error ? (
             <AdminEmpty title="No orders found." />
           ) : (
-            <AdminTable caption="Orders" stack>
+            <AdminTable caption="Orders" stack compact>
               <thead>
                 <tr>
                   {['Order','Date','Customer','Items','Total','Payment','Fulfillment','Tags','Shipping'].map(h => <AdminTh key={h}>{h}</AdminTh>)}

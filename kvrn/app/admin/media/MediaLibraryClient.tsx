@@ -56,7 +56,7 @@ export function MediaLibraryClient() {
       {msg && <AdminNotice tone={msg.tone} className="mb-4">{msg.text}</AdminNotice>}
       <AdminTabs ariaLabel="Media status" value={tab} onChange={setTab}
         tabs={[{ id: 'active', label: 'Library' }, { id: 'archived', label: 'Archived' }]} />
-      <div className="mb-4 max-w-[320px]">
+      <div className="mb-4 sm:max-w-[320px]">
         <input aria-label="Search media" placeholder="Search name, alt text or tag" value={q} onChange={e => setQ(e.target.value)} className={adminInputClass} />
       </div>
       {err && <AdminError message={err} onRetry={load} />}

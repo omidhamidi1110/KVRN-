@@ -14,7 +14,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { money } from '@/components/admin/FinancialUI'
 import {
-  AdminButton, AdminCard, AdminStat, AdminStatGrid, AdminField, AdminLoading, AdminNotice, AdminPageHeader,
+  AdminButton, AdminCard, AdminField, AdminLoading, AdminNotice, AdminPageHeader,
   AdminSectionHeader, AdminTable, AdminTabs, AdminTd, AdminTh, StatusBadge, adminInputClass, useConfirm,
 } from '@/components/admin/ui/AdminUI'
 import { collectionAttemptFingerprint, readOrCreateAttemptKey, clearAttemptKey }
@@ -281,7 +281,7 @@ export function AffiliatesClient() {
         description="Applications, affiliates, commissions and payouts"
         info={<>Commission is calculated on net merchandise after customer discounts, excluding shipping and sales tax. A customer discount and an affiliate commission are separate costs and both may apply to one order.</>}
       />
-      <AdminTabs tabs={tabs} value={tab} onChange={setTab} ariaLabel="Affiliate sections" />
+      <AdminTabs variant="ai" tabs={tabs} value={tab} onChange={setTab} ariaLabel="Affiliate sections" />
 
       {err && financial && <AdminNotice tone="danger" className="mb-4">{err}</AdminNotice>}
       {loading && financial && <AdminLoading />}
@@ -295,12 +295,19 @@ export function AffiliatesClient() {
 
       {tab === 'overview' && period && (
         <>
-          <AdminStatGrid maxCols={4} midCols={4} className="mb-5">
-            <AdminStat label="Net commission (30d)" value={money(period.netCommissionCents)} sub="Accrual, from the ledger" />
-            <AdminStat label="Accrued" value={money(period.accruedCents)} sub="New commissions earned" />
-            <AdminStat label="Reversed" value={money(period.reversedCents)} sub="Refunds and lost disputes" />
-            <AdminStat label="Cash paid" value={money(period.cashPaidCents)} sub={`${period.payoutCount} payout(s), separate from accrual`} />
-          </AdminStatGrid>
+          <div className="mb-5 grid grid-cols-1 gap-3 min-[560px]:grid-cols-2 min-[1100px]:grid-cols-4">
+            {[['Net commission (30d)', money(period.netCommissionCents), 'Accrual, from the ledger'],
+              ['Accrued', money(period.accruedCents), 'New commissions earned'],
+              ['Reversed', money(period.reversedCents), 'Refunds and lost disputes'],
+              ['Cash paid', money(period.cashPaidCents), `${period.payoutCount} payout(s), separate from accrual`]
+            ].map(([label, value, note]) => (
+              <AdminCard key={label}>
+                <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8A85]">{label}</p>
+                <p className="mt-1.5 text-[22px] font-medium">{value}</p>
+                <p className={`mt-1 text-[11px] ${muted}`}>{note}</p>
+              </AdminCard>
+            ))}
+          </div>
 
           {period.incompleteCount > 0 && (
             <AdminNotice tone="warning" className="mb-4">

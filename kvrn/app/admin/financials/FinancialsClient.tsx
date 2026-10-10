@@ -306,7 +306,7 @@ export function FinancialsClient() {
               <p className="mt-2">Realised operating profit subtracts recognised expense: real transactions apportioned to this period. Expected obligations and usage forecasts are never deducted. Cash actually paid is shown on the Infrastructure page and will differ when a charge spans several months.</p>
               <p className="mt-2">Cohort basis: orders paid in this period, with every refund, dispute, return, exchange and commission that later touched them. &ldquo;Exact&rdquo; is shown only when this period is reconciled (Unknown when something is missing, Invalid when the data contradicts itself); the other figures are known so far.</p>
             </>} />
-          <AdminStatGrid className={sectionGap}>
+          <AdminStatGrid balanced className={sectionGap}>
             <Metric label={present!.label}
                     value={present!.word ?? money(present!.cents as number)}
                     tone={present!.kind === 'exact'

@@ -177,7 +177,7 @@ export function ReturnsClient() {
           </AdminNotice>
           <AdminSectionHeader title={`Refunds awaiting processing-fee return (${awaitingFee.length})`}
             info="Independent of the merchandise / shipping / tax split and of any return." />
-          <AdminTable minWidth={720} caption="Refunds awaiting processing-fee return" stack>
+          <AdminTable minWidth={720} caption="Refunds awaiting processing-fee return" stack compact>
             <thead>
               <tr>
                 {['Order', 'Refund', 'Original Stripe fee', 'Fee returned', 'Fee returned $'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
@@ -228,7 +228,7 @@ export function ReturnsClient() {
           <AdminSectionHeader title={`Refunds awaiting breakdown (${awaiting.length})`}
             description="Derive when the refund equals the order total; otherwise enter a split that totals the refund." />
 
-          <AdminTable minWidth={760} caption="Refunds awaiting breakdown" stack>
+          <AdminTable minWidth={760} caption="Refunds awaiting breakdown" stack compact>
             <thead>
               <tr>
                 {['Order', 'Refund', 'Merchandise $', 'Shipping $', 'Tax $', 'Total'].map(h => <AdminTh key={h}>{h}</AdminTh>)}
@@ -290,7 +290,7 @@ export function ReturnsClient() {
           className={`${adminInputClass} mb-4 max-w-md`} />
         {loading ? <AdminLoading /> : refundHistory.length === 0
           ? <AdminEmpty title="No refunds recorded." />
-          : <AdminTable minWidth={850} caption="Recent refund history" stack>
+          : <AdminTable minWidth={850} caption="Recent refund history" stack compact>
             <thead><tr>{['Date','Order','Status','Amount','Merchandise','Shipping','Tax','Fee returned','Provider reference'].map(h=><AdminTh key={h}>{h}</AdminTh>)}</tr></thead>
             <tbody>{refundHistory.filter(r=>{
               const q=refundQuery.trim().toLowerCase()
@@ -313,7 +313,7 @@ export function ReturnsClient() {
       <AdminSectionHeader title="Returns"
         info="COGS is credited back only when a unit is sellable AND restocked. Damaged or lost units keep their original cost." />
       {loading ? <AdminLoading /> : returns.length === 0 ? <AdminEmpty title="No returns recorded." /> : (
-        <AdminTable minWidth={720} caption="Returns" stack>
+        <AdminTable minWidth={720} caption="Returns" stack compact>
           <thead>
             <tr>
               {['Return', 'Order', 'Status', 'Units', 'Return shipping', 'KVRN label cost', 'Requested'].map(h => <AdminTh key={h}>{h}</AdminTh>)}

@@ -108,7 +108,7 @@ export function ProductListClient() {
         </AdminNotice>
       )}
 
-      <AdminTabs<Filter> ariaLabel="Product status" value={filter} onChange={setFilter} tabs={[
+      <AdminTabs<Filter> variant="ai" ariaLabel="Product status" value={filter} onChange={setFilter} tabs={[
         { id: 'all', label: 'All', count: counts.all }, { id: 'draft', label: 'Draft', count: counts.draft ?? 0 }, { id: 'scheduled', label: 'Scheduled', count: counts.scheduled ?? 0 },
         { id: 'live', label: 'Live', count: counts.live ?? 0 }, { id: 'sold_out', label: 'Sold out', count: counts.sold_out ?? 0 }, { id: 'archived', label: 'Archived', count: counts.archived ?? 0 },
       ]} />
@@ -143,7 +143,7 @@ export function ProductListClient() {
       {err ? <AdminError message={err} onRetry={() => void load()} /> : !items ? <AdminLoading /> : shown.length === 0 ? (
         <AdminEmpty title={items.length ? 'No products match' : 'No products yet'} description={items.length ? 'Try another filter.' : 'Create your first product.'} action={items.length ? undefined : <Link href="/admin/products/new" className="text-[12px] underline">New product</Link>} />
       ) : (
-        <AdminTable stack caption="Products">
+        <AdminTable stack compact caption="Products">
           <thead><AdminTr>
             <AdminTh><input type="checkbox" aria-label="Select all" checked={allPicked} onChange={e => setPicked(e.target.checked ? new Set(shown.map(i => i.id)) : new Set())} /></AdminTh>
             <AdminTh>Product</AdminTh><AdminTh>Status</AdminTh><AdminTh>Price</AdminTh><AdminTh>Checks</AdminTh><AdminTh>Edited</AdminTh><AdminTh />

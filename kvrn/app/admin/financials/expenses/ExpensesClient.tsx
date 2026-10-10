@@ -211,7 +211,7 @@ export function ExpensesClient() {
       />
       {confirmNode}
 
-      <AdminTabs
+      <AdminTabs variant="ai"
         ariaLabel="Expense views"
         value={tab}
         onChange={setTab}
@@ -234,7 +234,7 @@ export function ExpensesClient() {
               <AdminButton variant="ghost" size="sm" onClick={undoTx} disabled={!canUndoTx || saving}>↶ Undo</AdminButton>
               <AdminButton variant="ghost" size="sm" onClick={redoTx} disabled={!canRedoTx || saving}>↷ Redo</AdminButton>
             </div>
-            <AdminFieldGrid cols={3}>
+            <AdminFieldGrid cols={2}>
               <AdminField label="Settles obligation" htmlFor="tx-def">
                 <select id="tx-def" value={txForm.expenseDefinitionId} className={adminSelectClass}
                   onChange={e => {
