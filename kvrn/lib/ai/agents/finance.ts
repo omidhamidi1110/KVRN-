@@ -53,7 +53,7 @@ export async function handleFinancePerformanceMonitor(event: { id:string }): Pro
   const [current, previous, sessionRows, attributionRows] = await Promise.all([
     service.getPeriodReport(range(7,0)),
     service.getPeriodReport(range(14,7)),
-    sql`SELECT COUNT(*)::int AS sessions_7d FROM analytics_sessions WHERE started_at >= NOW()-INTERVAL '7 days'`,
+    sql`SELECT COUNT(*)::int AS sessions_7d FROM analytics_sessions WHERE first_seen_at >= NOW()-INTERVAL '7 days'`,
     sql`
       SELECT COALESCE(NULLIF(lower(attribution->'last_touch'->>'source'),''),'unattributed') AS source,
              COUNT(*)::int AS orders

@@ -17,12 +17,12 @@ export type ChiefChatRoute = { topic: ChiefChatTopic; worker: string }
 
 const ROUTES: Array<{ topic: ChiefChatTopic; worker: string; pattern: RegExp }> = [
   { topic: 'ai-workforce', worker: 'Chief Operator', pattern: /\b(workforce|all (?:11|eleven) (?:agents|workers)|agent status|agents?|employees?|delegat(?:e|ion)|tasks?|scheduler|scheduled|queue|events?|dead.?letter|discarded|failures?|operational readiness)\b/ },
-  { topic: 'business-health', worker: 'Chief Operator', pattern: /\b(analytics|funnel|conversion|conversions|support|customers|orders|sales|store performance|business performance)\b/ },
+  { topic: 'business-health', worker: 'Chief Operator', pattern: /\b(analytics|funnel|conversion|conversions|support|customers|customer orders|sales|store performance|business performance)\b/ },
   { topic: 'ai-routing', worker: 'Chief Operator', pattern: /\b(provider|providers|gateway|routing|model|models|gemini|anthropic|openai|sonnet|haiku|connections?|integrations?|pushover|notification|alerts?|capabilities)\b/ },
   { topic: 'qa', worker: 'Engineering, QA & Security', pattern: /\b(test|tests|testing|qa|bug|regression|security|feature|features|browser|website|site down)\b/ },
   { topic: 'ai-budget', worker: 'Chief Operator', pattern: /\b(ai budget|budget|spent|spend|token|inference|cost cap|ai cost)\b/ },
   { topic: 'inventory-integrity', worker: 'Product, Inventory & Supply', pattern: /\b(stock|inventory|supply|variant|replenish|reorder|size|hoodie)\b/ },
-  { topic: 'payment-exceptions', worker: 'Finance, Attribution & Risk', pattern: /\b(finance|revenue|orders?|payment|payments|stripe|refund|chargeback|dispute|fraud)\b/ },
+  { topic: 'payment-exceptions', worker: 'Finance, Attribution & Risk', pattern: /\b(finance|revenue|customer orders|paid orders|payment|payments|stripe|refund|chargeback|dispute|fraud)\b/ },
   { topic: 'affiliate-integrity', worker: 'Creator & Affiliate', pattern: /\b(affiliate|commission|creator|payout)\b/ },
   { topic: 'marketing-consent', worker: 'Customer Support / Lifecycle Revenue', pattern: /\b(sms|opt.in|subscriber|consent|unsubscribe|a2p)\b/ },
   { topic: 'marketing-delivery', worker: 'Ads & Social', pattern: /\b(marketing|campaign|email|delivery|outreach|ads|advertising)\b/ },
@@ -40,6 +40,12 @@ export function classifyChiefChatRequest(message: string): ChiefChatRoute {
  */
 export function selectChiefChatTopics(message: string, previousOwnerMessage?: string): ChiefChatTopic[] {
   const lower = message.toLowerCase()
+  // "order to fix problems" is a planning request, not a customer order.
+  if (/\b(urgent|highest.priority|most important|biggest problems|top problems|prioriti[sz]e|triage)\b/.test(lower) &&
+      /\b(problems?|issues?|risks?|failures?|business|system|operations?|agents?|health|fix)\b/.test(lower) &&
+      !/\b(order number|specific order|checkout order|paid order|order #)\b/.test(lower)) {
+    return ['ai-workforce', 'qa', 'operations-brief', 'business-health', 'ai-budget', 'ai-routing']
+  }
   const audit = /\b(audit|comprehensive|entire|everything|full|all departments|all (?:11|eleven)|workforce health|system health|overall readiness|operating system|how is everything|whole business)\b/.test(lower)
   if (audit && /\b(ai|agents?|chief|workforce|employees?|operations?|departments?|system|everything|business|readiness)\b/.test(lower)) {
     // Aggregate workforce evidence, configuration, QA and representative canonical business domains.

@@ -145,6 +145,7 @@ export function ChiefChatClient() {
           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-black/[0.08] bg-white px-2.5 text-[11px] text-black/60 hover:text-black focus-visible:outline-2 focus-visible:outline-black/30">
           <EyeIcon/><span>Safety</span>
         </button>
+        <Link className="inline-flex h-9 items-center rounded-lg border border-black/[0.09] bg-white px-3 text-[11px] font-medium text-black/65 transition hover:border-black/20" href="/admin/developer-studio">Developer Studio</Link>
         <Link className="inline-flex h-9 items-center rounded-lg border border-black/[0.09] bg-white px-3 text-[11px] font-medium text-black/65 transition hover:border-black/20" href="/admin/ai">AI Operations</Link>
       </div>
     </header>

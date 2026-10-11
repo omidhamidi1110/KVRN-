@@ -1,0 +1,76 @@
+name: KVRN Developer Studio
+run-name: ${{ github.ref == 'refs/heads/kvrn-studio-draft' && format('Studio preview {0}', github.sha) || format('Studio production {0}', github.sha) }}
+on:
+  push:
+    branches:
+      - kvrn-cp60-source-integration
+      - kvrn-studio-draft
+permissions:
+  contents: write
+concurrency:
+  group: kvrn-studio-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  preview:
+    if: github.ref == 'refs/heads/kvrn-studio-draft'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: kvrn/package-lock.json
+      - name: Build isolated staging preview (no production secrets)
+        working-directory: kvrn
+        run: |
+          npm ci
+          npm run type-check
+          npm run cf:build
+      - name: Deploy preview Worker
+        working-directory: kvrn
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx opennextjs-cloudflare deploy --env preview
+      - name: Automatically merge owner-requested UI restore after successful preview
+        if: "${{ startsWith(github.event.head_commit.message, 'Developer Studio: restore UI to ') }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # UI restore was created by authenticated Developer Studio API against
+          # current release HEAD; the preview build and deploy have succeeded.
+          gh api -X POST "/repos/${GITHUB_REPOSITORY}/merges" \
+            -f base='kvrn-cp60-source-integration' \
+            -f head="${GITHUB_SHA}" \
+            -f commit_message="Developer Studio: restore compatible UI to ${GITHUB_SHA}"
+  production:
+    if: github.ref == 'refs/heads/kvrn-cp60-source-integration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: kvrn/package-lock.json
+      - name: Type-check and build
+        working-directory: kvrn
+        run: |
+          npm ci
+          npm run type-check
+          npm run cf:build
+      - name: Deploy production Worker
+        working-directory: kvrn
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx opennextjs-cloudflare deploy --env=""

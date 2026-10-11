@@ -270,6 +270,11 @@ const navGroups: NavGroup[] = [
         </>),
       },
       {
+        label: 'Developer Studio',
+        href: '/admin/developer-studio',
+        icon: icon(<path d="M4 5h16v14H4zM8 10l2 2-2 2m5 0h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>),
+      },
+      {
         label: 'System',
         href: '/admin/system',
         icon: icon(<>
