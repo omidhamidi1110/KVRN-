@@ -1,0 +1,26 @@
+# CP77: Isolated Developer Studio preview configuration.
+# Intentionally has NO route, custom_domain, zone, R2 binding, cron, or production secrets.
+# Do NOT add any domain routes here. Cloudflare workers.dev is the only deployment target.
+name = "kvrn-preview"
+main = "cloudflare-cron-wrapper.js"
+account_id = "5c2f1f1df8ff752572878665e985280b"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = true
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[vars]
+NODE_ENV = "production"
+NEXT_PUBLIC_SITE_URL = "https://preview.invalid"
+SITE_URL = "https://preview.invalid"
+AI_ENABLED = "false"
+AI_WEB_RESEARCH_ENABLED = "false"
+AI_EXTERNAL_SYNC_ENABLED = "false"
+AI_CHIEF_NOTIFICATION_GATE = "false"
+TWILIO_MARKETING_SEND_ENABLED = "false"
+TWILIO_SIGNUP_ENABLED = "false"
+ENABLE_STRIPE_TEST_CHECKOUT = "false"

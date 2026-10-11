@@ -38,18 +38,20 @@ check('Explicit paid order request still routes finance',()=>{
  assert.ok(topics.includes('payment-exceptions'))
 })
 const backend=readFileSync('lib/developer-studio.ts','utf8')
-check('Browser cannot edit workflows/secrets/migrations',()=>{
+check('Browser only edits approved UI and read-only research module paths',()=>{
  const js=ts.transpileModule(backend,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
  const mod={exports:{}}
  vm.runInNewContext(js,{module:mod,exports:mod.exports,process:{env:{}},Buffer})
  const accepts=mod.exports.editableFile
  assert.ok(accepts('kvrn/app/admin/ai/chief/ChiefChatClient.tsx'))
- for(const bad of ['kvrn/app/api/admin/orders/route.ts','kvrn/db/migrations/066.sql','kvrn/.github/workflows/x.yml','kvrn/app/../../.env','kvrn/scripts/deploy.sh']) assert.equal(accepts(bad),false,bad)
+ assert.ok(accepts('kvrn/lib/ai/agents/market-intel.ts'))
+ assert.ok(accepts('kvrn/lib/ai/integrations/research-tiktok.ts'))
+ for(const bad of ['kvrn/app/api/admin/orders/route.ts','kvrn/db/migrations/066.sql','kvrn/.github/workflows/x.yml','kvrn/app/../../.env','kvrn/scripts/deploy.sh','kvrn/lib/ai/agents/finance.ts','kvrn/lib/ai/router.ts','kvrn/app/api/admin/developer-studio/route.ts']) assert.equal(accepts(bad),false,bad)
 })
 const api=readFileSync('app/api/admin/developer-studio/route.ts','utf8')
-check('Admin auth and bounded JSON reads',()=>{assert.match(api,/requireAdmin\(req\)/);assert.match(api,/readAdminMutationJson\(req, 63_000\)/)})
+check('Admin auth and bounded JSON reads',()=>{assert.match(api,/requireAdmin\(req\)/);assert.match(api,/readAdminMutationJson\(req, 300_000\)/)})
 check('Release requires verified same-commit preview',()=>{assert.match(api,/draftSha && r\.conclusion === 'success'/);assert.match(api,/compare\/\$\{encodeURIComponent\(RELEASE\)\}/)})
-check('Rollback never applies migrations',()=>{assert.match(api,/edited UI|eligible UI|eligible.*UI/i);assert.doesNotMatch(api,/\b(DATABASE_URL|STRIPE_SECRET_KEY)\b/)})
+check('Rollback never applies migrations',()=>{assert.match(api,/Restore a bounded set of UI files|eligible UI|eligible.*UI/i);assert.doesNotMatch(api,/\b(DATABASE_URL|STRIPE_SECRET_KEY)\b/)})
 check('Finance session column uses schema field',()=>{
  const s=readFileSync('lib/ai/agents/finance.ts','utf8')
  assert.match(s,/FROM analytics_sessions WHERE first_seen_at/)

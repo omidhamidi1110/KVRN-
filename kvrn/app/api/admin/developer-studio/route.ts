@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { readAdminMutationJson } from '@/lib/admin-mutation-safety'
 import { runAiTask } from '@/lib/ai/router'
 import { github, branchSha, ensureDraft, getFile, listFiles, workflowRuns, requestPreview,
-  editableFile, studioConfigured, previewUrl, DRAFT, RELEASE, StudioError } from '@/lib/developer-studio'
+  editableFile, studioFileKind, commitChangeSet, studioConfigured, previewUrl, DRAFT, RELEASE, StudioError } from '@/lib/developer-studio'
 
 export const dynamic = 'force-dynamic'
 const SHA = /^[a-f0-9]{40}$/
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get('action') || 'status'
   if (action === 'status') {
     let draftSha = ''
-    if (studioConfigured()) try { draftSha = await branchSha(DRAFT) } catch { /* not created yet */ }
+    if (studioConfigured()) try { await ensureDraft(); draftSha = await branchSha(DRAFT) } catch (err) { return respondError(err) }
     return NextResponse.json({ configured: studioConfigured(), aiAvailable: process.env.AI_ENABLED === 'true',
       previewUrl: previewUrl(), draftSha, draftBranch: DRAFT, releaseBranch: RELEASE,
       setupNeeded: !studioConfigured() ? ['DEV_STUDIO_GITHUB_TOKEN Worker secret', 'GitHub Actions Cloudflare deploy secret'] : [] })
@@ -32,6 +32,12 @@ export async function GET(req: NextRequest) {
       const commits = await github<{ sha: string; commit: { message: string; author: { date: string } }; html_url: string }[]>(`commits?sha=${encodeURIComponent(RELEASE)}&per_page=25`)
       return NextResponse.json({ commits: commits.map(c => ({ sha: c.sha, message: c.commit.message.split('\n')[0], date: c.commit.author.date, url: c.html_url })) })
     }
+    if (action === 'changes') {
+      await ensureDraft()
+      const comparison = await github<{ files?: { filename: string; status: string; additions?: number; deletions?: number }[] }>(
+        `compare/${encodeURIComponent(RELEASE)}...${encodeURIComponent(DRAFT)}`)
+      return NextResponse.json({ files: (comparison.files || []).slice(0, 50).map(f => ({ ...f, kind: studioFileKind(f.filename) })) })
+    }
     if (action === 'runs') return NextResponse.json({ runs: await workflowRuns() })
     return NextResponse.json({ error: 'Unsupported action.' }, { status: 400 })
   } catch (err) { return respondError(err) }
@@ -40,23 +46,20 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const { identity, error } = await requireAdmin(req)
   if (error) return error
-  const parsed = await readAdminMutationJson(req, 63_000)
+  const parsed = await readAdminMutationJson(req, 300_000)
   if (!parsed.ok) return NextResponse.json({ error: 'Invalid or unauthorized request.' }, { status: parsed.status })
   const b = parsed.value as Record<string, unknown> | null
   if (!b || typeof b !== 'object' || Array.isArray(b)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 })
   const action = b.action
   try {
-    if (action === 'save') {
-      if (!editableFile(b.path as string) || typeof b.content !== 'string' || b.content.length > 40_000 || typeof b.sha !== 'string' || !SHA.test(b.sha))
-        throw new StudioError('Invalid file, content size or version. Refresh the file and retry.')
-      await ensureDraft()
-      const current = await getFile(b.path as string, DRAFT)
-      if (current.sha !== b.sha) throw new StudioError('This file changed in GitHub. Reload before saving to prevent overwriting someone else.', 409)
-      const result = await github<{ commit: { sha: string }; content: { sha: string } }>(`contents/${b.path}`, { method: 'PUT', body: {
-        message: `Developer Studio: edit ${b.path} (${identity.email})`, branch: DRAFT, sha: current.sha,
-        content: Buffer.from(b.content, 'utf8').toString('base64'),
-      } })
-      return NextResponse.json({ saved: true, commit: result.commit.sha, sha: result.content.sha, message: 'Draft saved; preview build triggered automatically.' })
+    if (action === 'save-batch') {
+      if (!Array.isArray(b.files) || typeof b.reference !== 'string' || !SHA.test(b.reference))
+        throw new StudioError('Refresh the draft and supply a valid change set.')
+      const files = b.files
+      // commitChangeSet rejects paths, oversized files, stale refs, duplicate paths,
+      // missing SHA evidence and concurrent branch modifications.
+      const commit = await commitChangeSet(files, b.reference, identity.email)
+      return NextResponse.json({ saved: true, commit, message: 'Changes saved atomically to draft. An isolated staging build is queued.' })
     }
     if (action === 'preview') {
       await ensureDraft()
@@ -64,18 +67,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ queued: true, reference: sha, message: 'Staging preview was queued by a GitHub commit. Track the build below.' })
     }
     if (action === 'publish') {
+      await ensureDraft()
       const draftSha = await branchSha(DRAFT)
       if (b.confirm !== 'PUBLISH' || b.reference !== draftSha) throw new StudioError('The draft changed. Refresh preview and confirm publishing again.', 409)
       const compare = await github<{ files?: { filename: string; status: string }[]; total_commits: number }>(
         `compare/${encodeURIComponent(RELEASE)}...${encodeURIComponent(DRAFT)}`)
       if (!compare.files?.length || compare.files.length > 20 || compare.total_commits > 25 ||
-        compare.files.some(file => file.status !== 'modified' || !editableFile(file.filename)))
-        throw new StudioError('Only a small set of existing UI files can be published directly. Review this change in GitHub instead.', 409)
+        compare.files.some(file => !['modified', 'added'].includes(file.status) || !editableFile(file.filename)))
+        throw new StudioError('Only approved source files can be published from Studio. Review other code changes in GitHub.', 409)
+      const includesBackend = compare.files.some(file => studioFileKind(file.filename) === 'backend')
+      if (includesBackend && b.confirmBackend !== 'PUBLISH_BACKEND')
+        throw new StudioError('Backend changes require a second explicit owner confirmation.', 409)
       const runs = await workflowRuns()
       if (!runs.some(r => r.head_sha === draftSha && r.conclusion === 'success' && r.display_title.startsWith('Studio preview ')))
         throw new StudioError('Build a successful staging preview of this exact draft before publishing.', 409)
       const response = await github<{ sha: string; merged: boolean }>('merges', { method: 'POST', body: {
-        base: RELEASE, head: draftSha, commit_message: `Developer Studio: publish UI changes (${identity.email})`,
+        base: RELEASE, head: draftSha, commit_message: `Developer Studio: publish reviewed source changes (${identity.email})`,
       } })
       try {
         // New changes start from the latest published commit, avoiding stale draft branches.
@@ -85,14 +92,13 @@ export async function POST(req: NextRequest) {
     }
     if (action === 'rollback') {
       if (b.confirm !== 'RESTORE' || typeof b.sha !== 'string' || !SHA.test(b.sha)) throw new StudioError('Select a valid release and confirm restore.')
-      // Restore a bounded set of eligible UI files as a NEW draft commit based on
-      // the latest production HEAD. GitHub Actions previews it then auto-merges only
-      // a successful explicitly marked restore, never Neon or migrations.
+      // Restore a bounded set of UI files to draft only. Never auto-publish,
+      // touch Neon, or change migrations: explicit preview + publish is required.
       const releaseSha = await branchSha(RELEASE)
       const comparison = await github<{ status: string; files?: { filename: string; status: string }[] }>(`compare/${b.sha}...${releaseSha}`)
       const changed = comparison.files || []
       if (!['ahead','identical'].includes(comparison.status) || !changed.length || changed.length > 20 ||
-          changed.some(f => f.status !== 'modified' || !editableFile(f.filename)))
+          changed.some(f => f.status !== 'modified' || studioFileKind(f.filename) !== 'ui'))
         throw new StudioError('This version cannot be safely restored automatically (non-UI changes or too many files). Use GitHub for a reviewed restore.', 409)
       const currentTree = await github<{ tree: { sha: string } }>(`git/commits/${releaseSha}`)
       const oldCommit = await github<{ tree: { sha: string } }>(`git/commits/${b.sha}`)
@@ -111,7 +117,7 @@ export async function POST(req: NextRequest) {
       await ensureDraft()
       await github(`git/refs/heads/${DRAFT}`, { method:'PATCH', body: {sha:commit.sha,force:true} })
       return NextResponse.json({ queued:true, reference:commit.sha,
-        message:'Restore preview queued. After a successful staging build, GitHub Actions automatically publishes this compatible UI restore.' })
+        message:'Restore saved to draft. Inspect the preview and explicitly choose Publish if you approve it.' })
     }
     if (action === 'ai') {
       if (b.confirm !== true || !editableFile(b.path as string) || typeof b.instruction !== 'string' || b.instruction.length < 5 || b.instruction.length > 1500)
@@ -121,7 +127,7 @@ export async function POST(req: NextRequest) {
       if (file.content.length > 8500) throw new StudioError('This file is too long for a safe full-file AI suggestion. Edit it manually.')
       const response = await runAiTask({ agentId: 'chief', role: 'cheap', purpose: 'owner_developer_studio_optional_code_suggestion',
         essential: false, temperature: 0.1, maxOutputTokens: 3800,
-        system: 'You are a careful TypeScript/React developer. Return ONLY the full resulting source file as plain code, no markdown or commentary. Do not alter security policy or introduce secrets, database queries, server APIs, permissions or external services. If unable, return the exact string UNABLE_TO_SUGGEST.',
+        system: 'You are a careful KVRN TypeScript developer. Return ONLY the full resulting source file as plain code, no markdown. Maintain existing security and authorization boundaries. Do not introduce secrets, change authentication, payments, migrations, external provider writes or API credentials. For approved backend research files, implement only safe read-only research logic; do not send messages, spend money or grant permissions. If unable, return the exact string UNABLE_TO_SUGGEST.',
         input: JSON.stringify({ path: b.path, instructions: b.instruction, originalSource: file.content }),
       })
       const suggestion = response.text.trim().replace(/^```[\w-]*\s*\n/, '').replace(/\n```$/, '')
