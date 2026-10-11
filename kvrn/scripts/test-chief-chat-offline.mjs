@@ -13,15 +13,16 @@ const source = ts.transpileModule(policy, {compilerOptions:{target:ts.ScriptTarg
 assert.equal((source.diagnostics||[]).filter(x=>x.category===ts.DiagnosticCategory.Error).length,0)
 const module = {exports:{}}
 vm.runInNewContext(source.outputText,{exports:module.exports, module},{filename:'chief-chat-policy.js'})
-const {classifyChiefChatRequest,validateChiefChatMessage,CHIEF_CHAT_READ_ONLY_NOTICE} = module.exports
+const {classifyChiefChatRequest,selectChiefChatTopics,validateChiefChatMessage,CHIEF_CHAT_READ_ONLY_NOTICE} = module.exports
 t('QA requests routed to Engineering',()=>assert.equal(classifyChiefChatRequest('Test all features').topic,'qa'))
 t('Payment requests routed to Finance',()=>assert.equal(classifyChiefChatRequest('refunds and payments').topic,'payment-exceptions'))
 t('Stock requests routed to Inventory',()=>assert.equal(classifyChiefChatRequest('stock of hoodies').topic,'inventory-integrity'))
 t('Unknown requests use safe operations brief',()=>assert.equal(classifyChiefChatRequest('hello there').topic,'operations-brief'))
-t('Chat input bounded',()=>{for(const v of [null,1,'','a','x'.repeat(1001),'\0hello'])assert.equal(validateChiefChatMessage(v),null);assert.equal(validateChiefChatMessage('Hey chief'),'Hey chief')})
+t('Cross-department audit routes to multiple canonical sources',()=>{const topics=selectChiefChatTopics('Comprehensive audit of all 11 AI employees and QA');assert.ok(topics.includes('ai-workforce'));assert.ok(topics.includes('ai-routing'));assert.ok(topics.includes('qa'))})
+t('Chat input bounded',()=>{for(const v of [null,1,'','a','x'.repeat(3501),'\0hello'])assert.equal(validateChiefChatMessage(v),null);assert.equal(validateChiefChatMessage('Hey chief'),'Hey chief')})
 t('Read-only policy prohibits risky operations',()=>assert.match(CHIEF_CHAT_READ_ONLY_NOTICE,/cannot send messages, change orders/))
 const api = readFileSync('app/api/admin/ai/chief/chat/route.ts','utf8')
-t('Route requires Access identity and origin-bounded JSON',()=>{assert.match(api,/requireAdmin\(req\)/);assert.match(api,/readAdminMutationJson\(req, 12_288\)/);assert.doesNotMatch(api,/\breq\.json\(/)})
+t('Route requires Access identity and origin-bounded JSON',()=>{assert.match(api,/requireAdmin\(req\)/);assert.match(api,/readAdminMutationJson\(req, 16_384\)/);assert.doesNotMatch(api,/\breq\.json\(/)})
 t('Paid AI gate and budget router preserved',()=>{assert.match(api,/AI_ENABLED !== 'true'/);assert.match(api,/runAiTask\(/);assert.match(api,/body\.reasoning/);assert.doesNotMatch(api,/process\.env\.AI_EXTERNAL_BUDGET_CAP_CONFIRMED\s*=/)})
 t('No arbitrary agent execution or SQL tools',()=>{assert.doesNotMatch(api,/\beval\s*\(/);assert.doesNotMatch(api,/\bexec\s*\(/);assert.match(api,/eventType: 'engineering_qa.monitor'/)})
 for(const p of ['app/admin/ai/chief/ChiefChatClient.tsx','app/admin/ai/chief/page.tsx','app/api/admin/ai/chief/chat/route.ts']){

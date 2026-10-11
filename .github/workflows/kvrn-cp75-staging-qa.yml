@@ -1,0 +1,57 @@
+# Manually dispatched, isolated and non-destructive QA. Never runs against live storefront.
+name: KVRN staging browser QA (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_origin:
+        description: 'Verified isolated staging origin (https://... or localhost), NEVER kvrn.shop'
+        required: true
+        type: string
+      submit_report:
+        description: 'Send actual reported staging checks to KVRN QA ledger (writes reporting metadata only)'
+        default: false
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kvrn-cp75-staging-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  staging-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: kvrn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: kvrn/package-lock.json
+      - name: Install application and browser QA dependencies
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Validate report-secret readiness
+        env:
+          SUBMIT: ${{ inputs.submit_report }}
+          REPORT_SECRET: ${{ secrets.QA_REPORT_SECRET }}
+        run: |
+          if [[ "$SUBMIT" == true && -z "$REPORT_SECRET" ]]; then
+            echo 'No QA_REPORT_SECRET configured. The reporting endpoint is not authorized.' >&2
+            exit 3
+          fi
+      - name: Run staging QA (no storefront writes)
+        env:
+          KVRN_BROWSER_BASE_URL: ${{ inputs.staging_origin }}
+          CP75_SUBMIT_QA_REPORT: ${{ inputs.submit_report && 'yes' || 'no' }}
+          QA_REPORT_SECRET: ${{ secrets.QA_REPORT_SECRET }}
+        run: bash scripts/cp75-qa-staging-runner.sh
