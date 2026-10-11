@@ -536,7 +536,7 @@ export function FinancialsClient() {
                         className={adminInputClass} />
                     </AdminField>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {['15', '20', '22', '25', '30', '37'].map(r => (
+                      {['15', '20', '22', '25', '30'].map(r => (
                         <button key={r} type="button" onClick={() => setTaxRate(r)} aria-pressed={taxRate === r}
                           className={`min-h-[32px] rounded-[8px] border px-2.5 text-[11px] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[#171717]/40 ${taxRate === r ? 'border-[#171717] bg-[#171717] text-white' : 'border-black/[0.12] bg-white text-[#171717]'}`}>
                           {r}%

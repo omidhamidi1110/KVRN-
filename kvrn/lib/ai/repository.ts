@@ -328,7 +328,7 @@ export async function resolveAiAlertsByDedupePrefix(input: {
     ), audited AS (
       INSERT INTO admin_audit_logs(actor_email, action, resource, resource_id, payload)
       SELECT ${AI_SYSTEM_ACTOR}, 'ai_alert_auto_resolved', 'ai_alert', id::text,
-             jsonb_build_object('note',${note})
+             jsonb_build_object('note',${note}::text)
       FROM resolved
       RETURNING 1
     )
