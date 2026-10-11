@@ -154,5 +154,3 @@ export function ManageTags({ tags, onChanged }: { tags: OrderTag[]; onChanged: (
     </details>
   )
 }
-
-// CP77 isolated preview test — no functional changes
