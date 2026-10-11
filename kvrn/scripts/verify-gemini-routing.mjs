@@ -30,7 +30,14 @@ const prop = (text,key) => {
   return match[1]
 }
 for (const [name, v] of vars) {
-  check(`${name}: pinned Gemini model`, () => assert.equal(prop(v,'AI_GOOGLE_VIDEO_MODEL'),'gemini-3.8-flash'))
+  if (name === 'root') {
+    check('root: approved Gemini code default without extra binding', () => {
+      assert.doesNotMatch(v, /^AI_GOOGLE_VIDEO_MODEL\s*=/m)
+      assert.match(config, /model: process\.env\.AI_GOOGLE_VIDEO_MODEL \|\| 'gemini-3\.8-flash'/)
+    })
+  } else {
+    check(`${name}: pinned Gemini model`, () => assert.equal(prop(v,'AI_GOOGLE_VIDEO_MODEL'),'gemini-3.8-flash'))
+  }
   check(`${name}: compatible Gemini API version`, () => assert.equal(prop(v,'AI_GOOGLE_API_VERSION'),'v1beta'))
   check(`${name}: Google AI Studio Gateway route`, () => assert.match(prop(v,'AI_GOOGLE_BASE_URL'),/\/kvrn-ai-prod\/google-ai-studio$/))
   check(`${name}: paid AI remains OFF`, () => assert.equal(prop(v,'AI_ENABLED'),'false'))
