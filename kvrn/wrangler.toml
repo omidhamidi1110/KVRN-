@@ -100,7 +100,6 @@ AI_GOOGLE_BASE_URL               = "https://gateway.ai.cloudflare.com/v1/5c2f1f1
 AI_GOOGLE_API_VERSION           = "v1beta"
 AI_GOOGLE_VIDEO_MODEL             = "gemini-3.8-flash"
 AI_BUSINESS_TIMEZONE              = "America/Los_Angeles"
-AI_DAILY_BRIEF_HOUR_LOCAL         = "19"
 
 # ── Production ────────────────────────────────────────────────────────────────
 [env.production]
