@@ -10,6 +10,20 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+/** Only expose preapproved failure categories to the owner, not raw provider/DB errors. */
+function paidFailureCategory(err: unknown): string {
+  const code = err instanceof Error ? err.message : ''
+  const allowlist = new Set([
+    'AI_BUDGET_LOCKED', 'AI_ESSENTIAL_ONLY', 'AI_OPERATIONAL_CUTOFF',
+    'AI_ABSOLUTE_CEILING', 'AI_AGENT_DISABLED', 'AI_MODEL_ROLE_NOT_ALLOWED',
+    'AI_EXTERNAL_BUDGET_CAP_NOT_CONFIRMED', 'AI_EXTERNAL_BUDGET_CAP_INVALID',
+    'AI_GATEWAY_REQUIRED', 'AI_GATEWAY_TOKEN_NOT_CONFIGURED',
+    'AI_GATEWAY_NOT_CONFIGURED', 'AI_INPUT_TOO_LARGE', 'AI_OUTPUT_LIMIT_TOO_LARGE',
+    'AI_SYSTEM_PROMPT_TOO_LARGE', 'AI_DISABLED',
+  ])
+  return allowlist.has(code) ? code : 'AI_RUNTIME_OR_PROVIDER_FAILURE'
+}
+
 function formatOfflineAnswer(evidence: ChiefEvidence[], unavailable: string[]): string {
   const report = [
     ...evidence.map(e => [
@@ -134,10 +148,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ reply: `${model.text}\n\n${CHIEF_CHAT_READ_ONLY_NOTICE}`,
       worker: routeLabel, modelUsed: true, model: model.model, provider: model.provider,
       estimatedCostUsd: Number((model.costMicros / 1_000_000).toFixed(6)), readOnly: true, externalTransmission: true, evidenceTopics: evidence.map(e => e.topic), unavailableTopics: unavailable })
-  } catch {
+  } catch (err: unknown) {
     // Show real canonical data without silently sending to an alternate provider.
     return NextResponse.json({ reply: formatOfflineAnswer(evidence, unavailable), worker: routeLabel,
       // The provider may have received an ambiguous failed request.
-      modelUsed: false, reason: 'paid_inference_unavailable_or_blocked', readOnly: true, externalTransmission: 'unknown', evidenceTopics: evidence.map(e => e.topic), unavailableTopics: unavailable })
+      modelUsed: false, reason: paidFailureCategory(err), readOnly: true, externalTransmission: 'unknown', evidenceTopics: evidence.map(e => e.topic), unavailableTopics: unavailable })
   }
 }
