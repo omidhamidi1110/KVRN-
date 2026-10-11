@@ -20,6 +20,15 @@
       ]
     },
     {
+      "path": "app/admin/ai/chief/page.tsx",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/admin/ai/insights/page.tsx",
       "feature": "ai_os",
       "requiredChecks": [
@@ -281,6 +290,15 @@
       ]
     },
     {
+      "path": "app/admin/reviews/page.tsx",
+      "feature": "product_detail",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/admin/sms/page.tsx",
       "feature": "admin_auth",
       "requiredChecks": [
@@ -310,6 +328,15 @@
     {
       "path": "app/admin/system/page.tsx",
       "feature": "admin_ui_refresh",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/affiliate-sign-in/page.tsx",
+      "feature": "affiliate_program",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -606,6 +633,24 @@
     },
     {
       "path": "app/api/admin/ai/budget/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/chief/chat/route.ts",
+      "feature": "ai_os",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/ai/chief/readiness/route.ts",
       "feature": "ai_os",
       "requiredChecks": [
         "typecheck",
@@ -978,6 +1023,15 @@
     },
     {
       "path": "app/api/admin/feature-flags/route.ts",
+      "feature": "admin_ui_refresh",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/feature-readiness/route.ts",
       "feature": "admin_ui_refresh",
       "requiredChecks": [
         "typecheck",
@@ -1552,6 +1606,15 @@
       ]
     },
     {
+      "path": "app/api/admin/reviews/route.ts",
+      "feature": "product_detail",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
       "path": "app/api/admin/shipments/[id]/cost/route.ts",
       "feature": "inventory_accounting",
       "requiredChecks": [
@@ -1601,6 +1664,15 @@
     {
       "path": "app/api/admin/store-credit/route.ts",
       "feature": "store_credit",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/admin/support/readiness/route.ts",
+      "feature": "support_inbox",
       "requiredChecks": [
         "typecheck",
         "build",
@@ -2053,6 +2125,15 @@
     {
       "path": "app/api/resend/marketing-webhook/route.ts",
       "feature": "marketing_suite",
+      "requiredChecks": [
+        "typecheck",
+        "build",
+        "regression"
+      ]
+    },
+    {
+      "path": "app/api/reviews/route.ts",
+      "feature": "product_detail",
       "requiredChecks": [
         "typecheck",
         "build",

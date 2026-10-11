@@ -94,10 +94,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unable to queue QA health monitor. Check AI Events and retry only after diagnosing the failure.' }, { status: 503 })
     }
   }
-  if (body.mode !== 'message' || Object.keys(body).some(k => !['mode', 'message', 'reasoning', 'history'].includes(k))) {
+  if (body.mode !== 'message' || Object.keys(body).some(k => !['mode', 'message', 'reasoning', 'history', 'modelRole'].includes(k))) {
     return NextResponse.json({ error: 'Invalid chat request.' }, { status: 400 })
   }
   const message = validateChiefChatMessage(body.message)
+  // Only two vetted Chief models. Cheap Haiku is default; Sonnet is explicit opt-in.
+  const modelRole = body.modelRole === undefined ? 'cheap' : body.modelRole
+  if (modelRole !== 'cheap' && modelRole !== 'business') return NextResponse.json({ error: 'Invalid Chief model role.' }, { status: 400 })
   if (!message || typeof body.reasoning !== 'boolean') return NextResponse.json({ error: 'Message must be 2–1000 characters.' }, { status: 400 })
   // In-tab conversational context is bounded, validated, and never written to the DB.
   const historyRaw = body.history ?? []
@@ -133,7 +136,7 @@ export async function POST(req: NextRequest) {
   // Gateway auth, model allowlist, DB budget and external cap are enforced by runAiTask.
   try {
     const model = await runAiTask({
-      agentId: 'chief', role: 'business', purpose: 'owner_chief_chat_read_only', essential: false,
+      agentId: 'chief', role: modelRole, purpose: 'owner_chief_chat_read_only', essential: false,
       system: [
         'You are KVRN Chief Operator assisting the authenticated store owner.',
         'Speak clearly and compactly. Route observations to the named department; do not claim to have executed tasks.',
@@ -146,7 +149,8 @@ export async function POST(req: NextRequest) {
       maxOutputTokens: 350, temperature: 0.2,
     })
     return NextResponse.json({ reply: `${model.text}\n\n${CHIEF_CHAT_READ_ONLY_NOTICE}`,
-      worker: evidence.worker, modelUsed: true, readOnly: true, externalTransmission: true })
+      worker: evidence.worker, modelUsed: true, model: model.model, provider: model.provider,
+      estimatedCostUsd: Number((model.costMicros / 1_000_000).toFixed(6)), readOnly: true, externalTransmission: true })
   } catch {
     // Show real canonical data without silently sending to an alternate provider.
     return NextResponse.json({ reply: formatOfflineAnswer(evidence), worker: evidence.worker,

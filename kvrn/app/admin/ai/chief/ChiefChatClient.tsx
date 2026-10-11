@@ -1,16 +1,33 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 
-type ChatItem = { id: number; who: 'owner' | 'chief'; text: string; worker?: string; modelUsed?: boolean }
+type ChatItem = { id: number; who: 'owner' | 'chief'; text: string; worker?: string; modelUsed?: boolean; model?: string }
+type ChiefReadiness = {
+  paidAvailable: boolean; status: string; blockers: string[]
+  models: { cheap: string; business: string; finance: string; video: string }
+  videoRouting?: { agent: string; provider: string; model: string; apiVersion: string; configured: boolean; videoRequestTested: boolean } | null
+  budgetMode?: string
+}
 
 export function ChiefChatClient() {
   const [items, setItems] = useState<ChatItem[]>([])
   const [input, setInput] = useState('')
   const [reasoning, setReasoning] = useState(false)
+  const [modelRole, setModelRole] = useState<'cheap' | 'business'>('cheap')
+  const [readiness, setReadiness] = useState<ChiefReadiness | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/admin/ai/chief/readiness', { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : null)
+      .then((data: ChiefReadiness | null) => { if (active && data) setReadiness(data) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   async function send(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -22,12 +39,12 @@ export function ChiefChatClient() {
     try {
       const res = await fetch('/api/admin/ai/chief/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
-        body: JSON.stringify({ mode: 'message', message, reasoning, history: items.slice(-6).map(item => ({ who: item.who, text: item.text.slice(0,1200) })) }),
+        body: JSON.stringify({ mode: 'message', message, reasoning, modelRole, history: items.slice(-6).map(item => ({ who: item.who, text: item.text.slice(0,1200) })) }),
       })
       const body = await res.json()
       if (!res.ok) throw Error(body.error || 'Chief could not load a verified report.')
       setItems(old => [...old, { id: stamp + 1, who: 'chief', text: String(body.reply),
-        worker: body.worker, modelUsed: Boolean(body.modelUsed) }])
+        worker: body.worker, modelUsed: Boolean(body.modelUsed), model: typeof body.model === 'string' ? body.model : undefined }])
     } catch (err: any) {
       setError(String(err?.message || 'Chief chat failed.'))
     } finally { setBusy(false) }
@@ -60,6 +77,13 @@ export function ChiefChatClient() {
     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-[12px] leading-5 text-amber-900">
       <strong>Read-only phase.</strong> Chief can inspect canonical status and request the existing QA registry monitor. Chat cannot run browser tests, issue refunds, change data, send messages, publish, or deploy. Conversations are only retained in this tab and are not saved to the database. Do not enter passwords, tokens or customer personal data.
     </div>
+    <section aria-label="AI readiness" className="mb-4 rounded-xl border border-black/[0.07] bg-white px-4 py-3 text-[11px] leading-5">
+      <p className="font-semibold text-black/75">Paid reasoning readiness: {readiness ? (readiness.paidAvailable ? 'Ready' : 'Not yet active') : 'Checking'}</p>
+      <p className="mt-1 text-black/55">{readiness?.models?.cheap ?? 'Claude Haiku 5.5'} is the economical default. Stronger business reasoning is an explicit opt-in and needs separate model verification.</p>
+      {readiness?.videoRouting && <p className="mt-1 text-black/55">Ads & Social video worker: {readiness.videoRouting.provider} / {readiness.videoRouting.model} ({readiness.videoRouting.apiVersion}) — {readiness.videoRouting.configured ? 'routing configured' : 'routing needs correction'}. Live video request not yet tested.</p>}
+      {readiness && readiness.blockers.length > 0 && <p className="mt-1 text-amber-800">Activation prerequisites: {readiness.blockers.join(' · ')}</p>}
+      <p className="mt-1 text-black/40">This check never invokes paid models or tests provider keys. It reports server and policy readiness only.</p>
+    </section>
     <section className="overflow-hidden rounded-xl border border-black/[0.07] bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] px-5 py-4">
         <div><h2 className="text-[15px] font-medium">Chief Operator</h2><p className="mt-1 text-[11px] text-black/40">Worker routing • Verified read-only evidence</p></div>
@@ -69,7 +93,7 @@ export function ChiefChatClient() {
         {items.length === 0 && <div className="max-w-xl text-[12px] leading-6 text-black/50">Ask “What is the status of my 25 QA features?”, “Any inventory issues?”, or “What needs my attention?” A QA registry check only inspects recorded results; it does not launch a browser runner.</div>}
         {items.map(item => <div key={item.id} className={`flex ${item.who === 'owner' ? 'justify-end' : 'justify-start'}`}>
           <div className={`max-w-[95%] rounded-xl p-4 sm:max-w-[82%] ${item.who === 'owner' ? 'bg-[#171717] text-white' : 'border border-black/[0.07] bg-white text-[#171717]'}`}>
-            <p className={`mb-2 text-[10px] font-medium ${item.who === 'owner' ? 'text-white/60' : 'text-black/45'}`}>{item.who === 'owner' ? 'You' : `Chief → ${item.worker ?? 'Executive'}`}{item.who === 'chief' && !item.modelUsed ? ' · Deterministic report' : item.modelUsed ? ' · Paid AI reasoning' : ''}</p>
+            <p className={`mb-2 text-[10px] font-medium ${item.who === 'owner' ? 'text-white/60' : 'text-black/45'}`}>{item.who === 'owner' ? 'You' : `Chief → ${item.worker ?? 'Executive'}`}{item.who === 'chief' && !item.modelUsed ? ' · Deterministic report' : item.modelUsed ? ` · AI: ${item.model || 'verified model'}` : ''}</p>
             <p className="whitespace-pre-wrap break-words text-[12px] leading-6">{item.text}</p>
           </div>
         </div>)}
@@ -80,7 +104,15 @@ export function ChiefChatClient() {
         <label htmlFor="chief-message" className="block text-[11px] font-medium text-black/70">Message Chief</label>
         <textarea id="chief-message" rows={3} maxLength={1000} value={input} onChange={e => setInput(e.target.value)} placeholder="Ask a question or describe what you want an agent to investigate…" className="w-full rounded-lg border border-black/10 px-3 py-2.5 text-[12px] outline-none focus:ring-2 focus:ring-black/10" />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-[11px] text-black/60"><input type="checkbox" checked={reasoning} onChange={e => setReasoning(e.target.checked)} />Use paid AI reasoning when configured (sends this message, recent chat and read-only aggregate evidence to your configured AI provider)</label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-[11px] text-black/60"><input type="checkbox" checked={reasoning} onChange={e => setReasoning(e.target.checked)} disabled={!readiness?.paidAvailable} />Use paid AI reasoning (sends bounded chat and aggregate read-only evidence to Anthropic)</label>
+            {reasoning && <label className="flex items-center gap-2 text-[11px] text-black/60">Model
+              <select value={modelRole} onChange={e => setModelRole(e.target.value === 'business' ? 'business' : 'cheap')} className="rounded border border-black/10 bg-white px-2 py-1">
+                <option value="cheap">Haiku 5.5 — lower cost (tested)</option>
+                <option value="business">Sonnet 5.5 — stronger (not yet tested)</option>
+              </select>
+            </label>}
+          </div>
           <button disabled={busy || input.trim().length < 2} type="submit" className="rounded-lg bg-[#171717] px-5 py-2.5 text-[11px] font-medium text-white disabled:opacity-40">{busy ? 'Working…' : 'Send to Chief'}</button>
         </div>
       </form>
