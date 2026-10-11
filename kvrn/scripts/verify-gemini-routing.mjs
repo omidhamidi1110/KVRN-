@@ -40,8 +40,8 @@ for (const [name, v] of vars) {
   }
   check(`${name}: compatible Gemini API version`, () => assert.equal(prop(v,'AI_GOOGLE_API_VERSION'),'v1beta'))
   check(`${name}: Google AI Studio Gateway route`, () => assert.match(prop(v,'AI_GOOGLE_BASE_URL'),/\/kvrn-ai-prod\/google-ai-studio$/))
-  check(`${name}: paid AI remains OFF`, () => assert.equal(prop(v,'AI_ENABLED'),'false'))
-  check(`${name}: spending confirmation stays OFF`, () => assert.equal(prop(v,'AI_EXTERNAL_BUDGET_CAP_CONFIRMED'),'false'))
+  check(`${name}: paid AI runtime`, () => assert.equal(prop(v,'AI_ENABLED'),name === 'root' ? 'true' : 'false'))
+  check(`${name}: budget confirmation`, () => assert.equal(prop(v,'AI_EXTERNAL_BUDGET_CAP_CONFIRMED'),name === 'root' ? 'true' : 'false'))
 }
 check('video role defaults to verified Google model', () => {
   assert.match(config,/case 'video':[\s\S]*?provider: 'google',[\s\S]*?model: process\.env\.AI_GOOGLE_VIDEO_MODEL \|\| 'gemini-3\.8-flash'/)
@@ -67,5 +67,10 @@ check('No retired Gemini model ID in active AI source', () => {
   for (const p of ['lib/ai/config.ts','lib/ai/providers.ts','lib/ai/agents/video-performance.ts']) {
     assert.doesNotMatch(read(p),/gemini-2\.5-flash/)
   }
+})
+check('CP74: only approved public research enabled at root', () => {
+  assert.equal(prop(rootVars,'AI_WEB_RESEARCH_ENABLED'),'true')
+  assert.equal(prop(rootVars,'AI_EXTERNAL_SYNC_ENABLED'),'false')
+  assert.equal(prop(rootVars,'AI_CHIEF_NOTIFICATION_GATE'),'false')
 })
 console.log(`PASS: ${cases.length}/${cases.length} Gemini routing guards (no paid requests made)`)
