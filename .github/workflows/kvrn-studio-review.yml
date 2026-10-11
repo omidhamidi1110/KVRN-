@@ -1,0 +1,33 @@
+name: KVRN Developer Studio Review
+on:
+  pull_request:
+    branches:
+      - kvrn-cp60-source-integration
+permissions:
+  contents: read
+jobs:
+  source-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: kvrn/package-lock.json
+      - name: Verify isolated preview configuration
+        working-directory: kvrn
+        run: node scripts/verify-studio-preview-isolation.mjs
+      - name: Install and build without deployment credentials
+        working-directory: kvrn
+        run: |
+          npm ci
+          npm run type-check
+          npm run cf:build
+      - name: Run Studio and Chief regression guards
+        working-directory: kvrn
+        run: |
+          node scripts/test-cp77-studio.mjs
+          node scripts/test-cp78-chief.mjs
+          node scripts/test-cp80-studio.mjs

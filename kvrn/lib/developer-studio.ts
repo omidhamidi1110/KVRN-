@@ -8,16 +8,21 @@ export const studioConfigured = () => Boolean(token() && /^[\w.-]+\/[\w.-]+$/.te
 export const previewUrl = () => process.env.DEV_STUDIO_PREVIEW_URL || ''
 
 export type StudioFileKind = 'ui' | 'backend'
-/** Explicitly scoped source editing. Nothing security/commerce/finance-sensitive is eligible. */
+/** Security and deployment controls are deliberately NOT self-editable from a deployed Worker.
+ * They may still be changed using github.dev + a reviewed GitHub pull request, without Codespaces.
+ */
 export function studioFileKind(path: string): StudioFileKind | null {
   if (typeof path !== 'string' || path.length > 240 || path.includes('..') || path.includes('\\') || path.includes('//')) return null
-  if (!/^kvrn\/[a-zA-Z0-9_./\[\]()-]+\.(ts|tsx|css)$/.test(path)) return null
-  if (/(?:^|\/)(?:node_modules|\.next|__tests__|middleware|_middleware)(?:\/|\.)/.test(path)) return null
-  if (/^kvrn\/(app|components)\/.+\.(tsx|css)$/.test(path) && !/^kvrn\/app\/api\//.test(path)) return 'ui'
-  // Backend AI research work only. Other backend source is handled through an independent reviewed PR.
-  if (/^kvrn\/lib\/ai\/agents\/(?:ads-social|creator-affiliate|growth|market-intel|market-research|review-growth|video-performance)\.ts$/.test(path)) return 'backend'
-  if (/^kvrn\/lib\/ai\/integrations\/research-[a-z0-9-]+\.ts$/.test(path)) return 'backend'
-  if (/^kvrn\/app\/api\/admin\/ai\/research\/[a-z0-9/-]*route\.ts$/.test(path)) return 'backend'
+  if (!/^kvrn\/[a-zA-Z0-9_./\[\]()-]+\.(ts|tsx|css|mjs)$/.test(path)) return null
+  if (/(?:^|\/)(?:node_modules|\.next|\.open-next|middleware|_middleware)(?:\/|\.)/.test(path)) return null
+  // Never let the browser change the permissions of its own privileged GitHub transport,
+  // admin authorization, DB migrations, environment, infrastructure or build configuration.
+  if (/^kvrn\/(?:lib\/(?:developer-studio|admin-auth|admin-mutation-safety|db|database|secrets|env)(?:\.|\/)|app\/(?:api\/admin\/developer-studio|admin\/developer-studio)\/|lib\/ai\/router\.)/.test(path)) return null
+  // Scripts used by the privileged deployment step must never be editable here.
+  if (path.startsWith('kvrn/scripts/') && !/^kvrn\/scripts\/(?:test-[a-z0-9-]+|build-qa-report)\.mjs$/.test(path)) return null
+  if (/^kvrn\/(?:app|components)\/.+\.(tsx|css)$/.test(path) && !/^kvrn\/app\/api\//.test(path)) return 'ui'
+  // All eligible backend files are review-only. They cannot use Studio's quick publish.
+  if (/^kvrn\/(?:app\/api|lib|scripts)\/.+\.(ts|tsx|mjs)$/.test(path)) return 'backend'
   return null
 }
 export const editableFile = (path: string) => studioFileKind(path) !== null
@@ -148,4 +153,30 @@ export async function requestPreview(): Promise<string> {
   } })
   await github(`git/refs/heads/${DRAFT}`, { method: 'PATCH', body: { sha: commit.sha, force: false } })
   return commit.sha
+}
+
+
+/** Submit an explicitly reviewed backend draft as a GitHub pull request. No production merge here. */
+export async function createReviewPullRequest(expectedHead: string, authorEmail: string) {
+  await ensureDraft()
+  const head = await branchSha(DRAFT)
+  if (!/^[a-f0-9]{40}$/.test(expectedHead) || expectedHead !== head)
+    throw new StudioError('The draft changed; refresh before requesting review.', 409)
+  const compare = await github<{files?: { filename:string; status:string }[]; total_commits:number}>(
+    `compare/${encodeURIComponent(RELEASE)}...${encodeURIComponent(DRAFT)}`)
+  if (!compare.files?.length || compare.files.length > 24 || compare.total_commits > 30 ||
+      compare.files.some(f => !['modified','added'].includes(f.status) || !editableFile(f.filename)))
+    throw new StudioError('The change set is too large or contains protected source. Use a separate GitHub review.', 409)
+  if (!compare.files.some(f => studioFileKind(f.filename) === 'backend'))
+    throw new StudioError('This review operation is for backend changes. UI-only changes use normal Publish.', 400)
+  const runs = await workflowRuns()
+  if (!runs.some(r => r.head_sha === head && r.conclusion === 'success' && r.display_title.startsWith('Studio preview ')))
+    throw new StudioError('Complete the exact-commit preview build before requesting backend review.', 409)
+  const result = await github<{number:number; html_url:string; state:string}>('pulls', {method:'POST',body:{
+    title:`Developer Studio backend review (${head.slice(0,10)})`,
+    head:DRAFT,base:RELEASE,
+    body:`Owner-requested KVRN backend review from Developer Studio.\n\nDraft SHA: \`${head}\`\nRequester: ${authorEmail.replace(/[\r\n]/g,'')}\n\nBefore merging: review complete diff, successful GitHub CI checks, security/provider effects, and Neon migration impact. This PR DOES NOT grant approval for production database changes or live provider sends.`,
+    draft:true,
+  }})
+  return {number:result.number,url:result.html_url}
 }

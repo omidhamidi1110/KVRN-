@@ -29,7 +29,7 @@ vm.runInNewContext(compiled,{module:mod,exports:mod.exports,process:{env:{DEV_ST
 const x=mod.exports
 assert.equal(x.studioFileKind('kvrn/lib/ai/agents/market-intel.ts'),'backend')
 assert.equal(x.studioFileKind('kvrn/app/admin/ai/chief/ChiefChatClient.tsx'),'ui')
-for (const p of ['kvrn/wrangler.toml','kvrn/app/api/admin/developer-studio/route.ts','kvrn/lib/admin-auth.ts','kvrn/lib/ai/agents/finance.ts','kvrn/.github/workflows/deploy.yml','kvrn/db/migrations/066.sql','kvrn/app/../.env']) assert.equal(x.editableFile(p),false,p)
+for (const p of ['kvrn/wrangler.toml','kvrn/app/api/admin/developer-studio/route.ts','kvrn/scripts/verify-studio-preview-isolation.mjs','kvrn/lib/admin-auth.ts','kvrn/.github/workflows/deploy.yml','kvrn/db/migrations/066.sql','kvrn/app/../.env']) assert.equal(x.editableFile(p),false,p)
 const changes = [{path:'kvrn/lib/ai/agents/market-intel.ts',content:'export const example = true',sha:d},{path:'kvrn/lib/ai/integrations/research-creators.ts',content:'export const safe = 1',sha:''}]
 assert.equal(await x.commitChangeSet(changes,a,'test@example.com'),b)
 assert.ok(calls.includes('POST git/trees'))
@@ -42,6 +42,6 @@ const wf=readFileSync('../.github/workflows/kvrn-developer-studio.yml','utf8')
 assert.doesNotMatch(wf,/gh api -X POST|auto.?merge|deploy --env preview/i)
 assert.match(wf,/opennextjs-cloudflare build --config=wrangler.studio-preview.toml/)
 const ui=readFileSync('app/admin/developer-studio/DeveloperStudioClient.tsx','utf8')
-assert.match(ui,/save-batch/);assert.match(ui,/PUBLISH_BACKEND/)
+assert.match(ui,/save-batch/);assert.match(ui,/Create backend review PR/)
 execFileSync('node',['scripts/verify-studio-preview-isolation.mjs'],{stdio:'inherit'})
 console.log('PASS CP77 atomic multi-file save, stale-reference rejection, scope, explicit publish and staging isolation')

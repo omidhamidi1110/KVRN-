@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/admin-auth'
 import { readAdminMutationJson } from '@/lib/admin-mutation-safety'
 import { runAiTask } from '@/lib/ai/router'
 import { github, branchSha, ensureDraft, getFile, listFiles, workflowRuns, requestPreview,
-  editableFile, studioFileKind, commitChangeSet, studioConfigured, previewUrl, DRAFT, RELEASE, StudioError } from '@/lib/developer-studio'
+  editableFile, studioFileKind, commitChangeSet, createReviewPullRequest, studioConfigured, previewUrl, DRAFT, RELEASE, StudioError } from '@/lib/developer-studio'
 
 export const dynamic = 'force-dynamic'
 const SHA = /^[a-f0-9]{40}$/
@@ -66,6 +66,12 @@ export async function POST(req: NextRequest) {
       const sha = await requestPreview()
       return NextResponse.json({ queued: true, reference: sha, message: 'Staging preview was queued by a GitHub commit. Track the build below.' })
     }
+    if (action === 'review-pr') {
+      if (b.confirm !== 'REQUEST_REVIEW' || typeof b.reference !== 'string' || !SHA.test(b.reference))
+        throw new StudioError('Refresh the draft and confirm backend review.', 409)
+      const review = await createReviewPullRequest(b.reference, identity.email)
+      return NextResponse.json({ review, message: 'Draft pull request created. Review checks and merge in GitHub; production remains unchanged.' })
+    }
     if (action === 'publish') {
       await ensureDraft()
       const draftSha = await branchSha(DRAFT)
@@ -75,9 +81,8 @@ export async function POST(req: NextRequest) {
       if (!compare.files?.length || compare.files.length > 20 || compare.total_commits > 25 ||
         compare.files.some(file => !['modified', 'added'].includes(file.status) || !editableFile(file.filename)))
         throw new StudioError('Only approved source files can be published from Studio. Review other code changes in GitHub.', 409)
-      const includesBackend = compare.files.some(file => studioFileKind(file.filename) === 'backend')
-      if (includesBackend && b.confirmBackend !== 'PUBLISH_BACKEND')
-        throw new StudioError('Backend changes require a second explicit owner confirmation.', 409)
+      if (compare.files.some(file => studioFileKind(file.filename) !== 'ui'))
+        throw new StudioError('Backend changes require a reviewed GitHub pull request; direct publishing is disabled.', 409)
       const runs = await workflowRuns()
       if (!runs.some(r => r.head_sha === draftSha && r.conclusion === 'success' && r.display_title.startsWith('Studio preview ')))
         throw new StudioError('Build a successful staging preview of this exact draft before publishing.', 409)
