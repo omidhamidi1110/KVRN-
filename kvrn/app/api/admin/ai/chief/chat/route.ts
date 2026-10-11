@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { readAdminMutationJson } from '@/lib/admin-mutation-safety'
 import { collectChiefEvidence, type ChiefEvidence } from '@/lib/ai/chief-evidence'
+import { compactChiefConversation, compactChiefModelEvidence } from '@/lib/ai/integrations/chief-context'
 import { enqueueAiEventWithAudit } from '@/lib/ai/repository'
 import { runAiTask } from '@/lib/ai/router'
 import {
@@ -19,9 +20,17 @@ function paidFailureCategory(err: unknown): string {
     'AI_EXTERNAL_BUDGET_CAP_NOT_CONFIRMED', 'AI_EXTERNAL_BUDGET_CAP_INVALID',
     'AI_GATEWAY_REQUIRED', 'AI_GATEWAY_TOKEN_NOT_CONFIGURED',
     'AI_GATEWAY_NOT_CONFIGURED', 'AI_INPUT_TOO_LARGE', 'AI_OUTPUT_LIMIT_TOO_LARGE',
-    'AI_SYSTEM_PROMPT_TOO_LARGE', 'AI_DISABLED',
+    'AI_SYSTEM_PROMPT_TOO_LARGE', 'AI_DISABLED', 'AI_OUTPUT_LIMIT_INVALID',
+    'AI_BAD_COST_ESTIMATE', 'AI_BUDGET_BLOCKED', 'AI_PROVIDER_TIMEOUT',
+    'AI_DB_PARAMETER_TYPE_ERROR',
   ])
-  return allowlist.has(code) ? code : 'AI_RUNTIME_OR_PROVIDER_FAILURE'
+  if (allowlist.has(code)) return code
+  if (/^(?:ANTHROPIC|OPENAI|GOOGLE)_HTTP_(?:400|401|403|408|413|429|500|502|503|504)$/.test(code)) return code
+  if (/^(?:ANTHROPIC|OPENAI|GOOGLE)_(?:MAX_TOKENS_NO_TEXT|EMPTY_RESPONSE|INVALID_JSON|RESPONSE_TOO_LARGE|REFUSAL)$/.test(code)) return code
+  if (err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')) return 'AI_PROVIDER_TIMEOUT'
+  const pgCode = err && typeof err === 'object' && 'code' in err ? String(err.code) : ''
+  if (pgCode === '42P18') return 'AI_DB_PARAMETER_TYPE_ERROR'
+  return 'AI_RUNTIME_OR_PROVIDER_FAILURE'
 }
 
 function formatOfflineAnswer(evidence: ChiefEvidence[], unavailable: string[]): string {
@@ -111,13 +120,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'The requested canonical reports are unavailable. Chief will not guess.' }, { status: 503 })
   }
   const { evidence, unavailable, routeLabel } = gathered
-  // Bounded and explicit source selection: no raw events, customer records, tokens,
-  // API secrets, executable commands or database payloads cross this boundary.
-  const safeEvidence = evidence.map(e => ({
-    ...e, lines: e.lines.slice(0, 23).map(l => ({
-      label: l.label.slice(0, 100), value: l.value.slice(0, 220), state: l.state,
-    })), warnings: e.warnings.slice(0, 3),
-  }))
+  // Every canonical source is still available in deterministic fallback,
+  // but paid inference receives a strict cross-report size budget.
+  const safeEvidence = compactChiefModelEvidence(evidence)
+  const safeHistory = compactChiefConversation(history)
 
   if (!body.reasoning || process.env.AI_ENABLED !== 'true') {
     return NextResponse.json({ reply: formatOfflineAnswer(evidence, unavailable), worker: routeLabel,
@@ -142,16 +148,22 @@ export async function POST(req: NextRequest) {
         'If asked to act, give a proposed safe next step and explain it requires separate owner approval and tooling.',
         'Unverified features are not equivalent to failing features.',
       ].join(' '),
-      input: JSON.stringify({ ownerRequest: message, recentConversation: history, evidence: safeEvidence, unavailableSources: unavailable, constraints: CHIEF_CHAT_READ_ONLY_NOTICE }),
-      maxOutputTokens: gathered.multiSource ? 1150 : 650, temperature: 0.2,
+      input: JSON.stringify({ ownerRequest: message, recentConversation: safeHistory, evidence: safeEvidence, unavailableSources: unavailable, constraints: CHIEF_CHAT_READ_ONLY_NOTICE }),
+      maxOutputTokens: gathered.multiSource ? 850 : 650, temperature: 0.2,
     })
     return NextResponse.json({ reply: `${model.text}\n\n${CHIEF_CHAT_READ_ONLY_NOTICE}`,
       worker: routeLabel, modelUsed: true, model: model.model, provider: model.provider,
       estimatedCostUsd: Number((model.costMicros / 1_000_000).toFixed(6)), readOnly: true, externalTransmission: true, evidenceTopics: evidence.map(e => e.topic), unavailableTopics: unavailable })
   } catch (err: unknown) {
+    const category = paidFailureCategory(err)
+    // Safe operational diagnostics: no prompts, credentials, raw errors, order data
+    // or provider bodies. Cloudflare logs can now distinguish common failures.
+    console.error('CHIEF_PAID_REASONING_FAILED', { category, modelRole,
+      topics: evidence.map(e => e.topic), inputEvidenceCount: safeEvidence.length,
+      approximateEvidenceChars: JSON.stringify(safeEvidence).length })
     // Show real canonical data without silently sending to an alternate provider.
     return NextResponse.json({ reply: formatOfflineAnswer(evidence, unavailable), worker: routeLabel,
       // The provider may have received an ambiguous failed request.
-      modelUsed: false, reason: paidFailureCategory(err), readOnly: true, externalTransmission: 'unknown', evidenceTopics: evidence.map(e => e.topic), unavailableTopics: unavailable })
+      modelUsed: false, reason: category, readOnly: true, externalTransmission: 'unknown', evidenceTopics: evidence.map(e => e.topic), unavailableTopics: unavailable })
   }
 }

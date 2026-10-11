@@ -22,7 +22,7 @@ const ROUTES: Array<{ topic: ChiefChatTopic; worker: string; pattern: RegExp }> 
   { topic: 'qa', worker: 'Engineering, QA & Security', pattern: /\b(test|tests|testing|qa|bug|regression|security|feature|features|browser|website|site down)\b/ },
   { topic: 'ai-budget', worker: 'Chief Operator', pattern: /\b(ai budget|budget|spent|spend|token|inference|cost cap|ai cost)\b/ },
   { topic: 'inventory-integrity', worker: 'Product, Inventory & Supply', pattern: /\b(stock|inventory|supply|variant|replenish|reorder|size|hoodie)\b/ },
-  { topic: 'payment-exceptions', worker: 'Finance, Attribution & Risk', pattern: /\b(finance|revenue|customer orders|paid orders|payment|payments|stripe|refund|chargeback|dispute|fraud)\b/ },
+  { topic: 'payment-exceptions', worker: 'Finance, Attribution & Risk', pattern: /\b(finance|financial|revenue|customer orders|paid orders|payment|payments|stripe|refund|chargeback|dispute|fraud)\b/ },
   { topic: 'affiliate-integrity', worker: 'Creator & Affiliate', pattern: /\b(affiliate|commission|creator|payout)\b/ },
   { topic: 'marketing-consent', worker: 'Customer Support / Lifecycle Revenue', pattern: /\b(sms|opt.in|subscriber|consent|unsubscribe|a2p)\b/ },
   { topic: 'marketing-delivery', worker: 'Ads & Social', pattern: /\b(marketing|campaign|email|delivery|outreach|ads|advertising)\b/ },
@@ -40,22 +40,21 @@ export function classifyChiefChatRequest(message: string): ChiefChatRoute {
  */
 export function selectChiefChatTopics(message: string, previousOwnerMessage?: string): ChiefChatTopic[] {
   const lower = message.toLowerCase()
-  // "order to fix problems" is a planning request, not a customer order.
-  if (/\b(urgent|highest.priority|most important|biggest problems|top problems|prioriti[sz]e|triage)\b/.test(lower) &&
+  // Prefer named departments even when the owner asks to prioritize issues.
+  // Previously "most important" silently expanded workforce+QA into six reports.
+  const found = ROUTES.filter(r => r.pattern.test(lower)).map(r => r.topic)
+  const unique = [...new Set(found)].slice(0, 6)
+  const prioritized = /\b(urgent|highest.priority|most important|biggest problems|top problems|prioriti[sz]e|triage)\b/.test(lower) &&
       /\b(problems?|issues?|risks?|failures?|business|system|operations?|agents?|health|fix)\b/.test(lower) &&
-      !/\b(order number|specific order|checkout order|paid order|order #)\b/.test(lower)) {
+      !/\b(order number|specific order|checkout order|paid order|order #)\b/.test(lower)
+  const audit = /\b(audit|comprehensive|entire|everything|full|all departments|all (?:11|eleven)|workforce health|system health|overall readiness|operating system|how is everything|whole business)\b/.test(lower)
+  const explicitNamedScope = /\b(workforce|qa|testing|engineering|inventory|stock|payments?|stripe|finance|financial|budget|routing|providers?|affiliate|marketing|consent|store.credit)\b/.test(lower)
+  // "All 11 employees" refers to workforce, not all six reporting departments.
+  // When the owner explicitly names scope, do not broaden to a full-business audit.
+  if (unique.length && explicitNamedScope) return unique
+  if (prioritized || (audit && /\b(ai|agents?|chief|workforce|employees?|operations?|departments?|system|everything|business|readiness)\b/.test(lower))) {
     return ['ai-workforce', 'qa', 'operations-brief', 'business-health', 'ai-budget', 'ai-routing']
   }
-  const audit = /\b(audit|comprehensive|entire|everything|full|all departments|all (?:11|eleven)|workforce health|system health|overall readiness|operating system|how is everything|whole business)\b/.test(lower)
-  if (audit && /\b(ai|agents?|chief|workforce|employees?|operations?|departments?|system|everything|business|readiness)\b/.test(lower)) {
-    // Aggregate workforce evidence, configuration, QA and representative canonical business domains.
-    // The owner can ask follow-up domain-specific questions for omitted domains.
-    return ['ai-workforce', 'ai-routing', 'qa', 'ai-budget', 'business-health', 'operations-brief']
-  }
-  const found = ROUTES.filter(r => r.pattern.test(lower)).map(r => r.topic)
-  // Distinct domains appearing together should all be checked, not misrouted
-  // because "QA" or "AI" appears earlier than the more specific topic.
-  const unique = [...new Set(found)].slice(0, 6)
   if (unique.length) return unique
   if (/^(?:what about|and|why|how about|explain|tell me more|what next|then)\b/i.test(message) && previousOwnerMessage) {
     return selectChiefChatTopics(previousOwnerMessage)
