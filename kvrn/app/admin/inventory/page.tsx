@@ -14,3 +14,5 @@ export default function AdminInventoryPage() {
 
 // ── All UI is client — Cloudflare Access handles auth at the edge ───────────
 import AdminInventoryClient from './AdminInventoryClient'
+
+// CP77 isolated preview test — no functional changes
