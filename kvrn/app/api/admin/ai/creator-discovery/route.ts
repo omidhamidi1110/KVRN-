@@ -9,7 +9,7 @@ export const dynamic='force-dynamic'
 const response=(obj:unknown,status=200)=>NextResponse.json(obj,{status,headers:{'Cache-Control':'private, no-store, max-age=0'}})
 const configured=()=>process.env.BRAVE_CREATOR_SEARCH_ENABLED==='true' && Boolean(process.env.BRAVE_CREATOR_SEARCH_KEY)
 function monthlyLimit():number{
-  const raw=process.env.BRAVE_CREATOR_MONTHLY_CAP??'0'
+  const raw=process.env.BRAVE_CREATOR_MONTHLY_CAP??'100'
   if(!/^\d{1,4}$/.test(raw))return 0
   return Math.min(1000,Number(raw))
 }
