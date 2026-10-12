@@ -54,8 +54,9 @@ export async function POST(req:NextRequest){
     const payload=await upstream.json() as {web?:{results?:Array<{title?:unknown;url?:unknown;description?:unknown}>}}
     // Rank public creator leads; never auto-save them.
     const results=rankBraveCreatorHits(payload.web?.results??[],searchTopic)
+    const providerResults=Array.isArray(payload.web?.results)?payload.web.results.length:0
     // Intentionally do not store results, queries, returned descriptions, provider payloads, or tokens.
-    return response({results,temporary:true,source:'Brave web index',retained:false,
+    return response({results,providerResults,temporary:true,source:'Brave web index',retained:false,
       warning:'Visit original public creator profiles and verify their information independently. Search result data is not imported into KVRN.'})
   }catch{return response({error:'Search timed out or could not complete.',reason:'provider_timeout'},504)}
   finally{clearTimeout(timer);void identity}

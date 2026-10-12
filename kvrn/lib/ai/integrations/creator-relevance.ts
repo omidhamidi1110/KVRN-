@@ -1,37 +1,74 @@
-type BraveHit={url?:unknown;title?:unknown;description?:unknown}
-type CreatorLead={title:string;url:string;snippet:string}
+/** Temporary public-index leads, never verified creators or imported identities. */
+export type BraveHit={url?:unknown;title?:unknown;description?:unknown}
+export type CreatorLead={url:string;title:string;snippet:string}
 
-const BLOCK=/\b(roblox|bloxburg|minecraft|fortnite|gaming|gameplay|gamepass|fakeheadless|headless|avatar)\b|dress to impress/i
-const FASHION=/\b(streetwear|menswear|fashion|outfits?|styling|styled|hoodies?|clothing|apparel|lookbook|wardrobe|ootd|try[ -]?on)\b/i
-const FILLER=new Set(['ugc','user','generated','content','creator','creators','influencer','influencers','tiktok','the','with','and','for'])
+const BAD=/\b(?:roblox|bloxburg|minecraft|fortnite|gaming|gameplay|gamepass|fakeheadless|headless|avatar|bloxfruits|blox)\b|dress to impress|pet simulator/i
+const STYLE=/\b(?:streetwear|street[ -]?style|menswear|fashion|outfits?|ootd|lookbook|hoodies?|clothing|apparel|wardrobe|styling|stylist|styled|styles?|fit[ -]?check|daily fits|try[ -]?on|haul|grwm|activewear|gymwear|fitness|workout)\b/i
 
-const words=(s:string)=>[...new Set((s.toLowerCase().match(/[a-z0-9]+/g)??[]).filter(w=>w.length>2&&!FILLER.has(w)))].slice(0,8)
+const FOCUS:[RegExp,string][]= [
+ [/\bstreetwear\b/i,'streetwear'],
+ [/\bmenswear\b/i,'menswear'],
+ [/\bhoodies?\b/i,'hoodie'],
+ [/\b(?:activewear|fitness|gymwear|workout)\b/i,'activewear'],
+ [/\b(?:outfits?|ootd)\b/i,'outfits'],
+ [/\b(?:clothing|apparel)\b/i,'fashion'],
+ [/\b(?:fashion|styling|style)\b/i,'fashion']
+]
 
-export function buildBraveCreatorQuery(topic:string){
- const t=words(topic)
- return `site:tiktok.com/@ ${t.length?t.join(' '):'streetwear outfits'} -roblox -headless -gaming -minecraft -fortnite -avatar`
+export function buildBraveCreatorQuery(topic:string):string{
+ const niche=FOCUS.find(([re])=>re.test(topic))?.[1]??'fashion'
+ // One broad niche per request instead of requiring every keyword.
+ return `site:tiktok.com ${niche} -roblox -minecraft -fortnite -headless`
 }
-export function rankBraveCreatorHits(hits:BraveHit[],topic:string):CreatorLead[]{
- const found=new Map<string,{score:number;lead:CreatorLead}>()
- for(const hit of (Array.isArray(hits)?hits:[]).slice(0,20)){
-  if(typeof hit.url!=='string'||hit.url.length>900)continue
+
+export function rankBraveCreatorHits(raw:BraveHit[],topic:string):CreatorLead[]{
+ const best=new Map<string,{score:number;lead:CreatorLead}>()
+ const niche=FOCUS.find(([re])=>re.test(topic))?.[1]??'fashion'
+
+ for(const item of (Array.isArray(raw)?raw:[]).slice(0,20)){
+  if(typeof item.url!=='string'||item.url.length>900)continue
+
   let u:URL
-  try{u=new URL(hit.url)}catch{continue}
-  if(u.protocol!=='https:'||u.username||u.password||!['tiktok.com','www.tiktok.com','m.tiktok.com'].includes(u.hostname.toLowerCase()))continue
-  const match=u.pathname.match(/^\/@([A-Za-z0-9._]{2,24})(?:\/video\/\d{10,22})?\/?$/)
-  if(!match)continue
-  const handle=match[1].toLowerCase()
-  const title=typeof hit.title==='string'?hit.title.slice(0,160):''
-  const snippet=typeof hit.description==='string'?hit.description.slice(0,280):''
-  const context=`${title} ${snippet} ${handle}`.toLowerCase()
-  if(BLOCK.test(context))continue
-  if(FASHION.test(topic)&&!FASHION.test(context))continue
-  const matched=words(topic).filter(w=>w==='outfit'?/\boutfits?\b|\bootd\b/.test(context):w==='styling'?/\bstyl(?:ing|e|ed|ist)\b/.test(context):new RegExp(`\\b${w}(?:s)?\\b`).test(context)).length
-  if(matched===0)continue
-  const direct=/^\/@[^/]+\/?$/.test(u.pathname)
-  const score=matched*4+(direct?3:0)
-  const lead={title:direct?`@${handle} — ${title}`:`@${handle} — possible fashion creator (verify profile)`,url:`https://www.tiktok.com/@${handle}`,snippet}
-  if(!found.has(handle)||score>found.get(handle)!.score)found.set(handle,{score,lead})
+  try{u=new URL(item.url)}catch{continue}
+
+  if(u.protocol!=='https:'||u.username||u.password||
+   !['tiktok.com','www.tiktok.com','m.tiktok.com'].includes(u.hostname.toLowerCase()))continue
+
+  const profile=u.pathname.match(/^\/@([A-Za-z0-9._]{2,24})\/?$/)
+  const video=u.pathname.match(/^\/@([A-Za-z0-9._]{2,24})\/video\/\d{10,22}\/?$/)
+  if(!profile&&!video)continue
+
+  const handle=(profile??video)![1].toLowerCase()
+  const title=typeof item.title==='string'?item.title.slice(0,160):''
+  const snippet=typeof item.description==='string'?item.description.slice(0,280):''
+  const content=`${title} ${snippet} ${handle}`
+
+  if(BAD.test(content))continue
+
+  const fashion=STYLE.test(content)
+
+  // Videos need fashion evidence; direct profiles may be tentative leads.
+  if(!profile&&!fashion)continue
+
+  const topicMatch=new RegExp(`\\b${niche}\\b`,'i').test(content)
+  const score=(fashion?8:0)+(topicMatch?4:0)+(profile?3:0)
+
+  const prefix=fashion?
+   (profile?'Fashion profile':'Fashion video → profile'):
+   'Possible creator — verify niche'
+
+  const lead={
+   url:`https://www.tiktok.com/@${handle}`,
+   title:`@${handle} · ${prefix}`,
+   snippet:snippet||title
+  }
+
+  const prev=best.get(handle)
+  if(!prev||prev.score<score)best.set(handle,{lead,score})
  }
- return [...found.values()].sort((a,b)=>b.score-a.score).slice(0,12).map(x=>x.lead)
+
+ return [...best.values()]
+  .sort((a,b)=>b.score-a.score)
+  .slice(0,12)
+  .map(x=>x.lead)
 }
