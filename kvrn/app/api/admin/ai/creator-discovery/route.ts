@@ -46,6 +46,7 @@ export async function POST(req:NextRequest){
     const url=new URL('https://api.search.brave.com/res/v1/web/search')
     url.searchParams.set('q',query)
     url.searchParams.set('count','20')
+    url.searchParams.set('extra_snippets','true')
     url.searchParams.set('country','US')
     const upstream=await fetch(url.toString(),{method:'GET',signal:controller.signal,cache:'no-store',headers:{
       Accept:'application/json','X-Subscription-Token':process.env.BRAVE_CREATOR_SEARCH_KEY!,
