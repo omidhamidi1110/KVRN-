@@ -75,7 +75,6 @@ crons = ["*/5 * * * *"]
 # Secrets must be set via `wrangler secret put` — never hardcode here
 [vars]
 NEXT_PUBLIC_SITE_URL              = "https://kvrn.shop"
-SITE_URL                          = "https://kvrn.shop"
 NEXT_PUBLIC_KVRN_SMS_NUMBER       = "+16572149996"
 SMS_SIGNUP_DISCOUNT_AMOUNT_CENTS  = "1000"
 TWILIO_A2P_APPROVED               = "false"
@@ -114,7 +113,6 @@ bucket_name = "kvrn-media"
 
 [env.production.vars]
 NEXT_PUBLIC_SITE_URL              = "https://kvrn.shop"
-SITE_URL                          = "https://kvrn.shop"
 NEXT_PUBLIC_KVRN_SMS_NUMBER       = "+16572149996"
 SMS_SIGNUP_DISCOUNT_AMOUNT_CENTS  = "1000"
 TWILIO_A2P_APPROVED               = "false"
@@ -138,7 +136,6 @@ AI_OPENAI_BASE_URL               = "https://gateway.ai.cloudflare.com/v1/5c2f1f1
 AI_GOOGLE_BASE_URL               = "https://gateway.ai.cloudflare.com/v1/5c2f1f1df8ff752572878665e985280b/kvrn-ai-prod/google-ai-studio"
 AI_GOOGLE_VIDEO_MODEL             = "gemini-3.8-flash"
 AI_BUSINESS_TIMEZONE              = "America/Los_Angeles"
-AI_DAILY_BRIEF_HOUR_LOCAL         = "19"
 
 # ── Preview / staging ─────────────────────────────────────────────────────────
 [env.preview]
@@ -159,7 +156,6 @@ AI_ANTHROPIC_BASE_URL            = "https://gateway.ai.cloudflare.com/v1/5c2f1f1
 AI_OPENAI_BASE_URL               = "https://gateway.ai.cloudflare.com/v1/5c2f1f1df8ff752572878665e985280b/kvrn-ai-prod/openai"
 AI_GOOGLE_BASE_URL               = "https://gateway.ai.cloudflare.com/v1/5c2f1f1df8ff752572878665e985280b/kvrn-ai-prod/google-ai-studio"
 AI_BUSINESS_TIMEZONE = "America/Los_Angeles"
-AI_DAILY_BRIEF_HOUR_LOCAL = "19"
 
 [[r2_buckets]]
 binding = "KVRN_MEDIA"
