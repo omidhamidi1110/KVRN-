@@ -5,7 +5,7 @@ import {requireAdmin} from '@/lib/admin-auth'
 import {readAdminMutationJson} from '@/lib/admin-mutation-safety'
 import {sql} from '@/lib/db'
 import {validatedCreatorQuery} from '@/lib/ai/integrations/creator-recruiting'
-import {buildBraveCreatorQuery,rankBraveCreatorHits} from '@/lib/ai/integrations/creator-relevance'
+import {buildBraveCreatorQuery,analyzeBraveCreatorHits} from '@/lib/ai/integrations/creator-relevance'
 export const dynamic='force-dynamic'
 const response=(obj:unknown,status=200)=>NextResponse.json(obj,{status,headers:{'Cache-Control':'private, no-store, max-age=0'}})
 const configured=()=>process.env.BRAVE_CREATOR_SEARCH_ENABLED==='true' && Boolean(process.env.BRAVE_CREATOR_SEARCH_KEY)
@@ -54,10 +54,10 @@ export async function POST(req:NextRequest){
     if(!upstream.ok)return response({error:'Creator web search is temporarily unavailable.',reason:'provider_unavailable'},502)
     const payload=await upstream.json() as {web?:{results?:Array<{title?:unknown;url?:unknown;description?:unknown}>}}
     // Rank public creator leads; never auto-save them.
-    const results=rankBraveCreatorHits(payload.web?.results??[],searchTopic)
+    const {results,diagnostics}=analyzeBraveCreatorHits(payload.web?.results??[],searchTopic)
     const providerResults=Array.isArray(payload.web?.results)?payload.web.results.length:0
     // Intentionally do not store results, queries, returned descriptions, provider payloads, or tokens.
-    return response({results,providerResults,temporary:true,source:'Brave web index',retained:false,
+    return response({results,providerResults,diagnostics,temporary:true,source:'Brave web index',retained:false,
       warning:'Visit original public creator profiles and verify their information independently. Search result data is not imported into KVRN.'})
   }catch{return response({error:'Search timed out or could not complete.',reason:'provider_timeout'},504)}
   finally{clearTimeout(timer);void identity}

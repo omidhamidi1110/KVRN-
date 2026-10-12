@@ -15,6 +15,7 @@ type Activity={id:string;prospect_id:string;direction:string;channel:string;cont
 type Funnel={counts?:Record<string,number>;applications?:Record<string,number>;linked?:Array<{prospectId:string;handle:string;affiliateId:string;attributedOrders:number;netCommissionCents:string}>;applicants?:Array<{id:string;status:string;createdAt:string;tiktokLinks:string[]}>;disclaimer?:string}
 type SearchState={connected:boolean;enabled:boolean;monthlyLimit:number;notes?:string}
 type SearchResult={title:string;url:string;snippet:string}
+type DiscoveryStats={providerPages:number;accountLinks:number;gamingExcluded:number;businessExcluded:number;strongMatches:number;reviewCandidates:number}
 const categories:[string,string][]=[['streetwear','Streetwear'],['mens_fashion',"Men's fashion"],['outfits','Outfit styling'],['lifestyle','Lifestyle'],['ugc','UGC reviews'],['other','Other']]
 const initialRatings={fitRating:'',contentRating:'',consistencyRating:'',engagementRating:''}
 const formatDate=(s?:string|null)=>s?new Date(s).toLocaleString():'—'
@@ -33,6 +34,7 @@ export function CreatorRecruitingClient(){
  const [results,setResults]=useState<SearchResult[]>([])
  const [searched,setSearched]=useState(false)
  const [searchNote,setSearchNote]=useState('')
+ const [discoveryStats,setDiscoveryStats]=useState<DiscoveryStats|null>(null)
  const [selected,setSelected]=useState('')
  const [handle,setHandle]=useState('')
  const [category,setCategory]=useState('streetwear')
@@ -92,12 +94,13 @@ export function CreatorRecruitingClient(){
   if(success){setActionNote('');setFollowup('')}
  }
  async function search(){
-  setBusy(true);setError('');setResults([]);setSearched(false);setSearchNote('')
+  setBusy(true);setError('');setResults([]);setSearched(false);setSearchNote('');setDiscoveryStats(null)
   try{
    const r=await fetch('/api/admin/ai/creator-discovery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:searchTopic})})
    const j=await r.json().catch(()=>({}))
    if(!r.ok)throw new Error(j.error??'Search unavailable')
    setResults(Array.isArray(j.results)?j.results:[])
+   setDiscoveryStats(j.diagnostics??null)
    setSearched(true)
    if(!Array.isArray(j.results)||j.results.length===0)
     setSearchNote(Number(j.providerResults)>0?
@@ -141,6 +144,7 @@ export function CreatorRecruitingClient(){
    <div className="mt-5 flex flex-wrap gap-3"><a className={BUTTON} href={creatorSearchUrl('site:tiktok.com/@ '+searchTopic)} target="_blank" rel="noreferrer noopener">Free web search ↗</a>
     <button className={SECOND} disabled={busy||!searchState.enabled} onClick={()=>void search()}>Search Brave in KVRN</button></div>
    {!searchState.enabled&&<p className="mt-3 text-xs text-amber-800">Brave API not connected. External Google search works now; provider search needs a separate key, $0 budget cap, and quota table.</p>}
+   {searched&&discoveryStats&&<p role="status" className="mt-3 text-xs text-neutral-600">Brave pages: {discoveryStats.providerPages} · TikTok account links: {discoveryStats.accountLinks} · Strong matches: {discoveryStats.strongMatches} · Needs review: {discoveryStats.reviewCandidates} · Gaming excluded: {discoveryStats.gamingExcluded} · Businesses excluded: {discoveryStats.businessExcluded}. Leads are unverified.</p>}
    <div className="mt-5 space-y-2">{results.map((r,i)=><div key={i} className="rounded-lg border p-3"><a href={r.url} className="break-all text-sm font-semibold underline" target="_blank" rel="noreferrer noopener">{r.title} ↗</a><p className="mt-1 text-xs text-neutral-500">{r.snippet}</p></div>)}</div>
    {searched&&results.length===0&&<p role="status" className="mt-3 text-sm text-neutral-600">{searchNote||'No usable TikTok profiles found. Try another niche.'}</p>}
    {results.length>0&&<p className="mt-3 text-xs text-neutral-600">Temporary provider results: not stored. Verify independently and type creator details into the review form.</p>}
