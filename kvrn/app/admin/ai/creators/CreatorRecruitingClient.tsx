@@ -31,6 +31,7 @@ export function CreatorRecruitingClient(){
  const [searchState,setSearchState]=useState<SearchState>({connected:false,enabled:false,monthlyLimit:0})
  const [searchTopic,setSearchTopic]=useState('streetwear outfit creator')
  const [results,setResults]=useState<SearchResult[]>([])
+ const [searched,setSearched]=useState(false)
  const [selected,setSelected]=useState('')
  const [handle,setHandle]=useState('')
  const [category,setCategory]=useState('streetwear')
@@ -90,12 +91,13 @@ export function CreatorRecruitingClient(){
   if(success){setActionNote('');setFollowup('')}
  }
  async function search(){
-  setBusy(true);setError('');setResults([])
+  setBusy(true);setError('');setResults([]);setSearched(false)
   try{
    const r=await fetch('/api/admin/ai/creator-discovery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:searchTopic})})
    const j=await r.json().catch(()=>({}))
    if(!r.ok)throw new Error(j.error??'Search unavailable')
    setResults(Array.isArray(j.results)?j.results:[])
+   setSearched(true)
   }catch(e){setError(e instanceof Error?e.message:'Search unavailable')}
   finally{setBusy(false)}
  }
@@ -135,6 +137,7 @@ export function CreatorRecruitingClient(){
     <button className={SECOND} disabled={busy||!searchState.enabled} onClick={()=>void search()}>Search Brave in KVRN</button></div>
    {!searchState.enabled&&<p className="mt-3 text-xs text-amber-800">Brave API not connected. External Google search works now; provider search needs a separate key, $0 budget cap, and quota table.</p>}
    <div className="mt-5 space-y-2">{results.map((r,i)=><div key={i} className="rounded-lg border p-3"><a href={r.url} className="break-all text-sm font-semibold underline" target="_blank" rel="noreferrer noopener">{r.title} ↗</a><p className="mt-1 text-xs text-neutral-500">{r.snippet}</p></div>)}</div>
+   {searched&&results.length===0&&<p role="status" className="mt-3 text-sm text-neutral-600">No relevant TikTok fashion creators found. Irrelevant results were filtered out. Try another search topic.</p>}
    {results.length>0&&<p className="mt-3 text-xs text-neutral-600">Temporary provider results: not stored. Verify independently and type creator details into the review form.</p>}
   </section><section className={card}><h2 className="text-lg font-semibold">Free creator sources</h2><div className="mt-4 grid gap-3 text-sm">
    <a href="https://afluencer.com/" rel="noreferrer noopener" target="_blank" className="rounded-lg border p-4"><strong>Afluencer ↗</strong><p className="mt-1 text-xs text-neutral-600">Post a collaboration and invite opted-in applicants to apply to KVRN.</p></a>

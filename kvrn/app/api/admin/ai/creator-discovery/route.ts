@@ -5,6 +5,7 @@ import {requireAdmin} from '@/lib/admin-auth'
 import {readAdminMutationJson} from '@/lib/admin-mutation-safety'
 import {sql} from '@/lib/db'
 import {validatedCreatorQuery} from '@/lib/ai/integrations/creator-recruiting'
+import {buildBraveCreatorQuery,rankBraveCreatorHits} from '@/lib/ai/integrations/creator-relevance'
 export const dynamic='force-dynamic'
 const response=(obj:unknown,status=200)=>NextResponse.json(obj,{status,headers:{'Cache-Control':'private, no-store, max-age=0'}})
 const configured=()=>process.env.BRAVE_CREATOR_SEARCH_ENABLED==='true' && Boolean(process.env.BRAVE_CREATOR_SEARCH_KEY)
@@ -41,20 +42,18 @@ export async function POST(req:NextRequest){
   const controller=new AbortController()
   const timer=setTimeout(()=>controller.abort(),7000)
   try{
-    const query=`site:tiktok.com/@ ${searchTopic}`
+    const query=buildBraveCreatorQuery(searchTopic)
     const url=new URL('https://api.search.brave.com/res/v1/web/search')
     url.searchParams.set('q',query)
-    url.searchParams.set('count','8')
+    url.searchParams.set('count','20')
     url.searchParams.set('country','US')
     const upstream=await fetch(url.toString(),{method:'GET',signal:controller.signal,cache:'no-store',headers:{
       Accept:'application/json','X-Subscription-Token':process.env.BRAVE_CREATOR_SEARCH_KEY!,
     }})
     if(!upstream.ok)return response({error:'Creator web search is temporarily unavailable.',reason:'provider_unavailable'},502)
     const payload=await upstream.json() as {web?:{results?:Array<{title?:unknown;url?:unknown;description?:unknown}>}}
-    // Never return arbitrary URLs as endorsed/saved creator profiles; these are only temporary leads.
-    const results=(payload.web?.results??[]).filter(x=>typeof x.url==='string' && /^https:\/\//.test(x.url))
-      .slice(0,8).map(x=>({title:String(x.title??'Creator search result').slice(0,160),
-        url:String(x.url).slice(0,500),snippet:String(x.description??'').slice(0,280)}))
+    // Rank public creator leads; never auto-save them.
+    const results=rankBraveCreatorHits(payload.web?.results??[],searchTopic)
     // Intentionally do not store results, queries, returned descriptions, provider payloads, or tokens.
     return response({results,temporary:true,source:'Brave web index',retained:false,
       warning:'Visit original public creator profiles and verify their information independently. Search result data is not imported into KVRN.'})
