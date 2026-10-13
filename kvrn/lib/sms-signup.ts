@@ -24,7 +24,7 @@ export async function submitSmsSignup(
   try {
     const res = await doFetch('/api/sms/subscribe', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: phone.trim(), source }),
+      body: JSON.stringify({ phone: phone.trim(), source, smsMarketingConsent: true, consentDisclosureVersion: "2026-10-13" }),
     })
     const data = await res.json()
     if (!res.ok || !data.success) {

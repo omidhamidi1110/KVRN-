@@ -33,6 +33,6 @@ export default function SmsSignupPage(){
       <p className="mt-6 text-sm leading-7 text-neutral-700">By sending JOIN and then YES, you expressly consent to recurring automated promotional texts from KVRN at your sending number. Consent is not required to purchase. Message frequency varies. Message and data rates may apply. Reply STOP to cancel or HELP for assistance. You must be 18 or older.</p>
       <p className="mt-4 text-sm leading-7 text-neutral-700">Review the <Link className="underline" href="/terms">Terms of Service</Link> and <Link className="underline" href="/privacy">Privacy Policy</Link>, or contact <a className="underline" href="mailto:support@kvrn.shop">support@kvrn.shop</a> for support.</p>
     </div>
-    <p className="mt-6 text-xs leading-6 text-neutral-500">This page describes KVRN&apos;s text-keyword opt-in process. Entering a phone number during checkout or subscribing to email does not enroll you in SMS marketing.</p>
+    <p className="mt-6 text-xs leading-6 text-neutral-500">KVRN also supports voluntary website SMS signup after carrier activation: customers enter a mobile number and explicitly check a separate, initially unchecked SMS marketing consent checkbox next to recurring-message, frequency, rates, STOP/HELP, not-required-to-purchase and policy-link disclosures. Checkout and email signups never imply SMS consent. While carrier registration is pending, neither website signup nor keyword enrollment is available.</p>
   </section>
 }

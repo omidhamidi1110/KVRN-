@@ -213,6 +213,8 @@ export function SmsPopup() {
       if (result.discountCode) {
         try { localStorage.setItem(KEY_CODE, result.discountCode) } catch {}
         setSuccessCode(result.discountCode)
+      } else {
+        setSuccessCode('')
       }
     } finally { setSubmitting(false) }
   }, [phone, smsConsent])
@@ -352,7 +354,7 @@ export function SmsPopup() {
 
   const Body = (
     <p style={{ fontFamily:SANS, fontSize:13, color:MUTED, margin:'0 0 24px', lineHeight:1.55, letterSpacing:'0.01em' }}>
-      Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription.
+      {mobile ? "Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription." : "Private access to drops, restocks, and KVRN releases. Enter your number and check the separate SMS consent box to subscribe once available."}
     </p>
   )
 
@@ -367,10 +369,76 @@ export function SmsPopup() {
 
   // Verified inbound JOIN → YES is required; browser phone entry cannot give consent.
   const PhoneForm = (
-    <div style={{fontFamily:SANS,color:FG,fontSize:13,lineHeight:1.7}}>
-      <p>To join, text <strong>JOIN</strong> to <strong>{SMS_NUMBER_DISPLAY}</strong>.</p>
-      <p>After KVRN replies, send <strong>YES</strong> within 30 minutes to confirm your signup.</p>
-      <p style={{color:MUTED,fontSize:11}}>No subscription or discount is created until confirmation. Replies are subject to provider registration and availability.</p>
+    <div>
+      <label htmlFor="sms-phone" style={{ display:'block', fontFamily:SANS, fontSize:9,
+        letterSpacing:'0.12em', textTransform:'uppercase', color:MUTED, marginBottom:6 }}>
+        Mobile number
+      </label>
+      <input id="sms-phone" type="tel" value={phone} autoComplete="tel"
+        placeholder="+1 (555) 000-0000"
+        onChange={e => setPhone(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+        style={{ width:'100%', padding:'12px 14px', background:'#1A1A1A',
+          border:'1px solid #2A2A2A', color:FG, fontFamily:SANS, fontSize:14,
+          outline:'none', boxSizing:'border-box', marginBottom:10 }}
+        disabled={submitting} aria-required="true" />
+
+        <label
+          htmlFor="sms-consent"
+          style={{
+            display:'flex',
+            alignItems:'flex-start',
+            gap:10,
+            margin:'6px 0 14px',
+            cursor:'pointer',
+          }}
+        >
+          <input
+            id="sms-consent"
+            type="checkbox"
+            checked={smsConsent}
+            onChange={e => {
+              setSmsConsent(e.target.checked)
+              if (e.target.checked) setError('')
+            }}
+            disabled={submitting}
+            style={{
+              width:16,
+              height:16,
+              margin:'2px 0 0',
+              flexShrink:0,
+              accentColor:FG,
+            }}
+          />
+          <span style={{
+            fontFamily:SANS,
+            fontSize:10,
+            lineHeight:1.6,
+            color:'#B7B1A7',
+          }}>
+            I agree to receive recurring automated marketing text messages about
+            KVRN product launches, drops, restocks, early access, and promotional
+            offers. Message frequency varies. Msg &amp; data rates may apply.
+            Reply STOP to cancel, HELP for help. Consent is not a condition of purchase.{' '}
+            <a href="/terms" onClick={e => e.stopPropagation()}
+              style={{ color:'#D3CDC3', textDecoration:'underline' }}>
+              Terms
+            </a>
+            {' · '}
+            <a href="/privacy" onClick={e => e.stopPropagation()}
+              style={{ color:'#D3CDC3', textDecoration:'underline' }}>
+              Privacy
+            </a>
+          </span>
+        </label>
+      {error && <p style={{ fontFamily:SANS, fontSize:11, color:'#C0392B', marginBottom:8 }} role="alert">{error}</p>}
+      <button onClick={handleSubmit} disabled={submitting || !smsConsent}
+        style={{ width:'100%', padding:'13px 0', background:FG, color:BG,
+          border:'none', cursor:'pointer', fontFamily:SANS, fontSize:11, fontWeight:500,
+          letterSpacing:'0.12em', textTransform:'uppercase', opacity:(submitting || !smsConsent) ? 0.45 : 1 }}
+        aria-busy={submitting}>
+        {submitting ? 'SIGNING UP…' : (mobile ? 'SIGN UP & GET $10 OFF' : CTA_DESK)}
+      </button>
     </div>
   )
 
@@ -396,18 +464,6 @@ export function SmsPopup() {
           {Disc}
           <div style={{ height:1, background:DIM, margin:'24px 0' }} />
           {PhoneForm}
-          {SMS_RAW && <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:20}}>
-            <a href={`sms:${SMS_RAW}?body=${encodeURIComponent('JOIN KVRN')}`}
-              style={{background:FG,color:BG,padding:'12px 15px',textDecoration:'none',fontFamily:SANS,fontSize:11,letterSpacing:'0.08em'}}>
-              OPEN MESSAGES
-            </a>
-            <button type="button" onClick={() => {
-              void navigator.clipboard?.writeText(SMS_RAW).then(() => setCopied(true)).catch(() => setError('Copy unavailable. Use the number shown above.'))
-            }} style={{background:'transparent',border:'1px solid #918B80',color:FG,padding:'12px 15px',fontFamily:SANS,fontSize:11}}>
-              {copied ? 'NUMBER COPIED' : 'COPY NUMBER'}
-            </button>
-          </div>}
-          {error && <p role="alert" style={{color:'#F2B3A6',fontSize:11}}>{error}</p>}
           {NoThanks}
         </div>
       </>
