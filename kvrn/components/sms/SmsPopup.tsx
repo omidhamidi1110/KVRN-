@@ -57,7 +57,7 @@ function isDism(): boolean {
 
 interface Offer { loading: boolean; active: boolean; amountCents: number }
 
-export function SmsPopup() {
+export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean } = {}) {
   const [visible,    setVisible]    = useState(false)
   const [claimToken, setClaimToken] = useState<string | null>(null)
   const [showTab,    setShowTab]    = useState(false)
@@ -84,7 +84,7 @@ export function SmsPopup() {
       .catch(() => setOffer({ loading: false, active: false, amountCents: 0 }))
   }, [])
 
-  const hasOffer = !offer.loading && offer.active
+  const hasOffer = signupAvailable && !offer.loading && offer.active
   const EYEBROW  = 'PRIVATE ACCESS'
   const HEAD1    = hasOffer ? '$10 OFF'        : 'EARLY ACCESS'
   const HEAD2    = hasOffer ? 'YOUR FIRST ORDER' : 'KVRN RELEASES'
@@ -94,7 +94,10 @@ export function SmsPopup() {
   // Mount timer
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (isSupp()) return
+    if (isSupp()) {
+      if (!signupAvailable) { setShowTab(true); setMobile(isMobile()) }
+      return
+    }
     if (isDism()) { setShowTab(true); setMobile(isMobile()); return }
     setMobile(isMobile())
     const id = setTimeout(() => { setVisible(true); setShowTab(true); track('sms_offer_view') }, 5000)
@@ -201,6 +204,11 @@ export function SmsPopup() {
   }, [])
 
   const handleSubmit = useCallback(async () => {
+    // Never call signup or Twilio when carrier approval/activation is pending.
+    if (!signupAvailable) {
+      setError('SMS signup is coming soon, pending carrier approval.')
+      return
+    }
     if (!phone.trim()) { setError('Enter your mobile number.'); return }
     if (!smsConsent) { setError('Please confirm SMS consent to continue.'); return }
     setSubmitting(true); setError('')
@@ -217,7 +225,7 @@ export function SmsPopup() {
         setSuccessCode('')
       }
     } finally { setSubmitting(false) }
-  }, [phone, smsConsent])
+  }, [phone, smsConsent, signupAvailable])
 
   const handleCopy = useCallback(async () => {
     if (!successCode) return
@@ -258,7 +266,7 @@ export function SmsPopup() {
           whiteSpace:'nowrap',
         }}
       >
-        <span>{hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'}</span>
+        <span>{!signupAvailable ? 'SMS UPDATES' : hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'}</span>
         <span style={{
           fontSize:14,
           lineHeight:1,
@@ -354,7 +362,7 @@ export function SmsPopup() {
 
   const Body = (
     <p style={{ fontFamily:SANS, fontSize:13, color:MUTED, margin:'0 0 24px', lineHeight:1.55, letterSpacing:'0.01em' }}>
-      {mobile ? "Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription." : "Private access to drops, restocks, and KVRN releases. Enter your number and check the separate SMS consent box to subscribe once available."}
+      {signupAvailable ? (<>{mobile ? "Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription." : "Private access to drops, restocks, and KVRN releases. Enter your number and check the separate SMS consent box to subscribe once available."}</>) : 'KVRN SMS updates are coming soon. Signup is paused while carrier approval is pending.'}
     </p>
   )
 
