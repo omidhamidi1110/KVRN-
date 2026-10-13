@@ -10,9 +10,9 @@ function isExcluded(path: string): boolean {
   return EXCLUDED.some(p => path === p || path.startsWith(p + '/'))
 }
 
-export function ConditionalSmsPopup() {
+export function ConditionalSmsPopup({enabled}: {enabled: boolean}) {
   const path = usePathname()
-  if (process.env.NEXT_PUBLIC_SMS_SIGNUP_ENABLED !== 'true') return null
+  if (!enabled) return null
   if (isExcluded(path)) return null
   return <SmsPopup />
 }

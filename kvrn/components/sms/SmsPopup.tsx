@@ -40,7 +40,7 @@ function track(e: SmsAnalyticsEvent) {
 }
 function isMobile(): boolean {
   if (typeof window === 'undefined') return false
-  return window.innerWidth < 900 || navigator.maxTouchPoints > 0
+  return window.innerWidth < 900
 }
 function isSupp(): boolean {
   try {
@@ -99,6 +99,13 @@ export function SmsPopup() {
     setMobile(isMobile())
     const id = setTimeout(() => { setVisible(true); setShowTab(true); track('sms_offer_view') }, 5000)
     return () => clearTimeout(id)
+  }, [])
+
+  // Update the layout when desktop/mobile widths change, including touch laptops.
+  useEffect(() => {
+    const sync = () => setMobile(isMobile())
+    window.addEventListener('resize', sync)
+    return () => window.removeEventListener('resize', sync)
   }, [])
 
   // Keep mobile offer pill above the PDP sticky purchase bar.
@@ -389,6 +396,18 @@ export function SmsPopup() {
           {Disc}
           <div style={{ height:1, background:DIM, margin:'24px 0' }} />
           {PhoneForm}
+          {SMS_RAW && <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:20}}>
+            <a href={`sms:${SMS_RAW}?body=${encodeURIComponent('JOIN KVRN')}`}
+              style={{background:FG,color:BG,padding:'12px 15px',textDecoration:'none',fontFamily:SANS,fontSize:11,letterSpacing:'0.08em'}}>
+              OPEN MESSAGES
+            </a>
+            <button type="button" onClick={() => {
+              void navigator.clipboard?.writeText(SMS_RAW).then(() => setCopied(true)).catch(() => setError('Copy unavailable. Use the number shown above.'))
+            }} style={{background:'transparent',border:'1px solid #918B80',color:FG,padding:'12px 15px',fontFamily:SANS,fontSize:11}}>
+              {copied ? 'NUMBER COPIED' : 'COPY NUMBER'}
+            </button>
+          </div>}
+          {error && <p role="alert" style={{color:'#F2B3A6',fontSize:11}}>{error}</p>}
           {NoThanks}
         </div>
       </>

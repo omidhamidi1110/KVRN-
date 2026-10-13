@@ -69,6 +69,7 @@ export function Footer({ shell }: { shell?: ShellData | null } = {}) {
             <div className="flex justify-center gap-5 pt-2">
               {socialLinks('text-[#6B6B6B] hover:text-[#1A1A1A] transition-colors')}
             </div>
+            <div><Link href="/sms-signup" className="inline-block text-[11px] text-[#6B6B6B] hover:text-[#1A1A1A]">SMS Updates</Link></div>
             <Link href="/admin" className="inline-block text-[9px] uppercase tracking-[0.16em] text-[#9B9B9B] hover:text-[#1A1A1A]">Admin Login</Link>
           </div>
 

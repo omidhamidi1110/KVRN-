@@ -84,7 +84,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <AnnouncementBar shell={shell} />
                 <Nav shell={shell} affiliatePortalEnabled={isFeatureEnabled('AFFILIATE_PORTAL')} />
                 <CartDrawer />
-        <ConditionalSmsPopup />
+        <ConditionalSmsPopup enabled={
+                  process.env.NEXT_PUBLIC_SMS_SIGNUP_ENABLED === 'true' &&
+                  process.env.TWILIO_A2P_APPROVED === 'true' &&
+                  process.env.TWILIO_SIGNUP_ENABLED === 'true' &&
+                  process.env.TWILIO_KEYWORD_DOUBLE_OPTIN_ENABLED === 'true' &&
+                  process.env.KVRN_SMS_POLICY_PUBLIC_ENABLED === 'true'
+                } />
                 <WishlistDrawer />
                 <main id="main-content" className="w-full min-w-0">{children}</main>
                 <ConditionalFooter shell={shell} />
