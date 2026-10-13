@@ -469,7 +469,6 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
           {Eyebrow}
           {Headline}
           {Body}
-          {Disc}
           <div style={{ height:1, background:DIM, margin:'24px 0' }} />
           {PhoneForm}
           {NoThanks}
@@ -489,7 +488,7 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
         {Body}
 
         {/* Disclosure before CTAs */}
-        {Disc}
+        {!showManual && Disc}
 
         <div style={{ height:1, background:DIM, margin:'20px 0 18px' }} />
 
