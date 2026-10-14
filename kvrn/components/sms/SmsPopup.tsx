@@ -84,9 +84,9 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
       .catch(() => setOffer({ loading: false, active: false, amountCents: 0 }))
   }, [])
 
-  const hasOffer = signupAvailable && !offer.loading && offer.active
+  const hasOffer = !offer.loading && offer.active
   const EYEBROW  = 'PRIVATE ACCESS'
-  const HEAD1    = hasOffer ? '$10 OFF'        : 'EARLY ACCESS'
+  const HEAD1    = hasOffer ? 'GET $10 OFF'    : 'EARLY ACCESS'
   const HEAD2    = hasOffer ? 'YOUR FIRST ORDER' : 'KVRN RELEASES'
   const CTA_MOB  = hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'
   const CTA_DESK = hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'
@@ -239,7 +239,7 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
     return (
       <button
         onClick={open}
-        aria-label="Open KVRN private access offer"
+        aria-label="Open KVRN first-order offer"
         style={{
           position:'fixed',
           left: mobile ? 16 : 24,
@@ -266,7 +266,7 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
           whiteSpace:'nowrap',
         }}
       >
-        <span>{!signupAvailable ? 'SMS UPDATES' : hasOffer ? 'GET $10 OFF' : 'JOIN THE LIST'}</span>
+        <span>{hasOffer ? 'GET $10 OFF' : 'EARLY ACCESS'}</span>
         <span style={{
           fontSize:14,
           lineHeight:1,
@@ -338,6 +338,8 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
     width:`min(440px, calc(100vw - 24px))`,
     background:BG, outline:'none',
     padding: mobile ? '36px 28px 28px' : '44px 40px 36px',
+    maxHeight: mobile ? 'calc(100dvh - 24px)' : undefined,
+    overflowY: mobile ? 'auto' : undefined,
   }
 
   const CloseBtn = (
@@ -362,7 +364,7 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
 
   const Body = (
     <p style={{ fontFamily:SANS, fontSize:13, color:MUTED, margin:'0 0 24px', lineHeight:1.55, letterSpacing:'0.01em' }}>
-      {signupAvailable ? (<>{mobile ? "Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription." : "Private access to drops, restocks, and KVRN releases. Enter your number and check the separate SMS consent box to subscribe once available."}</>) : 'KVRN SMS updates are coming soon. Signup is paused while carrier approval is pending.'}
+      {signupAvailable ? (<>{mobile ? "Private access to drops, restocks, and KVRN releases. After texting JOIN, reply YES to confirm your subscription." : "Private access to drops, restocks, and KVRN releases. Enter your number and check the separate SMS consent box to subscribe once available."}</>) : (hasOffer ? '$10 off your first eligible order will be available when SMS signup opens. Signup is paused pending carrier approval.' : 'KVRN SMS updates are coming soon. Signup is paused while carrier approval is pending.')}
     </p>
   )
 
@@ -500,7 +502,15 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
                 ? `JOIN KVRN${SMS_CONSENT_TEXT} Ref: TK-${claimToken}`
                 : `JOIN KVRN${SMS_CONSENT_TEXT}`
             )}`}
-            onClick={onDeeplink}
+            onClick={(event) => {
+              if (!signupAvailable) {
+                event.preventDefault()
+                setError('SMS enrollment opens after carrier approval. No text was sent.')
+                return
+              }
+              onDeeplink()
+            }}
+            aria-disabled={!signupAvailable}
             style={{ display:'block', width:'100%', padding:'14px 0', boxSizing:'border-box',
               background:FG, color:BG, textDecoration:'none', textAlign:'center',
               fontFamily:SANS, fontSize:11, fontWeight:500, letterSpacing:'0.12em',
@@ -510,6 +520,7 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
           </a>
         ) : null}
 
+        {!signupAvailable && error && <p role="status" style={{fontFamily:SANS,fontSize:11,color:MUTED,margin:'6px 0 12px'}}>{error}</p>}
         {/* Secondary: manual entry drawer */}
         {!showManual ? (
           <button
