@@ -44,7 +44,7 @@ export function AnnouncementBar({ shell }: { shell?: ShellData | null } = {}) {
   const current = messages.length ? messages[idx % messages.length] : null
 
   return (
-    <div
+    <div id="kvrn-announcement-bar"
       className="fixed inset-x-0 top-0 z-[250] box-border flex h-[var(--bar-height)] min-h-[var(--bar-height)] max-h-[var(--bar-height)] items-center justify-center overflow-hidden bg-[#0E0E0E] p-0"
       {...(current ? { 'aria-live': 'polite' as const, 'aria-label': t['announce.label'] } : { 'aria-hidden': true })}
     >

@@ -361,3 +361,27 @@ html {
     scroll-snap-align: none;
   }
 }
+
+/* CP93: announcement text must have the same geometry before/after hydration
+   and on hard reload. Keep the owner's original 36px bar and 56px nav. */
+#kvrn-announcement-bar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--bar-height);
+  min-height: var(--bar-height);
+  max-height: var(--bar-height);
+  padding-block: 0;
+  margin-block: 0;
+  overflow: hidden;
+}
+#kvrn-announcement-bar p {
+  box-sizing: border-box;
+  margin-block: 0;
+  padding-block: 0;
+  line-height: 18px;
+  position: static;
+  top: auto;
+  vertical-align: middle;
+}
