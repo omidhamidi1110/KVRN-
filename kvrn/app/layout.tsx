@@ -38,6 +38,13 @@ export async function generateMetadata(): Promise<Metadata> {
   return siteMetadata(cmsContentEnabled() ? await contentPublic().getGlobalSeo() : DEFAULT_GLOBAL_SEO)
 }
 
+// Reads only the URL query / sessionStorage; adds the recorder script synchronously (before the body is
+// parsed) so the very first SSR geometry is captured. try/catch: storage can throw in private mode.
+const BAR_DEBUG_LOADER =
+  "(function(){try{var q=/[?&]barDebug=(\\d)/.exec(location.search),k='kvrn-bar-debug';" +
+  "if(q){if(q[1]==='1')sessionStorage.setItem(k,'1');else sessionStorage.removeItem(k)}" +
+  "if(sessionStorage.getItem(k)==='1')document.write('<script src=\"/kvrn-bar-debug.js\"><\\/script>')}catch(e){}})()"
+
 export const viewport: Viewport = {
   width: 'device-width', initialScale: 1, themeColor: '#000000',
 }
@@ -61,6 +68,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        {/* CP72: opt-in announcement-bar recorder. Does nothing unless the URL has ?barDebug=1
+            (remembered for the tab session; ?barDebug=0 clears it). See public/kvrn-bar-debug.js. */}
+        <script dangerouslySetInnerHTML={{ __html: BAR_DEBUG_LOADER }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLd(orgSchema(seo)) }}
