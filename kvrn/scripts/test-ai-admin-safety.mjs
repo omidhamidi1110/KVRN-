@@ -13,8 +13,8 @@ vm.runInNewContext(compiled,{exports,process:{env:{}},Number,Object,Set,RegExp},
 const {validateAiAgentEdit:agent,validateAiBudgetLockInput:budget,validateAiNotificationSettings:settings}=exports
 let passed=0
 function test(name,body){body();passed++;console.log('PASS',name)}
-const off={AI_ENABLED:'false',AI_HIGH_AUTONOMY_OWNER_APPROVED:'false',AI_EXTERNAL_BUDGET_CAP_CONFIRMED:'false'}
-const ready={AI_ENABLED:'true',AI_HIGH_AUTONOMY_OWNER_APPROVED:'true',AI_EXTERNAL_BUDGET_CAP_CONFIRMED:'true'}
+const off={AI_ENABLED:'false',AI_EXTERNAL_BUDGET_CAP_CONFIRMED:'false',AI_EXTERNAL_BUDGET_CAP_USD:'5'}
+const ready={AI_ENABLED:'true',AI_EXTERNAL_BUDGET_CAP_CONFIRMED:'true',AI_EXTERNAL_BUDGET_CAP_USD:'5'}
 test('agent reference validated',()=>{
  for(const id of ['','BAD','a','a'.repeat(80),'chief;drop'])assert.equal(agent({id,enabled:false},off).ok,false)
  assert.equal(agent({id:'chief',enabled:false},off).ok,true)
@@ -27,7 +27,7 @@ test('low-autonomy configuration remains editable while global AI off',()=>{
  assert.equal(agent({id:'chief',autonomyLevel:'shadow'},off).ok,true)
  assert.equal(agent({id:'chief',autonomyLevel:'approval'},off).ok,true)
 })
-test('trusted/limited require three simultaneous explicit gates',()=>{
+test('trusted/limited require enabled AI and confirmed budget cap',()=>{
  for(const key of Object.keys(ready)){
   const bad={...ready,[key]:'false'}
   assert.equal(agent({id:'chief',autonomyLevel:'trusted'},bad).ok,false)
@@ -55,5 +55,9 @@ test('AI mutating routes use bounded origin-protected requests',()=>{
   assert.match(source,/readAdminMutationJson\(req,\d+\)/)
   assert.doesNotMatch(source,/\breq\.json\(/)
  }
+})
+test('budget above $5 cannot unlock autonomy',()=>{
+ for(const val of ['0','5.01','6','NaN',''])
+  assert.equal(agent({id:'support',autonomyLevel:'trusted'}, {...ready,AI_EXTERNAL_BUDGET_CAP_USD:val}).ok,false)
 })
 console.log(`${passed}/${passed} offline AI mutation guards pass`)
