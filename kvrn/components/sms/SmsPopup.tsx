@@ -197,11 +197,6 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
     if (!signedUpRef.current) track('sms_offer_decline')
   }, [])
 
-  // On iOS Safari, use &body= to request a prefilled Messages draft.
-  // On Android, ?body= remains appropriate. Native OS behavior may differ.
-  const smsBodySeparator = typeof navigator !== 'undefined' &&
-    /iPhone|iPad|iPod/i.test(navigator.userAgent) ? '&' : '?'
-
   const onDeeplink = useCallback(() => {
     track('sms_deeplink_open')
     try { localStorage.setItem(KEY_DEEPLINK, String(Date.now())) } catch {}
@@ -376,9 +371,9 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
   const Disc = (
     <p style={{ fontFamily:SANS, fontSize:10, color:'#8F897F', lineHeight:1.65, margin:'16px 0 0' }}>
       {DISCLOSURE}{' '}
-      <a href="/terms" style={{ color:'#A9A298', textDecoration:'underline' }}>Terms</a>
+      <a href="/messaging-terms" style={{ color:'#A9A298', textDecoration:'underline' }}>Terms</a>
       {' · '}
-      <a href="/privacy" style={{ color:'#A9A298', textDecoration:'underline' }}>Privacy</a>
+      <a href="/messaging-privacy" style={{ color:'#A9A298', textDecoration:'underline' }}>Privacy</a>
     </p>
   )
 
@@ -435,12 +430,12 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
             KVRN product launches, drops, restocks, early access, and promotional
             offers. Message frequency varies. Msg &amp; data rates may apply.
             Reply STOP to cancel, HELP for help. Consent is not a condition of purchase.{' '}
-            <a href="/terms" onClick={e => e.stopPropagation()}
+            <a href="/messaging-terms" onClick={e => e.stopPropagation()}
               style={{ color:'#D3CDC3', textDecoration:'underline' }}>
               Terms
             </a>
             {' · '}
-            <a href="/privacy" onClick={e => e.stopPropagation()}
+            <a href="/messaging-privacy" onClick={e => e.stopPropagation()}
               style={{ color:'#D3CDC3', textDecoration:'underline' }}>
               Privacy
             </a>
@@ -502,25 +497,20 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
         {/* Primary CTA: open Messages app — link includes claim token if pre-fetched */}
         {SMS_RAW ? (
           <a
-            href={`sms:${SMS_RAW}${smsBodySeparator}body=${encodeURIComponent(
+            href={`sms:${SMS_RAW}?body=${encodeURIComponent(
               signupAvailable && claimToken
                 ? `JOIN KVRN${SMS_CONSENT_TEXT} Ref: TK-${claimToken}`
                 : `JOIN KVRN${SMS_CONSENT_TEXT}`
             )}`}
             onClick={(event) => {
-              if (!signupAvailable) {
-                // Allow a *draft-only* UI check via an explicit preview URL.
-                // Normal visitors cannot launch an unapproved enrollment flow.
-                const preview = typeof window !== 'undefined' &&
-                  new URLSearchParams(window.location.search).get('sms_preview') === '1'
-                if (!preview) {
-                  event.preventDefault()
-                  setError('SMS enrollment opens after carrier approval. No text was sent.')
-                  return
-                }
-                // Native Messages opens with an unsent draft. Do not tap Send.
-                setError('Preview only: do not press Send until KVRN has carrier approval.')
-                return
+              // Open a native Messages draft, even while live SMS signup is paused.
+              // The visitor must explicitly press Send in their messaging app.
+              const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+              if (isIOS) {
+                event.preventDefault()
+                const link = event.currentTarget.getAttribute('href')
+                if (link) window.location.href = link.replace('?body=', '&body=')
               }
               onDeeplink()
             }}
