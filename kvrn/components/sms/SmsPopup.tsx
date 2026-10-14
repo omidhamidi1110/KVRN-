@@ -197,6 +197,11 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
     if (!signedUpRef.current) track('sms_offer_decline')
   }, [])
 
+  // On iOS Safari, use &body= to request a prefilled Messages draft.
+  // On Android, ?body= remains appropriate. Native OS behavior may differ.
+  const smsBodySeparator = typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod/i.test(navigator.userAgent) ? '&' : '?'
+
   const onDeeplink = useCallback(() => {
     track('sms_deeplink_open')
     try { localStorage.setItem(KEY_DEEPLINK, String(Date.now())) } catch {}
@@ -497,20 +502,28 @@ export function SmsPopup({ signupAvailable = true }: { signupAvailable?: boolean
         {/* Primary CTA: open Messages app — link includes claim token if pre-fetched */}
         {SMS_RAW ? (
           <a
-            href={`sms:${SMS_RAW}?body=${encodeURIComponent(
-              claimToken
+            href={`sms:${SMS_RAW}${smsBodySeparator}body=${encodeURIComponent(
+              signupAvailable && claimToken
                 ? `JOIN KVRN${SMS_CONSENT_TEXT} Ref: TK-${claimToken}`
                 : `JOIN KVRN${SMS_CONSENT_TEXT}`
             )}`}
             onClick={(event) => {
               if (!signupAvailable) {
-                event.preventDefault()
-                setError('SMS enrollment opens after carrier approval. No text was sent.')
+                // Allow a *draft-only* UI check via an explicit preview URL.
+                // Normal visitors cannot launch an unapproved enrollment flow.
+                const preview = typeof window !== 'undefined' &&
+                  new URLSearchParams(window.location.search).get('sms_preview') === '1'
+                if (!preview) {
+                  event.preventDefault()
+                  setError('SMS enrollment opens after carrier approval. No text was sent.')
+                  return
+                }
+                // Native Messages opens with an unsent draft. Do not tap Send.
+                setError('Preview only: do not press Send until KVRN has carrier approval.')
                 return
               }
               onDeeplink()
             }}
-            aria-disabled={!signupAvailable}
             style={{ display:'block', width:'100%', padding:'14px 0', boxSizing:'border-box',
               background:FG, color:BG, textDecoration:'none', textAlign:'center',
               fontFamily:SANS, fontSize:11, fontWeight:500, letterSpacing:'0.12em',
