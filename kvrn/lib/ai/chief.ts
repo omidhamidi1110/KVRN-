@@ -222,8 +222,10 @@ export async function processChiefAlerts(limit = 25): Promise<{
       title: `${disposition === 'critical_pushover' ? 'CRITICAL — ' : ''}${String(row.title)}`,
       message: `${String(row.summary)}${suffix}`,
       priority: disposition === 'critical_pushover' ? 1 : 0,
-      url: siteAdminUrl('/admin/ai?tab=alerts'),
-      urlTitle: 'Open KVRN AI',
+      url: siteAdminUrl(row.category === 'support' && row.metadata?.requiresOwner === true
+        ? '/admin/support' : '/admin/ai?tab=alerts'),
+      urlTitle: row.category === 'support' && row.metadata?.requiresOwner === true
+        ? 'Open KVRN Support Inbox' : 'Open KVRN AI',
     }, { timeoutMs: PUSHOVER_TIMEOUT_MS })
 
     if (result.outcome === 'sent') {

@@ -748,14 +748,14 @@ export async function recoverExhaustedAiEvents(): Promise<number> {
   return rows.length
 }
 
-export type AiEventLane = 'fast' | 'slow' | 'all'
+export type AiEventLane = 'fast' | 'slow' | 'support' | 'all'
 
 export async function claimAiEvents(limit = 10, lane: AiEventLane = 'all'): Promise<any[]> {
   // Slow events may perform external network I/O and/or paid inference. Keeping them
   // in a separate lane prevents one 5-minute Chief cycle from claiming ten 30-second
   // jobs and overlapping the next scheduled invocation. High-severity support events
   // still sort ahead of routine slow sync/research work inside their lane.
-  const safeLane: AiEventLane = lane === 'fast' || lane === 'slow' ? lane : 'all'
+  const safeLane: AiEventLane = lane === 'fast' || lane === 'slow' || lane === 'support' ? lane : 'all'
   // available_at doubles as a processing lease deadline while status='processing'.
   // If a Worker dies mid-event, another cycle may safely reclaim it after 10 minutes.
   // Event handlers are required to be idempotent; processAiEvents also skips a retry
@@ -770,6 +770,7 @@ export async function claimAiEvents(limit = 10, lane: AiEventLane = 'all'): Prom
         AND attempts < 8
         AND (
           ${safeLane} = 'all'
+          OR (${safeLane} = 'support' AND event_type = 'support.inbound')
           OR (${safeLane} = 'slow' AND event_type IN (
             'support.inbound',
             'finance.performance_monitor',

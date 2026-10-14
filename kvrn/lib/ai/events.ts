@@ -235,8 +235,8 @@ async function dispatchAiEvent(event: any): Promise<void> {
   }
 }
 
-export async function processAiEvents(limit = 10): Promise<{ processed: number; failed: number }> {
-  await recoverExhaustedAiEvents()
+export async function processAiEvents(limit = 10, supportOnly = false): Promise<{ processed: number; failed: number }> {
+  if (!supportOnly) await recoverExhaustedAiEvents()
   let processed = 0
   let failed = 0
 
@@ -305,9 +305,14 @@ export async function processAiEvents(limit = 10): Promise<{ processed: number; 
   // Drain cheap local monitors first. Slow/network/model-capable work is intentionally
   // restricted to one claimed event per cycle. This bounds cron wall time and also
   // makes runaway paid inference much harder even before the dollar budget gate.
-  const fastLimit = Math.max(1, Math.min(12, Number.isFinite(limit) ? Math.floor(limit) : 10))
-  await handleBatch(await claimAiEvents(fastLimit, 'fast'))
-  await handleBatch(await claimAiEvents(1, 'slow'))
+  if (supportOnly) {
+    // Called only when support mail arrives. Do not awaken other scheduled jobs.
+    await handleBatch(await claimAiEvents(2, 'support'))
+  } else {
+    const fastLimit = Math.max(1, Math.min(12, Number.isFinite(limit) ? Math.floor(limit) : 10))
+    await handleBatch(await claimAiEvents(fastLimit, 'fast'))
+    await handleBatch(await claimAiEvents(1, 'slow'))
+  }
 
   return { processed, failed }
 }

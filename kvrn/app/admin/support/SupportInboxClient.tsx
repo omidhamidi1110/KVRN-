@@ -72,7 +72,7 @@ export function SupportInboxClient() {
   const [listErr, setListErr] = useState<string | null>(null)
   const [loadingList, setLoadingList] = useState(true)
   const [lastListRefresh, setLastListRefresh] = useState<Date | null>(null)
-  const [supportReadiness, setSupportReadiness] = useState<{ forwardingDestinationConfigured: boolean; resendApiKeyConfigured: boolean; inboundEmailIngestConfigured: boolean } | null>(null)
+  const [supportReadiness, setSupportReadiness] = useState<{ forwardingDestinationConfigured: boolean; resendApiKeyConfigured: boolean; inboundEmailIngestConfigured: boolean; aiSupportAutoReplyReady: boolean; aiSupportCanaryReady: boolean; aiSupportAutonomyLevel: string } | null>(null)
   useEffect(() => {
     fetch('/api/admin/support/readiness', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
@@ -251,7 +251,8 @@ export function SupportInboxClient() {
           <strong className="text-[#22221F]">Support routing configuration:</strong>{' '}
           Owner forwarding {supportReadiness.forwardingDestinationConfigured ? 'configured' : 'NOT configured'} ·{' '}
           Resend {supportReadiness.resendApiKeyConfigured ? 'configured' : 'NOT configured'} ·{' '}
-          Inbound worker {supportReadiness.inboundEmailIngestConfigured ? 'configured' : 'NOT configured'}.
+          Inbound worker {supportReadiness.inboundEmailIngestConfigured ? 'configured' : 'NOT configured'} ·{' '}
+          AI replies {supportReadiness.aiSupportAutoReplyReady ? 'READY (all customers)' : supportReadiness.aiSupportCanaryReady ? 'TEST ONLY (owner mailbox)' : `OFF (${supportReadiness.aiSupportAutonomyLevel})`}.
           <span className="block mt-1">These are configuration checks, not proof that Cloudflare routing or the sending domain is verified. Contact messages are still saved to Admin Support first.</span>
         </div>
       )}

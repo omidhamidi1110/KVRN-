@@ -11,9 +11,12 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { notifySupportEmail } from '@/lib/owner-notifications'
-import { enqueueAiEvent } from '@/lib/ai/repository'
+import { enqueueAiEvent, getAiAgentRuntimePolicy } from '@/lib/ai/repository'
+import { isPushoverConfigured } from '@/lib/pushover'
+import { processAiEvents } from '@/lib/ai/events'
+import { processChiefAlerts } from '@/lib/ai/chief'
 import {
-  SupportError, SUPPORT_LIMITS, buildInboundEmailInput, constantTimeEqual, createSupportService,
+  SupportError, SUPPORT_LIMITS, buildInboundEmailInput, constantTimeEqual, createSupportService, normalizeEmail,
 } from '@/lib/support-inbox'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +30,19 @@ export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization') ?? ''
   if (!auth.startsWith('Bearer ') || !constantTimeEqual(auth.slice(7), secret)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401, headers: NO_STORE })
+  }
+
+  // Private in-process continuation from the Email Worker via ctx.waitUntil.
+  // This path never processes the scheduler's unrelated AI monitors.
+  if (req.headers.get('x-kvrn-internal-task') === 'process-support-ai') {
+    if (process.env.AI_ENABLED !== 'true') return NextResponse.json({ processed: 0 }, { headers: NO_STORE })
+    try {
+      const result = await processAiEvents(2, true)
+      if (process.env.AI_CHIEF_NOTIFICATION_GATE === 'true') await processChiefAlerts(10)
+      return NextResponse.json({ok:true,...result},{headers:NO_STORE})
+    } catch {
+      return NextResponse.json({ error:'Support AI continuation unavailable' },{status:500,headers:NO_STORE})
+    }
   }
 
   let raw: string
@@ -51,16 +67,25 @@ export async function POST(req: NextRequest) {
     if (!r.duplicate) {
       // Queue only identifiers/low-risk metadata. The AI event processor reads canonical support data server-side,
       // sanitizes it, and starts in Shadow Mode; a queue failure can never fail inbound email storage.
-      await enqueueAiEvent({
+      const queueId = await enqueueAiEvent({
         eventType: 'support.inbound',
         source: 'support_email',
         sourceAgentId: 'support',
-        severity: 'info',
+        severity: 'high', // new customer conversation precedes scheduled low-priority slow jobs
         subject: 'New inbound support message',
         payload: { threadId: r.threadId, messageId: r.messageId, threadCreated: r.threadCreated },
         idempotencyKey: `support.inbound:${r.messageId}`,
-      }).catch(() => {})
-      await notifySupportEmail({ fromName: input.fromName, subject: input.subject }).catch(() => {})
+      }).catch(() => null)
+      const agent = await getAiAgentRuntimePolicy('support').catch(() => null)
+      const canary = agent?.autonomyLevel === 'limited'
+        && normalizeEmail(process.env.SUPPORT_FORWARD_TO) === input.customerEmail
+      const autonomous = Boolean(queueId && agent?.enabled && agent.status !== 'disabled'
+        && (agent.autonomyLevel === 'trusted' || canary) && process.env.AI_ENABLED === 'true'
+        && process.env.AI_CHIEF_NOTIFICATION_GATE === 'true'
+        && process.env.RESEND_API_KEY && isPushoverConfigured())
+      // In shadow/off modes retain existing immediate owner alert. In trusted mode
+      // routine inbound notifications are silent; the agent alerts only on escalation.
+      if (!autonomous) await notifySupportEmail({ fromName: input.fromName, subject: input.subject }).catch(() => {})
     }
     return NextResponse.json(
       { ok: true, duplicate: r.duplicate, threadCreated: r.threadCreated, matchedBy: r.matchedBy },

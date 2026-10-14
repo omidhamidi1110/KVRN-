@@ -54,11 +54,31 @@ export default {
    * Admin → Support through the internal ingest route. Never logs addresses, subjects or bodies.
    */
   async email(message, env, ctx) {
-    await handleSupportEmail(message, env, {
+    const result = await handleSupportEmail(message, env, {
       parseMime: (raw) => PostalMime.parse(raw),
       ingest: (req) => openNextWorker.fetch(req, env, ctx),
       log: { info: (m) => console.log(m), error: (m) => console.error(m) },
     })
+    // Event-driven support continuation only. Email reception does NOT wait for
+    // model inference, and the 15-minute cron remains unchanged. This same
+    // authenticated route claims only support.inbound events; duplicate deliveries
+    // cannot start duplicate replies because send claims are durable in ai_actions.
+    if (result.ingested && env.SUPPORT_EMAIL_INGEST_SECRET && env.AI_ENABLED === 'true') {
+      ctx.waitUntil((async () => {
+        try {
+          const response = await openNextWorker.fetch(new Request('https://internal/api/internal/support-email-ingest', {
+            method:'POST',
+            headers: {
+              Authorization: `Bearer ${env.SUPPORT_EMAIL_INGEST_SECRET}`,
+              'x-kvrn-internal-task':'process-support-ai',
+            },
+          }),env,ctx)
+          if (!response.ok) console.error(`[support-ai] continuation HTTP ${response.status}`)
+        } catch (err) {
+          console.error('[support-ai] continuation failed')
+        }
+      })())
+    }
   },
 
   /**
