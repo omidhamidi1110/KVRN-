@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
 import { isFeatureEnabled, type FeatureFlagName } from '@/lib/feature-flags'
 import { sql } from '@/lib/db'
+import { isTwilioCampaignVerified } from '@/lib/twilio'
 import { SEED_ACTOR } from '@/lib/content-seed-actor'
 
 export const dynamic = 'force-dynamic'
@@ -109,13 +110,14 @@ export async function GET(req: NextRequest) {
 
   // Additional production gates, beyond the eight explicit feature flags on System.
   // These read-only booleans expose no provider tokens or customer details.
+  const carrierApproved = await isTwilioCampaignVerified()
   const otherControls = [
     { label: 'Live checkout', env: 'ENABLE_CHECKOUT', enabled: process.env.ENABLE_CHECKOUT === 'true', note: 'Stripe live-mode and webhook credentials must be configured separately.' },
     { label: 'AI Operations', env: 'AI_ENABLED', enabled: process.env.AI_ENABLED === 'true', note: 'Deferred until owner supplies AI provider credentials.' },
     { label: 'AI Chief phone notifications', env: 'AI_CHIEF_NOTIFICATION_GATE', enabled: process.env.AI_CHIEF_NOTIFICATION_GATE === 'true', note: 'Pushover credentials and rate limits are required.' },
     { label: 'SMS marketing sends', env: 'TWILIO_MARKETING_SEND_ENABLED', enabled: process.env.TWILIO_MARKETING_SEND_ENABLED === 'true', note: 'Do not activate for legacy contacts without verifiable, KVRN-specific consent.' },
     { label: 'SMS signup', env: 'TWILIO_SIGNUP_ENABLED', enabled: process.env.TWILIO_SIGNUP_ENABLED === 'true', note: 'Requires registered A2P campaign and opt-in flow.' },
-    { label: 'A2P carrier approval', env: 'TWILIO_A2P_APPROVED', enabled: process.env.TWILIO_A2P_APPROVED === 'true', note: 'This reflects provider approval, not a switch to bypass.' },
+    { label: 'A2P carrier approval (Twilio-verified)', env: 'TWILIO_A2P_APPROVED', enabled: carrierApproved, note: 'Checked directly with Twilio; an owner-enabled flag is not proof of carrier approval.' },
     { label: 'SMS legal pages', env: 'KVRN_SMS_POLICY_PUBLIC_ENABLED', enabled: process.env.KVRN_SMS_POLICY_PUBLIC_ENABLED === 'true', note: 'Publish reviewed messaging terms/privacy before opting in.' },
     { label: 'Store credit issuance', env: 'STORE_CREDIT_ISSUANCE_ENABLED', enabled: process.env.STORE_CREDIT_ISSUANCE_ENABLED === 'true', note: 'Owner-restricted issuance, separate from checkout redemption.' },
     { label: 'Store credit checkout release', env: 'STORE_CREDIT_CHECKOUT_RELEASE_ENABLED', enabled: process.env.STORE_CREDIT_CHECKOUT_RELEASE_ENABLED === 'true' && process.env.STRIPE_MODE === 'test', note: 'Test-mode only; live USD credit redemption not supported.' },

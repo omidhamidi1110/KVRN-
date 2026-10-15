@@ -3,7 +3,7 @@
  * explicitly enabled before new enrollment. No marketing provider sends here.
  */
 import {type NextRequest,NextResponse} from 'next/server'
-import {validateTwilioSignature,parseFormBody,getWebhookUrl} from '@/lib/twilio'
+import {validateTwilioSignature,parseFormBody,getWebhookUrl,isTwilioCampaignVerified} from '@/lib/twilio'
 import {normalizePhoneE164} from '@/lib/phone'
 import {readLimitedText} from '@/lib/limited-json-request'
 import {suppressInboundSmsPhone} from '@/lib/sms-subscribers'
@@ -42,7 +42,7 @@ export async function POST(req:NextRequest){
   }
   try{
     if(keyword==='HELP')return asXml() // configured Twilio Messaging Service owns HELP.
-    const enabled=canAcceptSmsKeywordOptin(process.env)
+    const enabled=canAcceptSmsKeywordOptin(process.env) && await isTwilioCampaignVerified()
     if(KEYWORD_STARTS.has(keyword)){
       if(!enabled)return asXml() // no signup, no send, no silent consent
       // Token is only honored if embedded in verified inbound text.

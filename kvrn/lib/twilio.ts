@@ -45,6 +45,29 @@ export function canSendMarketingSms(): boolean {
   return isA2PApproved() && isMarketingSendEnabled()
 }
 
+/** Current carrier approval, independently fetched from Twilio. The local
+ * TWILIO_A2P_APPROVED switch only enables the workflow; it is never evidence
+ * that the carrier has actually verified the Messaging Service campaign.
+ * Fail closed if unavailable, pending, suspended, or credentials cannot read it.
+ */
+export async function isTwilioCampaignVerified(): Promise<boolean> {
+  const sid = process.env.TWILIO_MESSAGING_SERVICE_SID ?? ''
+  const account = process.env.TWILIO_ACCOUNT_SID ?? ''
+  const key = process.env.TWILIO_API_KEY_SID ?? ''
+  const secret = process.env.TWILIO_API_KEY_SECRET ?? ''
+  if (!/^MG[0-9a-f]{32}$/i.test(sid) || !/^AC[0-9a-f]{32}$/i.test(account) || !key || !secret) return false
+  try {
+    const res = await fetch(`https://messaging.twilio.com/v1/Services/${sid}/Compliance/Usa2p?PageSize=20`, {
+      method: 'GET', headers: { Authorization: `Basic ${btoa(`${key}:${secret}`)}` },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return false
+    const data = await res.json() as {compliance?: Array<{campaign_status?:string;messaging_service_sid?:string;account_sid?:string;mock?:boolean}>;meta?:{next_page_url?:string|null}}
+    if (!Array.isArray(data.compliance) || data.meta?.next_page_url) return false
+    return data.compliance.some(c => c.messaging_service_sid === sid && c.account_sid === account && c.mock !== true && c.campaign_status === 'VERIFIED')
+  } catch { return false }
+}
+
 // ── REST API: send one SMS ─────────────────────────────────────────────────────
 
 /**
@@ -70,6 +93,11 @@ export async function sendSms(opts: {
   }
   if (!messagingService) {
     return { ok: false, error: 'TWILIO_MESSAGING_SERVICE_SID not configured.' }
+  }
+  // Production SMS must never rely on a locally asserted A2P status.
+  // Twilio's live campaign status is authoritative.
+  if (process.env.NODE_ENV === 'production' && !(await isTwilioCampaignVerified())) {
+    return { ok: false, error: 'A2P campaign is not verified by Twilio.' }
   }
 
   // HTTP Basic Auth: API Key SID (username) + API Key Secret (password)

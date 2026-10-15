@@ -1,5 +1,6 @@
 /** Consent-only administrative statistics: no email addresses or phone numbers. */
 import {sql} from '@/lib/db'
+import {isTwilioCampaignVerified} from './twilio'
 export type MarketingOverview={email:{subscribed:number,unsubscribed:number,pendingSync:number,affirmativeCheckboxRecords:number|null},sms:{subscribed:number,unsubscribed:number,confirmedKeyword:number|null},provider:{a2pApproved:boolean,smsSendingEnabled:boolean,emailConfigured:boolean,contactSyncEnabled:boolean,optInSyncEnabled:boolean},limits:{smsMonthlyUsd:number,smsDailyUsd:number,emailMonthlyUsd:number}}
 const count=(v:any)=>Math.max(0,Number(v)||0)
 export async function getMarketingOverview():Promise<MarketingOverview>{
@@ -39,7 +40,7 @@ export async function getMarketingOverview():Promise<MarketingOverview>{
   return {
     email:{subscribed:count(a?.active),unsubscribed:count(a?.unsubscribed),pendingSync:count(a?.needs_sync),affirmativeCheckboxRecords:emailCheckboxCount},
     sms:{subscribed:count(b?.active),unsubscribed:count(b?.unsubscribed),confirmedKeyword:verifiedCount},
-    provider:{a2pApproved:process.env.TWILIO_A2P_APPROVED==='true',
+    provider:{a2pApproved:await isTwilioCampaignVerified(),
       smsSendingEnabled:false, // campaign transport has not been implemented
       emailConfigured:Boolean(process.env.RESEND_MARKETING_API_KEY&&process.env.RESEND_MARKETING_TOPIC_ID),
       contactSyncEnabled:process.env.RESEND_MARKETING_CONTACT_SYNC_ENABLED==='true',
